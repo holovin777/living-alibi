@@ -1,37 +1,33 @@
-## v1.2.1 — NPC survival regression fix
-- Elena can visit the market on weekends when food or water stocks run low.
-- Health recovers slowly during adequate care; it no longer remains permanently reduced after a temporary shortage.
-- Historical relationship status explicitly marks deceased participants.
-- Added `ElenaSurvivalSmokeTest` covering 35 game days and permanent death.
-- Saved deaths are **not** reversed by upgrading. To retest a fresh world, move `data/world.db` aside after backing it up.
-
 # Changelog
+
+## 1.3.0 — Population Generation
+
+- Introduce reproducible procedural residents with permanent unique IDs, names, occupations, home and work locations, stable traits and goals.
+- Allow generating 1–20 residents at a time, up to 40 additional residents per town.
+- Add lightweight autonomous activities for new residents: travel, jobs, supplies, eating, drinking, sleep and survival.
+- Preserve generated identities, individual state, routes and personal preferences through additive SQLite `town_people` migrations.
+- Record generated events and per-resident observations; extend `where` and `known` to all known resident IDs.
+- Add `population`, `population generate N`, `population add N` and `resident ID` commands.
+- Add long-running `PopulationSmokeTest` plus SQLite `PopulationDatabaseSmokeTest` and CI steps.
+- Keep Marco and Elena's original simulation, friendship and saved histories intact.
+
+## 1.2.1 — Survival Fix
+
+- Elena can buy food and water on weekends, independent of weekday shifts.
+- Restore health after shortages when basic needs are met; preserve permanent death once it occurs.
+- Add the 35-day `ElenaSurvivalSmokeTest` regression.
 
 ## 1.2.0 — Social Life
 
-- Add persistent social relationship for Marco and Elena: affinity, trust, tension, encounters, conversations and arguments.
-- Generate rule-based local small talk, friendly chats, conflict and reconciliation while both residents are co-located and awake.
-- Limit chats to one per encounter; persist random state for reproducible continuation after restarting.
-- Record each social interaction in world-truth and eyewitness logs, plus a dedicated social interaction journal.
-- Extend SQLite schema additively without dropping existing saves or memories.
-- Add `relationships` and `social-events` commands and three social tests (including a JDBC integration test).
-- No AI calls for NPC-to-NPC simulation; no procedural population generation yet.
-
-# Changelog
+- Add persistent, rule-driven conversations, affinity, trust, tension and conflict for Marco and Elena.
+- Capture social encounters in world truth, each observer's log and a dedicated SQLite table.
+- Add `relationships` and `social-events`, with smoke and database migration tests.
 
 ## 1.1.0 — The Living Town
 
-- Add Elena Rossi, an autonomous second resident with simplified independent needs and finances.
-- Add six named places and timed travel with a distinct in-transit state.
-- Track world-authoritative town events separately from per-resident eyewitness observations.
-- Add `town`, `where`, `town-events`, and `known` console commands.
-- Add new SQLite tables with additive migration, atomic saves for world and town advancements.
-- Pass Marco's witnessed town observations (not omniscient world events) to optional AI dialogue.
-- Add `TownSmokeTest` and keep the earlier `SimulationSmokeTest` unchanged.
-- Retain the v1.0 Marco save schema, core rules, and existing dialogue history.
+- Add Elena Rossi, six named places, travel times, authoritative town events and private witness observations.
+- Add additive SQLite migration and `town`, `where`, `known`, and `town-events` commands.
 
 ## 1.0.0 — Marco Bianchi
 
-- Autonomous physiology, financial state, aging, and long-term goals.
-- SQLite state/memory persistence and optional paid OpenAI conversation/reflection.
-- Time controls and optional offline catch-up.
+- Add original autonomous physiology, goals, economy, mortality, time controls, SQLite persistence and optional OpenAI dialogue.

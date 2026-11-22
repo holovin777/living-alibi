@@ -68,6 +68,26 @@ final class WorldDatabase implements AutoCloseable {
                 st.executeUpdate("ALTER TABLE town_meta ADD COLUMN meeting_since INTEGER NOT NULL DEFAULT -1");
             }
         }
+        // v1.3: preserve existing two citizens and make generated identities persistent.
+        LinkedHashMap<String,String> citizenColumns=new LinkedHashMap<>();
+        citizenColumns.put("name","TEXT NOT NULL DEFAULT ''");
+        citizenColumns.put("occupation","TEXT NOT NULL DEFAULT ''");
+        citizenColumns.put("home_place","TEXT NOT NULL DEFAULT 'NORTH_RESIDENCES'");
+        citizenColumns.put("work_place","TEXT NOT NULL DEFAULT 'MARKET'");
+        citizenColumns.put("sociability","INTEGER NOT NULL DEFAULT 62");
+        citizenColumns.put("carefulness","INTEGER NOT NULL DEFAULT 55");
+        citizenColumns.put("curiosity","INTEGER NOT NULL DEFAULT 50");
+        citizenColumns.put("goal","TEXT NOT NULL DEFAULT 'STABILITY'");
+        citizenColumns.put("schedule_offset","INTEGER NOT NULL DEFAULT 0");
+        citizenColumns.put("generation_index","INTEGER NOT NULL DEFAULT 0");
+        citizenColumns.put("personal_seed","INTEGER NOT NULL DEFAULT 0");
+        for(var col:citizenColumns.entrySet()) {
+            if(!columnExists("town_people",col.getKey())) {
+                try(Statement st=db.createStatement()) {
+                    st.executeUpdate("ALTER TABLE town_people ADD COLUMN "+col.getKey()+" "+col.getValue());
+                }
+            }
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -243,7 +263,15 @@ final class WorldDatabase implements AutoCloseable {
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM town_people")) {
             while(rs.next()) {
                 String id=rs.getString("id");
-                if(!town.people.containsKey(id))continue;
+                if(!town.people.containsKey(id)) {
+                    // Never manufacture unknown IDs: only explicitly generated people can load.
+                    if(!id.matches("resident-[0-9]{4}"))continue;
+                    String fullName=rs.getString("name"),occupation=rs.getString("occupation");
+                    if(fullName==null||fullName.isBlank()||occupation==null||occupation.isBlank())
+                        throw new SQLException("Generated resident has missing identity: "+id);
+                    town.people.put(id,new TownLife.Citizen(id,fullName,occupation,
+                            TownLife.Place.valueOf(rs.getString("place"))));
+                }
                 var p=town.get(id);
                 p.place=TownLife.Place.valueOf(rs.getString("place"));
                 p.destination=TownLife.Place.valueOf(rs.getString("destination"));
@@ -251,6 +279,18 @@ final class WorldDatabase implements AutoCloseable {
                 p.hunger=rs.getInt("hunger");p.thirst=rs.getInt("thirst");p.fatigue=rs.getInt("fatigue");
                 p.health=rs.getInt("health");p.money=rs.getInt("money");p.food=rs.getInt("food");
                 p.water=rs.getInt("water");p.age=rs.getInt("age");p.alive=rs.getInt("alive")!=0;
+                if(p.id.startsWith("resident-")) {
+                    p.home=TownLife.Place.valueOf(rs.getString("home_place"));
+                    p.workplace=TownLife.Place.valueOf(rs.getString("work_place"));
+                    p.sociability=rs.getInt("sociability");
+                    p.carefulness=rs.getInt("carefulness");
+                    p.curiosity=rs.getInt("curiosity");
+                    p.goal=rs.getString("goal");
+                    p.scheduleOffset=rs.getInt("schedule_offset");
+                    p.generationIndex=rs.getInt("generation_index");
+                    p.personalSeed=rs.getLong("personal_seed");
+                    if(p.generationIndex<=0)throw new SQLException("Invalid generation index: "+id);
+                }
             }
         }
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT together, meeting_since FROM town_meta WHERE id=1")) {
@@ -279,14 +319,21 @@ final class WorldDatabase implements AutoCloseable {
                              List<TownLife.Observation> observations) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
             INSERT INTO town_people(id,place,destination,travel_remaining,activity,hunger,thirst,fatigue,
-                                    health,money,food,water,age,alive)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                    health,money,food,water,age,alive,name,occupation,home_place,work_place,
+                                    sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,activity=excluded.activity,
                 hunger=excluded.hunger,thirst=excluded.thirst,fatigue=excluded.fatigue,
                 health=excluded.health,money=excluded.money,food=excluded.food,
-                water=excluded.water,age=excluded.age,alive=excluded.alive
+                water=excluded.water,age=excluded.age,alive=excluded.alive,
+                name=excluded.name,occupation=excluded.occupation,
+                home_place=excluded.home_place,work_place=excluded.work_place,
+                sociability=excluded.sociability,carefulness=excluded.carefulness,
+                curiosity=excluded.curiosity,goal=excluded.goal,
+                schedule_offset=excluded.schedule_offset,generation_index=excluded.generation_index,
+                personal_seed=excluded.personal_seed
             """)) {
             for(var c:town.people.values()) {
                 p.setString(1,c.id);p.setString(2,c.place.name());p.setString(3,c.destination.name());
@@ -294,6 +341,12 @@ final class WorldDatabase implements AutoCloseable {
                 p.setInt(6,c.hunger);p.setInt(7,c.thirst);p.setInt(8,c.fatigue);
                 p.setInt(9,c.health);p.setInt(10,c.money);p.setInt(11,c.food);
                 p.setInt(12,c.water);p.setInt(13,c.age);p.setInt(14,c.alive?1:0);
+                p.setString(15,c.name);p.setString(16,c.occupation);
+                p.setString(17,c.home.name());p.setString(18,c.workplace.name());
+                p.setInt(19,c.sociability);p.setInt(20,c.carefulness);
+                p.setInt(21,c.curiosity);p.setString(22,c.goal);
+                p.setInt(23,c.scheduleOffset);p.setInt(24,c.generationIndex);
+                p.setLong(25,c.personalSeed);
                 p.addBatch();
             }
             p.executeBatch();

@@ -25,10 +25,17 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Persistent relationship progress and private observations of social encounters
 - Deterministic social rules and smoke tests, without API cost
 
+### Population Generation v1.3 — First procedurally generated citizens
+
+- Reproducible names and stable citizen IDs, traits, professions, abstract home/work locations and simple life goals
+- Rule-driven activity, travel, needs, work, shopping, mortality and SQLite persistence for generated citizens
+- A conservative cap of 40 generated residents and CLI tools to inspect population and resident state
+- Note: no generated-citizen friendship network, births or spontaneous immigration yet
+
 ## Proposed, not implemented
 
-1. **Shared agent engine:** move Marco and Elena to the same extensible, non-hardcoded NPC engine; realistic time/position-aware action execution.
-2. **Procedural population:** generate reproducible resident identities, jobs, ages and stable traits from a world seed; dynamic families, work schedules, interaction durations and access to locations.
+1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.
+2. **Dynamic society:** social network and relationships among all residents, births and migration, unique home units and scalable work schedules.
 3. **Memory and belief:** uncertain memories, information exchange, deception, forgetting, and private motives.
 4. **Incidents and evidence:** theft/lost property, alibis, trails, witnesses, event causality, evidence acquisition.
 5. **Playable detective:** interviews, case notebook, deduction, accusations and feedback grounded in world truth.

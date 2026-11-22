@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.2 — Social Life");
+            System.out.println("Living Alibi v1.3 — Population Generation");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -42,6 +42,29 @@ public final class Main {
                     if(lower.equals("status")||lower.equals("observe")) {status(state);continue;}
                     if(lower.equals("personality")) {personality(state);continue;}
                     if(lower.equals("town")) {townStatus(town,state);continue;}
+                    if(lower.equals("population") || lower.startsWith("population ")) {
+                        String[] parts=input.split("\\s+");
+                        if(parts.length==1 || (parts.length==2 && parts[1].matches("[0-9]+"))) {
+                            int limit=parts.length==1?20:Integer.parseInt(parts[1]);
+                            if(limit<1||limit>100)throw new IllegalArgumentException("List 1–100 residents.");
+                            populationStatus(town,limit);continue;
+                        }
+                        if(parts.length==3 && (parts[1].equalsIgnoreCase("add")||parts[1].equalsIgnoreCase("generate"))) {
+                            int count=Integer.parseInt(parts[2]);
+                            var candidate=town.copy();
+                            var added=PopulationGenerator.add(candidate,count);
+                            db.save(state,List.of(),List.of(),candidate,List.of(),List.of(),List.of());
+                            town.copyFrom(candidate);
+                            System.out.println("Generated "+added.size()+" residents. Use population to browse their IDs.");
+                            for(var c:added)System.out.println("  "+c.id+" | "+c.name+" | "+c.occupation);
+                            continue;
+                        }
+                        throw new IllegalArgumentException("Use population, population 20, or population generate 12.");
+                    }
+                    if(lower.startsWith("resident ")) {
+                        var citizen=town.get(arg(input));
+                        residentStatus(citizen);continue;
+                    }
                     if(lower.equals("relationships") || lower.equals("relationship marco elena") ||
                             lower.equals("relationship elena marco")) {
                         relationshipStatus(town);continue;
@@ -250,7 +273,9 @@ public final class Main {
     }
     private static void townStatus(TownLife.Town town,WorldState s) {
         System.out.println("Town status | Day "+s.day+" "+clock(s.minute));
+        int shown=0;
         for(TownLife.Citizen citizen:town.people.values()) {
+            if(shown++>=12)break;
             System.out.println(citizen.name+" ("+citizen.occupation+") | "+
                     citizen.locationText()+" | "+(citizen.alive?citizen.activity:"deceased"));
             if(citizen.id.equals("elena"))
@@ -258,8 +283,33 @@ public final class Main {
                         " | Fatigue "+citizen.fatigue+" | Health "+citizen.health+
                         " | Money EUR "+citizen.money);
         }
-        System.out.println("Locations: Marco's home, Elena's home, Bakery, Market, Park, Cafe.");
+        if(town.people.size()>12)System.out.println("... and "+(town.people.size()-12)+" more residents (use population).");
+        System.out.println("Locations include homes, workplaces, market, cafe and park.");
         System.out.println("Developer view: authoritative town-events and private known logs are for testing.");
+    }
+    private static void populationStatus(TownLife.Town town,int limit) {
+        long alive=town.people.values().stream().filter(p->p.alive).count();
+        System.out.println("Population: "+town.people.size()+" total | "+alive+" alive | "+
+                (town.people.size()-alive)+" deceased");
+        int shown=0;
+        for(var p:town.people.values()) {
+            if(shown++>=limit)break;
+            System.out.println("  "+p.id+" | "+p.name+" | "+p.occupation+
+                    " | age "+p.age+" | "+p.locationText());
+        }
+        if(town.people.size()>limit)System.out.println("Showing "+limit+" of "+town.people.size()+". Use population 50.");
+    }
+    private static void residentStatus(TownLife.Citizen c) {
+        System.out.println(c.name+" | "+c.id+" | "+c.occupation+" | age "+c.age+
+                " | "+(c.alive?"alive":"deceased"));
+        System.out.println("Home: "+c.home.label+" | Work: "+c.workplace.label+
+                " | Location: "+c.locationText()+" | Activity: "+c.activity);
+        System.out.println("Hunger "+c.hunger+" | Thirst "+c.thirst+" | Fatigue "+c.fatigue+
+                " | Health "+c.health+" | Money EUR "+c.money+
+                " | Food "+c.food+" | Water "+c.water);
+        System.out.println("Sociability "+c.sociability+" | Carefulness "+c.carefulness+
+                " | Curiosity "+c.curiosity+" | Goal: "+c.goal);
+        if(c.generationIndex>0)System.out.println("Procedurally generated citizen (no API calls).");
     }
     private static void relationshipStatus(TownLife.Town town) {
         var r=town.relationship;
@@ -280,7 +330,8 @@ public final class Main {
     private static void help() {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
-        System.out.println(" town | where marco | where elena | town-events [count] | known marco [count] | known elena [count]");
+        System.out.println(" town | population [count] | population generate 12 | resident resident-0001");
+        System.out.println(" where <id> | known <id> [count] | town-events [count]");
         System.out.println(" relationships | relationship marco elena | social-events [count]");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");

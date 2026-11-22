@@ -1,103 +1,87 @@
 # Living Alibi
 
-> **v1.2.1 stability update:** Elena now buys essentials on weekends and recovers health slowly with adequate food, water and rest. Existing character deaths remain permanent in saved worlds.
+**v1.3 — Population Generation** · Java 21+ · Maven · SQLite · headless console prototype
 
-**v1.2.1 — Social Life (stability fix)** · Headless Java detective-simulation prototype
+> An independent town, private observations, and a detective who must discover what really happened.
 
-> An independent world, private memories, and a detective who must discover what really happened.
+Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **There is no playable detective, investigation system or 3D world yet.** Code, documentation, and game text are English-only.
 
-The game is in early development. This release is a **console-based simulation**, not a finished detective game. All source code, documentation, and game interface text are in English.
+## Implemented
 
-## What exists today
+- **Marco Bianchi:** baker with richer physiological needs, economic goals, permanent mortality, personal memory, and optional paid OpenAI dialogue.
+- **Elena Rossi:** shopkeeper with a simpler independent needs/work system and a persistent friendship with Marco.
+- **Procedural population:** generate up to 40 *additional* unique, stable residents (`resident-0001`, etc.), 1–20 per command, without any AI/API calls.
+- Generated citizens have age, profession, work location, home building, stable personality traits, goals, independent food/water, money, work schedules and daily travel.
+- New citizens purchase provisions, eat, drink, earn wages and can die if their basic needs aren't met. Their identity and state persist in SQLite.
+- Multiple abstract locations, time-consuming travel, authoritative world events and per-resident eyewitness logs.
+- Marco/Elena relationship model: small talk, trust, affinity, tension, reconciliation and arguments. **Relationships among procedurally generated citizens are not implemented yet.**
+- Deterministic generation and simulation; optional paid OpenAI only for direct `talk` and `reflect` commands, never for simulated minutes.
+- Manual time skipping, accelerated live mode and optional offline catch-up *on reopening* (not a continuously hosted server).
 
-- **Marco Bianchi**, a baker with his v1.0 physiological and financial simulation, personality, long-term goal, SQLite save data, and optional OpenAI conversations.
-- **Elena Rossi**, a shopkeeper with **independent, simpler** needs, employment income, time, money, daily activities, and SQLite-persisted state.
-- A small town with **two homes, a bakery, a market, a park, and a cafe**.
-- Coarse, **8–10 minute travel time**, with an explicit *in-transit* state (not instant teleportation between destinations).
-- An **authoritative world event log**: what actually occurred in the simulation.
-- A **separate observation log per resident**: only events the resident was present to witness. This is foundational detective infrastructure, not a full psychology model.
-- **Autonomous social life**: Marco and Elena may talk while co-located, building affinity and trust, sometimes arguing or reconciling. Their social relationship and interactions persist in SQLite.
-- **Bounded social events**: at most one conversation per encounter, with no language-model calls. All interactions are also in the world event journal and participants' observed logs.
-- Backward-compatible, additive SQLite schema extensions. Existing Marco history is retained.
-- Offline operation without any API key. The optional OpenAI API is used **only** on `talk` / `reflect`, never for time stepping.
+## Quick start
 
-## Requirements
-
-- Java 21+ (Java 25 on Arch Linux works)
-- Maven 3.9+
-- Maven dependency download on first run
+Requires Java 21+ and Maven 3.9+:
 
 ```bash
 mvn -q compile exec:java
 ```
 
-The console creates `data/world.db` if absent. This database is local and excluded from Git.
+The application creates `data/world.db` if missing. That directory is ignored by Git. No API key is required.
 
-## Commands
+### Try a generated town
 
 ```text
-status                # Marco's physiological / financial state
-town                  # Who is in town, where, and doing what?
-where marco           # Marco's location / current travel
-where elena           # Elena's location / current travel
-town-events 20        # DEBUG: true events from the world journal
-known marco 20        # DEBUG: Marco's personal eyewitness log
-known elena 20        # DEBUG: Elena's personal eyewitness log
-relationships         # Marco/Elena affinity, trust, tension and conversations
-social-events 20       # DEBUG: history of autonomous conversations
-wait 600              # Advance 600 game minutes
-simulate 7            # Advance 7 game days
-personality           # Marco's enduring traits
-events 30             # Marco's legacy life events
-memories 20           # Marco's past conversations
-facts                 # Persisted facts told to Marco
-remember My name is Alex.
-talk Hello, Marco!
-reflect               # Optional paid API call
-speed 60              # 60 game minutes per real second in live mode
-live 30               # Run for 30 real seconds
-offline on            # Catch up on elapsed time when the app next starts
-offline off
+population
+population generate 12
+population
+resident resident-0001
+simulate 7
+population 20
+where resident-0001
+known resident-0001 20
+town-events 20
+relationships
+exit
+```
+
+`population generate 12` **adds** residents to the existing world (Marco and Elena remain). Generation is deterministic by stable resident index. The command does not automatically create births, migration, families or relationships. Each citizen receives an abstract residential building, not a unique furnished house.
+
+### Other commands
+
+```text
 help
-exit
-```
-
-`town-events` and `known` are **developer tools**, not the eventual player's omniscient abilities. Real investigations will require interviews and evidence collection rather than direct access to world truth.
-
-### First social-life experiment
-
-```text
+status
+observe
+personality
 town
-relationships
-simulate 14
-relationships
-social-events 20
-known marco 20
-known elena 20
-exit
-```
-
-Relationships evolve via simplified, seeded rules and actual meetings, not generated dialogue. If they never meet or one person dies, conversations cannot occur. Check `social-events` for the results; long simulations can lead to illness or death, so back up your save first.
-
-### First observation experiment
-
-```text
-town
-where marco
-where elena
+population [count]
+population generate <count>   # or: population add <count>
+resident <id>
+where <id>
+known <id> [count]         # DEBUG: private observation journal
+town-events [count]        # DEBUG: authoritative world truth
+relationships              # currently Marco and Elena only
+social-events [count]
+events [count]
+memories [count]
+facts
+remember My name is Alex.
+talk Hello, Marco!          # optional paid dialogue when OpenAI API is enabled
+reflect                     # optional paid reflection
 wait 600
-town
-town-events 30
-known marco 30
-known elena 30
+simulate 7                  # up to 365 days per command
+speed 60
+live 30
+offline on
+offline off
 exit
 ```
 
-Compare the `known` results: both people may know about a meeting, but a person absent from an event should have no record of it.
+**Developer-only commands:** `town-events` exposes world truth and `known` exposes personal witness logs. The eventual player-detective will instead need to investigate, interview and verify evidence.
 
-## Updating from Living Alibi v1.2
+## Updating from v1.2.1
 
-**Stop the game first. Back up your local database if you have one:**
+Stop the game first. Preserve the local database (important because deaths and other world events are permanent):
 
 ```bash
 cd ~/Repositories/living-alibi
@@ -107,65 +91,73 @@ if [ -f data/world.db ]; then
 fi
 ```
 
-Extract the `living-alibi-v1.2.1.zip` archive **from `~/Repositories`**, preserving your existing `.git` directory and ignored local database:
+Download the `living-alibi-v1.3.zip` release archive, then **unzip from `~/Repositories`** so the files update the existing checkout instead of creating an unrelated project:
 
 ```bash
 cd ~/Repositories
-unzip -o ~/Downloads/living-alibi-v1.2.1.zip
+unzip -o ~/Downloads/living-alibi-v1.3.zip
 cd living-alibi
+mvn -q clean test-compile
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.PopulationSmokeTest
+mvn -q -Dexec.mainClass=com.holovin.npclife.PopulationDatabaseSmokeTest -Dexec.classpathScope=test exec:java
+mvn -q compile exec:java
+```
+
+Only after checking the new version:
+
+```bash
+git status
+git add .github README.md CHANGELOG.md docs pom.xml src
+git commit -m "Add procedural residents and persistent population"
+git push
+```
+
+The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. Database migration adds columns to `town_people` without deleting `world_state`, `town_events`, relationships or dialogue.
+
+## Architecture
+
+| File | Purpose |
+| --- | --- |
+| `LifeSimulation.java`, `WorldState.java` | Marco's original character engine |
+| `TownLife.java` | Shared town, physical co-location, movement, witnessed events |
+| `SocialLife.java` | Marco/Elena relationships |
+| `PopulationGenerator.java` | Stable identities, traits, homes and occupations |
+| `PopulationLife.java` | Autonomous needs, schedules, shopping and travel of generated residents |
+| `WorldDatabase.java` | SQLite persistence and additive migrations |
+| `Main.java` | Console commands and time management |
+| `OpenAiDialogue.java` | Optional paid conversation/reflection (Marco only) |
+
+See [docs/POPULATION.md](docs/POPULATION.md), [docs/SOCIAL.md](docs/SOCIAL.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Tests
+
+```bash
 mvn -q test-compile
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.SimulationSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.TownSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.ElenaSurvivalSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.PopulationSmokeTest
 mvn -q -Dexec.mainClass=com.holovin.npclife.SocialDatabaseSmokeTest -Dexec.classpathScope=test exec:java
-mvn -q compile exec:java
+mvn -q -Dexec.mainClass=com.holovin.npclife.PopulationDatabaseSmokeTest -Dexec.classpathScope=test exec:java
 ```
 
-Inspect changes and commit your update using your existing GitHub SSH remote:
+Smoke tests do not replace more thorough integration and balance testing. GitHub Actions runs all of the above when code is pushed.
 
-```bash
-git status --short
-git add .github README.md CHANGELOG.md docs pom.xml src
-git commit -m "Fix Elena weekend shopping and health recovery"
-git push
-```
+## Known limitations
 
-Nothing in the update archive overwrites `data/`, your `.git` directory, or any API configuration.
+- **Not yet one unified citizen engine.** Marco, Elena and generated people currently have different rule implementations; behavior isn't fully comparable. A shared agent architecture is the next technical priority.
+- Generated citizens live in one of two abstract residence buildings; co-location there does not distinguish apartments. The witness model needs individual rooms/line-of-sight before it can serve as forensic evidence.
+- Generated residents don't yet form relationships, have children, migrate, commit crimes, retain complex beliefs or use freeform AI conversations. Births and spontaneous immigration are future features.
+- Only two named residents are pre-authored. New identities appear **only when you request population generation**, not automatically on a timer.
+- Travel uses approximate times and does not have routes or a map. Some legacy Marco actions do not yet require physical presence at a site.
+- Maximum 40 generated residents (42 including Marco and Elena) is a conservative testing cap, not a general engine limit.
+- Local SQLite history is private; do not commit it. Back up before upgrading or performing long simulations.
+- A public repository does not automatically grant an open-source license; no license is selected yet.
 
-GitHub Actions automatically compiles and runs five smoke tests on pushes and pull requests.
+## Optional OpenAI API
 
-## Existing simulated deaths and creating a new test world
-
-This fix does **not** revive Elena if she is already dead in your saved database. The game intentionally treats death as permanent. To observe the corrected survival rules from a fresh start, first exit the game, then **preserve the old world** in the ignored `data/` directory:
-
-```bash
-cd ~/Repositories/living-alibi
-mv data/world.db "data/world-day15-archive-$(date +%Y%m%d-%H%M%S).db"
-mvn -q compile exec:java
-```
-
-A new `data/world.db` will be created; the archived world remains available for later investigation. **Do not run this while the program is open.** If you prefer to preserve the original timeline as the active world, skip the `mv` command; Elena will remain deceased there.
-
-## Persistent storage
-
-The previous `world_state`, `life_events`, `memories`, and `character_facts` tables are not dropped. The new SQLite tables are:
-
-- `town_people` — town positions and Elena's independent game state (and a snapshot for Marco)
-- `town_meta` — whether the two people were already co-located, and when their meeting began
-- `town_events` — **world-authoritative** location/action events
-- `town_observations` — personal witnessed events keyed by resident
-
-Additional tables in v1.2:
-
-- `town_relationships` — persistent affinity, trust, tension, encounters, conversation counts and deterministic random state
-- `social_interactions` — timestamped social events with participants, place, and kind
-
-Simulation state and both event journals are committed in **one SQLite transaction** during time advancement. These are developer-side debug logs, not proof of what an NPC believes or will say under pressure.
-
-## OpenAI API (optional)
-
-ChatGPT subscriptions and OpenAI API billing are separate. No API access is required for simulation. To enable paid conversation/reflection calls, configure a strict API budget, then set a key in your shell without storing it in files:
+The game works without API calls. ChatGPT subscription charges and OpenAI API charges are separate. For optional Marco dialogue/reflection, configure an API budget first and set the secret in your terminal:
 
 ```bash
 read -rs OPENAI_API_KEY
@@ -173,39 +165,4 @@ export OPENAI_API_KEY
 mvn -q compile exec:java
 ```
 
-`talk` supplies Marco's saved facts, prior dialogue, important **personal life** events, and his **own eyewitness observations**; it does **not** supply the omniscient town event journal. The model can still make mistakes, so all actions and authoritative world facts remain controlled by Java.
-
-Default model: `gpt-4.1-mini`, override with `OPENAI_MODEL` if supported by your API account.
-
-## Code overview
-
-```text
-src/main/java/com/holovin/npclife/
-  Main.java             Console commands and simulation loop
-  WorldState.java       Marco's original state
-  LifeSimulation.java   Marco's original autonomous life rules
-  WorldDatabase.java    SQLite persistence and additive migrations
-  TownLife.java         Two residents, places, movement, event/observation generation
-  SocialLife.java       Local conversations, trust, affinity and conflict
-  OpenAiDialogue.java   Optional paid dialogue/reflection
-src/test/java/com/holovin/npclife/
-  SimulationSmokeTest.java
-  TownSmokeTest.java
-  SocialSmokeTest.java
-  ElenaSurvivalSmokeTest.java
-  SocialDatabaseSmokeTest.java
-```
-
-See [docs/SOCIAL.md](docs/SOCIAL.md) for social mechanics, [docs/TOWN.md](docs/TOWN.md) for modeling limits and [docs/ROADMAP.md](docs/ROADMAP.md) for the detective roadmap.
-
-## Known limitations
-
-1. **Only two hand-authored test residents.** Procedural NPC generation and a scalable shared citizen engine are planned, not implemented. Elena has a lightweight needs/schedule model.
-2. Travel is only a timed change of abstract locations, without roads, geometry, maps, or pathfinding.
-3. Marco's older v1.0 shopping/eating actions can still happen instantly; their spatial preconditions need refactoring before real investigation mechanics rely on them.
-4. Social conversations are rule-generated **summaries**, not freeform NPC-to-NPC speech. There is no rumor transmission, lying, belief uncertainty, gossip, forgetting or evidence yet. Witness observations track only some events.
-5. There are no crimes, solved cases, detective inventory, courtroom mechanics, 3D, or multiplayer.
-6. `offline on` **replays** elapsed time on the next launch; it is not a persistent 24/7 server.
-7. Test classes are assertion-based smoke tests, not a complete production test suite. Back up game databases before upgrading.
-
-License: none specified yet. Public source visibility alone does not establish an open-source license.
+Never commit API keys. OpenAI dialogue receives selected personal memory and eyewitness data; it is not allowed to overwrite world truth.

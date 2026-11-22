@@ -11,7 +11,10 @@ final class TownLife {
 
     enum Place {
         MARCO_HOME("Marco's home"), ELENA_HOME("Elena's home"), BAKERY("Bakery"),
-        MARKET("Market"), PARK("Park"), CAFE("Cafe");
+        MARKET("Market"), PARK("Park"), CAFE("Cafe"),
+        NORTH_RESIDENCES("North residences"), SOUTH_RESIDENCES("South residences"),
+        OFFICE("Office"), CLINIC("Clinic"), SCHOOL("School"),
+        WORKSHOP("Workshop"), LIBRARY("Library");
         final String label;
         Place(String label) { this.label=label; }
     }
@@ -33,6 +36,14 @@ final class TownLife {
         int water;
         int age;
         int sociability;
+        int carefulness;
+        int curiosity;
+        int scheduleOffset;
+        int generationIndex;
+        long personalSeed;
+        String goal;
+        Place home;
+        Place workplace;
         boolean alive;
 
         Citizen(String id, String name, String occupation, Place place) {
@@ -40,12 +51,17 @@ final class TownLife {
             this.place=place;this.destination=place;this.activity="RELAXING";
             this.hunger=20;this.thirst=20;this.fatigue=20;this.health=100;
             this.money=55;this.food=3;this.water=3;this.age=32;this.alive=true;this.sociability=62;
+            this.carefulness=55;this.curiosity=50;this.goal="STABILITY";
+            this.home=place;this.workplace=place;this.personalSeed=0;
         }
         Citizen copy() {
             Citizen c=new Citizen(id,name,occupation,place);
             c.destination=destination;c.travelRemaining=travelRemaining;c.activity=activity;
             c.hunger=hunger;c.thirst=thirst;c.fatigue=fatigue;c.health=health;
             c.money=money;c.food=food;c.water=water;c.age=age;c.alive=alive;c.sociability=sociability;
+            c.carefulness=carefulness;c.curiosity=curiosity;c.scheduleOffset=scheduleOffset;
+            c.generationIndex=generationIndex;c.personalSeed=personalSeed;c.goal=goal;
+            c.home=home;c.workplace=workplace;
             return c;
         }
         boolean presentAt(Place p) {return alive && travelRemaining==0 && place==p;}
@@ -63,7 +79,7 @@ final class TownLife {
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
         Citizen get(String id) {
             Citizen p=people.get(id.toLowerCase());
-            if(p==null)throw new IllegalArgumentException("Unknown resident: "+id+". Try marco or elena.");
+            if(p==null)throw new IllegalArgumentException("Unknown resident: "+id+". Use population to list IDs.");
             return p;
         }
         Town copy() {
@@ -85,7 +101,9 @@ final class TownLife {
         Town t=new Town();
         Place initial=desiredMarco(marco,null);
         t.people.put("marco",new Citizen("marco","Marco Bianchi","Baker",initial));
+        t.get("marco").home=Place.MARCO_HOME;t.get("marco").workplace=Place.BAKERY;
         t.people.put("elena",new Citizen("elena","Elena Rossi","Shopkeeper",desiredElena(marco.day,marco.minute)));
+        t.get("elena").home=Place.ELENA_HOME;t.get("elena").workplace=Place.MARKET;
         t.get("elena").activity="WORKING";
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
@@ -106,6 +124,7 @@ final class TownLife {
         if(m.alive)move(town,m,desiredMarco(marco,m.place),marco,truth,observations);
         elenaNeeds(e,marco,truth,observations,town);
         if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e),marco,truth,observations);
+        PopulationLife.tick(town,marco,truth,observations);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {
             town.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
@@ -198,7 +217,7 @@ final class TownLife {
         // Coarse walking times; no route geometry yet.
         return from==to?0:(from==Place.PARK||to==Place.PARK?10:8);
     }
-    private static void move(Town town,Citizen c,Place desired,WorldState clock,List<Event> events,List<Observation> observations) {
+    static void move(Town town,Citizen c,Place desired,WorldState clock,List<Event> events,List<Observation> observations) {
         if(c.travelRemaining>0) {
             c.travelRemaining--;
             if(c.travelRemaining==0) {
