@@ -1,4 +1,4 @@
-# Living Alibi — Town Simulation (v1.1)
+# Living Alibi — Town Simulation (v1.1+, updated in v1.2)
 
 ## Why locations matter
 
@@ -42,6 +42,10 @@ Travel uses an approximate eight- or ten-minute delay. There is no spatial colli
 ## Current detective-specific compromises
 
 The game still contains instantaneous, legacy Marco shopping actions. A future action model must require **arrival at a location before actions can be executed** and reserve time for actions such as buying, speaking, or picking up an object. Until then, developer logs should not be treated as a forensic-grade history.
+
+## Social Life in v1.2
+
+When Marco and Elena stay at the same location for sufficient time, the new social simulation can produce a witnessed conversation. Each such interaction is also stored in `social_interactions`; the relationship counters are in `town_relationships`. See [SOCIAL.md](SOCIAL.md).
 
 ## Next milestone
 

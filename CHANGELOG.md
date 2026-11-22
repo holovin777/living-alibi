@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 — Social Life
+
+- Add persistent social relationship for Marco and Elena: affinity, trust, tension, encounters, conversations and arguments.
+- Generate rule-based local small talk, friendly chats, conflict and reconciliation while both residents are co-located and awake.
+- Limit chats to one per encounter; persist random state for reproducible continuation after restarting.
+- Record each social interaction in world-truth and eyewitness logs, plus a dedicated social interaction journal.
+- Extend SQLite schema additively without dropping existing saves or memories.
+- Add `relationships` and `social-events` commands and three social tests (including a JDBC integration test).
+- No AI calls for NPC-to-NPC simulation; no procedural population generation yet.
+
+# Changelog
+
 ## 1.1.0 — The Living Town
 
 - Add Elena Rossi, an autonomous second resident with simplified independent needs and finances.

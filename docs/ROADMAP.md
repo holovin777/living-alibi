@@ -18,10 +18,17 @@ The eventual game is an emergent detective simulation. The player investigates e
 - SQLite migration without deleting Marco's history
 - Tests for independent life state, meetings, and observation isolation
 
+### Social Life v1.2 — First autonomous relationships
+
+- Rule-based NPC-to-NPC conversations requiring actual co-location
+- Affinity, trust, tension, small talk, arguments and reconciliation
+- Persistent relationship progress and private observations of social encounters
+- Deterministic social rules and smoke tests, without API cost
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco and Elena to the same extensible, non-hardcoded NPC engine; realistic time/position-aware action execution.
-2. **Town simulation:** more residents, work schedules, relationships and interaction durations, dynamic place access, physical objects.
+2. **Procedural population:** generate reproducible resident identities, jobs, ages and stable traits from a world seed; dynamic families, work schedules, interaction durations and access to locations.
 3. **Memory and belief:** uncertain memories, information exchange, deception, forgetting, and private motives.
 4. **Incidents and evidence:** theft/lost property, alibis, trails, witnesses, event causality, evidence acquisition.
 5. **Playable detective:** interviews, case notebook, deduction, accusations and feedback grounded in world truth.

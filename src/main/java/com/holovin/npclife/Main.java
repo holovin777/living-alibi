@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.1 — The Living Town");
+            System.out.println("Living Alibi v1.2 — Social Life");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -42,6 +42,17 @@ public final class Main {
                     if(lower.equals("status")||lower.equals("observe")) {status(state);continue;}
                     if(lower.equals("personality")) {personality(state);continue;}
                     if(lower.equals("town")) {townStatus(town,state);continue;}
+                    if(lower.equals("relationships") || lower.equals("relationship marco elena") ||
+                            lower.equals("relationship elena marco")) {
+                        relationshipStatus(town);continue;
+                    }
+                    if(lower.equals("social-events") || lower.startsWith("social-events ")) {
+                        var entries=db.socialEvents(optionalLimit(input,20));
+                        if(entries.isEmpty())System.out.println("No social conversations recorded yet.");
+                        for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
+                                " | "+e.kind()+" | "+e.place().label+" | "+e.description());
+                        continue;
+                    }
                     if(lower.startsWith("where ")) {
                         var citizen=town.get(arg(input));
                         System.out.println(citizen.name+" | "+citizen.locationText()+" | "+
@@ -166,10 +177,11 @@ public final class Main {
                         state.loneliness=Math.max(0,state.loneliness-8);
                         List<TownLife.Event> townEvents=new ArrayList<>();
                         List<TownLife.Observation> observations=new ArrayList<>();
+                        List<SocialLife.Interaction> socialEvents=new ArrayList<>();
                         List<LifeSimulation.LifeEvent> events=LifeSimulation.advance(state,5,
-                                current -> TownLife.tick(town,current,townEvents,observations));
+                                current -> TownLife.tick(town,current,townEvents,observations,socialEvents));
                         db.save(state,events,List.of(new WorldDatabase.Memory("player",message,day,minute),
-                                new WorldDatabase.Memory("marco",answer,day,minute)),town,townEvents,observations);
+                                new WorldDatabase.Memory("marco",answer,day,minute)),town,townEvents,observations,socialEvents);
                         continue;
                     }
                     System.out.println("Unknown command. Type help.");
@@ -189,9 +201,10 @@ public final class Main {
         TownLife.Town townCandidate=town.copy();
         List<TownLife.Event> townEvents=new ArrayList<>();
         List<TownLife.Observation> observations=new ArrayList<>();
+        List<SocialLife.Interaction> socialEvents=new ArrayList<>();
         List<LifeSimulation.LifeEvent> events=LifeSimulation.advance(candidate,minutes,
-                current -> TownLife.tick(townCandidate,current,townEvents,observations));
-        db.save(candidate,events,List.of(),townCandidate,townEvents,observations);
+                current -> TownLife.tick(townCandidate,current,townEvents,observations,socialEvents));
+        db.save(candidate,events,List.of(),townCandidate,townEvents,observations,socialEvents);
         copy(candidate,s);
         town.copyFrom(townCandidate);
     }
@@ -248,6 +261,14 @@ public final class Main {
         System.out.println("Locations: Marco's home, Elena's home, Bakery, Market, Park, Cafe.");
         System.out.println("Developer view: authoritative town-events and private known logs are for testing.");
     }
+    private static void relationshipStatus(TownLife.Town town) {
+        var r=town.relationship;
+        System.out.println("Marco Bianchi ↔ Elena Rossi | "+r.label());
+        System.out.println("Affinity "+r.affinity+"/100 | Trust "+r.trust+"/100 | Tension "+r.tension+"/100");
+        System.out.println("Encounters "+r.encounters+" | Conversations "+r.conversations+
+                " | Arguments "+r.arguments);
+        System.out.println("This relationship is simulated using local rules (no AI calls).");
+    }
     private static void personality(WorldState s) {
         System.out.println("Marco's personality (stable traits, 0–100):");
         System.out.println("Sociability: "+s.personalitySociable+" | Carefulness: "+s.personalityCareful+
@@ -258,6 +279,7 @@ public final class Main {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
         System.out.println(" town | where marco | where elena | town-events [count] | known marco [count] | known elena [count]");
+        System.out.println(" relationships | relationship marco elena | social-events [count]");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");

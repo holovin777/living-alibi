@@ -45,7 +45,28 @@ final class WorldDatabase implements AutoCloseable {
                     text TEXT NOT NULL)
                 """);
             st.execute("CREATE INDEX IF NOT EXISTS idx_town_observations_witness ON town_observations(witness_id,id)");
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS town_relationships (
+                    first_id TEXT NOT NULL, second_id TEXT NOT NULL,
+                    affinity INTEGER NOT NULL, trust INTEGER NOT NULL, tension INTEGER NOT NULL,
+                    encounters INTEGER NOT NULL, conversations INTEGER NOT NULL, arguments INTEGER NOT NULL,
+                    last_interaction_tick INTEGER NOT NULL, rng INTEGER NOT NULL,
+                    PRIMARY KEY(first_id,second_id))
+                """);
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS social_interactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL, minute INTEGER NOT NULL,
+                    first_id TEXT NOT NULL, second_id TEXT NOT NULL, place TEXT NOT NULL,
+                    kind TEXT NOT NULL, description TEXT NOT NULL)
+                """);
 
+
+        }
+        // Additive migration for databases created by v1.1.
+        if(!columnExists("town_meta","meeting_since")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE town_meta ADD COLUMN meeting_since INTEGER NOT NULL DEFAULT -1");
+            }
         }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
@@ -89,7 +110,11 @@ final class WorldDatabase implements AutoCloseable {
     }
 
     private boolean columnExists(String col) throws SQLException {
-        try (Statement st=db.createStatement();ResultSet rs=st.executeQuery("PRAGMA table_info(world_state)")) {
+        return columnExists("world_state",col);
+    }
+    private boolean columnExists(String table,String col) throws SQLException {
+        // Names are fixed internal identifiers; never accept user input here.
+        try (Statement st=db.createStatement();ResultSet rs=st.executeQuery("PRAGMA table_info("+table+")")) {
             while (rs.next()) if (col.equals(rs.getString("name"))) return true;
         }
         return false;
@@ -120,12 +145,18 @@ final class WorldDatabase implements AutoCloseable {
     }
 
     void save(WorldState s,List<LifeSimulation.LifeEvent> events,List<Memory> messages) throws SQLException {
-        save(s,events,messages,null,List.of(),List.of());
+        save(s,events,messages,null,List.of(),List.of(),List.of());
     }
 
     void save(WorldState s,List<LifeSimulation.LifeEvent> events,List<Memory> messages,
               TownLife.Town town,List<TownLife.Event> townEvents,
               List<TownLife.Observation> observations) throws SQLException {
+        save(s,events,messages,town,townEvents,observations,List.of());
+    }
+
+    void save(WorldState s,List<LifeSimulation.LifeEvent> events,List<Memory> messages,
+              TownLife.Town town,List<TownLife.Event> townEvents,
+              List<TownLife.Observation> observations,List<SocialLife.Interaction> socialEvents) throws SQLException {
         // Marco, the other residents, world events, and their knowledge commit atomically.
         s.lastSavedEpoch=Instant.now().getEpochSecond();
         db.setAutoCommit(false);
@@ -158,7 +189,10 @@ final class WorldDatabase implements AutoCloseable {
                 for(var m:messages) {p.setString(1,NPC);p.setString(2,m.speaker());p.setString(3,m.text());p.setInt(4,m.day());p.setInt(5,m.minute());p.addBatch();}
                 if(!messages.isEmpty())p.executeBatch();
             }
-            if(town!=null) persistTown(town,townEvents,observations);
+            if(town!=null) {
+                persistTown(town,townEvents,observations);
+                persistSocial(town,socialEvents);
+            }
             db.commit();
         } catch(SQLException ex) {db.rollback();throw ex;}
         finally{db.setAutoCommit(true);}
@@ -219,8 +253,24 @@ final class WorldDatabase implements AutoCloseable {
                 p.water=rs.getInt("water");p.age=rs.getInt("age");p.alive=rs.getInt("alive")!=0;
             }
         }
-        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT together FROM town_meta WHERE id=1")) {
-            if(rs.next())town.together=rs.getInt(1)!=0;
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT together, meeting_since FROM town_meta WHERE id=1")) {
+            if(rs.next()) {
+                town.together=rs.getInt(1)!=0;
+                town.meetingSinceTick=rs.getLong(2);
+                if(town.together && town.meetingSinceTick<0)
+                    town.meetingSinceTick=(long)(state.day-1)*1440L+state.minute;
+            }
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+                SELECT * FROM town_relationships WHERE first_id='marco' AND second_id='elena'
+                """);ResultSet rs=p.executeQuery()) {
+            if(rs.next()) {
+                var r=town.relationship;
+                r.affinity=rs.getInt("affinity");r.trust=rs.getInt("trust");r.tension=rs.getInt("tension");
+                r.encounters=rs.getInt("encounters");r.conversations=rs.getInt("conversations");
+                r.arguments=rs.getInt("arguments");r.lastInteractionTick=rs.getLong("last_interaction_tick");
+                r.rng=rs.getLong("rng");
+            }
         }
         return town;
     }
@@ -249,9 +299,12 @@ final class WorldDatabase implements AutoCloseable {
             p.executeBatch();
         }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO town_meta(id,together) VALUES(1,?)
-            ON CONFLICT(id) DO UPDATE SET together=excluded.together
-            """)) {p.setInt(1,town.together?1:0);p.executeUpdate();}
+            INSERT INTO town_meta(id,together,meeting_since) VALUES(1,?,?)
+            ON CONFLICT(id) DO UPDATE SET together=excluded.together,
+                                          meeting_since=excluded.meeting_since
+            """)) {
+            p.setInt(1,town.together?1:0);p.setLong(2,town.meetingSinceTick);p.executeUpdate();
+        }
         try(PreparedStatement p=db.prepareStatement("""
             INSERT INTO town_events(day,minute,actor_id,place,text) VALUES(?,?,?,?,?)
             """)) {
@@ -295,6 +348,53 @@ final class WorldDatabase implements AutoCloseable {
             try(ResultSet r=p.executeQuery()) {
                 while(r.next())entries.add(new TownLife.Observation(witnessId,r.getInt(1),
                         r.getInt(2),TownLife.Place.valueOf(r.getString(3)),r.getString(4)));
+            }
+        }
+        Collections.reverse(entries);return entries;
+    }
+
+
+    private void persistSocial(TownLife.Town town,List<SocialLife.Interaction> interactions) throws SQLException {
+        var r=town.relationship;
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO town_relationships(first_id,second_id,affinity,trust,tension,encounters,
+                                           conversations,arguments,last_interaction_tick,rng)
+            VALUES(?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(first_id,second_id) DO UPDATE SET
+                affinity=excluded.affinity,trust=excluded.trust,tension=excluded.tension,
+                encounters=excluded.encounters,conversations=excluded.conversations,
+                arguments=excluded.arguments,last_interaction_tick=excluded.last_interaction_tick,
+                rng=excluded.rng
+            """)) {
+            p.setString(1,r.firstId);p.setString(2,r.secondId);p.setInt(3,r.affinity);
+            p.setInt(4,r.trust);p.setInt(5,r.tension);p.setInt(6,r.encounters);
+            p.setInt(7,r.conversations);p.setInt(8,r.arguments);p.setLong(9,r.lastInteractionTick);
+            p.setLong(10,r.rng);p.executeUpdate();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO social_interactions(day,minute,first_id,second_id,place,kind,description)
+            VALUES(?,?,?,?,?,?,?)
+            """)) {
+            for(var i:interactions) {
+                p.setInt(1,i.day());p.setInt(2,i.minute());p.setString(3,i.firstId());
+                p.setString(4,i.secondId());p.setString(5,i.place().name());
+                p.setString(6,i.kind().name());p.setString(7,i.description());p.addBatch();
+            }
+            if(!interactions.isEmpty())p.executeBatch();
+        }
+    }
+
+    List<SocialLife.Interaction> socialEvents(int limit) throws SQLException {
+        List<SocialLife.Interaction> entries=new ArrayList<>();
+        try(PreparedStatement p=db.prepareStatement("""
+                SELECT day,minute,first_id,second_id,place,kind,description
+                FROM social_interactions ORDER BY id DESC LIMIT ?
+                """)) {
+            p.setInt(1,limit);
+            try(ResultSet rs=p.executeQuery()) {
+                while(rs.next())entries.add(new SocialLife.Interaction(rs.getInt(1),rs.getInt(2),
+                        rs.getString(3),rs.getString(4),TownLife.Place.valueOf(rs.getString(5)),
+                        SocialLife.Kind.valueOf(rs.getString(6)),rs.getString(7)));
             }
         }
         Collections.reverse(entries);return entries;

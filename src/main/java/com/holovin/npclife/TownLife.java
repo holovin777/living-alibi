@@ -32,19 +32,20 @@ final class TownLife {
         int food;
         int water;
         int age;
+        int sociability;
         boolean alive;
 
         Citizen(String id, String name, String occupation, Place place) {
             this.id=id;this.name=name;this.occupation=occupation;
             this.place=place;this.destination=place;this.activity="RELAXING";
             this.hunger=20;this.thirst=20;this.fatigue=20;this.health=100;
-            this.money=55;this.food=3;this.water=3;this.age=32;this.alive=true;
+            this.money=55;this.food=3;this.water=3;this.age=32;this.alive=true;this.sociability=62;
         }
         Citizen copy() {
             Citizen c=new Citizen(id,name,occupation,place);
             c.destination=destination;c.travelRemaining=travelRemaining;c.activity=activity;
             c.hunger=hunger;c.thirst=thirst;c.fatigue=fatigue;c.health=health;
-            c.money=money;c.food=food;c.water=water;c.age=age;c.alive=alive;
+            c.money=money;c.food=food;c.water=water;c.age=age;c.alive=alive;c.sociability=sociability;
             return c;
         }
         boolean presentAt(Place p) {return alive && travelRemaining==0 && place==p;}
@@ -58,19 +59,23 @@ final class TownLife {
     static final class Town {
         final Map<String,Citizen> people=new LinkedHashMap<>();
         boolean together;
+        long meetingSinceTick=-1;
+        SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
         Citizen get(String id) {
             Citizen p=people.get(id.toLowerCase());
             if(p==null)throw new IllegalArgumentException("Unknown resident: "+id+". Try marco or elena.");
             return p;
         }
         Town copy() {
-            Town t=new Town();t.together=together;
+            Town t=new Town();t.together=together;t.meetingSinceTick=meetingSinceTick;
+            t.relationship=relationship.copy();
             for(var e:people.entrySet())t.people.put(e.getKey(),e.getValue().copy());
             return t;
         }
         void copyFrom(Town other) {
             people.clear();for(var e:other.people.entrySet())people.put(e.getKey(),e.getValue().copy());
-            together=other.together;
+            together=other.together;meetingSinceTick=other.meetingSinceTick;
+            relationship=other.relationship.copy();
         }
     }
 
@@ -83,10 +88,15 @@ final class TownLife {
         t.people.put("elena",new Citizen("elena","Elena Rossi","Shopkeeper",desiredElena(marco.day,marco.minute)));
         t.get("elena").activity="WORKING";
         t.together=initial==t.get("elena").place;
+        if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
     }
 
     static void tick(Town town,WorldState marco,List<Event> truth,List<Observation> observations) {
+        tick(town,marco,truth,observations,new ArrayList<>());
+    }
+    static void tick(Town town,WorldState marco,List<Event> truth,List<Observation> observations,
+                     List<SocialLife.Interaction> interactions) {
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;
         m.age=marco.age;
@@ -98,9 +108,13 @@ final class TownLife {
         if(e.alive)move(town,e,desiredElena(marco.day,marco.minute),marco,truth,observations);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {
+            town.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
+            SocialLife.onEncounter(town);
             publish(town,marco,"marco",m.place,"Marco Bianchi and Elena Rossi crossed paths at "+m.place.label+".",truth,observations);
         }
+        if(!nowTogether)town.meetingSinceTick=-1;
         town.together=nowTogether;
+        SocialLife.tick(town,marco,truth,observations,interactions);
     }
 
     private static int clamp(int n) {return Math.max(0,Math.min(100,n));}
@@ -184,7 +198,7 @@ final class TownLife {
             c.activity="TRAVELING";
         }
     }
-    private static void publish(Town t,WorldState clock,String actor,Place where,String text,
+    static void publish(Town t,WorldState clock,String actor,Place where,String text,
                                 List<Event> truth,List<Observation> observations) {
         truth.add(new Event(clock.day,clock.minute,actor,where,text));
         for(Citizen citizen:t.people.values()) {
