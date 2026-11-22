@@ -114,6 +114,28 @@ final class WorldDatabase implements AutoCloseable {
                 }
             }
         }
+        // v1.6: claims are separate from the authoritative event log and old observations.
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS resident_beliefs (
+                    resident_id TEXT NOT NULL, event_key TEXT NOT NULL,
+                    event_day INTEGER NOT NULL, event_minute INTEGER NOT NULL,
+                    actor_id TEXT NOT NULL, scene_id TEXT NOT NULL, statement TEXT NOT NULL,
+                    origin TEXT NOT NULL CHECK(origin IN ('DIRECT','HEARD')),
+                    learned_from TEXT NOT NULL, learned_day INTEGER NOT NULL,
+                    learned_minute INTEGER NOT NULL, hops INTEGER NOT NULL,
+                    confidence INTEGER NOT NULL,
+                    PRIMARY KEY(resident_id,event_key))
+                """);
+            st.execute("CREATE INDEX IF NOT EXISTS idx_resident_beliefs_person ON resident_beliefs(resident_id,event_day,event_minute)");
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS information_transfers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+                    minute INTEGER NOT NULL, from_id TEXT NOT NULL, to_id TEXT NOT NULL,
+                    event_key TEXT NOT NULL, confidence INTEGER NOT NULL,
+                    hops INTEGER NOT NULL, statement TEXT NOT NULL)
+                """);
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -238,8 +260,10 @@ final class WorldDatabase implements AutoCloseable {
             if(town!=null) {
                 persistTown(town,townEvents,observations);
                 persistSocial(town,socialEvents);
+                persistKnowledge(town);
             }
             db.commit();
+            if(town!=null)town.pendingTransfers.clear();
         } catch(SQLException ex) {db.rollback();throw ex;}
         finally{db.setAutoCommit(true);}
     }
@@ -345,6 +369,20 @@ final class WorldDatabase implements AutoCloseable {
                 r.meetingSinceTick=rs.getLong("meeting_since_tick");
                 r.lastAttemptDay=rs.getInt("last_attempt_day");
                 if(!legacy)town.peerRelationships.put(SocialNetwork.key(first,second),r);
+            }
+        }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT * FROM resident_beliefs ORDER BY event_day,event_minute,event_key")) {
+            while(rs.next()) {
+                String resident=rs.getString("resident_id");
+                if(!town.people.containsKey(resident))continue;
+                var belief=new KnowledgeLife.Belief(resident,rs.getString("event_key"),
+                        rs.getInt("event_day"),rs.getInt("event_minute"),rs.getString("actor_id"),
+                        rs.getString("scene_id"),rs.getString("statement"),rs.getString("origin"),
+                        rs.getString("learned_from"),rs.getInt("learned_day"),
+                        rs.getInt("learned_minute"),rs.getInt("hops"),rs.getInt("confidence"));
+                town.beliefs.computeIfAbsent(resident,ignored->new LinkedHashMap<>())
+                        .put(belief.eventKey(),belief);
             }
         }
         return town;
@@ -496,6 +534,78 @@ final class WorldDatabase implements AutoCloseable {
             }
         }
         Collections.reverse(entries);return entries;
+    }
+
+    private void persistKnowledge(TownLife.Town town) throws SQLException {
+        // UPSERT retains provenance on restart and lets a later direct witness
+        // upgrade a second-hand report to direct observation of the same event.
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO resident_beliefs(resident_id,event_key,event_day,event_minute,
+                actor_id,scene_id,statement,origin,learned_from,learned_day,learned_minute,hops,confidence)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(resident_id,event_key) DO UPDATE SET
+                origin=excluded.origin,learned_from=excluded.learned_from,
+                learned_day=excluded.learned_day,learned_minute=excluded.learned_minute,
+                hops=excluded.hops,confidence=excluded.confidence
+            """)) {
+            for(var entries:town.beliefs.values())for(var b:entries.values()) {
+                p.setString(1,b.residentId());p.setString(2,b.eventKey());
+                p.setInt(3,b.eventDay());p.setInt(4,b.eventMinute());
+                p.setString(5,b.actorId());p.setString(6,b.sceneId());
+                p.setString(7,b.statement());p.setString(8,b.origin());
+                p.setString(9,b.learnedFrom());p.setInt(10,b.learnedDay());
+                p.setInt(11,b.learnedMinute());p.setInt(12,b.hops());
+                p.setInt(13,b.confidence());p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO information_transfers(day,minute,from_id,to_id,event_key,confidence,hops,statement)
+            VALUES(?,?,?,?,?,?,?,?)
+            """)) {
+            for(var t:town.pendingTransfers) {
+                p.setInt(1,t.day());p.setInt(2,t.minute());
+                p.setString(3,t.fromId());p.setString(4,t.toId());
+                p.setString(5,t.eventKey());p.setInt(6,t.confidence());
+                p.setInt(7,t.hops());p.setString(8,t.statement());p.addBatch();
+            }
+            if(!town.pendingTransfers.isEmpty())p.executeBatch();
+        }
+    }
+
+    List<KnowledgeLife.Belief> beliefs(String residentId,int limit) throws SQLException {
+        List<KnowledgeLife.Belief> result=new ArrayList<>();
+        try(PreparedStatement p=db.prepareStatement("""
+            SELECT * FROM resident_beliefs WHERE resident_id=?
+            ORDER BY learned_day DESC,learned_minute DESC,event_key DESC LIMIT ?
+            """)) {
+            p.setString(1,residentId);p.setInt(2,limit);
+            try(ResultSet rs=p.executeQuery()) {
+                while(rs.next())result.add(new KnowledgeLife.Belief(residentId,
+                        rs.getString("event_key"),rs.getInt("event_day"),
+                        rs.getInt("event_minute"),rs.getString("actor_id"),
+                        rs.getString("scene_id"),rs.getString("statement"),rs.getString("origin"),
+                        rs.getString("learned_from"),rs.getInt("learned_day"),
+                        rs.getInt("learned_minute"),rs.getInt("hops"),rs.getInt("confidence")));
+            }
+        }
+        Collections.reverse(result);return result;
+    }
+
+    List<KnowledgeLife.Transfer> informationTransfers(int limit) throws SQLException {
+        List<KnowledgeLife.Transfer> result=new ArrayList<>();
+        try(PreparedStatement p=db.prepareStatement("""
+            SELECT * FROM information_transfers ORDER BY id DESC LIMIT ?
+            """)) {
+            p.setInt(1,limit);
+            try(ResultSet rs=p.executeQuery()) {
+                while(rs.next())result.add(new KnowledgeLife.Transfer(rs.getInt("day"),
+                        rs.getInt("minute"),rs.getString("from_id"),rs.getString("to_id"),
+                        rs.getString("event_key"),rs.getInt("confidence"),rs.getInt("hops"),
+                        rs.getString("statement")));
+            }
+        }
+        Collections.reverse(result);return result;
     }
 
     @Override public void close() throws SQLException {db.close();}

@@ -1,6 +1,6 @@
 # Living Alibi
 
-**v1.5 — Social Network** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.6 — Memory & Beliefs** · Java 21+ · Maven · SQLite · headless console prototype
 
 > An independent town, private observations, and a detective who must discover what really happened.
 
@@ -18,6 +18,8 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 - Individual need phases reduce synchronized food and water actions across generated residents.
 - **Autonomous relationship network:** any two residents can meet, make small talk, become friends, disagree or reconcile, with separate persistent affinity, trust, tension and interaction history. Legacy Marco/Elena state is preserved. New relationships are created only after a shared-scene encounter.
 - **Social pacing:** each non-legacy pair attempts spontaneous conversation at most once per game day; contact is not guaranteed. This is still an abstract rule-based simulation, not a fully natural dialogue engine.
+- **Attributed beliefs (new in v1.6):** residents record notable witnessed events as `DIRECT` and can relay one claim per real conversation. Secondhand `HEARD` claims retain the original event, source ID, relay hops and a reduced confidence score; gossip never writes to world truth.
+- **Epistemic separation:** `town-events` is authoritative developer truth, `known` is a direct sensory event log, `beliefs` is a filtered attributed claim journal, and `rumors` is a relay log.
 - Deterministic generation and simulation; optional paid OpenAI only for direct `talk` and `reflect` commands, never for simulated minutes.
 - Manual time skipping, accelerated live mode and optional offline catch-up *on reopening* (not a continuously hosted server).
 
@@ -47,6 +49,8 @@ town-events 20
 relationships 20
 relationship resident-0001 resident-0002
 social-events 20
+beliefs resident-0001 20
+rumors 20
 exit
 ```
 
@@ -70,6 +74,8 @@ town-events [count]        # DEBUG: authoritative world truth
 relationships [count]       # strongest/most active links first
 relationship <id> <id>     # e.g. relationship resident-0001 resident-0002
 social-events [count]
+beliefs <id> [count]       # DEBUG: DIRECT/HEARD, source, confidence, hops
+rumors [count]            # DEBUG: who told what to whom
 events [count]
 memories [count]
 facts
@@ -85,9 +91,9 @@ offline off
 exit
 ```
 
-**Developer-only commands:** `town-events` exposes world truth and `known` exposes personal witness logs. The eventual player-detective will instead need to investigate, interview and verify evidence.
+**Developer-only commands:** `town-events` exposes world truth, `known` exposes direct witness logs, and `beliefs`/`rumors` expose attributed reports. The eventual player-detective will instead need to investigate, interview and verify evidence.
 
-## Updating from v1.4
+## Updating safely from v1.5
 
 Stop the game first. Preserve the local database (important because deaths and other world events are permanent):
 
@@ -99,15 +105,20 @@ if [ -f data/world.db ]; then
 fi
 ```
 
-Download the `living-alibi-v1.4.zip` release archive, then **unzip from `~/Repositories`** so the files update the existing checkout instead of creating an unrelated project:
+Download the `living-alibi-v1.6.zip` release archive, then **unzip from `~/Repositories`** so the files update the existing checkout instead of creating an unrelated project:
 
 ```bash
 cd ~/Repositories
-unzip -o ~/Downloads/living-alibi-v1.4.zip
+unzip -o ~/Downloads/living-alibi-v1.6.zip
 cd living-alibi
 mvn -q clean test-compile
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.PrivateLivesSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialNetworkSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.KnowledgeSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.KnowledgeIntegrationSmokeTest
 mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PrivateLivesDatabaseSmokeTest' exec:exec
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.SocialNetworkDatabaseSmokeTest' exec:exec
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.KnowledgeDatabaseSmokeTest' exec:exec
 mvn -q compile exec:java
 ```
 
@@ -116,11 +127,11 @@ Only after checking the new version:
 ```bash
 git status
 git add .github README.md CHANGELOG.md docs pom.xml src
-git commit -m "Add private homes and isolated witness observations"
+git commit -m "Add attributable NPC memories and information sharing"
 git push
 ```
 
-The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. Database migration adds `home_unit` to `town_people`, and `space_id` to world events and observations without deleting existing game state, relationships or dialogue. Historical events from v1.3 keep an **unknown** room ID; previously recorded eyewitness logs are not retroactively modified.
+The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. Database migration adds `resident_beliefs` and `information_transfers` without deleting existing game state, relationships or dialogue. Previously recorded eyewitness logs are not retroactively converted to v1.6 beliefs.
 
 ## Architecture
 
@@ -131,11 +142,13 @@ The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. D
 | `SocialLife.java` | Marco/Elena relationships |
 | `PopulationGenerator.java` | Stable identities, traits, homes and occupations |
 | `PopulationLife.java` | Autonomous needs, schedules, shopping and travel of generated residents |
+| `SocialNetwork.java` | Autonomous pairwise interactions among all residents |
+| `KnowledgeLife.java` | Provenance-aware, first-hand and hearsay claims |
 | `WorldDatabase.java` | SQLite persistence and additive migrations |
 | `Main.java` | Console commands and time management |
 | `OpenAiDialogue.java` | Optional paid conversation/reflection (Marco only) |
 
-See [docs/PRIVATE_LIVES.md](docs/PRIVATE_LIVES.md), [docs/POPULATION.md](docs/POPULATION.md), [docs/SOCIAL.md](docs/SOCIAL.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+See [docs/BELIEFS.md](docs/BELIEFS.md), [docs/PRIVATE_LIVES.md](docs/PRIVATE_LIVES.md), [docs/SOCIAL_NETWORK.md](docs/SOCIAL_NETWORK.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Tests
 
@@ -158,7 +171,7 @@ Smoke tests do not replace more thorough integration and balance testing. GitHub
 
 - **Not yet one unified citizen engine.** Marco, Elena and generated people currently have different rule implementations; behavior isn't fully comparable. A shared agent architecture is the next technical priority.
 - Each resident has an abstract private apartment within a building, but there are no doors, sightlines, rooms, shared households or audibility mechanics yet. Public locations still treat everyone present as an eligible witness. **This is not forensic-quality evidence.**
-- Generated residents don't yet form relationships, have children, migrate, commit crimes, retain complex beliefs or use freeform AI conversations. Births and spontaneous immigration are future features.
+- Generated residents form basic pairwise relationships and carry simple attributed claims, but have no children, migration, autonomous crimes, intentional deception, complex memory decay or freeform AI conversations yet.
 - Only two named residents are pre-authored. New identities appear **only when you request population generation**, not automatically on a timer.
 - Travel uses approximate times and does not have routes or a map. Some legacy Marco actions do not yet require physical presence at a site.
 - Maximum 40 generated residents (42 including Marco and Elena) is a conservative testing cap, not a general engine limit.
@@ -175,28 +188,31 @@ export OPENAI_API_KEY
 mvn -q compile exec:java
 ```
 
-Never commit API keys. OpenAI dialogue receives selected personal memory and eyewitness data; it is not allowed to overwrite world truth.
+Never commit API keys. OpenAI dialogue receives selected personal memory and eyewitness data; it is not allowed to overwrite world truth. New NPC-to-NPC attributed beliefs are rule-based and do not require the API.
 
-## Social Network v1.5 verification
+## Memory & Beliefs v1.6 verification
 
-After backing up the local `data/world.db` and extracting the archive, run:
+Stop the simulation before updating; back up `data/world.db` first and unzip v1.6 over the existing `~/Repositories/living-alibi` directory. Do **not** delete your saved world.
 
 ```bash
 mvn -q clean test-compile
-java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialNetworkSmokeTest
-mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.SocialNetworkDatabaseSmokeTest' exec:exec
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.KnowledgeSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.KnowledgeIntegrationSmokeTest
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.KnowledgeDatabaseSmokeTest' exec:exec
 ```
 
-The SQLite test uses a **temporary database** and does not modify `data/world.db`.
+The JDBC smoke test uses a **temporary SQLite file**, not your own `data/world.db`. The existing town remains intact; v1.6 creates two new tables without removing older events or memories. Existing v1.5 observations are **not** retrospectively promoted to beliefs because the old rows lack some provenance information.
 
-To inspect a city that already has generated residents:
+Inside the running game:
 
 ```text
-simulate 7
-relationships 20
-relationship resident-0001 resident-0002
-social-events 20
+simulate 14
+rumors 20
+beliefs marco 20
+beliefs resident-0001 20
 known resident-0001 20
 ```
 
-`relationship` shows **"No encounter recorded"** until those residents actually meet. Friends and arguments are game-level social rules. NPCs do not yet share testimony, remember reported claims, hide evidence, fall in love or start families. Only a future detective interface will distinguish public clues from internal developer truth.
+`rumors` and `beliefs` are **developer-only inspection tools**, not detective UI. The original `known` command still returns direct observations and may contain routine events such as eating. The new `beliefs` journal selects only notable events (meetings, arguments, deaths and potential crime-relevant reports).
+
+The system relays only a limited, accurate description of an event; **there is no intentional lying, source impersonation, forgetting, independent fact-checking, or probabilistic memory error yet**. The confidence score is a simplified heuristic based on whether a claim was witnessed, relay distance and pair trust, not a calibrated probability of truth. No API charges are generated by simulated conversations.

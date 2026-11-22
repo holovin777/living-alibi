@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 — Memory & Beliefs
+
+- Track important firsthand events as `DIRECT` beliefs and preserve their source event identity.
+- Relay selected claims during real autonomous conversations; receivers store `HEARD`, a speaker ID, relay hops and reduced confidence.
+- Prevent remote conversation, source-free claims, duplication, and direct memories being silently replaced by hearsay.
+- Add `resident_beliefs` and `information_transfers` with additive SQLite migration and transactional saves.
+- Add `beliefs <id> [count]` and `rumors [count]` developer commands, integration/unit/JDBC smoke tests and CI coverage.
+- Do not retrospectively infer historical v1.5 beliefs or enable lying, forgetting, crime generation or the detective UI.
+
 ## 1.5.0 — Social Network
 
 - Create persistent pairwise trust, affinity, tension and conversation counts between any residents, not only Marco and Elena.

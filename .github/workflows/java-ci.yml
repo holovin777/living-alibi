@@ -51,3 +51,11 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.SocialNetworkDatabaseSmokeTest' exec:exec
+      - name: Test attributed direct and secondhand knowledge
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.KnowledgeSmokeTest
+      - name: Test knowledge propagation through actual town conversations
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.KnowledgeIntegrationSmokeTest
+      - name: Test SQLite attributed belief and information exchange persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.KnowledgeDatabaseSmokeTest' exec:exec

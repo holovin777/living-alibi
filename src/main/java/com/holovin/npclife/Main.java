@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.5 — Social Network");
+            System.out.println("Living Alibi v1.6 — Memory & Beliefs");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -115,6 +115,28 @@ public final class Main {
                         if(entries.isEmpty())System.out.println("No direct observations recorded for "+witness+".");
                         for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
                                 " | "+TownLife.sceneLabel(e.place(),e.spaceId())+" | "+e.text());
+                        continue;
+                    }
+                    if(lower.startsWith("beliefs ")) {
+                        String[] parts=arg(input).toLowerCase(Locale.ROOT).split("\\s+");
+                        if(parts.length<1 || parts.length>2)
+                            throw new IllegalArgumentException("Use beliefs <resident-id> [count].");
+                        String resident=town.get(parts[0]).id;
+                        int limit=parts.length==1?20:Integer.parseInt(parts[1]);
+                        if(limit<1 || limit>100)throw new IllegalArgumentException("Count must be 1–100.");
+                        var beliefs=db.beliefs(resident,limit);
+                        if(beliefs.isEmpty())System.out.println("No tracked claims for "+resident+" yet.");
+                        for(var b:beliefs)System.out.println("Day "+b.eventDay()+" "+clock(b.eventMinute())+
+                                " | "+b.origin()+" | confidence "+b.confidence()+"/100 | via "+b.learnedFrom()+
+                                " | hops "+b.hops()+" | "+b.statement());
+                        continue;
+                    }
+                    if(lower.equals("rumors")||lower.startsWith("rumors ")) {
+                        var transfers=db.informationTransfers(optionalLimit(input,20));
+                        if(transfers.isEmpty())System.out.println("No reported information exchanges yet.");
+                        for(var t:transfers)System.out.println("Day "+t.day()+" "+clock(t.minute())+
+                                " | "+t.fromId()+" -> "+t.toId()+" | confidence "+t.confidence()+
+                                "/100 | hops "+t.hops()+" | "+t.statement());
                         continue;
                     }
                     if(lower.equals("memories")||lower.startsWith("memories ")) {
@@ -362,6 +384,7 @@ public final class Main {
         System.out.println(" home <id>             — inspect a resident's private home unit (developer view)");
         System.out.println(" where <id> | known <id> [count] | town-events [count]");
         System.out.println(" relationships [count] | relationship <id> <id> | social-events [count]");
+        System.out.println(" beliefs <id> [count] | rumors [count] — attributed claims (developer view)");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");

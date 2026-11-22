@@ -48,11 +48,19 @@ The eventual game is an emergent detective simulation. The player investigates e
 - The original Marco/Elena relationship survives the upgrade without rewriting prior history.
 - No exchange of secondhand knowledge, uncertain beliefs, manipulation or independent testimony yet.
 
+### Memory & Beliefs v1.6 — Attributed testimony and rumor circulation
+
+- Distinguish witnessed noteworthy events (`DIRECT`) from claims received in conversation (`HEARD`).
+- Record source, original event, relay depth and a simple confidence heuristic for each claim.
+- Relay at most one unshared claim per actual conversation and preserve private scene boundaries.
+- Persist claims and the history of information exchanges to new SQLite tables.
+- **Not implemented:** deliberate deception, mistaken identity, distortion, evidence search or interviews by the detective.
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.
 2. **Dynamic society:** births and migration, shared households, detailed room geometry, and scalable work schedules. General relationships are implemented at a basic level.
-3. **Memory and belief:** uncertain memories, information exchange, deception, forgetting, and private motives.
+3. **Advanced memory and belief:** basic attributed information exchange is implemented; deception, fading memory, contradictory reports and private motives remain to be developed.
 4. **Incidents and evidence:** theft/lost property, alibis, trails, witnesses, event causality, evidence acquisition.
 5. **Playable detective:** interviews, case notebook, deduction, accusations and feedback grounded in world truth.
 6. **Continuous hosting:** headless daemon + eventual optional Godot 3D client.

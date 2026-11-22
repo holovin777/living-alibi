@@ -86,6 +86,9 @@ final class TownLife {
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
         /** Other pairs are created on first encounter, rather than preallocating N² relationships. */
         final Map<String,SocialLife.Relationship> peerRelationships=new LinkedHashMap<>();
+        /** New in v1.6: per-resident claims with source, confidence and provenance. */
+        final Map<String,LinkedHashMap<String,KnowledgeLife.Belief>> beliefs=new LinkedHashMap<>();
+        final List<KnowledgeLife.Transfer> pendingTransfers=new ArrayList<>();
         SocialLife.Relationship existingRelationship(String id1,String id2) {
             String a=id1.compareTo(id2)<=0?id1:id2;
             String b=id1.compareTo(id2)<=0?id2:id1;
@@ -103,6 +106,8 @@ final class TownLife {
             t.relationship=relationship.copy();
             for(var e:peerRelationships.entrySet())t.peerRelationships.put(e.getKey(),e.getValue().copy());
             for(var e:people.entrySet())t.people.put(e.getKey(),e.getValue().copy());
+            for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
+            t.pendingTransfers.addAll(pendingTransfers);
             return t;
         }
         void copyFrom(Town other) {
@@ -111,6 +116,9 @@ final class TownLife {
             relationship=other.relationship.copy();
             peerRelationships.clear();
             for(var e:other.peerRelationships.entrySet())peerRelationships.put(e.getKey(),e.getValue().copy());
+            beliefs.clear();
+            for(var e:other.beliefs.entrySet())beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
+            pendingTransfers.clear();pendingTransfers.addAll(other.pendingTransfers);
         }
     }
 
@@ -161,8 +169,13 @@ final class TownLife {
         }
         if(!nowTogether)town.meetingSinceTick=-1;
         town.together=nowTogether;
+        int before=interactions.size();
         SocialLife.tick(town,marco,truth,observations,interactions);
         SocialNetwork.tick(town,marco,truth,observations,interactions);
+        for(int i=before;i<interactions.size();i++) {
+            var conversation=interactions.get(i);
+            KnowledgeLife.exchange(town,marco,conversation.firstId(),conversation.secondId());
+        }
     }
 
     private static int clamp(int n) {return Math.max(0,Math.min(100,n));}
@@ -268,10 +281,13 @@ final class TownLife {
         // is not enough to witness an action inside somebody else's apartment.
         String scene=source!=null && source.place==where
                 ? source.currentSpace() : publicSpace(where);
-        truth.add(new Event(clock.day,clock.minute,actor,where,scene,text));
+        Event event=new Event(clock.day,clock.minute,actor,where,scene,text);
+        truth.add(event);
         for(Citizen witness:t.people.values()) {
-            if(witness.presentAt(where) && witness.currentSpace().equals(scene))
+            if(witness.presentAt(where) && witness.currentSpace().equals(scene)) {
                 observations.add(new Observation(witness.id,clock.day,clock.minute,where,scene,text));
+                KnowledgeLife.witnessed(t,event,witness.id);
+            }
         }
     }
 }
