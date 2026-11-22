@@ -45,3 +45,9 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PrivateLivesDatabaseSmokeTest' exec:exec
+      - name: Test autonomous relationships across the generated population
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialNetworkSmokeTest
+      - name: Test arbitrary-pair relationship SQLite persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.SocialNetworkDatabaseSmokeTest' exec:exec

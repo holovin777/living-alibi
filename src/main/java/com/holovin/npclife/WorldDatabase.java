@@ -89,6 +89,22 @@ final class WorldDatabase implements AutoCloseable {
                 }
             }
         }
+        // v1.5: encounter boundaries are persistent; older Marco/Elena relations remain intact.
+        if(!columnExists("town_relationships","last_seen_tick")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE town_relationships ADD COLUMN last_seen_tick INTEGER NOT NULL DEFAULT -1");
+            }
+        }
+        if(!columnExists("town_relationships","meeting_since_tick")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE town_relationships ADD COLUMN meeting_since_tick INTEGER NOT NULL DEFAULT -1");
+            }
+        }
+        if(!columnExists("town_relationships","last_attempt_day")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE town_relationships ADD COLUMN last_attempt_day INTEGER NOT NULL DEFAULT -1");
+            }
+        }
         // v1.4: tag event scenes; historical rows keep an empty space ID because
         // their original exact interior location cannot be reconstructed.
         for(String table:List.of("town_events","town_observations")) {
@@ -315,15 +331,20 @@ final class WorldDatabase implements AutoCloseable {
                     town.meetingSinceTick=(long)(state.day-1)*1440L+state.minute;
             }
         }
-        try(PreparedStatement p=db.prepareStatement("""
-                SELECT * FROM town_relationships WHERE first_id='marco' AND second_id='elena'
-                """);ResultSet rs=p.executeQuery()) {
-            if(rs.next()) {
-                var r=town.relationship;
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT * FROM town_relationships")) {
+            while(rs.next()) {
+                String first=rs.getString("first_id"),second=rs.getString("second_id");
+                if(!town.people.containsKey(first)||!town.people.containsKey(second))continue;
+                boolean legacy=first.equals("marco") && second.equals("elena");
+                SocialLife.Relationship r=legacy?town.relationship:new SocialLife.Relationship(first,second);
                 r.affinity=rs.getInt("affinity");r.trust=rs.getInt("trust");r.tension=rs.getInt("tension");
                 r.encounters=rs.getInt("encounters");r.conversations=rs.getInt("conversations");
                 r.arguments=rs.getInt("arguments");r.lastInteractionTick=rs.getLong("last_interaction_tick");
-                r.rng=rs.getLong("rng");
+                r.rng=rs.getLong("rng");r.lastSeenTick=rs.getLong("last_seen_tick");
+                r.meetingSinceTick=rs.getLong("meeting_since_tick");
+                r.lastAttemptDay=rs.getInt("last_attempt_day");
+                if(!legacy)town.peerRelationships.put(SocialNetwork.key(first,second),r);
             }
         }
         return town;
@@ -424,21 +445,29 @@ final class WorldDatabase implements AutoCloseable {
 
 
     private void persistSocial(TownLife.Town town,List<SocialLife.Interaction> interactions) throws SQLException {
-        var r=town.relationship;
         try(PreparedStatement p=db.prepareStatement("""
             INSERT INTO town_relationships(first_id,second_id,affinity,trust,tension,encounters,
-                                           conversations,arguments,last_interaction_tick,rng)
-            VALUES(?,?,?,?,?,?,?,?,?,?)
+                                           conversations,arguments,last_interaction_tick,rng,last_seen_tick,meeting_since_tick,last_attempt_day)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(first_id,second_id) DO UPDATE SET
                 affinity=excluded.affinity,trust=excluded.trust,tension=excluded.tension,
                 encounters=excluded.encounters,conversations=excluded.conversations,
                 arguments=excluded.arguments,last_interaction_tick=excluded.last_interaction_tick,
-                rng=excluded.rng
+                rng=excluded.rng,last_seen_tick=excluded.last_seen_tick,
+                meeting_since_tick=excluded.meeting_since_tick,last_attempt_day=excluded.last_attempt_day
             """)) {
-            p.setString(1,r.firstId);p.setString(2,r.secondId);p.setInt(3,r.affinity);
-            p.setInt(4,r.trust);p.setInt(5,r.tension);p.setInt(6,r.encounters);
-            p.setInt(7,r.conversations);p.setInt(8,r.arguments);p.setLong(9,r.lastInteractionTick);
-            p.setLong(10,r.rng);p.executeUpdate();
+            List<SocialLife.Relationship> all=new ArrayList<>();
+            all.add(town.relationship);
+            all.addAll(town.peerRelationships.values());
+            for(var r:all) {
+                p.setString(1,r.firstId);p.setString(2,r.secondId);p.setInt(3,r.affinity);
+                p.setInt(4,r.trust);p.setInt(5,r.tension);p.setInt(6,r.encounters);
+                p.setInt(7,r.conversations);p.setInt(8,r.arguments);p.setLong(9,r.lastInteractionTick);
+                p.setLong(10,r.rng);p.setLong(11,r.lastSeenTick);p.setLong(12,r.meetingSinceTick);
+                p.setInt(13,r.lastAttemptDay);
+                p.addBatch();
+            }
+            p.executeBatch();
         }
         try(PreparedStatement p=db.prepareStatement("""
             INSERT INTO social_interactions(day,minute,first_id,second_id,place,kind,description)

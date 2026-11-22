@@ -84,6 +84,15 @@ final class TownLife {
         boolean together;
         long meetingSinceTick=-1;
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
+        /** Other pairs are created on first encounter, rather than preallocating N² relationships. */
+        final Map<String,SocialLife.Relationship> peerRelationships=new LinkedHashMap<>();
+        SocialLife.Relationship existingRelationship(String id1,String id2) {
+            String a=id1.compareTo(id2)<=0?id1:id2;
+            String b=id1.compareTo(id2)<=0?id2:id1;
+            if(a.equals(b))throw new IllegalArgumentException("Choose two different residents.");
+            if(a.equals("elena")&&b.equals("marco"))return relationship;
+            return peerRelationships.get(a+"|"+b);
+        }
         Citizen get(String id) {
             Citizen p=people.get(id.toLowerCase());
             if(p==null)throw new IllegalArgumentException("Unknown resident: "+id+". Use population to list IDs.");
@@ -92,6 +101,7 @@ final class TownLife {
         Town copy() {
             Town t=new Town();t.together=together;t.meetingSinceTick=meetingSinceTick;
             t.relationship=relationship.copy();
+            for(var e:peerRelationships.entrySet())t.peerRelationships.put(e.getKey(),e.getValue().copy());
             for(var e:people.entrySet())t.people.put(e.getKey(),e.getValue().copy());
             return t;
         }
@@ -99,6 +109,8 @@ final class TownLife {
             people.clear();for(var e:other.people.entrySet())people.put(e.getKey(),e.getValue().copy());
             together=other.together;meetingSinceTick=other.meetingSinceTick;
             relationship=other.relationship.copy();
+            peerRelationships.clear();
+            for(var e:other.peerRelationships.entrySet())peerRelationships.put(e.getKey(),e.getValue().copy());
         }
     }
 
@@ -150,6 +162,7 @@ final class TownLife {
         if(!nowTogether)town.meetingSinceTick=-1;
         town.together=nowTogether;
         SocialLife.tick(town,marco,truth,observations,interactions);
+        SocialNetwork.tick(town,marco,truth,observations,interactions);
     }
 
     private static int clamp(int n) {return Math.max(0,Math.min(100,n));}
@@ -166,11 +179,11 @@ final class TownLife {
         e.activity=sleeping?"SLEEPING":(isWorkTime(clock.day,minute)?"WORKING":"FREE_TIME");
         if(minute%15==0)e.fatigue=clamp(e.fatigue+(sleeping?-3:1));
         if(e.travelRemaining>0)return;
-        if(e.hunger>=65&&e.food>0&&(e.place==Place.ELENA_HOME||e.place==Place.MARKET)) {
+        if(!sleeping&&e.hunger>=65&&e.food>0&&(e.place==Place.ELENA_HOME||e.place==Place.MARKET)) {
             e.food--;e.hunger=clamp(e.hunger-48);
             publish(town,clock,"elena",e.place,"Elena Rossi ate a meal.",events,observations);
         }
-        if(e.thirst>=65&&e.water>0&&(e.place==Place.ELENA_HOME||e.place==Place.MARKET)) {
+        if(!sleeping&&e.thirst>=65&&e.water>0&&(e.place==Place.ELENA_HOME||e.place==Place.MARKET)) {
             e.water--;e.thirst=clamp(e.thirst-50);
             publish(town,clock,"elena",e.place,"Elena Rossi drank water.",events,observations);
         }

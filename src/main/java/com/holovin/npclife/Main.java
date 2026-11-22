@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.4 — Private Lives");
+            System.out.println("Living Alibi v1.5 — Social Network");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -71,9 +71,18 @@ public final class Main {
                                 TownLife.sceneLabel(citizen.home,citizen.homeUnit));
                         continue;
                     }
-                    if(lower.equals("relationships") || lower.equals("relationship marco elena") ||
-                            lower.equals("relationship elena marco")) {
-                        relationshipStatus(town);continue;
+                    if(lower.equals("relationships") || lower.startsWith("relationships ")) {
+                        int limit=optionalLimit(input,20);
+                        relationshipOverview(town,limit);continue;
+                    }
+                    if(lower.startsWith("relationship ")) {
+                        String[] ids=arg(input).toLowerCase(Locale.ROOT).split("\\s+");
+                        if(ids.length!=2)throw new IllegalArgumentException("Use relationship <first-id> <second-id>.");
+                        var first=town.get(ids[0]);var second=town.get(ids[1]);
+                        var relation=town.existingRelationship(first.id,second.id);
+                        if(relation==null)System.out.println("No encounter recorded for this pair yet.");
+                        else relationshipStatus(town,relation);
+                        continue;
                     }
                     if(lower.equals("social-events") || lower.startsWith("social-events ")) {
                         var entries=db.socialEvents(optionalLimit(input,20));
@@ -317,10 +326,23 @@ public final class Main {
                 " | Curiosity "+c.curiosity+" | Goal: "+c.goal);
         if(c.generationIndex>0)System.out.println("Procedurally generated citizen (no API calls).");
     }
-    private static void relationshipStatus(TownLife.Town town) {
-        var r=town.relationship;
-        boolean deceased=!town.get("marco").alive || !town.get("elena").alive;
-        System.out.println("Marco Bianchi ↔ Elena Rossi | "+r.label()+
+    private static void relationshipOverview(TownLife.Town town,int limit) {
+        List<SocialLife.Relationship> all=new ArrayList<>();
+        all.add(town.relationship);
+        all.addAll(town.peerRelationships.values());
+        all.sort((a,b)->Integer.compare(b.conversations,a.conversations));
+        System.out.println("Recorded relationship pairs: "+all.size());
+        int shown=0;
+        for(var r:all) {
+            if(shown++>=limit)break;
+            System.out.println("  "+r.firstId+" ↔ "+r.secondId+" | "+r.label()+
+                    " | conversations "+r.conversations+" | trust "+r.trust+"/100");
+        }
+    }
+    private static void relationshipStatus(TownLife.Town town,SocialLife.Relationship r) {
+        var first=town.get(r.firstId);var second=town.get(r.secondId);
+        boolean deceased=!first.alive || !second.alive;
+        System.out.println(first.name+" ↔ "+second.name+" | "+r.label()+
                 (deceased?" (historical; participant deceased)":""));
         System.out.println("Affinity "+r.affinity+"/100 | Trust "+r.trust+"/100 | Tension "+r.tension+"/100");
         System.out.println("Encounters "+r.encounters+" | Conversations "+r.conversations+
@@ -339,7 +361,7 @@ public final class Main {
         System.out.println(" town | population [count] | population generate 12 | resident resident-0001");
         System.out.println(" home <id>             — inspect a resident's private home unit (developer view)");
         System.out.println(" where <id> | known <id> [count] | town-events [count]");
-        System.out.println(" relationships | relationship marco elena | social-events [count]");
+        System.out.println(" relationships [count] | relationship <id> <id> | social-events [count]");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");

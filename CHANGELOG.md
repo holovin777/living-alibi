@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0 — Social Network
+
+- Create persistent pairwise trust, affinity, tension and conversation counts between any residents, not only Marco and Elena.
+- Require precise shared public/private scene and awake co-presence before an encounter can occur.
+- Limit spontaneous conversation attempts to one per pair per in-game day; simulate small talk, friendship, arguments and reconciliation without OpenAI.
+- Preserve Marco and Elena's existing relationship and all previous SQLite history through additive relationship columns.
+- Add `relationships [count]`, `relationship <id> <id>`, and social network smoke/persistence tests in CI.
+- Generated residents and Elena no longer eat or drink meals while their activity is SLEEPING; generated wage event text is clarified.
+- Still no complete NPC cognition, information exchange, lying, family trees or playable detective.
+
 ## 1.4.0 — Private Lives
 
 - Assign a stable private home unit to every citizen, including residents generated in v1.3.

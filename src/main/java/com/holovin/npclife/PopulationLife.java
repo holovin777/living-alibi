@@ -54,11 +54,11 @@ final class PopulationLife {
                 TownLife.publish(town,clock,c.id,c.place,c.name+" purchased water.",events,observations);
             }
         }
-        if(c.hunger>=65 && c.food>0) {
+        if(!sleeping && c.hunger>=65 && c.food>0) {
             c.food--;c.hunger=clamp(c.hunger-50);
             TownLife.publish(town,clock,c.id,c.place,c.name+" ate a meal.",events,observations);
         }
-        if(c.thirst>=65 && c.water>0) {
+        if(!sleeping && c.thirst>=65 && c.water>0) {
             c.water--;c.thirst=clamp(c.thirst-52);
             TownLife.publish(town,clock,c.id,c.place,c.name+" drank water.",events,observations);
         }
@@ -67,7 +67,7 @@ final class PopulationLife {
             c.activity="WORKING";
             if(minute%60==0){
                 c.money+=11;
-                TownLife.publish(town,clock,c.id,c.place,c.name+" earned a day's hourly wage.",events,observations);
+                TownLife.publish(town,clock,c.id,c.place,c.name+" earned EUR 11 for one hour of work.",events,observations);
             }
         } else c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"FREE_TIME";
         if(minute%60==0 && (c.hunger>93||c.thirst>93))c.health=clamp(c.health-2);

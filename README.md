@@ -1,6 +1,6 @@
 # Living Alibi
 
-**v1.4 — Private Lives** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.5 — Social Network** · Java 21+ · Maven · SQLite · headless console prototype
 
 > An independent town, private observations, and a detective who must discover what really happened.
 
@@ -16,7 +16,8 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 - Multiple abstract locations and private home units, timed travel, authoritative world events and per-resident eyewitness logs.
 - **Private events:** two residents in the same residential building do not automatically witness events inside each other's apartment. New records include a distinct `space_id`.
 - Individual need phases reduce synchronized food and water actions across generated residents.
-- Marco/Elena relationship model: small talk, trust, affinity, tension, reconciliation and arguments. **Relationships among procedurally generated citizens are not implemented yet.**
+- **Autonomous relationship network:** any two residents can meet, make small talk, become friends, disagree or reconcile, with separate persistent affinity, trust, tension and interaction history. Legacy Marco/Elena state is preserved. New relationships are created only after a shared-scene encounter.
+- **Social pacing:** each non-legacy pair attempts spontaneous conversation at most once per game day; contact is not guaranteed. This is still an abstract rule-based simulation, not a fully natural dialogue engine.
 - Deterministic generation and simulation; optional paid OpenAI only for direct `talk` and `reflect` commands, never for simulated minutes.
 - Manual time skipping, accelerated live mode and optional offline catch-up *on reopening* (not a continuously hosted server).
 
@@ -43,11 +44,13 @@ population 20
 where resident-0001
 known resident-0001 20
 town-events 20
-relationships
+relationships 20
+relationship resident-0001 resident-0002
+social-events 20
 exit
 ```
 
-`population generate 12` **adds** residents to the existing world (Marco and Elena remain). Generation is deterministic by stable resident index. The command does not automatically create births, migration, families or relationships. Each citizen receives a unique **abstract private unit** within an existing residential area, not a furnished or geometrically modeled apartment.
+`population generate 12` **adds** residents to the existing world (Marco and Elena remain). Generation is deterministic by stable resident index. The command does not automatically create births, migration or families. Relationships form later when residents spend time together. Each citizen receives a unique **abstract private unit** within an existing residential area, not a furnished or geometrically modeled apartment.
 
 ### Other commands
 
@@ -64,7 +67,8 @@ home <id>                # DEBUG: assigned private home unit
 where <id>
 known <id> [count]         # DEBUG: private observation journal
 town-events [count]        # DEBUG: authoritative world truth
-relationships              # currently Marco and Elena only
+relationships [count]       # strongest/most active links first
+relationship <id> <id>     # e.g. relationship resident-0001 resident-0002
 social-events [count]
 events [count]
 memories [count]
@@ -83,7 +87,7 @@ exit
 
 **Developer-only commands:** `town-events` exposes world truth and `known` exposes personal witness logs. The eventual player-detective will instead need to investigate, interview and verify evidence.
 
-## Updating from v1.3
+## Updating from v1.4
 
 Stop the game first. Preserve the local database (important because deaths and other world events are permanent):
 
@@ -172,3 +176,27 @@ mvn -q compile exec:java
 ```
 
 Never commit API keys. OpenAI dialogue receives selected personal memory and eyewitness data; it is not allowed to overwrite world truth.
+
+## Social Network v1.5 verification
+
+After backing up the local `data/world.db` and extracting the archive, run:
+
+```bash
+mvn -q clean test-compile
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialNetworkSmokeTest
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.SocialNetworkDatabaseSmokeTest' exec:exec
+```
+
+The SQLite test uses a **temporary database** and does not modify `data/world.db`.
+
+To inspect a city that already has generated residents:
+
+```text
+simulate 7
+relationships 20
+relationship resident-0001 resident-0002
+social-events 20
+known resident-0001 20
+```
+
+`relationship` shows **"No encounter recorded"** until those residents actually meet. Friends and arguments are game-level social rules. NPCs do not yet share testimony, remember reported claims, hide evidence, fall in love or start families. Only a future detective interface will distinguish public clues from internal developer truth.

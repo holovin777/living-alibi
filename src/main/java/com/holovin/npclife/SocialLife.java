@@ -22,6 +22,9 @@ final class SocialLife {
         int conversations;
         int arguments;
         long lastInteractionTick=-1;
+        long lastSeenTick=-1; // v1.5: last time two residents could interact
+        long meetingSinceTick=-1;
+        int lastAttemptDay=-1; // v1.5: at most one spontaneous approach attempt per day
         long rng=0x6A09E667F3BCC909L;
 
         Relationship(String firstId,String secondId) {
@@ -32,6 +35,8 @@ final class SocialLife {
             r.affinity=affinity;r.trust=trust;r.tension=tension;
             r.encounters=encounters;r.conversations=conversations;r.arguments=arguments;
             r.lastInteractionTick=lastInteractionTick;r.rng=rng;
+            r.lastSeenTick=lastSeenTick;r.meetingSinceTick=meetingSinceTick;
+            r.lastAttemptDay=lastAttemptDay;
             return r;
         }
         String label() {
