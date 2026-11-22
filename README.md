@@ -1,6 +1,6 @@
 # Living Alibi
 
-**v1.6 — Memory & Beliefs** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.7 — Secrets & Deception** · Java 21+ · Maven · SQLite · headless console prototype
 
 > An independent town, private observations, and a detective who must discover what really happened.
 
@@ -18,7 +18,8 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 - Individual need phases reduce synchronized food and water actions across generated residents.
 - **Autonomous relationship network:** any two residents can meet, make small talk, become friends, disagree or reconcile, with separate persistent affinity, trust, tension and interaction history. Legacy Marco/Elena state is preserved. New relationships are created only after a shared-scene encounter.
 - **Social pacing:** each non-legacy pair attempts spontaneous conversation at most once per game day; contact is not guaranteed. This is still an abstract rule-based simulation, not a fully natural dialogue engine.
-- **Attributed beliefs (new in v1.6):** residents record notable witnessed events as `DIRECT` and can relay one claim per real conversation. Secondhand `HEARD` claims retain the original event, source ID, relay hops and a reduced confidence score; gossip never writes to world truth.
+- **Attributed beliefs (since v1.6):** residents record notable witnessed events as `DIRECT` and can relay one claim per real conversation. Secondhand `HEARD` claims retain the original event, source ID, relay hops and a reduced confidence score; gossip never writes to world truth.
+- **Secrets & Deception (new in v1.7):** some personally sensitive witnessed events become private. A resident may conceal them or intentionally give a false claim depending on trust and carefulness. The false claim enters hearsay, never world truth. All decisions are recorded separately for developer audits.
 - **Epistemic separation:** `town-events` is authoritative developer truth, `known` is a direct sensory event log, `beliefs` is a filtered attributed claim journal, and `rumors` is a relay log.
 - Deterministic generation and simulation; optional paid OpenAI only for direct `talk` and `reflect` commands, never for simulated minutes.
 - Manual time skipping, accelerated live mode and optional offline catch-up *on reopening* (not a continuously hosted server).
@@ -51,6 +52,8 @@ relationship resident-0001 resident-0002
 social-events 20
 beliefs resident-0001 20
 rumors 20
+secrets marco 20
+deceptions 20
 exit
 ```
 
@@ -76,6 +79,8 @@ relationship <id> <id>     # e.g. relationship resident-0001 resident-0002
 social-events [count]
 beliefs <id> [count]       # DEBUG: DIRECT/HEARD, source, confidence, hops
 rumors [count]            # DEBUG: who told what to whom
+secrets <id> [count]      # DEBUG ONLY: sensitive event keys for a resident
+deceptions [count]        # DEBUG ONLY: withheld / deliberate lies
 events [count]
 memories [count]
 facts
@@ -91,9 +96,9 @@ offline off
 exit
 ```
 
-**Developer-only commands:** `town-events` exposes world truth, `known` exposes direct witness logs, and `beliefs`/`rumors` expose attributed reports. The eventual player-detective will instead need to investigate, interview and verify evidence.
+**Developer-only commands:** `town-events` exposes world truth, `known` exposes direct witness logs, `beliefs`/`rumors` expose attributed reports and `secrets`/`deceptions` expose confidential knowledge and deception decisions. The eventual player-detective will instead need to investigate, interview and verify evidence.
 
-## Updating safely from v1.5
+## Updating safely from v1.6
 
 Stop the game first. Preserve the local database (important because deaths and other world events are permanent):
 
@@ -105,20 +110,23 @@ if [ -f data/world.db ]; then
 fi
 ```
 
-Download the `living-alibi-v1.6.zip` release archive, then **unzip from `~/Repositories`** so the files update the existing checkout instead of creating an unrelated project:
+Download the `living-alibi-v1.7.zip` release archive, then **unzip from `~/Repositories`** so the files update the existing checkout instead of creating an unrelated project:
 
 ```bash
 cd ~/Repositories
-unzip -o ~/Downloads/living-alibi-v1.6.zip
+unzip -o ~/Downloads/living-alibi-v1.7.zip
 cd living-alibi
 mvn -q clean test-compile
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.PrivateLivesSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialNetworkSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.KnowledgeSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.KnowledgeIntegrationSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.DeceptionSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.DeceptionIntegrationSmokeTest
 mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PrivateLivesDatabaseSmokeTest' exec:exec
 mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.SocialNetworkDatabaseSmokeTest' exec:exec
 mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.KnowledgeDatabaseSmokeTest' exec:exec
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.DeceptionDatabaseSmokeTest' exec:exec
 mvn -q compile exec:java
 ```
 
@@ -127,11 +135,11 @@ Only after checking the new version:
 ```bash
 git status
 git add .github README.md CHANGELOG.md docs pom.xml src
-git commit -m "Add attributable NPC memories and information sharing"
+git commit -m "Add private NPC secrets and deceptive testimony"
 git push
 ```
 
-The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. Database migration adds `resident_beliefs` and `information_transfers` without deleting existing game state, relationships or dialogue. Previously recorded eyewitness logs are not retroactively converted to v1.6 beliefs.
+The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. Database migration adds `resident_secrets` and `deception_decisions` without deleting v1.6 beliefs, world events, relationships or dialogue. Past events are not retroactively assigned secrets.
 
 ## Architecture
 
@@ -144,11 +152,12 @@ The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. D
 | `PopulationLife.java` | Autonomous needs, schedules, shopping and travel of generated residents |
 | `SocialNetwork.java` | Autonomous pairwise interactions among all residents |
 | `KnowledgeLife.java` | Provenance-aware, first-hand and hearsay claims |
+| `DeceptionLife.java` | Secret eyewitness events, withholding, and false reports |
 | `WorldDatabase.java` | SQLite persistence and additive migrations |
 | `Main.java` | Console commands and time management |
 | `OpenAiDialogue.java` | Optional paid conversation/reflection (Marco only) |
 
-See [docs/BELIEFS.md](docs/BELIEFS.md), [docs/PRIVATE_LIVES.md](docs/PRIVATE_LIVES.md), [docs/SOCIAL_NETWORK.md](docs/SOCIAL_NETWORK.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+See [docs/SECRETS_AND_DECEPTION.md](docs/SECRETS_AND_DECEPTION.md), [docs/BELIEFS.md](docs/BELIEFS.md), [docs/PRIVATE_LIVES.md](docs/PRIVATE_LIVES.md), [docs/SOCIAL_NETWORK.md](docs/SOCIAL_NETWORK.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Tests
 
@@ -171,7 +180,7 @@ Smoke tests do not replace more thorough integration and balance testing. GitHub
 
 - **Not yet one unified citizen engine.** Marco, Elena and generated people currently have different rule implementations; behavior isn't fully comparable. A shared agent architecture is the next technical priority.
 - Each resident has an abstract private apartment within a building, but there are no doors, sightlines, rooms, shared households or audibility mechanics yet. Public locations still treat everyone present as an eligible witness. **This is not forensic-quality evidence.**
-- Generated residents form basic pairwise relationships and carry simple attributed claims, but have no children, migration, autonomous crimes, intentional deception, complex memory decay or freeform AI conversations yet.
+- Generated residents form basic pairwise relationships and can conceal or lie about selected experiences, but have no children, migration, autonomous crimes, sophisticated deception plans, complex memory decay or freeform AI conversations yet.
 - Only two named residents are pre-authored. New identities appear **only when you request population generation**, not automatically on a timer.
 - Travel uses approximate times and does not have routes or a map. Some legacy Marco actions do not yet require physical presence at a site.
 - Maximum 40 generated residents (42 including Marco and Elena) is a conservative testing cap, not a general engine limit.

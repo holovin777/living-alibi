@@ -47,6 +47,7 @@ final class KnowledgeLife {
         own.put(key,new Belief(residentId,key,event.day(),event.minute(),event.actorId(),
                 event.spaceId(),event.text(),"DIRECT",residentId,
                 event.day(),event.minute(),0,100));
+        DeceptionLife.onWitness(town,event,residentId);
     }
 
     /** Only an actual conversation between co-present, awake, living residents can relay a claim. */
@@ -79,13 +80,21 @@ final class KnowledgeLife {
         if(chosen==null)return false;
         var relation=town.existingRelationship(speaker.id,listener.id);
         int trust=relation==null?45:relation.trust;
+        DeceptionLife.Mode mode=DeceptionLife.mode(town,speaker,listener,chosen.eventKey(),trust);
+        if(mode==DeceptionLife.Mode.WITHHELD) {
+            DeceptionLife.log(town,clock,speaker.id,listener.id,chosen.eventKey(),mode,"[withheld]");
+            return false;
+        }
+        String claimed=mode==DeceptionLife.Mode.LIE
+                ?DeceptionLife.falseStatement(chosen.statement()):chosen.statement();
+        DeceptionLife.log(town,clock,speaker.id,listener.id,chosen.eventKey(),mode,claimed);
         int confidence=Math.max(20,Math.min(90,chosen.confidence()-12-(100-trust)/8));
         int hops=chosen.hops()+1;
         receiver.put(chosen.eventKey(),new Belief(listener.id,chosen.eventKey(),
                 chosen.eventDay(),chosen.eventMinute(),chosen.actorId(),chosen.sceneId(),
-                chosen.statement(),"HEARD",speaker.id,clock.day,clock.minute,hops,confidence));
+                claimed,"HEARD",speaker.id,clock.day,clock.minute,hops,confidence));
         town.pendingTransfers.add(new Transfer(clock.day,clock.minute,speaker.id,
-                listener.id,chosen.eventKey(),confidence,hops,chosen.statement()));
+                listener.id,chosen.eventKey(),confidence,hops,claimed));
         return true;
     }
 }

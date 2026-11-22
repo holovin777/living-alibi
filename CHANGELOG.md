@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.0 — Secrets & Deception
+
+- Mark a small deterministic subset of personally sensitive DIRECT events as privately held secrets.
+- At real NPC conversations, choose truthful reporting, intentional false claims or withholding based on trust and carefulness.
+- Preserve world truth separately from deceptive HEARD claims and track deceptive actions in a developer-only audit journal.
+- Persist `resident_secrets` and `deception_decisions` in additive SQLite tables without rewriting legacy history.
+- Fix belief UPSERT so a subsequent direct observation also restores the truthful statement text in SQLite.
+- Add `secrets <id>`, `deceptions`, dedicated rule-based and SQLite round-trip tests.
+- Still no generated crime cases, detective interview UI, sophisticated motives or full natural language deception.
+
+
 ## 1.6.0 — Memory & Beliefs
 
 - Track important firsthand events as `DIRECT` beliefs and preserve their source event identity.

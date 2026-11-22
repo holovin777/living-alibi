@@ -136,6 +136,22 @@ final class WorldDatabase implements AutoCloseable {
                     hops INTEGER NOT NULL, statement TEXT NOT NULL)
                 """);
         }
+        // v1.7: confidential eyewitness experiences and deliberate misstatements.
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS resident_secrets (
+                    keeper_id TEXT NOT NULL, event_key TEXT NOT NULL,
+                    day INTEGER NOT NULL, minute INTEGER NOT NULL, reason TEXT NOT NULL,
+                    PRIMARY KEY(keeper_id,event_key))
+                """);
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS deception_decisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+                    minute INTEGER NOT NULL, from_id TEXT NOT NULL, to_id TEXT NOT NULL,
+                    event_key TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('WITHHELD','LIE')),
+                    statement TEXT NOT NULL)
+                """);
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -261,9 +277,13 @@ final class WorldDatabase implements AutoCloseable {
                 persistTown(town,townEvents,observations);
                 persistSocial(town,socialEvents);
                 persistKnowledge(town);
+                persistDeception(town);
             }
             db.commit();
-            if(town!=null)town.pendingTransfers.clear();
+            if(town!=null) {
+                town.pendingTransfers.clear();
+                town.pendingDecisions.clear();
+            }
         } catch(SQLException ex) {db.rollback();throw ex;}
         finally{db.setAutoCommit(true);}
     }
@@ -383,6 +403,17 @@ final class WorldDatabase implements AutoCloseable {
                         rs.getInt("learned_minute"),rs.getInt("hops"),rs.getInt("confidence"));
                 town.beliefs.computeIfAbsent(resident,ignored->new LinkedHashMap<>())
                         .put(belief.eventKey(),belief);
+            }
+        }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT * FROM resident_secrets ORDER BY day,minute,event_key")) {
+            while(rs.next()) {
+                String keeper=rs.getString("keeper_id");
+                if(!town.people.containsKey(keeper))continue;
+                var secret=new DeceptionLife.Secret(keeper,rs.getString("event_key"),
+                        rs.getInt("day"),rs.getInt("minute"),rs.getString("reason"));
+                town.secrets.computeIfAbsent(keeper,ignored->new LinkedHashMap<>())
+                        .put(secret.eventKey(),secret);
             }
         }
         return town;
@@ -544,8 +575,9 @@ final class WorldDatabase implements AutoCloseable {
                 actor_id,scene_id,statement,origin,learned_from,learned_day,learned_minute,hops,confidence)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(resident_id,event_key) DO UPDATE SET
-                origin=excluded.origin,learned_from=excluded.learned_from,
-                learned_day=excluded.learned_day,learned_minute=excluded.learned_minute,
+                statement=excluded.statement,actor_id=excluded.actor_id,
+                scene_id=excluded.scene_id,origin=excluded.origin,
+                learned_from=excluded.learned_from,learned_day=excluded.learned_day,learned_minute=excluded.learned_minute,
                 hops=excluded.hops,confidence=excluded.confidence
             """)) {
             for(var entries:town.beliefs.values())for(var b:entries.values()) {
@@ -571,6 +603,59 @@ final class WorldDatabase implements AutoCloseable {
             }
             if(!town.pendingTransfers.isEmpty())p.executeBatch();
         }
+    }
+
+    private void persistDeception(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT OR IGNORE INTO resident_secrets(keeper_id,event_key,day,minute,reason)
+                VALUES(?,?,?,?,?)
+                """)) {
+            for(var secrets:town.secrets.values())for(var s:secrets.values()) {
+                p.setString(1,s.keeperId());p.setString(2,s.eventKey());
+                p.setInt(3,s.day());p.setInt(4,s.minute());p.setString(5,s.reason());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO deception_decisions(day,minute,from_id,to_id,event_key,kind,statement)
+                VALUES(?,?,?,?,?,?,?)
+                """)) {
+            for(var d:town.pendingDecisions) {
+                p.setInt(1,d.day());p.setInt(2,d.minute());
+                p.setString(3,d.fromId());p.setString(4,d.toId());
+                p.setString(5,d.eventKey());p.setString(6,d.kind());
+                p.setString(7,d.statement());p.addBatch();
+            }
+            if(!town.pendingDecisions.isEmpty())p.executeBatch();
+        }
+    }
+
+    List<DeceptionLife.Secret> secrets(String keeperId,int limit) throws SQLException {
+        List<DeceptionLife.Secret> result=new ArrayList<>();
+        try(PreparedStatement p=db.prepareStatement("""
+                SELECT * FROM resident_secrets WHERE keeper_id=? ORDER BY day DESC,minute DESC LIMIT ?
+                """)) {
+            p.setString(1,keeperId);p.setInt(2,limit);
+            try(ResultSet rs=p.executeQuery()) { while(rs.next())result.add(new DeceptionLife.Secret(
+                rs.getString("keeper_id"),rs.getString("event_key"),rs.getInt("day"),
+                rs.getInt("minute"),rs.getString("reason"))); }
+        }
+        Collections.reverse(result);return result;
+    }
+
+    List<DeceptionLife.Decision> deceptions(int limit) throws SQLException {
+        List<DeceptionLife.Decision> result=new ArrayList<>();
+        try(PreparedStatement p=db.prepareStatement("""
+                SELECT * FROM deception_decisions ORDER BY id DESC LIMIT ?
+                """)) {
+            p.setInt(1,limit);
+            try(ResultSet rs=p.executeQuery()) { while(rs.next())result.add(new DeceptionLife.Decision(
+                rs.getInt("day"),rs.getInt("minute"),rs.getString("from_id"),
+                rs.getString("to_id"),rs.getString("event_key"),rs.getString("kind"),
+                rs.getString("statement"))); }
+        }
+        Collections.reverse(result);return result;
     }
 
     List<KnowledgeLife.Belief> beliefs(String residentId,int limit) throws SQLException {

@@ -89,6 +89,8 @@ final class TownLife {
         /** New in v1.6: per-resident claims with source, confidence and provenance. */
         final Map<String,LinkedHashMap<String,KnowledgeLife.Belief>> beliefs=new LinkedHashMap<>();
         final List<KnowledgeLife.Transfer> pendingTransfers=new ArrayList<>();
+        final Map<String,LinkedHashMap<String,DeceptionLife.Secret>> secrets=new LinkedHashMap<>();
+        final List<DeceptionLife.Decision> pendingDecisions=new ArrayList<>();
         SocialLife.Relationship existingRelationship(String id1,String id2) {
             String a=id1.compareTo(id2)<=0?id1:id2;
             String b=id1.compareTo(id2)<=0?id2:id1;
@@ -108,6 +110,8 @@ final class TownLife {
             for(var e:people.entrySet())t.people.put(e.getKey(),e.getValue().copy());
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
+            for(var e:secrets.entrySet())t.secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
+            t.pendingDecisions.addAll(pendingDecisions);
             return t;
         }
         void copyFrom(Town other) {
@@ -119,6 +123,9 @@ final class TownLife {
             beliefs.clear();
             for(var e:other.beliefs.entrySet())beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             pendingTransfers.clear();pendingTransfers.addAll(other.pendingTransfers);
+            secrets.clear();
+            for(var e:other.secrets.entrySet())secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
+            pendingDecisions.clear();pendingDecisions.addAll(other.pendingDecisions);
         }
     }
 
@@ -138,6 +145,7 @@ final class TownLife {
         Place initial=desiredMarco(marco,null);
         t.people.put("marco",new Citizen("marco","Marco Bianchi","Baker",initial));
         t.get("marco").home=Place.MARCO_HOME;t.get("marco").workplace=Place.BAKERY;
+        t.get("marco").carefulness=marco.personalityCareful;
         t.people.put("elena",new Citizen("elena","Elena Rossi","Shopkeeper",desiredElena(marco.day,marco.minute)));
         t.get("elena").home=Place.ELENA_HOME;t.get("elena").workplace=Place.MARKET;
         t.get("elena").activity="WORKING";
@@ -153,6 +161,7 @@ final class TownLife {
                      List<SocialLife.Interaction> interactions) {
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;
+        m.carefulness=marco.personalityCareful;
         m.age=marco.age;
         m.hunger=marco.hunger;m.thirst=marco.thirst;m.fatigue=marco.fatigue;
         m.health=marco.health;m.money=marco.money;m.activity=marco.activity;

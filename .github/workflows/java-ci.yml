@@ -59,3 +59,11 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.KnowledgeDatabaseSmokeTest' exec:exec
+      - name: Test secrets and dishonest claims without changing world truth
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.DeceptionSmokeTest
+      - name: Test SQLite secret and deceptive claim persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.DeceptionDatabaseSmokeTest' exec:exec
+      - name: Test deception in a full two-week simulated town
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.DeceptionIntegrationSmokeTest

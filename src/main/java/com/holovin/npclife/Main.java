@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.6 — Memory & Beliefs");
+            System.out.println("Living Alibi v1.7 — Secrets & Deception");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -89,6 +89,27 @@ public final class Main {
                         if(entries.isEmpty())System.out.println("No social conversations recorded yet.");
                         for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
                                 " | "+e.kind()+" | "+e.place().label+" | "+e.description());
+                        continue;
+                    }
+                    if(lower.startsWith("secrets ")) {
+                        String[] parts=arg(input).toLowerCase(Locale.ROOT).split("\\s+");
+                        if(parts.length<1 || parts.length>2)
+                            throw new IllegalArgumentException("Use secrets <resident-id> [count].");
+                        var owner=town.get(parts[0]);
+                        int limit=parts.length==1?20:Integer.parseInt(parts[1]);
+                        if(limit<1||limit>100)throw new IllegalArgumentException("Count must be 1–100.");
+                        var items=db.secrets(owner.id,limit);
+                        System.out.println("Developer-only private secrets for "+owner.name+": "+items.size());
+                        for(var s:items)System.out.println("Day "+s.day()+" "+clock(s.minute())+
+                                " | "+s.eventKey()+" | "+s.reason());
+                        continue;
+                    }
+                    if(lower.equals("deceptions")||lower.startsWith("deceptions ")) {
+                        var items=db.deceptions(optionalLimit(input,20));
+                        if(items.isEmpty())System.out.println("No concealments or deliberate lies recorded yet.");
+                        for(var d:items)System.out.println("Day "+d.day()+" "+clock(d.minute())+
+                                " | "+d.kind()+" | "+d.fromId()+" -> "+d.toId()+
+                                " | "+d.statement());
                         continue;
                     }
                     if(lower.startsWith("where ")) {
@@ -385,6 +406,7 @@ public final class Main {
         System.out.println(" where <id> | known <id> [count] | town-events [count]");
         System.out.println(" relationships [count] | relationship <id> <id> | social-events [count]");
         System.out.println(" beliefs <id> [count] | rumors [count] — attributed claims (developer view)");
+        System.out.println(" secrets <id> [count] | deceptions [count] — confidential developer diagnostics");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");
