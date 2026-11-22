@@ -1,0 +1,29 @@
+# Build output
+/target/
+*.class
+
+# Local game state and conversation history
+/data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# Credentials and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE files
+.idea/
+.vscode/
+.settings/
+.project
+.classpath
+.DS_Store
+
+# Backups and logs
+*.backup
+*.log
