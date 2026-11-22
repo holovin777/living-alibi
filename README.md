@@ -1,6 +1,8 @@
 # Living Alibi
 
-**v1.2 — Social Life** · Headless Java detective-simulation prototype
+> **v1.2.1 stability update:** Elena now buys essentials on weekends and recovers health slowly with adequate food, water and rest. Existing character deaths remain permanent in saved worlds.
+
+**v1.2.1 — Social Life (stability fix)** · Headless Java detective-simulation prototype
 
 > An independent world, private memories, and a detective who must discover what really happened.
 
@@ -93,7 +95,7 @@ exit
 
 Compare the `known` results: both people may know about a meeting, but a person absent from an event should have no record of it.
 
-## Updating from Living Alibi v1.1
+## Updating from Living Alibi v1.2
 
 **Stop the game first. Back up your local database if you have one:**
 
@@ -105,16 +107,17 @@ if [ -f data/world.db ]; then
 fi
 ```
 
-Extract the `living-alibi-v1.2.zip` archive **from `~/Repositories`**, preserving your existing `.git` directory and ignored local database:
+Extract the `living-alibi-v1.2.1.zip` archive **from `~/Repositories`**, preserving your existing `.git` directory and ignored local database:
 
 ```bash
 cd ~/Repositories
-unzip -o ~/Downloads/living-alibi-v1.2.zip
+unzip -o ~/Downloads/living-alibi-v1.2.1.zip
 cd living-alibi
 mvn -q test-compile
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.SimulationSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.TownSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.ElenaSurvivalSmokeTest
 mvn -q -Dexec.mainClass=com.holovin.npclife.SocialDatabaseSmokeTest -Dexec.classpathScope=test exec:java
 mvn -q compile exec:java
 ```
@@ -124,13 +127,25 @@ Inspect changes and commit your update using your existing GitHub SSH remote:
 ```bash
 git status --short
 git add .github README.md CHANGELOG.md docs pom.xml src
-git commit -m "Add autonomous social life and persistent relationships"
+git commit -m "Fix Elena weekend shopping and health recovery"
 git push
 ```
 
 Nothing in the update archive overwrites `data/`, your `.git` directory, or any API configuration.
 
-GitHub Actions automatically compiles and runs four smoke tests on pushes and pull requests.
+GitHub Actions automatically compiles and runs five smoke tests on pushes and pull requests.
+
+## Existing simulated deaths and creating a new test world
+
+This fix does **not** revive Elena if she is already dead in your saved database. The game intentionally treats death as permanent. To observe the corrected survival rules from a fresh start, first exit the game, then **preserve the old world** in the ignored `data/` directory:
+
+```bash
+cd ~/Repositories/living-alibi
+mv data/world.db "data/world-day15-archive-$(date +%Y%m%d-%H%M%S).db"
+mvn -q compile exec:java
+```
+
+A new `data/world.db` will be created; the archived world remains available for later investigation. **Do not run this while the program is open.** If you prefer to preserve the original timeline as the active world, skip the `mv` command; Elena will remain deceased there.
 
 ## Persistent storage
 
@@ -177,6 +192,7 @@ src/test/java/com/holovin/npclife/
   SimulationSmokeTest.java
   TownSmokeTest.java
   SocialSmokeTest.java
+  ElenaSurvivalSmokeTest.java
   SocialDatabaseSmokeTest.java
 ```
 

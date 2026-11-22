@@ -263,7 +263,9 @@ public final class Main {
     }
     private static void relationshipStatus(TownLife.Town town) {
         var r=town.relationship;
-        System.out.println("Marco Bianchi ↔ Elena Rossi | "+r.label());
+        boolean deceased=!town.get("marco").alive || !town.get("elena").alive;
+        System.out.println("Marco Bianchi ↔ Elena Rossi | "+r.label()+
+                (deceased?" (historical; participant deceased)":""));
         System.out.println("Affinity "+r.affinity+"/100 | Trust "+r.trust+"/100 | Tension "+r.tension+"/100");
         System.out.println("Encounters "+r.encounters+" | Conversations "+r.conversations+
                 " | Arguments "+r.arguments);

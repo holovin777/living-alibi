@@ -27,5 +27,7 @@ jobs:
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.TownSmokeTest
       - name: Test NPC social interactions
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialSmokeTest
+      - name: Test Elena weekend shopping and long-term survival
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.ElenaSurvivalSmokeTest
       - name: Test social persistence and v1.1 SQLite migration
         run: mvn --batch-mode --no-transfer-progress -q -Dexec.mainClass=com.holovin.npclife.SocialDatabaseSmokeTest -Dexec.classpathScope=test exec:java

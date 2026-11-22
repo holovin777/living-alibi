@@ -105,7 +105,7 @@ final class TownLife {
         m.food=marco.food;m.water=marco.water;
         if(m.alive)move(town,m,desiredMarco(marco,m.place),marco,truth,observations);
         elenaNeeds(e,marco,truth,observations,town);
-        if(e.alive)move(town,e,desiredElena(marco.day,marco.minute),marco,truth,observations);
+        if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e),marco,truth,observations);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {
             town.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
@@ -154,6 +154,9 @@ final class TownLife {
             }
         }
         if(minute%60==0 && (e.hunger>93||e.thirst>93)) e.health=clamp(e.health-2);
+        // Elena can recover after a shortage instead of remaining permanently at low health.
+        if(minute%180==0 && e.hunger<65 && e.thirst<60 && e.fatigue<85)
+            e.health=clamp(e.health+1);
         if(e.health==0) {
             e.alive=false;e.activity="DECEASED";
             publish(town,clock,"elena",e.place,"Elena Rossi died from declining health.",events,observations);
@@ -163,8 +166,20 @@ final class TownLife {
         return (day-1)%7<5 && minute>=420 && minute<960;
     }
     private static Place desiredElena(int day,int minute) {
+        // Initial placement, before the citizen has a local inventory snapshot.
         if(minute<390||minute>=1320)return Place.ELENA_HOME;
         if(isWorkTime(day,minute))return Place.MARKET;
+        if(minute>=960 && minute<1200)return (day%3==0)?Place.CAFE:Place.PARK;
+        return Place.ELENA_HOME;
+    }
+    private static Place desiredElena(int day,int minute,Citizen e) {
+        if(minute<390 || minute>=1320)return Place.ELENA_HOME;
+        if(isWorkTime(day,minute))return Place.MARKET;
+        // Shopping is a separate need, not an effect of having a weekday job.
+        // On weekends she still visits the market when food/water runs low.
+        if(minute>=420 && minute<1200 &&
+                ((e.food<2 && e.money>=9) || (e.water<2 && e.money>=3)))
+            return Place.MARKET;
         if(minute>=960 && minute<1200)return (day%3==0)?Place.CAFE:Place.PARK;
         return Place.ELENA_HOME;
     }

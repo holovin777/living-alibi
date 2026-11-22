@@ -1,3 +1,10 @@
+## v1.2.1 — NPC survival regression fix
+- Elena can visit the market on weekends when food or water stocks run low.
+- Health recovers slowly during adequate care; it no longer remains permanently reduced after a temporary shortage.
+- Historical relationship status explicitly marks deceased participants.
+- Added `ElenaSurvivalSmokeTest` covering 35 game days and permanent death.
+- Saved deaths are **not** reversed by upgrading. To retest a fresh world, move `data/world.db` aside after backing it up.
+
 # Changelog
 
 ## 1.2.0 — Social Life
