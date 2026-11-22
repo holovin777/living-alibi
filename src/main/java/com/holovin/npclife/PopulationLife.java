@@ -19,8 +19,11 @@ final class PopulationLife {
                                  List<TownLife.Event> events,List<TownLife.Observation> observations) {
         int minute=clock.minute;
         if(minute==0 && clock.day>1 && (clock.day-1)%365==0)c.age++;
-        if(minute%12==0)c.hunger=clamp(c.hunger+1);
-        if(minute%10==0)c.thirst=clamp(c.thirst+1);
+        // Keep each resident's need cycles independent of everyone else's.
+        int hungerPhase=Math.floorMod(c.generationIndex*7,12);
+        int thirstPhase=Math.floorMod(c.generationIndex*3,10);
+        if((minute+hungerPhase)%12==0)c.hunger=clamp(c.hunger+1);
+        if((minute+thirstPhase)%10==0)c.thirst=clamp(c.thirst+1);
         boolean sleeping=minute<390||minute>=1320;
         if(minute%15==0)c.fatigue=clamp(c.fatigue+(sleeping?-3:1));
         boolean workday=(clock.day-1)%7<5;

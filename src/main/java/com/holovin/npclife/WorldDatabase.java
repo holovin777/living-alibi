@@ -81,10 +81,20 @@ final class WorldDatabase implements AutoCloseable {
         citizenColumns.put("schedule_offset","INTEGER NOT NULL DEFAULT 0");
         citizenColumns.put("generation_index","INTEGER NOT NULL DEFAULT 0");
         citizenColumns.put("personal_seed","INTEGER NOT NULL DEFAULT 0");
+        citizenColumns.put("home_unit","TEXT NOT NULL DEFAULT ''");
         for(var col:citizenColumns.entrySet()) {
             if(!columnExists("town_people",col.getKey())) {
                 try(Statement st=db.createStatement()) {
                     st.executeUpdate("ALTER TABLE town_people ADD COLUMN "+col.getKey()+" "+col.getValue());
+                }
+            }
+        }
+        // v1.4: tag event scenes; historical rows keep an empty space ID because
+        // their original exact interior location cannot be reconstructed.
+        for(String table:List.of("town_events","town_observations")) {
+            if(!columnExists(table,"space_id")) {
+                try(Statement st=db.createStatement()) {
+                    st.executeUpdate("ALTER TABLE "+table+" ADD COLUMN space_id TEXT NOT NULL DEFAULT ''");
                 }
             }
         }
@@ -279,6 +289,10 @@ final class WorldDatabase implements AutoCloseable {
                 p.hunger=rs.getInt("hunger");p.thirst=rs.getInt("thirst");p.fatigue=rs.getInt("fatigue");
                 p.health=rs.getInt("health");p.money=rs.getInt("money");p.food=rs.getInt("food");
                 p.water=rs.getInt("water");p.age=rs.getInt("age");p.alive=rs.getInt("alive")!=0;
+                String savedHomeUnit=rs.getString("home_unit");
+                // Upgrading v1.3 saves assigns each existing resident a distinct unit.
+                p.homeUnit=(savedHomeUnit==null||savedHomeUnit.isBlank())
+                        ? TownLife.privateUnit(p.id) : savedHomeUnit;
                 if(p.id.startsWith("resident-")) {
                     p.home=TownLife.Place.valueOf(rs.getString("home_place"));
                     p.workplace=TownLife.Place.valueOf(rs.getString("work_place"));
@@ -320,8 +334,8 @@ final class WorldDatabase implements AutoCloseable {
         try(PreparedStatement p=db.prepareStatement("""
             INSERT INTO town_people(id,place,destination,travel_remaining,activity,hunger,thirst,fatigue,
                                     health,money,food,water,age,alive,name,occupation,home_place,work_place,
-                                    sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                    sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed,home_unit)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,activity=excluded.activity,
@@ -333,7 +347,7 @@ final class WorldDatabase implements AutoCloseable {
                 sociability=excluded.sociability,carefulness=excluded.carefulness,
                 curiosity=excluded.curiosity,goal=excluded.goal,
                 schedule_offset=excluded.schedule_offset,generation_index=excluded.generation_index,
-                personal_seed=excluded.personal_seed
+                personal_seed=excluded.personal_seed,home_unit=excluded.home_unit
             """)) {
             for(var c:town.people.values()) {
                 p.setString(1,c.id);p.setString(2,c.place.name());p.setString(3,c.destination.name());
@@ -346,7 +360,7 @@ final class WorldDatabase implements AutoCloseable {
                 p.setInt(19,c.sociability);p.setInt(20,c.carefulness);
                 p.setInt(21,c.curiosity);p.setString(22,c.goal);
                 p.setInt(23,c.scheduleOffset);p.setInt(24,c.generationIndex);
-                p.setLong(25,c.personalSeed);
+                p.setLong(25,c.personalSeed);p.setString(26,c.homeUnit);
                 p.addBatch();
             }
             p.executeBatch();
@@ -359,20 +373,22 @@ final class WorldDatabase implements AutoCloseable {
             p.setInt(1,town.together?1:0);p.setLong(2,town.meetingSinceTick);p.executeUpdate();
         }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO town_events(day,minute,actor_id,place,text) VALUES(?,?,?,?,?)
+            INSERT INTO town_events(day,minute,actor_id,place,space_id,text) VALUES(?,?,?,?,?,?)
             """)) {
             for(var e:events) {
                 p.setInt(1,e.day());p.setInt(2,e.minute());p.setString(3,e.actorId());
-                p.setString(4,e.place().name());p.setString(5,e.text());p.addBatch();
+                p.setString(4,e.place().name());p.setString(5,e.spaceId());
+                p.setString(6,e.text());p.addBatch();
             }
             if(!events.isEmpty())p.executeBatch();
         }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO town_observations(witness_id,day,minute,place,text) VALUES(?,?,?,?,?)
+            INSERT INTO town_observations(witness_id,day,minute,place,space_id,text) VALUES(?,?,?,?,?,?)
             """)) {
             for(var o:observations) {
                 p.setString(1,o.witnessId());p.setInt(2,o.day());p.setInt(3,o.minute());
-                p.setString(4,o.place().name());p.setString(5,o.text());p.addBatch();
+                p.setString(4,o.place().name());p.setString(5,o.spaceId());
+                p.setString(6,o.text());p.addBatch();
             }
             if(!observations.isEmpty())p.executeBatch();
         }
@@ -381,12 +397,12 @@ final class WorldDatabase implements AutoCloseable {
     List<TownLife.Event> townEvents(int limit) throws SQLException {
         List<TownLife.Event> entries=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-            SELECT day,minute,actor_id,place,text FROM town_events ORDER BY id DESC LIMIT ?
+            SELECT day,minute,actor_id,place,space_id,text FROM town_events ORDER BY id DESC LIMIT ?
             """)) {
             p.setInt(1,limit);
             try(ResultSet r=p.executeQuery()) {
                 while(r.next())entries.add(new TownLife.Event(r.getInt(1),r.getInt(2),
-                        r.getString(3),TownLife.Place.valueOf(r.getString(4)),r.getString(5)));
+                        r.getString(3),TownLife.Place.valueOf(r.getString(4)),r.getString(5),r.getString(6)));
             }
         }
         Collections.reverse(entries);return entries;
@@ -394,13 +410,13 @@ final class WorldDatabase implements AutoCloseable {
     List<TownLife.Observation> observations(String witnessId,int limit) throws SQLException {
         List<TownLife.Observation> entries=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-            SELECT day,minute,place,text FROM town_observations
+            SELECT day,minute,place,space_id,text FROM town_observations
             WHERE witness_id=? ORDER BY id DESC LIMIT ?
             """)) {
             p.setString(1,witnessId);p.setInt(2,limit);
             try(ResultSet r=p.executeQuery()) {
                 while(r.next())entries.add(new TownLife.Observation(witnessId,r.getInt(1),
-                        r.getInt(2),TownLife.Place.valueOf(r.getString(3)),r.getString(4)));
+                        r.getInt(2),TownLife.Place.valueOf(r.getString(3)),r.getString(4),r.getString(5)));
             }
         }
         Collections.reverse(entries);return entries;

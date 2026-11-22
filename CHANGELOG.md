@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 — Private Lives
+
+- Assign a stable private home unit to every citizen, including residents generated in v1.3.
+- Distinguish **public scenes** from **private apartments** when recording new town events and observations.
+- Prevent neighbors sharing a residential building from witnessing private indoor activity.
+- Preserve existing SQLite history with additive `home_unit` and `space_id` migrations; legacy events retain unknown room identifiers.
+- Show home units with `home <id>`, `resident <id>`, `where <id>`, `town-events` and `known` developer commands.
+- Stagger generated citizens' hunger and thirst cycles to avoid artificial simultaneous activities.
+- Add `PrivateLivesSmokeTest` and `PrivateLivesDatabaseSmokeTest`; fix CI to invoke SQLite tests with `exec:exec` instead of inadvertently starting the game.
+- Still no interior geometry, sound propagation, universal NPC relationship system, player investigation or 24/7 daemon.
+
 ## 1.3.0 — Population Generation
 
 - Introduce reproducible procedural residents with permanent unique IDs, names, occupations, home and work locations, stable traits and goals.

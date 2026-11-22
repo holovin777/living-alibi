@@ -32,6 +32,16 @@ jobs:
       - name: Test generated population over 30 days
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PopulationSmokeTest
       - name: Test social persistence and v1.1 SQLite migration
-        run: mvn --batch-mode --no-transfer-progress -q -Dexec.mainClass=com.holovin.npclife.SocialDatabaseSmokeTest -Dexec.classpathScope=test exec:java
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.SocialDatabaseSmokeTest' exec:exec
       - name: Test generated resident persistence and SQLite migrations
-        run: mvn --batch-mode --no-transfer-progress -q -Dexec.mainClass=com.holovin.npclife.PopulationDatabaseSmokeTest -Dexec.classpathScope=test exec:java
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PopulationDatabaseSmokeTest' exec:exec
+      - name: Test private home witness isolation
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PrivateLivesSmokeTest
+      - name: Test private scene persistence and v1.3 SQLite migration
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PrivateLivesDatabaseSmokeTest' exec:exec

@@ -1,6 +1,6 @@
 # Living Alibi
 
-**v1.3 — Population Generation** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.4 — Private Lives** · Java 21+ · Maven · SQLite · headless console prototype
 
 > An independent town, private observations, and a detective who must discover what really happened.
 
@@ -11,9 +11,11 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 - **Marco Bianchi:** baker with richer physiological needs, economic goals, permanent mortality, personal memory, and optional paid OpenAI dialogue.
 - **Elena Rossi:** shopkeeper with a simpler independent needs/work system and a persistent friendship with Marco.
 - **Procedural population:** generate up to 40 *additional* unique, stable residents (`resident-0001`, etc.), 1–20 per command, without any AI/API calls.
-- Generated citizens have age, profession, work location, home building, stable personality traits, goals, independent food/water, money, work schedules and daily travel.
+- Generated citizens have age, profession, work location, **private home unit**, stable personality traits, goals, individual food/water, money, work schedules and daily travel.
 - New citizens purchase provisions, eat, drink, earn wages and can die if their basic needs aren't met. Their identity and state persist in SQLite.
-- Multiple abstract locations, time-consuming travel, authoritative world events and per-resident eyewitness logs.
+- Multiple abstract locations and private home units, timed travel, authoritative world events and per-resident eyewitness logs.
+- **Private events:** two residents in the same residential building do not automatically witness events inside each other's apartment. New records include a distinct `space_id`.
+- Individual need phases reduce synchronized food and water actions across generated residents.
 - Marco/Elena relationship model: small talk, trust, affinity, tension, reconciliation and arguments. **Relationships among procedurally generated citizens are not implemented yet.**
 - Deterministic generation and simulation; optional paid OpenAI only for direct `talk` and `reflect` commands, never for simulated minutes.
 - Manual time skipping, accelerated live mode and optional offline catch-up *on reopening* (not a continuously hosted server).
@@ -35,6 +37,7 @@ population
 population generate 12
 population
 resident resident-0001
+home resident-0001
 simulate 7
 population 20
 where resident-0001
@@ -44,7 +47,7 @@ relationships
 exit
 ```
 
-`population generate 12` **adds** residents to the existing world (Marco and Elena remain). Generation is deterministic by stable resident index. The command does not automatically create births, migration, families or relationships. Each citizen receives an abstract residential building, not a unique furnished house.
+`population generate 12` **adds** residents to the existing world (Marco and Elena remain). Generation is deterministic by stable resident index. The command does not automatically create births, migration, families or relationships. Each citizen receives a unique **abstract private unit** within an existing residential area, not a furnished or geometrically modeled apartment.
 
 ### Other commands
 
@@ -57,6 +60,7 @@ town
 population [count]
 population generate <count>   # or: population add <count>
 resident <id>
+home <id>                # DEBUG: assigned private home unit
 where <id>
 known <id> [count]         # DEBUG: private observation journal
 town-events [count]        # DEBUG: authoritative world truth
@@ -79,7 +83,7 @@ exit
 
 **Developer-only commands:** `town-events` exposes world truth and `known` exposes personal witness logs. The eventual player-detective will instead need to investigate, interview and verify evidence.
 
-## Updating from v1.2.1
+## Updating from v1.3
 
 Stop the game first. Preserve the local database (important because deaths and other world events are permanent):
 
@@ -91,15 +95,15 @@ if [ -f data/world.db ]; then
 fi
 ```
 
-Download the `living-alibi-v1.3.zip` release archive, then **unzip from `~/Repositories`** so the files update the existing checkout instead of creating an unrelated project:
+Download the `living-alibi-v1.4.zip` release archive, then **unzip from `~/Repositories`** so the files update the existing checkout instead of creating an unrelated project:
 
 ```bash
 cd ~/Repositories
-unzip -o ~/Downloads/living-alibi-v1.3.zip
+unzip -o ~/Downloads/living-alibi-v1.4.zip
 cd living-alibi
 mvn -q clean test-compile
-java -ea -cp target/classes:target/test-classes com.holovin.npclife.PopulationSmokeTest
-mvn -q -Dexec.mainClass=com.holovin.npclife.PopulationDatabaseSmokeTest -Dexec.classpathScope=test exec:java
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.PrivateLivesSmokeTest
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PrivateLivesDatabaseSmokeTest' exec:exec
 mvn -q compile exec:java
 ```
 
@@ -108,18 +112,18 @@ Only after checking the new version:
 ```bash
 git status
 git add .github README.md CHANGELOG.md docs pom.xml src
-git commit -m "Add procedural residents and persistent population"
+git commit -m "Add private homes and isolated witness observations"
 git push
 ```
 
-The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. Database migration adds columns to `town_people` without deleting `world_state`, `town_events`, relationships or dialogue.
+The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. Database migration adds `home_unit` to `town_people`, and `space_id` to world events and observations without deleting existing game state, relationships or dialogue. Historical events from v1.3 keep an **unknown** room ID; previously recorded eyewitness logs are not retroactively modified.
 
 ## Architecture
 
 | File | Purpose |
 | --- | --- |
 | `LifeSimulation.java`, `WorldState.java` | Marco's original character engine |
-| `TownLife.java` | Shared town, physical co-location, movement, witnessed events |
+| `TownLife.java` | Shared town, movement, public/private spaces and witnessed events |
 | `SocialLife.java` | Marco/Elena relationships |
 | `PopulationGenerator.java` | Stable identities, traits, homes and occupations |
 | `PopulationLife.java` | Autonomous needs, schedules, shopping and travel of generated residents |
@@ -127,7 +131,7 @@ The ZIP does **not** contain `.git`, `data`, an API key, or a SQLite database. D
 | `Main.java` | Console commands and time management |
 | `OpenAiDialogue.java` | Optional paid conversation/reflection (Marco only) |
 
-See [docs/POPULATION.md](docs/POPULATION.md), [docs/SOCIAL.md](docs/SOCIAL.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+See [docs/PRIVATE_LIVES.md](docs/PRIVATE_LIVES.md), [docs/POPULATION.md](docs/POPULATION.md), [docs/SOCIAL.md](docs/SOCIAL.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Tests
 
@@ -138,8 +142,10 @@ java -ea -cp target/classes:target/test-classes com.holovin.npclife.TownSmokeTes
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.SocialSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.ElenaSurvivalSmokeTest
 java -ea -cp target/classes:target/test-classes com.holovin.npclife.PopulationSmokeTest
-mvn -q -Dexec.mainClass=com.holovin.npclife.SocialDatabaseSmokeTest -Dexec.classpathScope=test exec:java
-mvn -q -Dexec.mainClass=com.holovin.npclife.PopulationDatabaseSmokeTest -Dexec.classpathScope=test exec:java
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.PrivateLivesSmokeTest
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.SocialDatabaseSmokeTest' exec:exec
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PopulationDatabaseSmokeTest' exec:exec
+mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PrivateLivesDatabaseSmokeTest' exec:exec
 ```
 
 Smoke tests do not replace more thorough integration and balance testing. GitHub Actions runs all of the above when code is pushed.
@@ -147,7 +153,7 @@ Smoke tests do not replace more thorough integration and balance testing. GitHub
 ## Known limitations
 
 - **Not yet one unified citizen engine.** Marco, Elena and generated people currently have different rule implementations; behavior isn't fully comparable. A shared agent architecture is the next technical priority.
-- Generated citizens live in one of two abstract residence buildings; co-location there does not distinguish apartments. The witness model needs individual rooms/line-of-sight before it can serve as forensic evidence.
+- Each resident has an abstract private apartment within a building, but there are no doors, sightlines, rooms, shared households or audibility mechanics yet. Public locations still treat everyone present as an eligible witness. **This is not forensic-quality evidence.**
 - Generated residents don't yet form relationships, have children, migrate, commit crimes, retain complex beliefs or use freeform AI conversations. Births and spontaneous immigration are future features.
 - Only two named residents are pre-authored. New identities appear **only when you request population generation**, not automatically on a timer.
 - Travel uses approximate times and does not have routes or a map. Some legacy Marco actions do not yet require physical presence at a site.

@@ -44,6 +44,8 @@ final class TownLife {
         String goal;
         Place home;
         Place workplace;
+        /** Individual private residence within a coarse neighborhood location. */
+        String homeUnit;
         boolean alive;
 
         Citizen(String id, String name, String occupation, Place place) {
@@ -53,6 +55,7 @@ final class TownLife {
             this.money=55;this.food=3;this.water=3;this.age=32;this.alive=true;this.sociability=62;
             this.carefulness=55;this.curiosity=50;this.goal="STABILITY";
             this.home=place;this.workplace=place;this.personalSeed=0;
+            this.homeUnit=privateUnit(id);
         }
         Citizen copy() {
             Citizen c=new Citizen(id,name,occupation,place);
@@ -61,14 +64,18 @@ final class TownLife {
             c.money=money;c.food=food;c.water=water;c.age=age;c.alive=alive;c.sociability=sociability;
             c.carefulness=carefulness;c.curiosity=curiosity;c.scheduleOffset=scheduleOffset;
             c.generationIndex=generationIndex;c.personalSeed=personalSeed;c.goal=goal;
-            c.home=home;c.workplace=workplace;
+            c.home=home;c.workplace=workplace;c.homeUnit=homeUnit;
             return c;
         }
         boolean presentAt(Place p) {return alive && travelRemaining==0 && place==p;}
+        /** A shared neighborhood does not imply a shared apartment or line of sight. */
+        String currentSpace() {
+            return place==home ? homeUnit : publicSpace(place);
+        }
         String locationText() {
             if(!alive)return place.label+" (deceased)";
             if(travelRemaining>0)return "in transit to "+destination.label+" ("+travelRemaining+" min remaining)";
-            return place.label;
+            return sceneLabel(place,currentSpace());
         }
     }
 
@@ -95,8 +102,17 @@ final class TownLife {
         }
     }
 
-    record Event(int day,int minute,String actorId,Place place,String text) { }
-    record Observation(String witnessId,int day,int minute,Place place,String text) { }
+    /** spaceId distinguishes a private unit from a public scene within the same Place. */
+    record Event(int day,int minute,String actorId,Place place,String spaceId,String text) { }
+    record Observation(String witnessId,int day,int minute,Place place,String spaceId,String text) { }
+
+    static String privateUnit(String id) {return "unit:"+id;}
+    static String publicSpace(Place where) {return "public:"+where.name();}
+    static String sceneLabel(Place place,String spaceId) {
+        if(spaceId!=null && spaceId.startsWith("unit:"))
+            return place.label+" / private unit "+spaceId.substring(5);
+        return place.label;
+    }
     static Town create(WorldState marco) {
         Town t=new Town();
         Place initial=desiredMarco(marco,null);
@@ -234,10 +250,15 @@ final class TownLife {
     }
     static void publish(Town t,WorldState clock,String actor,Place where,String text,
                                 List<Event> truth,List<Observation> observations) {
-        truth.add(new Event(clock.day,clock.minute,actor,where,text));
-        for(Citizen citizen:t.people.values()) {
-            if(citizen.presentAt(where))
-                observations.add(new Observation(citizen.id,clock.day,clock.minute,where,text));
+        Citizen source=t.people.get(actor);
+        // The event has one authoritative scene. Being in the same neighborhood
+        // is not enough to witness an action inside somebody else's apartment.
+        String scene=source!=null && source.place==where
+                ? source.currentSpace() : publicSpace(where);
+        truth.add(new Event(clock.day,clock.minute,actor,where,scene,text));
+        for(Citizen witness:t.people.values()) {
+            if(witness.presentAt(where) && witness.currentSpace().equals(scene))
+                observations.add(new Observation(witness.id,clock.day,clock.minute,where,scene,text));
         }
     }
 }

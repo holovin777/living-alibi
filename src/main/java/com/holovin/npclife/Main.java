@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.3 — Population Generation");
+            System.out.println("Living Alibi v1.4 — Private Lives");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -65,6 +65,12 @@ public final class Main {
                         var citizen=town.get(arg(input));
                         residentStatus(citizen);continue;
                     }
+                    if(lower.startsWith("home ")) {
+                        var citizen=town.get(arg(input));
+                        System.out.println(citizen.name+" lives in "+
+                                TownLife.sceneLabel(citizen.home,citizen.homeUnit));
+                        continue;
+                    }
                     if(lower.equals("relationships") || lower.equals("relationship marco elena") ||
                             lower.equals("relationship elena marco")) {
                         relationshipStatus(town);continue;
@@ -86,7 +92,7 @@ public final class Main {
                         var entries=db.townEvents(optionalLimit(input,20));
                         if(entries.isEmpty())System.out.println("No recorded town events yet.");
                         for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
-                                " | "+e.place().label+" | "+e.text());
+                                " | "+TownLife.sceneLabel(e.place(),e.spaceId())+" | "+e.text());
                         continue;
                     }
                     if(lower.startsWith("known ")) {
@@ -99,7 +105,7 @@ public final class Main {
                         var entries=db.observations(witness,limit);
                         if(entries.isEmpty())System.out.println("No direct observations recorded for "+witness+".");
                         for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
-                                " | "+e.place().label+" | "+e.text());
+                                " | "+TownLife.sceneLabel(e.place(),e.spaceId())+" | "+e.text());
                         continue;
                     }
                     if(lower.equals("memories")||lower.startsWith("memories ")) {
@@ -302,7 +308,7 @@ public final class Main {
     private static void residentStatus(TownLife.Citizen c) {
         System.out.println(c.name+" | "+c.id+" | "+c.occupation+" | age "+c.age+
                 " | "+(c.alive?"alive":"deceased"));
-        System.out.println("Home: "+c.home.label+" | Work: "+c.workplace.label+
+        System.out.println("Home: "+TownLife.sceneLabel(c.home,c.homeUnit)+" | Work: "+c.workplace.label+
                 " | Location: "+c.locationText()+" | Activity: "+c.activity);
         System.out.println("Hunger "+c.hunger+" | Thirst "+c.thirst+" | Fatigue "+c.fatigue+
                 " | Health "+c.health+" | Money EUR "+c.money+
@@ -331,6 +337,7 @@ public final class Main {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
         System.out.println(" town | population [count] | population generate 12 | resident resident-0001");
+        System.out.println(" home <id>             — inspect a resident's private home unit (developer view)");
         System.out.println(" where <id> | known <id> [count] | town-events [count]");
         System.out.println(" relationships | relationship marco elena | social-events [count]");
         System.out.println(" wait 60               — advance 60 game minutes");
