@@ -16,7 +16,8 @@ public final class Main {
     public static void main(String[] args) throws Exception {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
-            System.out.println("NPC Life Lab v1.0 — Marco Bianchi");
+            TownLife.Town town=db.loadTown(state);
+            System.out.println("Living Alibi v1.1 — The Living Town");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -24,7 +25,7 @@ public final class Main {
                 if(elapsed>0) {
                     long simulated=Math.min(elapsed,525_600L); // protective 1-year limit per relaunch
                     System.out.println("Replaying "+simulated+" offline minute(s) without API calls...");
-                    advanceAndSave(db,state,simulated);
+                    advanceAndSave(db,state,town,simulated);
                     if(elapsed>simulated)System.out.println("Offline interval exceeded one year; extra time was not simulated.");
                 }
             }
@@ -40,6 +41,33 @@ public final class Main {
                     if(lower.equals("help")) {help();continue;}
                     if(lower.equals("status")||lower.equals("observe")) {status(state);continue;}
                     if(lower.equals("personality")) {personality(state);continue;}
+                    if(lower.equals("town")) {townStatus(town,state);continue;}
+                    if(lower.startsWith("where ")) {
+                        var citizen=town.get(arg(input));
+                        System.out.println(citizen.name+" | "+citizen.locationText()+" | "+
+                                citizen.activity+" | "+(citizen.alive?"alive":"deceased"));
+                        continue;
+                    }
+                    if(lower.equals("town-events")||lower.startsWith("town-events ")) {
+                        var entries=db.townEvents(optionalLimit(input,20));
+                        if(entries.isEmpty())System.out.println("No recorded town events yet.");
+                        for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
+                                " | "+e.place().label+" | "+e.text());
+                        continue;
+                    }
+                    if(lower.startsWith("known ")) {
+                        String[] parts=arg(input).toLowerCase(Locale.ROOT).split("\\s+");
+                        if(parts.length<1 || parts.length>2)
+                            throw new IllegalArgumentException("Use known marco [count] or known elena [count].");
+                        String witness=parts[0];town.get(witness);
+                        int limit=parts.length==1?20:Integer.parseInt(parts[1]);
+                        if(limit<1||limit>100)throw new IllegalArgumentException("Count must be 1–100.");
+                        var entries=db.observations(witness,limit);
+                        if(entries.isEmpty())System.out.println("No direct observations recorded for "+witness+".");
+                        for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
+                                " | "+e.place().label+" | "+e.text());
+                        continue;
+                    }
                     if(lower.equals("memories")||lower.startsWith("memories ")) {
                         int limit=optionalLimit(input,12);var entries=db.memories(limit);
                         if(entries.isEmpty())System.out.println("No conversations recorded yet.");
@@ -70,14 +98,14 @@ public final class Main {
                     if(lower.startsWith("wait ")) {
                         long minutes=Long.parseLong(arg(input));
                         if(minutes<1||minutes>525_600L){System.out.println("Allowed range: 1 to 525600 minutes.");continue;}
-                        advanceAndSave(db,state,minutes);
+                        advanceAndSave(db,state,town,minutes);
                         System.out.println("Advanced "+minutes+" game minutes. "+(state.alive?"Marco is "+LifeSimulation.readableActivity(state.activity)+".":"Marco is deceased."));
                         continue;
                     }
                     if(lower.startsWith("simulate ")) {
                         long days=Long.parseLong(arg(input));
                         if(days<1||days>365){System.out.println("Allowed range: 1 to 365 days.");continue;}
-                        advanceAndSave(db,state,days*1440L);
+                        advanceAndSave(db,state,town,days*1440L);
                         System.out.println("Simulated "+days+" day(s). Type status or events 30 to inspect what happened.");
                         continue;
                     }
@@ -95,7 +123,7 @@ public final class Main {
                         System.out.println("Observing a live simulation for "+seconds+" second(s). Ctrl+C exits the process.");
                         for(int i=0;i<seconds;i++) {
                             Thread.sleep(1000);
-                            advanceAndSave(db,state,state.speed);
+                            advanceAndSave(db,state,town,state.speed);
                             if((i+1)%10==0||!state.alive)
                                 System.out.println("Day "+state.day+" "+clock(state.minute)+" — "+LifeSimulation.readableActivity(state.activity));
                         }
@@ -128,16 +156,20 @@ public final class Main {
                         if(state.activity.equals("SLEEPING")) {System.out.println("Marco is sleeping. Try again when he is awake.");continue;}
                         String answer;
                         if(OpenAiDialogue.available()) {
-                            try {answer=OpenAiDialogue.talk(state,db.memories(18),db.milestones(30),db.facts(50),message);}
+                            try {answer=OpenAiDialogue.talk(state,db.memories(18),db.milestones(30),db.facts(50),
+                                    db.observations("marco",30),message);}
                             catch(Exception ex) {System.out.println("OpenAI unavailable: "+safeError(ex));answer=demoReply(state);}
                         } else answer=demoReply(state);
                         System.out.println("Marco: "+answer);
                         int day=state.day,minute=state.minute;
                         state.friendship=Math.min(100,state.friendship+1);
                         state.loneliness=Math.max(0,state.loneliness-8);
-                        List<LifeSimulation.LifeEvent> events=LifeSimulation.advance(state,5);
+                        List<TownLife.Event> townEvents=new ArrayList<>();
+                        List<TownLife.Observation> observations=new ArrayList<>();
+                        List<LifeSimulation.LifeEvent> events=LifeSimulation.advance(state,5,
+                                current -> TownLife.tick(town,current,townEvents,observations));
                         db.save(state,events,List.of(new WorldDatabase.Memory("player",message,day,minute),
-                                new WorldDatabase.Memory("marco",answer,day,minute)));
+                                new WorldDatabase.Memory("marco",answer,day,minute)),town,townEvents,observations);
                         continue;
                     }
                     System.out.println("Unknown command. Type help.");
@@ -145,17 +177,23 @@ public final class Main {
                 catch(IllegalArgumentException ex){System.out.println(ex.getMessage());}
                 catch(SQLException ex){System.out.println("Database error: "+safeError(ex));}
             }
-            db.save(state,List.of(),List.of());
+            db.save(state,List.of(),List.of(),town,List.of(),List.of());
             System.out.println("World saved. Goodbye.");
         }
     }
 
-    private static void advanceAndSave(WorldDatabase db,WorldState s,long minutes) throws SQLException {
-        // Compute on a copy to avoid displaying uncommitted state if a write fails.
+    private static void advanceAndSave(WorldDatabase db,WorldState s,TownLife.Town town,long minutes)
+            throws SQLException {
+        // Compute off-state, then commit the whole world and both event logs together.
         WorldState candidate=s.copy();
-        List<LifeSimulation.LifeEvent> events=LifeSimulation.advance(candidate,minutes);
-        db.save(candidate,events,List.of());
+        TownLife.Town townCandidate=town.copy();
+        List<TownLife.Event> townEvents=new ArrayList<>();
+        List<TownLife.Observation> observations=new ArrayList<>();
+        List<LifeSimulation.LifeEvent> events=LifeSimulation.advance(candidate,minutes,
+                current -> TownLife.tick(townCandidate,current,townEvents,observations));
+        db.save(candidate,events,List.of(),townCandidate,townEvents,observations);
         copy(candidate,s);
+        town.copyFrom(townCandidate);
     }
     private static void copy(WorldState from,WorldState to) {
         // Loaded state is the only mutable reference in the console; explicit copy avoids surprising aliases.
@@ -197,6 +235,19 @@ public final class Main {
         System.out.println("Bakery owner: "+s.ownsBakery+" | Friendship with player: "+s.friendship+"/100");
         System.out.println("Offline catch-up: "+(s.offlineProgress?"ON":"OFF")+" | Live speed: "+s.speed+" game min/real sec");
     }
+    private static void townStatus(TownLife.Town town,WorldState s) {
+        System.out.println("Town status | Day "+s.day+" "+clock(s.minute));
+        for(TownLife.Citizen citizen:town.people.values()) {
+            System.out.println(citizen.name+" ("+citizen.occupation+") | "+
+                    citizen.locationText()+" | "+(citizen.alive?citizen.activity:"deceased"));
+            if(citizen.id.equals("elena"))
+                System.out.println("  Hunger "+citizen.hunger+" | Thirst "+citizen.thirst+
+                        " | Fatigue "+citizen.fatigue+" | Health "+citizen.health+
+                        " | Money EUR "+citizen.money);
+        }
+        System.out.println("Locations: Marco's home, Elena's home, Bakery, Market, Park, Cafe.");
+        System.out.println("Developer view: authoritative town-events and private known logs are for testing.");
+    }
     private static void personality(WorldState s) {
         System.out.println("Marco's personality (stable traits, 0–100):");
         System.out.println("Sociability: "+s.personalitySociable+" | Carefulness: "+s.personalityCareful+
@@ -206,6 +257,7 @@ public final class Main {
     private static void help() {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
+        System.out.println(" town | where marco | where elena | town-events [count] | known marco [count] | known elena [count]");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");

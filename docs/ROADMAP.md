@@ -1,27 +1,36 @@
 # Living Alibi — Roadmap
 
-Living Alibi is a planned detective simulation where residents have persistent autonomous lives. A detective can investigate emergent events by interviewing people, checking timelines, and comparing evidence. Truth belongs to the world simulation; NPC dialogue is not an authoritative event log.
+The eventual game is an emergent detective simulation. The player investigates events in a town where residents continue to pursue their own lives independently.
 
-## Current milestone: Marco v1.0
+## Completed
 
-- Console-based autonomous life simulation for one resident
-- Simplified needs, economy, aging, illness, and mortality
-- SQLite persistence for world state, conversations, and events
-- Optional OpenAI-powered dialogue and explicit reflection
+### Marco v1.0 — Autonomous console resident
 
-## Proposed next milestones (not yet implemented)
+- Marco's needs, economy, aging and mortality
+- SQLite persistence and optional OpenAI dialogue
+- Time skipping, controlled live mode and optional catch-up on reopening
 
-1. Refactor one-person simulation into a multi-agent world engine.
-2. Add locations, travel times, and independently observable activities.
-3. Implement private per-NPC memories, witnesses, uncertain beliefs, and gossip.
-4. Introduce world-authoritative incidents, evidence, and investigations.
-5. Add player detective tools, interviews, case notebook, and verification.
-6. Enable headless server operation and eventually an optional 3D client.
+### The Living Town v1.1 — First witness infrastructure
 
-## Design principles
+- Second named resident (Elena Rossi), with a simplified independent state
+- Two homes and four public places, timed travel
+- Separate authoritative town events and personal observation logs
+- SQLite migration without deleting Marco's history
+- Tests for independent life state, meetings, and observation isolation
 
-- The world advances independently of the player.
-- NPCs only know things they could have witnessed, inferred, or learned.
-- Rules and simulation decide physical outcomes; language models do not silently rewrite world truth.
-- Store personal game data and API credentials outside version control.
-- Keep the CLI and documentation in English.
+## Proposed, not implemented
+
+1. **Shared agent engine:** move Marco and Elena to the same extensible, non-hardcoded NPC engine; realistic time/position-aware action execution.
+2. **Town simulation:** more residents, work schedules, relationships and interaction durations, dynamic place access, physical objects.
+3. **Memory and belief:** uncertain memories, information exchange, deception, forgetting, and private motives.
+4. **Incidents and evidence:** theft/lost property, alibis, trails, witnesses, event causality, evidence acquisition.
+5. **Playable detective:** interviews, case notebook, deduction, accusations and feedback grounded in world truth.
+6. **Continuous hosting:** headless daemon + eventual optional Godot 3D client.
+
+## Principles
+
+- The simulation, not the language model, determines world truth and physical outcomes.
+- Every resident knows only what they could have witnessed or learned.
+- No mandatory paid AI call during time steps.
+- Persistent history outlives individual residents.
+- API secrets and local conversation history never belong in the public Git repository.

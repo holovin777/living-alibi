@@ -2,6 +2,7 @@ package com.holovin.npclife;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /** Pure simulation logic: time, physical state, money and feasible autonomous actions. */
 final class LifeSimulation {
@@ -16,11 +17,17 @@ final class LifeSimulation {
     }
 
     static List<LifeEvent> advance(WorldState s, long minutes) {
+        return advance(s,minutes,ignored -> { });
+    }
+    static List<LifeEvent> advance(WorldState s, long minutes, Consumer<WorldState> afterTick) {
         if (minutes < 0 || minutes > 525_600L) {
             throw new IllegalArgumentException("Advance must be between 0 and 525600 minutes (one game year).");
         }
         List<LifeEvent> changes = new ArrayList<>();
-        for (long i = 0; i < minutes; i++) tick(s, changes);
+        for (long i = 0; i < minutes; i++) {
+            tick(s, changes);
+            afterTick.accept(s);
+        }
         return changes;
     }
 

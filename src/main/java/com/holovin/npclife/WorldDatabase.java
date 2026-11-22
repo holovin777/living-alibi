@@ -22,6 +22,30 @@ final class WorldDatabase implements AutoCloseable {
             st.execute("CREATE TABLE IF NOT EXISTS life_events (id INTEGER PRIMARY KEY AUTOINCREMENT, npc_id TEXT NOT NULL, day INTEGER NOT NULL, minute INTEGER NOT NULL, text TEXT NOT NULL)");
             st.execute("CREATE TABLE IF NOT EXISTS character_facts (id INTEGER PRIMARY KEY AUTOINCREMENT, npc_id TEXT NOT NULL, text TEXT NOT NULL, day INTEGER NOT NULL, minute INTEGER NOT NULL)");
             st.execute("INSERT OR IGNORE INTO world_state(id,day,minute,friendship) VALUES(1,1,450,0)");
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS town_people (
+                    id TEXT PRIMARY KEY, place TEXT NOT NULL, destination TEXT NOT NULL,
+                    travel_remaining INTEGER NOT NULL, activity TEXT NOT NULL,
+                    hunger INTEGER NOT NULL, thirst INTEGER NOT NULL, fatigue INTEGER NOT NULL,
+                    health INTEGER NOT NULL, money INTEGER NOT NULL,
+                    food INTEGER NOT NULL, water INTEGER NOT NULL, age INTEGER NOT NULL,
+                    alive INTEGER NOT NULL)
+                """);
+            st.execute("CREATE TABLE IF NOT EXISTS town_meta (id INTEGER PRIMARY KEY CHECK(id=1), together INTEGER NOT NULL)");
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS town_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+                    minute INTEGER NOT NULL, actor_id TEXT NOT NULL, place TEXT NOT NULL,
+                    text TEXT NOT NULL)
+                """);
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS town_observations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, witness_id TEXT NOT NULL,
+                    day INTEGER NOT NULL, minute INTEGER NOT NULL, place TEXT NOT NULL,
+                    text TEXT NOT NULL)
+                """);
+            st.execute("CREATE INDEX IF NOT EXISTS idx_town_observations_witness ON town_observations(witness_id,id)");
+
         }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
@@ -96,7 +120,13 @@ final class WorldDatabase implements AutoCloseable {
     }
 
     void save(WorldState s,List<LifeSimulation.LifeEvent> events,List<Memory> messages) throws SQLException {
-        // Every state mutation and its event log are committed atomically.
+        save(s,events,messages,null,List.of(),List.of());
+    }
+
+    void save(WorldState s,List<LifeSimulation.LifeEvent> events,List<Memory> messages,
+              TownLife.Town town,List<TownLife.Event> townEvents,
+              List<TownLife.Observation> observations) throws SQLException {
+        // Marco, the other residents, world events, and their knowledge commit atomically.
         s.lastSavedEpoch=Instant.now().getEpochSecond();
         db.setAutoCommit(false);
         try {
@@ -128,6 +158,7 @@ final class WorldDatabase implements AutoCloseable {
                 for(var m:messages) {p.setString(1,NPC);p.setString(2,m.speaker());p.setString(3,m.text());p.setInt(4,m.day());p.setInt(5,m.minute());p.addBatch();}
                 if(!messages.isEmpty())p.executeBatch();
             }
+            if(town!=null) persistTown(town,townEvents,observations);
             db.commit();
         } catch(SQLException ex) {db.rollback();throw ex;}
         finally{db.setAutoCommit(true);}
@@ -173,5 +204,101 @@ final class WorldDatabase implements AutoCloseable {
         }
         Collections.reverse(result);return result;
     }
+    TownLife.Town loadTown(WorldState state) throws SQLException {
+        TownLife.Town town=TownLife.create(state);
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM town_people")) {
+            while(rs.next()) {
+                String id=rs.getString("id");
+                if(!town.people.containsKey(id))continue;
+                var p=town.get(id);
+                p.place=TownLife.Place.valueOf(rs.getString("place"));
+                p.destination=TownLife.Place.valueOf(rs.getString("destination"));
+                p.travelRemaining=rs.getInt("travel_remaining");p.activity=rs.getString("activity");
+                p.hunger=rs.getInt("hunger");p.thirst=rs.getInt("thirst");p.fatigue=rs.getInt("fatigue");
+                p.health=rs.getInt("health");p.money=rs.getInt("money");p.food=rs.getInt("food");
+                p.water=rs.getInt("water");p.age=rs.getInt("age");p.alive=rs.getInt("alive")!=0;
+            }
+        }
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT together FROM town_meta WHERE id=1")) {
+            if(rs.next())town.together=rs.getInt(1)!=0;
+        }
+        return town;
+    }
+
+    private void persistTown(TownLife.Town town,List<TownLife.Event> events,
+                             List<TownLife.Observation> observations) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO town_people(id,place,destination,travel_remaining,activity,hunger,thirst,fatigue,
+                                    health,money,food,water,age,alive)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET
+                place=excluded.place,destination=excluded.destination,
+                travel_remaining=excluded.travel_remaining,activity=excluded.activity,
+                hunger=excluded.hunger,thirst=excluded.thirst,fatigue=excluded.fatigue,
+                health=excluded.health,money=excluded.money,food=excluded.food,
+                water=excluded.water,age=excluded.age,alive=excluded.alive
+            """)) {
+            for(var c:town.people.values()) {
+                p.setString(1,c.id);p.setString(2,c.place.name());p.setString(3,c.destination.name());
+                p.setInt(4,c.travelRemaining);p.setString(5,c.activity);
+                p.setInt(6,c.hunger);p.setInt(7,c.thirst);p.setInt(8,c.fatigue);
+                p.setInt(9,c.health);p.setInt(10,c.money);p.setInt(11,c.food);
+                p.setInt(12,c.water);p.setInt(13,c.age);p.setInt(14,c.alive?1:0);
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO town_meta(id,together) VALUES(1,?)
+            ON CONFLICT(id) DO UPDATE SET together=excluded.together
+            """)) {p.setInt(1,town.together?1:0);p.executeUpdate();}
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO town_events(day,minute,actor_id,place,text) VALUES(?,?,?,?,?)
+            """)) {
+            for(var e:events) {
+                p.setInt(1,e.day());p.setInt(2,e.minute());p.setString(3,e.actorId());
+                p.setString(4,e.place().name());p.setString(5,e.text());p.addBatch();
+            }
+            if(!events.isEmpty())p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO town_observations(witness_id,day,minute,place,text) VALUES(?,?,?,?,?)
+            """)) {
+            for(var o:observations) {
+                p.setString(1,o.witnessId());p.setInt(2,o.day());p.setInt(3,o.minute());
+                p.setString(4,o.place().name());p.setString(5,o.text());p.addBatch();
+            }
+            if(!observations.isEmpty())p.executeBatch();
+        }
+    }
+
+    List<TownLife.Event> townEvents(int limit) throws SQLException {
+        List<TownLife.Event> entries=new ArrayList<>();
+        try(PreparedStatement p=db.prepareStatement("""
+            SELECT day,minute,actor_id,place,text FROM town_events ORDER BY id DESC LIMIT ?
+            """)) {
+            p.setInt(1,limit);
+            try(ResultSet r=p.executeQuery()) {
+                while(r.next())entries.add(new TownLife.Event(r.getInt(1),r.getInt(2),
+                        r.getString(3),TownLife.Place.valueOf(r.getString(4)),r.getString(5)));
+            }
+        }
+        Collections.reverse(entries);return entries;
+    }
+    List<TownLife.Observation> observations(String witnessId,int limit) throws SQLException {
+        List<TownLife.Observation> entries=new ArrayList<>();
+        try(PreparedStatement p=db.prepareStatement("""
+            SELECT day,minute,place,text FROM town_observations
+            WHERE witness_id=? ORDER BY id DESC LIMIT ?
+            """)) {
+            p.setString(1,witnessId);p.setInt(2,limit);
+            try(ResultSet r=p.executeQuery()) {
+                while(r.next())entries.add(new TownLife.Observation(witnessId,r.getInt(1),
+                        r.getInt(2),TownLife.Place.valueOf(r.getString(3)),r.getString(4)));
+            }
+        }
+        Collections.reverse(entries);return entries;
+    }
+
     @Override public void close() throws SQLException {db.close();}
 }

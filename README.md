@@ -1,101 +1,130 @@
 # Living Alibi
 
-**NPC Life Lab: Marco Bianchi v1.0 — console prototype**
+**v1.1 — The Living Town** · Headless Java detective-simulation prototype
 
-**One observable person. Autonomous daily life. Persistent history. Optional language-model conversations.**
+> An independent world, private memories, and a detective who must discover what really happened.
 
-This repository is the first Java simulation milestone for **Living Alibi**, a planned emergent detective game. The detective investigation system and multi-NPC town are not implemented yet.
+The game is in early development. This release is a **console-based simulation**, not a finished detective game. All source code, documentation, and game interface text are in English.
 
-This is the **complete v1.0 console-stage character prototype**, not a finished 3D game or a scientifically accurate model of a human being. Marco continues taking autonomous actions during simulated time without any language model. You can watch him, speak to him, or simulate weeks and years. His state, event log, and conversations survive restarts.
+## What exists today
 
-The UI, code, project documentation, and sample dialogues are **English-only**.
+- **Marco Bianchi**, a baker with his v1.0 physiological and financial simulation, personality, long-term goal, SQLite save data, and optional OpenAI conversations.
+- **Elena Rossi**, a shopkeeper with **independent, simpler** needs, employment income, time, money, daily activities, and SQLite-persisted state.
+- A small town with **two homes, a bakery, a market, a park, and a cafe**.
+- Coarse, **8–10 minute travel time**, with an explicit *in-transit* state (not instant teleportation between destinations).
+- An **authoritative world event log**: what actually occurred in the simulation.
+- A **separate observation log per resident**: only events the resident was present to witness. This is foundational detective infrastructure, not a full psychology model.
+- Backward-compatible, additive SQLite schema extensions. Existing Marco history is retained.
+- Offline operation without any API key. The optional OpenAI API is used **only** on `talk` / `reflect`, never for time stepping.
 
 ## Requirements
 
-- Java 21 or newer (Java 25 on Arch Linux is fine)
-- Apache Maven 3.9+
-- Internet connection only for Maven's first dependency download and optional OpenAI calls
-
-Run it from the directory containing `pom.xml`:
+- Java 21+ (Java 25 on Arch Linux works)
+- Maven 3.9+
+- Maven dependency download on first run
 
 ```bash
 mvn -q compile exec:java
 ```
 
-It automatically creates `data/world.db` on first run. No API key is required.
-
-## What is implemented
-
-- Persistent world day, time, character state and event journal
-- Real autonomous needs: hunger, thirst, fatigue, hygiene, stress, loneliness, mood and health in **simplified game units**
-- Food and water inventory; shopping only when stores are open and Marco has money
-- Income from working as a baker, spending on groceries, rent, debt repayment
-- A personal goal (open a bakery) and a possible ownership transition
-- Illness, recovery, medical visits, aging and probabilistic mortality; **death is permanent in this world**
-- A stable, distinct personality (sociable / careful / curious traits) that affects some choices
-- Autonomous work, sleep, exploration, socializing, care and rest
-- Persistent player conversations, explicit long-term facts, life milestones
-- Optional OpenAI-generated **dialogue** and an explicit **reflect** action to pick a long-term priority (API charges apply)
-- Flexible time: manual time-jump, accelerated live mode, optional *offline catch-up* when the app is reopened
-- Schema migration that **adds columns and tables without deleting** existing `world_state`, `memories` or `life_events` from v0.1/v0.2
+The console creates `data/world.db` if absent. This database is local and excluded from Git.
 
 ## Commands
 
 ```text
-help
-status
-observe
-personality
-events 30
-memories 20
-facts
+status                # Marco's physiological / financial state
+town                  # Who is in town, where, and doing what?
+where marco           # Marco's location / current travel
+where elena           # Elena's location / current travel
+town-events 20        # DEBUG: true events from the world journal
+known marco 20        # DEBUG: Marco's personal eyewitness log
+known elena 20        # DEBUG: Elena's personal eyewitness log
+wait 600              # Advance 600 game minutes
+simulate 7            # Advance 7 game days
+personality           # Marco's enduring traits
+events 30             # Marco's legacy life events
+memories 20           # Marco's past conversations
+facts                 # Persisted facts told to Marco
 remember My name is Alex.
-talk Hello, Marco. Remember my name?
-wait 600
-simulate 7
-speed 60
-live 30
-offline on
+talk Hello, Marco!
+reflect               # Optional paid API call
+speed 60              # 60 game minutes per real second in live mode
+live 30               # Run for 30 real seconds
+offline on            # Catch up on elapsed time when the app next starts
 offline off
-reflect
+help
 exit
 ```
 
-- `wait 600` simulates 600 game minutes.
-- `simulate 7` simulates 7 game days; max 365 days per command. **No API calls are made for simulation.**
-- `speed 60` sets 60 game minutes per real second for `live` mode. Supported values: 1, 10, 60 and 1440.
-- `live 30` runs for 30 real seconds, saving once per second; max 600 seconds per invocation.
-- `offline on` makes the app, **when launched next time**, calculate the minutes elapsed while it was closed and replay up to one game year. It is not an actual background process. `offline off` means world time pauses when closed (the default).
-- `talk` uses the model when the API key is present. Without a key it gives a clearly labeled, predefined demo response.
-- `remember` explicitly records a permanent fact. Older dialogues remain in SQLite but the language model only receives recent messages plus saved facts and selected milestones.
-- `reflect` makes **one paid model request** to choose one priority from a restricted list; normal actions remain controlled by deterministic simulation code.
+`town-events` and `known` are **developer tools**, not the eventual player's omniscient abilities. Real investigations will require interviews and evidence collection rather than direct access to world truth.
 
-## Update safely from v0.2
+### First observation experiment
 
-**Important: stop the program before updating.** From your existing project directory:
-
-```bash
-cd ~/Repositories/npc-life-lab
-mkdir -p data
-cp -a data/world.db data/world.db.backup-$(date +%Y%m%d-%H%M%S)
+```text
+town
+where marco
+where elena
+wait 600
+town
+town-events 30
+known marco 30
+known elena 30
+exit
 ```
 
-Then extract the v1.0 ZIP over the old project:
+Compare the `known` results: both people may know about a meeting, but a person absent from an event should have no record of it.
+
+## Updating from Living Alibi v1.0
+
+**Stop the game first. Back up your local database if you have one:**
+
+```bash
+cd ~/Repositories/living-alibi
+mkdir -p data
+if [ -f data/world.db ]; then
+    cp -p data/world.db "data/world.db.backup-$(date +%Y%m%d-%H%M%S)"
+fi
+```
+
+Extract the `living-alibi-v1.1.zip` archive **from `~/Repositories`**, preserving your existing `.git` directory and ignored local database:
 
 ```bash
 cd ~/Repositories
-unzip -o ~/Downloads/npc-life-lab-v1.0.zip
-cd npc-life-lab
+unzip -o ~/Downloads/living-alibi-v1.1.zip
+cd living-alibi
+mvn -q test-compile
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.SimulationSmokeTest
+java -ea -cp target/classes:target/test-classes com.holovin.npclife.TownSmokeTest
 mvn -q compile exec:java
 ```
 
-The archive deliberately **does not include any `data` directory or database file**. The next start will add new state columns and a new `character_facts` table if necessary. It preserves earlier dialogue text, including Ukrainian text already saved in v0.1, while **all new UI messages are in English**.
+Inspect changes and commit your update using your existing GitHub SSH remote:
 
-If an update fails, stop the program and restore your `.backup-...` file as `data/world.db`.
+```bash
+git status --short
+git add .github README.md CHANGELOG.md docs pom.xml src
+git commit -m "Add the living town and private witness observations"
+git push
+```
+
+Nothing in the update archive overwrites `data/`, your `.git` directory, or any API configuration.
+
+GitHub Actions automatically compiles and runs both smoke tests on pushes and pull requests.
+
+## Persistent storage
+
+The previous `world_state`, `life_events`, `memories`, and `character_facts` tables are not dropped. The new SQLite tables are:
+
+- `town_people` — town positions and Elena's independent game state (and a snapshot for Marco)
+- `town_meta` — whether the two people were already co-located
+- `town_events` — **world-authoritative** location/action events
+- `town_observations` — personal witnessed events keyed by resident
+
+Simulation state and both event journals are committed in **one SQLite transaction** during time advancement. These are developer-side debug logs, not proof of what an NPC believes or will say under pressure.
 
 ## OpenAI API (optional)
 
-OpenAI API billing is **separate** from ChatGPT subscriptions. Create an API key, set a strict budget in your API account, and then:
+ChatGPT subscriptions and OpenAI API billing are separate. No API access is required for simulation. To enable paid conversation/reflection calls, configure a strict API budget, then set a key in your shell without storing it in files:
 
 ```bash
 read -rs OPENAI_API_KEY
@@ -103,62 +132,35 @@ export OPENAI_API_KEY
 mvn -q compile exec:java
 ```
 
-Enter the key invisibly after `read -rs`, then press Enter. Never commit keys to Git or store them in game state.
+`talk` supplies Marco's saved facts, prior dialogue, important **personal life** events, and his **own eyewitness observations**; it does **not** supply the omniscient town event journal. The model can still make mistakes, so all actions and authoritative world facts remain controlled by Java.
 
-Optional model selection:
+Default model: `gpt-4.1-mini`, override with `OPENAI_MODEL` if supported by your API account.
 
-```bash
-export OPENAI_MODEL=gpt-4.1-mini
-```
-
-The selected model must be available to your API account. The application sends selected game state, the player's dialogue, recent memories, milestones and explicit persistent facts to OpenAI during `talk` / `reflect`. Responses are not used as world-state authority. The request uses `store=false`. If the request fails, `talk` falls back to demo replies, and `reflect` makes no state change.
-
-## File structure
+## Code overview
 
 ```text
-npc-life-lab/
-├── pom.xml
-├── README.md
-├── CHANGELOG.md
-├── .gitignore
-└── src/
-    ├── main/java/com/holovin/npclife/
-    │   ├── Main.java             # English CLI and time controls
-    │   ├── WorldState.java       # Marco's state and personality
-    │   ├── LifeSimulation.java   # Needs, actions, economy, age, mortality
-    │   ├── WorldDatabase.java    # Additive SQLite migrations & persistence
-    │   └── OpenAiDialogue.java   # Optional paid dialogue/reflection API
-    └── test/java/com/holovin/npclife/
-        └── SimulationSmokeTest.java
+src/main/java/com/holovin/npclife/
+  Main.java             Console commands and simulation loop
+  WorldState.java       Marco's original state
+  LifeSimulation.java   Marco's original autonomous life rules
+  WorldDatabase.java    SQLite persistence and additive migrations
+  TownLife.java         Two residents, places, movement, event/observation generation
+  OpenAiDialogue.java   Optional paid dialogue/reflection
+src/test/java/com/holovin/npclife/
+  SimulationSmokeTest.java
+  TownSmokeTest.java
 ```
 
-Run the dependency-free logic smoke tests after compilation:
+See [docs/TOWN.md](docs/TOWN.md) for modeling limits and [docs/ROADMAP.md](docs/ROADMAP.md) for the detective roadmap.
 
-```bash
-mvn -q test-compile
-java -ea -cp target/classes:target/test-classes com.holovin.npclife.SimulationSmokeTest
-```
+## Known limitations
 
-## Intentional limits — important
+1. **Only two residents.** Elena has a lightweight needs/schedule model; she is not yet simulated with every mechanic Marco has.
+2. Travel is only a timed change of abstract locations, without roads, geometry, maps, or pathfinding.
+3. Marco's older v1.0 shopping/eating actions can still happen instantly; their spatial preconditions need refactoring before real investigation mechanics rely on them.
+4. Witness observations track some physical events and co-location. They are not comprehensive: no lying, forgetting, belief uncertainty, gossip, or evidence yet.
+5. There are no crimes, solved cases, detective inventory, courtroom mechanics, 3D, or multiplayer.
+6. `offline on` **replays** elapsed time on the next launch; it is not a persistent 24/7 server.
+7. Test classes are assertion-based smoke tests, not a complete production test suite. Back up game databases before upgrading.
 
-1. This is **one NPC**, not a society. Social interaction with other named, fully simulated NPCs is not yet implemented.
-2. Marco makes **rule/utility-based autonomous choices**. An OpenAI call can generate dialogue and, on an explicit `reflect` command, suggest one allowed priority. The model does not independently think every minute.
-3. The physiology, economy, illness and mortality are simplified **game mechanics**. They are not medical or economic predictions.
-4. The app is not a continuously running 24/7 server. `offline on` merely simulates elapsed time when restarted; someday a dedicated headless Java daemon can run it around the clock.
-5. There is no graphics, animation, Godot, audio, pathfinding or multiplayer yet.
-6. SQLite contains permanent local conversation history and personal facts, so treat `data/world.db` as private user data.
-7. Saves are local and additive, but backups are still essential before each update. Large time jumps can produce irreversible simulated events, including death.
-
-### Recommended first test
-
-```text
-status
-personality
-simulate 1
-events 20
-remember The player prefers quiet walks in nature.
-talk Hello, Marco! How did your day go?
-exit
-```
-
-Restart with `mvn -q compile exec:java`, then run `memories` and `facts` to confirm persistence.
+License: none specified yet. Public source visibility alone does not establish an open-source license.

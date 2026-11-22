@@ -1,17 +1,18 @@
 # Changelog
 
-## 1.0.0 — Console character simulation
+## 1.1.0 — The Living Town
 
-- Rebuilt character simulation around persistent physical needs, mood, stress and loneliness
-- Introduced stable personality traits and goal-dependent behavior
-- Added income, monthly expenses, debt and possibility of buying a bakery
-- Added simplified illness, recovery, treatment, birthdays and permanent mortality
-- Added long-term fact memory and selected lifetime milestones for model conversations
-- Added accelerated live execution, manual long-term simulation and opt-in offline catch-up
-- Added explicit (paid, opt-in) OpenAI reflection as a constrained long-term priority decision
-- Preserved the v0.1/v0.2 database tables, characters, event log and prior conversations
-- Kept every source file, UI message and documentation example in English
+- Add Elena Rossi, an autonomous second resident with simplified independent needs and finances.
+- Add six named places and timed travel with a distinct in-transit state.
+- Track world-authoritative town events separately from per-resident eyewitness observations.
+- Add `town`, `where`, `town-events`, and `known` console commands.
+- Add new SQLite tables with additive migration, atomic saves for world and town advancements.
+- Pass Marco's witnessed town observations (not omniscient world events) to optional AI dialogue.
+- Add `TownSmokeTest` and keep the earlier `SimulationSmokeTest` unchanged.
+- Retain the v1.0 Marco save schema, core rules, and existing dialogue history.
 
-### Scope
+## 1.0.0 — Marco Bianchi
 
-This is the first complete **console NPC character** iteration, not the final game. True 24/7 simulation, multiple NPCs, richer autonomous cognition and 3D observation are future phases.
+- Autonomous physiology, financial state, aging, and long-term goals.
+- SQLite state/memory persistence and optional paid OpenAI conversation/reflection.
+- Time controls and optional offline catch-up.
