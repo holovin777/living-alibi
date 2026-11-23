@@ -91,6 +91,7 @@ final class TownLife {
         final List<KnowledgeLife.Transfer> pendingTransfers=new ArrayList<>();
         final Map<String,LinkedHashMap<String,DeceptionLife.Secret>> secrets=new LinkedHashMap<>();
         final List<DeceptionLife.Decision> pendingDecisions=new ArrayList<>();
+        final Map<String,InvestigationLife.CaseFile> cases=new LinkedHashMap<>();
         SocialLife.Relationship existingRelationship(String id1,String id2) {
             String a=id1.compareTo(id2)<=0?id1:id2;
             String b=id1.compareTo(id2)<=0?id2:id1;
@@ -112,6 +113,7 @@ final class TownLife {
             t.pendingTransfers.addAll(pendingTransfers);
             for(var e:secrets.entrySet())t.secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingDecisions.addAll(pendingDecisions);
+            for(var e:cases.entrySet())t.cases.put(e.getKey(),e.getValue().copy());
             return t;
         }
         void copyFrom(Town other) {
@@ -126,6 +128,7 @@ final class TownLife {
             secrets.clear();
             for(var e:other.secrets.entrySet())secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             pendingDecisions.clear();pendingDecisions.addAll(other.pendingDecisions);
+            cases.clear();for(var e:other.cases.entrySet())cases.put(e.getKey(),e.getValue().copy());
         }
     }
 
@@ -170,6 +173,7 @@ final class TownLife {
         elenaNeeds(e,marco,truth,observations,town);
         if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e),marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
+        InvestigationLife.tick(town,marco,truth,observations);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {
             town.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;

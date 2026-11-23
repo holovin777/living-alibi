@@ -72,3 +72,10 @@ The eventual game is an emergent detective simulation. The player investigates e
 - No mandatory paid AI call during time steps.
 - Persistent history outlives individual residents.
 - API secrets and local conversation history never belong in the public Git repository.
+
+### First Investigation v1.8 — Console prototype
+
+- A living, co-present population can create an authoritative missing-wallet incident.
+- The detective sees a case report, not the culprit; can inspect the scene, record attributed interviews and accuse a suspect.
+- Evidence, case history and outcomes persist separately from the simulation's hidden truth.
+- Further work: richer crime motives, scene reconstruction, time-limited travel/interviews, forensics, evidence-based verdicts, multi-case causality.

@@ -152,6 +152,26 @@ final class WorldDatabase implements AutoCloseable {
                     statement TEXT NOT NULL)
                 """);
         }
+        // v1.8: separate authoritative incident details from player-visible investigation notes.
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS investigation_cases (
+                    id TEXT PRIMARY KEY, day INTEGER NOT NULL, minute INTEGER NOT NULL,
+                    place TEXT NOT NULL, victim_id TEXT NOT NULL, offender_id TEXT NOT NULL,
+                    item TEXT NOT NULL, amount INTEGER NOT NULL,
+                    inspected INTEGER NOT NULL, solved INTEGER NOT NULL)
+                """);
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS investigation_witnesses (
+                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL,
+                    PRIMARY KEY(case_id,resident_id))
+                """);
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS investigation_interviews (
+                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL, statement TEXT NOT NULL,
+                    PRIMARY KEY(case_id,resident_id))
+                """);
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -278,6 +298,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistSocial(town,socialEvents);
                 persistKnowledge(town);
                 persistDeception(town);
+                persistInvestigations(town);
             }
             db.commit();
             if(town!=null) {
@@ -414,6 +435,33 @@ final class WorldDatabase implements AutoCloseable {
                         rs.getInt("day"),rs.getInt("minute"),rs.getString("reason"));
                 town.secrets.computeIfAbsent(keeper,ignored->new LinkedHashMap<>())
                         .put(secret.eventKey(),secret);
+            }
+        }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT * FROM investigation_cases ORDER BY id")) {
+            while(rs.next()) {
+                if(!town.people.containsKey(rs.getString("victim_id")) ||
+                   !town.people.containsKey(rs.getString("offender_id")))continue;
+                var c=new InvestigationLife.CaseFile(rs.getString("id"),rs.getInt("day"),
+                        rs.getInt("minute"),TownLife.Place.valueOf(rs.getString("place")),
+                        rs.getString("victim_id"),rs.getString("offender_id"),
+                        rs.getString("item"),rs.getInt("amount"));
+                c.inspected=rs.getInt("inspected")!=0;c.solved=rs.getInt("solved")!=0;
+                town.cases.put(c.id,c);
+            }
+        }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT case_id,resident_id FROM investigation_witnesses")) {
+            while(rs.next()) {
+                var c=town.cases.get(rs.getString(1));
+                if(c!=null && town.people.containsKey(rs.getString(2)))c.witnesses.add(rs.getString(2));
+            }
+        }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT case_id,resident_id,statement FROM investigation_interviews")) {
+            while(rs.next()) {
+                var c=town.cases.get(rs.getString(1));
+                if(c!=null && town.people.containsKey(rs.getString(2)))c.interviews.put(rs.getString(2),rs.getString(3));
             }
         }
         return town;
@@ -691,6 +739,40 @@ final class WorldDatabase implements AutoCloseable {
             }
         }
         Collections.reverse(result);return result;
+    }
+
+    private void persistInvestigations(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved)
+            VALUES(?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET inspected=excluded.inspected,solved=excluded.solved
+            """)) {
+            for(var c:town.cases.values()) {
+                p.setString(1,c.id);p.setInt(2,c.day);p.setInt(3,c.minute);
+                p.setString(4,c.place.name());p.setString(5,c.victimId);p.setString(6,c.offenderId);
+                p.setString(7,c.item);p.setInt(8,c.amount);
+                p.setInt(9,c.inspected?1:0);p.setInt(10,c.solved?1:0);p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT OR IGNORE INTO investigation_witnesses(case_id,resident_id) VALUES(?,?)
+            """)) {
+            for(var c:town.cases.values())for(var witness:c.witnesses) {
+                p.setString(1,c.id);p.setString(2,witness);p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO investigation_interviews(case_id,resident_id,statement) VALUES(?,?,?)
+            ON CONFLICT(case_id,resident_id) DO UPDATE SET statement=excluded.statement
+            """)) {
+            for(var c:town.cases.values())for(var entry:c.interviews.entrySet()) {
+                p.setString(1,c.id);p.setString(2,entry.getKey());
+                p.setString(3,entry.getValue());p.addBatch();
+            }
+            p.executeBatch();
+        }
     }
 
     @Override public void close() throws SQLException {db.close();}

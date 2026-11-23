@@ -1,10 +1,10 @@
 # Living Alibi
 
-**v1.7 — Secrets & Deception** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.8 — First Investigation** · Java 21+ · Maven · SQLite · headless console prototype
 
 > An independent town, private observations, and a detective who must discover what really happened.
 
-Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **There is no playable detective, investigation system or 3D world yet.** Code, documentation, and game text are English-only.
+Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The first detective commands are playable in the console; there is no 3D world or unrestricted investigation system yet.** Code, documentation, and game text are English-only.
 
 ## Implemented
 
@@ -20,6 +20,8 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 - **Social pacing:** each non-legacy pair attempts spontaneous conversation at most once per game day; contact is not guaranteed. This is still an abstract rule-based simulation, not a fully natural dialogue engine.
 - **Attributed beliefs (since v1.6):** residents record notable witnessed events as `DIRECT` and can relay one claim per real conversation. Secondhand `HEARD` claims retain the original event, source ID, relay hops and a reduced confidence score; gossip never writes to world truth.
 - **Secrets & Deception (new in v1.7):** some personally sensitive witnessed events become private. A resident may conceal them or intentionally give a false claim depending on trust and carefulness. The false claim enters hearsay, never world truth. All decisions are recorded separately for developer audits.
+- **First Investigation (v1.8):** in a sufficiently populated shared public scene, the simulation can generate a missing-wallet case. It chooses participating living residents from their current positions and traits, records a secret authoritative perpetrator, and preserves witnesses, scene examination, interviews, and resolution in SQLite.
+- **Playable prototype detective commands:** `cases`, `case case-0001`, `inspect case-0001`, `interview resident-0001 case-0001`, `accuse case-0001 resident-0001`. These do not require an OpenAI API key. Inspecting a scene yields a modest clue; witnesses can report observations or hearsay, not world truth.
 - **Epistemic separation:** `town-events` is authoritative developer truth, `known` is a direct sensory event log, `beliefs` is a filtered attributed claim journal, and `rumors` is a relay log.
 - Deterministic generation and simulation; optional paid OpenAI only for direct `talk` and `reflect` commands, never for simulated minutes.
 - Manual time skipping, accelerated live mode and optional offline catch-up *on reopening* (not a continuously hosted server).
@@ -33,6 +35,26 @@ mvn -q compile exec:java
 ```
 
 The application creates `data/world.db` if missing. That directory is ignored by Git. No API key is required.
+
+### Try your first investigation
+
+If your saved world already has 12 generated residents, **do not run `population generate 12` again**.
+
+```text
+cases
+simulate 14
+cases
+case case-0001
+inspect case-0001
+population 20
+interview marco case-0001
+interview elena case-0001
+case case-0001
+```
+
+Use `interview <resident-id> case-0001` to question other residents who were at the scene. You can then try `accuse case-0001 <resident-id>`. The correct suspect **is never shown** in the `cases` listing or the initial case summary. For debugging, `town-events` may expose authoritative events; avoid it while playing detective.
+
+Prototype limitations: incident opportunities are checked on **one evening per game week**; a case requires at least three residents co-present at a public location, so case counts depend on the town. The only incident type is an abstract wallet theft; this is a rules-based experiment, not yet a physically modeled crime. Scene inspection and interviewing are instantaneous and location-independent, and the final accusation is judged against hidden engine truth rather than legal proof. Evidence is currently intentionally basic, and interrogation uses fixed rules, not open-ended AI speech.
 
 ### Try a generated town
 
@@ -81,6 +103,12 @@ beliefs <id> [count]       # DEBUG: DIRECT/HEARD, source, confidence, hops
 rumors [count]            # DEBUG: who told what to whom
 secrets <id> [count]      # DEBUG ONLY: sensitive event keys for a resident
 deceptions [count]        # DEBUG ONLY: withheld / deliberate lies
+cases                    # public case reports; no culprit shown
+case <case-id>           # case summary and your collected evidence
+inspect <case-id>        # search the incident scene (abstract, instant)
+interview <id> <case-id>  # record a resident's statement
+accuse <case-id> <id>     # submit a theory after at least two interviews
+
 events [count]
 memories [count]
 facts

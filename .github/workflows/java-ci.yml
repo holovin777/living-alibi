@@ -67,3 +67,11 @@ jobs:
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.DeceptionDatabaseSmokeTest' exec:exec
       - name: Test deception in a full two-week simulated town
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.DeceptionIntegrationSmokeTest
+      - name: Test first playable investigation mechanics
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.InvestigationSmokeTest
+      - name: Test autonomous case emergence in a living town
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.InvestigationIntegrationSmokeTest
+      - name: Test investigation SQLite migration and persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.InvestigationDatabaseSmokeTest' exec:exec

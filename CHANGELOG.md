@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.0 — First Investigation
+
+- Generate the first authoritative missing-wallet incident from living, co-present residents at periodic public-scene opportunities.
+- Keep culprit identification hidden from case summaries and public witness accounts; the engine retains authoritative identity.
+- Add persistent case files, scene examination, attributed witness interviews, and evidence-gated accusation commands.
+- Keep room-level witness isolation and existing rumors, personalities, relationships and world saves intact.
+- Add additive SQLite tables for cases, witnesses and interviews; add unit, integration and JDBC smoke tests.
+- This version is still a **console investigation prototype**, not dynamic property simulation, free-text AI interrogation, or a police/legal system.
+
 ## 1.7.0 — Secrets & Deception
 
 - Mark a small deterministic subset of personally sensitive DIRECT events as privately held secrets.
