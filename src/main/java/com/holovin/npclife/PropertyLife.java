@@ -10,7 +10,7 @@ final class PropertyLife {
     private PropertyLife() { }
 
     enum Type { WALLET, PHONE, BICYCLE }
-    enum Action { ACQUIRED_AT_MIGRATION, PURCHASED, STOLEN, RETURNED }
+    enum Action { ACQUIRED_AT_MIGRATION, PURCHASED, STOLEN, SEIZED, RETURNED }
 
     static final class Item {
         final String id;
@@ -85,6 +85,33 @@ final class PropertyLife {
         town.pendingProperty.add(new Change(clock.day,clock.minute,Action.STOLEN,
                 wallet.id,victim.id,offender.id,"Custody changed; legal ownership retained"));
         return wallet.id;
+    }
+
+    /** Evidence stays physically outside citizen inventories until the case is closed. */
+    static boolean seizeForCase(TownLife.Town town,WorldState clock,
+                                InvestigationLife.CaseFile c,String suspectId) {
+        if(c.physicalItemId==null)return false;
+        var item=town.items.get(c.physicalItemId);
+        if(item==null || !item.stolen || !suspectId.equals(item.holderId))return false;
+        item.holderId=null;
+        item.storedSpace="evidence:"+c.id;
+        town.pendingProperty.add(new Change(clock.day,clock.minute,Action.SEIZED,item.id,
+                suspectId,"evidence:"+c.id,"Item secured in evidence; legal owner unchanged"));
+        return true;
+    }
+
+    static boolean returnFromEvidence(TownLife.Town town,WorldState clock,
+                                      InvestigationLife.CaseFile c) {
+        if(c.physicalItemId==null || !c.solved)return false;
+        var item=town.items.get(c.physicalItemId);
+        if(item==null || !item.stolen || !("evidence:"+c.id).equals(item.storedSpace)
+                || item.holderId!=null || !c.victimId.equals(item.ownerId))return false;
+        item.holderId=c.victimId;
+        item.storedSpace=null;
+        item.stolen=false;
+        town.pendingProperty.add(new Change(clock.day,clock.minute,Action.RETURNED,item.id,
+                "evidence:"+c.id,c.victimId,"Recovered item returned to its legal owner"));
+        return true;
     }
 
     /** A wallet can be replaced only by purchasing a NEW item while at the market. */

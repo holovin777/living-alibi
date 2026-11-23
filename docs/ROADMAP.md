@@ -86,7 +86,14 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Stable wallet, phone and bicycle IDs with legal owner, actual holder and location (current carrier vs private home storage).
 - Wallet-theft cases now involve a specific carried object; victim retains legal ownership. Purchase a distinct replacement after a theft.
 - Append-only custody audit and private case-to-object linkage; historical cases are preserved without fabricated property records.
-- Developer-only inventory views never substitute for detective evidence. Item recovery, gifts/trades and detailed item forensics are future features.
+- Developer-only inventory views never substitute for detective evidence. Item seizure/release is implemented in v1.14; gifts/trades and detailed item forensics are future features.
+
+### Recovery & Chain of Custody v1.14 — Evidence-guided searches
+
+- An investigator can search a resident after interviewing enough people and establishing a named or non-unique clothing lead.
+- The item is secured in an evidence room with append-only custody history, and returned only after resolution.
+- Search outcomes survive SQLite restarts and repeated actions are idempotent.
+- A two-week repeat-victim cooldown reduces unrealistic wallet-theft loops without modifying old reports.
 
 ## Proposed, not implemented
 
@@ -95,7 +102,9 @@ The eventual game is an emergent detective simulation. The player investigates e
 3. **Advanced memory and belief:** basic attributed information exchange is implemented; deception and simple motive pressure are implemented; fading memory, genuine contradictions, and deep psychological drivers remain to be developed.
 4. **Incidents and evidence:** theft/lost property, alibis, trails, witnesses, event causality, evidence acquisition.
 5. **Playable detective:** first console interviews, case summaries, background leads, and accusations are implemented; rich deduction tools, travel, case linkage, and fair legal outcomes remain future work.
-6. **Continuous hosting:** headless daemon + eventual optional Godot 3D client.
+6. **Organized crime and social power:** emergent groups with ranks, territorial influence, debts, intimidation and leverage over witnesses. Authority must be built through interactions and history, never attached as a static "criminal" flag.
+7. **Human vulnerability and addiction:** nuanced dependency, harm, support and recovery mechanics grounded in character histories; substance use or a health vulnerability must never automatically imply violence or criminal behavior.
+8. **Continuous hosting and presentation:** headless daemon first, then an optional Godot client that reads the same authoritative events without controlling world truth.
 
 ## Principles
 

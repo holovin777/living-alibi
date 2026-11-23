@@ -279,6 +279,21 @@ final class WorldDatabase implements AutoCloseable {
                 st.executeUpdate("ALTER TABLE investigation_cases ADD COLUMN physical_item_id TEXT");
             }
         }
+        // v1.14: a returned case stays historically returned even if its wallet is stolen again.
+        if(!columnExists("investigation_cases","returned")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE investigation_cases ADD COLUMN returned INTEGER NOT NULL DEFAULT 0");
+            }
+        }
+        // v1.14: preserve detective searches independently of hidden item custody.
+        // Older saved cases start with zero searches; no retroactive search result exists.
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS investigation_searches (
+                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL, result TEXT NOT NULL,
+                    PRIMARY KEY(case_id,resident_id))
+                """);
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -407,6 +422,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistKnowledge(town);
                 persistDeception(town);
                 persistInvestigations(town);
+                persistSearches(town);
                 persistEconomy(town);
                 persistLifeChanges(town);
                 persistProperty(town);
@@ -571,6 +587,7 @@ final class WorldDatabase implements AutoCloseable {
                 c.motiveCode=rs.getString("motive_code");
                 c.motiveStrength=rs.getInt("motive_strength");
                 c.physicalItemId=rs.getString("physical_item_id");
+                c.returned=rs.getInt("returned")!=0;
                 town.cases.put(c.id,c);
             }
         }
@@ -602,6 +619,14 @@ final class WorldDatabase implements AutoCloseable {
                 var c=town.cases.get(rs.getString(1));
                 if(c!=null && town.people.containsKey(rs.getString(2)))
                     c.alibiChecks.put(rs.getString(2),rs.getString(3));
+            }
+        }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT case_id,resident_id,result FROM investigation_searches")) {
+            while(rs.next()) {
+                var c=town.cases.get(rs.getString(1));
+                if(c!=null && town.people.containsKey(rs.getString(2)))
+                    c.searches.put(rs.getString(2),rs.getString(3));
             }
         }
         try(Statement st=db.createStatement();
@@ -924,12 +949,13 @@ final class WorldDatabase implements AutoCloseable {
 
     private void persistInvestigations(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved,fabric_color,motive_code,motive_strength,physical_item_id)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved,fabric_color,motive_code,motive_strength,physical_item_id,returned)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(id) DO UPDATE SET inspected=excluded.inspected,solved=excluded.solved,
                                          fabric_color=excluded.fabric_color,
                                          motive_code=excluded.motive_code,motive_strength=excluded.motive_strength,
-                                         physical_item_id=excluded.physical_item_id
+                                         physical_item_id=excluded.physical_item_id,
+                                         returned=excluded.returned
             """)) {
             for(var c:town.cases.values()) {
                 p.setString(1,c.id);p.setInt(2,c.day);p.setInt(3,c.minute);
@@ -939,7 +965,7 @@ final class WorldDatabase implements AutoCloseable {
                 p.setString(11,c.fabricColor);p.setString(12,c.motiveCode);
                 if(c.motiveCode==null)p.setNull(13,java.sql.Types.INTEGER);
                 else p.setInt(13,c.motiveStrength);
-                p.setString(14,c.physicalItemId);
+                p.setString(14,c.physicalItemId);p.setInt(15,c.returned?1:0);
                 p.addBatch();
             }
             p.executeBatch();
@@ -987,6 +1013,19 @@ final class WorldDatabase implements AutoCloseable {
             """)) {
             for(var c:town.cases.values())for(var entry:c.alibiChecks.entrySet()) {
                 p.setString(1,c.id);p.setString(2,entry.getKey());p.setString(3,entry.getValue());p.addBatch();
+            }
+            p.executeBatch();
+        }
+    }
+
+    private void persistSearches(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO investigation_searches(case_id,resident_id,result) VALUES(?,?,?)
+            ON CONFLICT(case_id,resident_id) DO UPDATE SET result=excluded.result
+            """)) {
+            for(var c:town.cases.values())for(var entry:c.searches.entrySet()) {
+                p.setString(1,c.id);p.setString(2,entry.getKey());
+                p.setString(3,entry.getValue());p.addBatch();
             }
             p.executeBatch();
         }

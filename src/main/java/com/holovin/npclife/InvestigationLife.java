@@ -24,6 +24,8 @@ final class InvestigationLife {
         final Map<String,String> incidentSpaces=new LinkedHashMap<>();
         /** Detective notes, not authoritative evidence. May be updated after new interviews. */
         final Map<String,String> alibiChecks=new LinkedHashMap<>();
+        /** Search outcomes are retained to prevent unlimited repeated searches. */
+        final Map<String,String> searches=new LinkedHashMap<>();
         /** Empty for pre-v1.9 cases, whose historic scene evidence cannot be rewritten. */
         String fabricColor;
         /** Only post-v1.13 incidents link to a real, movable world item. */
@@ -33,7 +35,7 @@ final class InvestigationLife {
         int motiveStrength;
         /** Contemporary circumstances for every resident, not an accusation. */
         final Map<String,MotiveLife.Indicators> incidentProfiles=new LinkedHashMap<>();
-        boolean inspected, solved;
+        boolean inspected, solved, returned;
 
         CaseFile(String id,int day,int minute,TownLife.Place place,
                  String victimId,String offenderId,String item,int amount) {
@@ -43,9 +45,9 @@ final class InvestigationLife {
         }
         CaseFile copy() {
             var c=new CaseFile(id,day,minute,place,victimId,offenderId,item,amount);
-            c.inspected=inspected;c.solved=solved;c.witnesses.addAll(witnesses);
+            c.inspected=inspected;c.solved=solved;c.returned=returned;c.witnesses.addAll(witnesses);
             c.interviews.putAll(interviews);c.incidentSpaces.putAll(incidentSpaces);
-            c.alibiChecks.putAll(alibiChecks);c.fabricColor=fabricColor;
+            c.alibiChecks.putAll(alibiChecks);c.searches.putAll(searches);c.fabricColor=fabricColor;
             c.physicalItemId=physicalItemId;
             c.motiveCode=motiveCode;c.motiveStrength=motiveStrength;
             c.incidentProfiles.putAll(incidentProfiles);
@@ -90,7 +92,8 @@ final class InvestigationLife {
                         {recentlyOffended=true;break;}
                 if(recentlyOffended)continue;
                 for(var victim:people) {
-                    if(victim==offender || victim.money<30 || PropertyLife.carriedWallet(town,victim)==null)continue;
+                    if(victim==offender || victim.money<30 || PropertyLife.carriedWallet(town,victim)==null ||
+                            recentlyVictimized(town,clock,victim.id,14))continue;
                     var assessment=MotiveLife.assess(town,clock,offender,victim);
                     if(assessment.strength()<59)continue;
                     int jitter=(int)Math.floorMod(mix(now^offender.id.hashCode()^
@@ -110,6 +113,17 @@ final class InvestigationLife {
         int chance=Math.min(95,Math.max(8,winning.strength()-38)); // rare per-window chance; motivation changes probability
         if(Math.floorMod(entropy,1000)>=chance)return;
         recordIncident(town,clock,scene,chosen,target,winning,truth,observations);
+    }
+
+    /** Trauma/caution cooldown applies to future victim selection, not old case data. */
+    static boolean recentlyVictimized(TownLife.Town town,WorldState clock,String victimId,int days) {
+        long now=((long)clock.day-1)*1440L+clock.minute;
+        for(var c:town.cases.values()) {
+            long then=((long)c.day-1)*1440L+c.minute;
+            if(c.victimId.equals(victimId) && then<=now && now-then<(long)days*1440L)
+                return true;
+        }
+        return false;
     }
 
     private static long mix(long n) {
@@ -299,6 +313,56 @@ final class InvestigationLife {
             return "No contemporaneous background snapshot is available for this older case. "+
                    "Do not infer past circumstances from today's information.";
         return person.name+" | Incident-time leads | "+data.publicSummary();
+    }
+
+    /** Player-facing, evidence-gated suspect search. No global inventory is exposed. */
+    static String search(TownLife.Town town,WorldState clock,String caseId,String residentId) {
+        var c=caseById(town,caseId);
+        var target=town.get(residentId);
+        if(c.physicalItemId==null)
+            return "This historical case has no traceable physical item. Do not invent past evidence.";
+        var item=town.items.get(c.physicalItemId);
+        if(item==null)return "The physical item record is unavailable.";
+        if(("evidence:"+c.id).equals(item.storedSpace))
+            return "The item is already held in the evidence room.";
+        if(!item.stolen)return "The reported item is no longer missing.";
+        if(!c.inspected || c.interviews.size()<2 || !c.interviews.containsKey(target.id))
+            return "Inspect the scene and interview at least two people, including this resident, before searching.";
+        if(c.searches.containsKey(target.id))return "Previous search: "+c.searches.get(target.id);
+        if(c.searches.size()>=3)return "No more searches are authorized in this investigation (limit: 3).";
+        boolean namedByWitness=false;
+        for(var entry:c.interviews.entrySet()) {
+            if(entry.getKey().equals(target.id) || !c.witnesses.contains(entry.getKey()))continue;
+            if(entry.getValue().contains(target.name)) {namedByWitness=true;break;}
+        }
+        boolean matchesFabric=c.witnesses.contains(target.id) &&
+                c.fabricColor!=null && c.fabricColor.equals(coatColor(target,c.day));
+        if(!namedByWitness && !matchesFabric)
+            return "Insufficient grounds: need a named witness lead or matching scene clothing for this person.";
+        String result;
+        if(PropertyLife.seizeForCase(town,clock,c,target.id)) {
+            result="MATCH: a wallet bearing the recorded item identifier was found and secured in the evidence room. " +
+                    "This links custody to the suspect, but case resolution remains separate.";
+        } else {
+            result="NO MATCH: no wallet matching this case's recorded item was found during the search. " +
+                    "This does not prove innocence.";
+        }
+        c.searches.put(target.id,result);
+        return result;
+    }
+
+    /** Release the physical item only after a solved case and an actual seizure. */
+    static String returnItem(TownLife.Town town,WorldState clock,String caseId) {
+        var c=caseById(town,caseId);
+        if(c.physicalItemId==null)
+            return "This old case has no documented physical item to return.";
+        if(c.returned)return "This case's item has already been returned to its legal owner.";
+        if(!c.solved)return "The case must be solved before evidence can be released to its owner.";
+        if(PropertyLife.returnFromEvidence(town,clock,c)) {
+            c.returned=true;
+            return "The recovered wallet was returned to "+town.get(c.victimId).name+". Chain of custody recorded.";
+        }
+        return "The item is not available in this case's evidence room. Recover it first, or it has already been returned.";
     }
 
     static String accuse(TownLife.Town town,String caseId,String residentId) {

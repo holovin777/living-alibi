@@ -113,3 +113,11 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PropertyDatabaseSmokeTest' exec:exec
+      - name: Test evidence-gated item seizure and return
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.RecoverySmokeTest
+      - name: Test repeat victim protection in a 28-day town
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.RecoveryIntegrationSmokeTest
+      - name: Test SQLite search, seizure and return persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.RecoveryDatabaseSmokeTest' exec:exec

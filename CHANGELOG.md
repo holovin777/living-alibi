@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.14.0 — Recovery & Chain of Custody
+
+- Add `search <case-id> <resident-id>` as a detective-only evidence search. An inspected scene, two interviews (including the resident being searched), and a supporting name/clothing lead are necessary. The result is based on the concrete wallet associated with the case, never on an arbitrary generated duplicate.
+- Limit authorized searches to three distinct residents per case, preserving negative and positive outcomes in a new `investigation_searches` SQLite table. A failed search does not prove innocence. Searches without sufficient grounds do not consume the budget.
+- On a successful search, move the item to a separate `evidence:<case-id>` space without transferring legal title or deleting the property record. Add `SEIZED` to append-only `property_changes`.
+- Add `return-item <case-id>` to release a physically seized item to its rightful owner *after* the case is solved; log exactly one `RETURNED` change. Repeated saves and repeated commands are idempotent; an additive `returned` case flag preserves historical resolution even if the same wallet is stolen later.
+- Introduce a 14-day victim cooldown for future incidents so a single solvent resident is not repeatedly targeted after buying replacement wallets. This never modifies historical cases, dates, motives or guilt.
+- Add unit, full-simulation and SQLite persistence tests; retain property/legacy migrations and all prior game systems.
+- Limitations: simplified instant police search, no real warrant system, no item trading/fencing, no suspect movement during search, no formal criminal procedure, and no manual control of police resources. Full legal adjudication remains out of scope.
+
 ## 1.13.0 — Property & Possessions
 
 - Add stable physical wallet, phone and bicycle items, with separate legal owner, current holder and stored home space; moving people carry held objects with them.

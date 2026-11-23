@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.13 — Property & Possessions");
+            System.out.println("Living Alibi v1.14 — Recovery & Chain of Custody");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -203,6 +203,17 @@ public final class Main {
                         for(var entry:c.interviews.entrySet())System.out.println("  "+town.get(entry.getKey()).name+": "+entry.getValue());
                         for(var entry:c.alibiChecks.entrySet())System.out.println("  Alibi check ("+
                                 town.get(entry.getKey()).name+"): "+entry.getValue());
+                        System.out.println("Evidence searches: "+c.searches.size()+"/3");
+                        for(var entry:c.searches.entrySet())System.out.println("  Search ("+
+                                town.get(entry.getKey()).name+"): "+entry.getValue());
+                        if(c.physicalItemId!=null) {
+                            var property=town.items.get(c.physicalItemId);
+                            if(c.returned)
+                                System.out.println("Physical evidence: RETURNED TO OWNER");
+                            else if(property!=null && ("evidence:"+c.id).equals(property.storedSpace))
+                                System.out.println("Physical evidence: RECOVERED / HELD IN EVIDENCE");
+                            else System.out.println("Physical evidence: NOT RECOVERED");
+                        }
                         continue;
                     }
                     if(lower.startsWith("inspect ")) {
@@ -233,6 +244,20 @@ public final class Main {
                                 "Use background <case-id> <resident-id>.");
                         System.out.println(InvestigationLife.background(town,parts[0],parts[1]));
                         continue;
+                    }
+                    if(lower.startsWith("search ")) {
+                        String[] parts=arg(input).split("\\s+");
+                        if(parts.length!=2)throw new IllegalArgumentException("Use search <case-id> <resident-id>.");
+                        var candidate=town.copy();
+                        String result=InvestigationLife.search(candidate,state,parts[0],parts[1]);
+                        db.save(state,List.of(),List.of(),candidate,List.of(),List.of(),List.of());
+                        town.copyFrom(candidate);System.out.println(result);continue;
+                    }
+                    if(lower.startsWith("return-item ")) {
+                        var candidate=town.copy();
+                        String result=InvestigationLife.returnItem(candidate,state,arg(input));
+                        db.save(state,List.of(),List.of(),candidate,List.of(),List.of(),List.of());
+                        town.copyFrom(candidate);System.out.println(result);continue;
                     }
                     if(lower.startsWith("accuse ")) {
                         String[] parts=arg(input).split("\\s+");
@@ -564,6 +589,7 @@ public final class Main {
         System.out.println(" secrets <id> [count] | deceptions [count] — confidential developer diagnostics");
         System.out.println(" cases | case <id> | inspect <id> | interview <resident-id> <case-id>");
         System.out.println(" check-alibi <case-id> <resident-id> | background <case-id> <resident-id>");
+        System.out.println(" search <case-id> <resident-id> | return-item <case-id> — evidence custody");
         System.out.println(" accuse <case-id> <resident-id>");
         System.out.println(" finances <id> | debts | ledger [count] | ledger <id> [count] — developer finance diagnostics");
         System.out.println(" career <id> | life-events [count] | life-events <id> [count] — developer life diagnostics");
