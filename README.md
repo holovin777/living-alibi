@@ -1,6 +1,6 @@
 # Living Alibi
 
-**v1.11 — Economy & Debts** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.12 — Employment & Life Events** · Java 21+ · Maven · SQLite · headless console prototype
 
 > An independent town, private observations, and a detective who must discover what really happened.
 
@@ -26,10 +26,16 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 - **Motives & Opportunity (v1.10):** theft opportunities are checked at spaced daytime windows, not on a fixed weekday. Autonomous motives combine financial pressure, relationship tension, envy, and impulsivity. A three-day city cooldown and ten-day repeat-offender cooldown limit case flooding. The culprit and motive are authoritative engine truth, never displayed to the detective.
 - **Incident-time background:** `background <case-id> <resident-id>` becomes available after examining the scene and interviewing the resident. It shows broad categories for financial strain, interpersonal friction, and impulsivity from the incident instant, not a guilt score. Profiles persist separately in SQLite; old cases gain no fabricated history.
 - **Economy & Debts (v1.11):** generated residents pay periodic housing/utilities bills and occasional household repairs. Unpaid expenses become arrears; trusted residents can make small zero-interest loans only if they meet in a public location and the lender has enough cash. Repayment moves existing money between residents; a late loan harms trust and increases tension. New finances affect future motive calculations, never historical case backgrounds.
+- **Employment & Life Events (v1.12):** procedural residents can lose jobs, search for new work after a realistic delay, be hired into another occupation, and suffer short illnesses that prevent wage earning. Medical costs become actual household bills, paid or overdue. A daily deterministic decision rule uses a resident's fixed personal seed and the simulated calendar, not real clock time or paid AI calls.
+- **Developer life diagnostics:** `career <id>`, `life-events [count]`, and `life-events <id> [count]` show present employment and append-only job/health changes. Private illness details are not automatically broadcast to every nearby NPC or revealed to the detective. Marco and Elena retain their previous special-case work simulation; only generated residents use the v1.12 employment subsystem.
 - **Developer finance tools:** `finances <resident-id>`, `debts`, `ledger [count]`, and `ledger <resident-id> [count]`. Loan contracts, household arrears and an append-only accounting history persist in SQLite. These reveal private information and should not be used during a blind detective run.
 - **Epistemic separation:** `town-events` is authoritative developer truth, `known` is a direct sensory event log, `beliefs` is a filtered attributed claim journal, and `rumors` is a relay log.
 - Deterministic generation and simulation; optional paid OpenAI only for direct `talk` and `reflect` commands, never for simulated minutes.
 - Manual time skipping, accelerated live mode and optional offline catch-up *on reopening* (not a continuously hosted server).
+
+## Upgrading an existing world
+
+Quit the console with `exit`, back up `data/world.db` while it is closed, and extract the ZIP from the `~/Repositories` parent folder. The archive never includes your personal SQLite database. v1.12 adds five `town_people` columns and a new `resident_life_changes` table. Existing people, cases and old witness logs are retained; previous financial or medical events are not fabricated retrospectively. The old `world.db` remains the active save when starting the updated game.
 
 ## Quick start
 
@@ -40,6 +46,20 @@ mvn -q compile exec:java
 ```
 
 The application creates `data/world.db` if missing. That directory is ignored by Git. No API key is required.
+
+### Employment and short life events (v1.12)
+
+```text
+career resident-0001
+simulate 21
+career resident-0001
+life-events 30
+life-events resident-0001 20
+finances resident-0001
+ledger resident-0001 20
+```
+
+**No guaranteed layoffs, illnesses or loans in any particular 14-day period.** Existing residents begin v1.12 employed and healthy (no invented backdated events). Future unemployment stops their hourly pay; seeking new work can take several days and may lead to a different workplace. Two- or three-day illness episodes interrupt work and create medical bills. Affluent residents may still pay everything and have no debts. These summaries expose private data and are **developer-only**; the detective must not use them as automatic evidence.
 
 ### Household finance diagnostics (v1.11)
 

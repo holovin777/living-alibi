@@ -9,7 +9,7 @@ import java.util.List;
 final class EconomyLife {
     private EconomyLife() { }
 
-    enum Kind { BILL, BILL_PAYMENT, LOAN, REPAYMENT, OVERDUE }
+    enum Kind { BILL, MEDICAL_BILL, BILL_PAYMENT, LOAN, REPAYMENT, OVERDUE }
     enum Status { OPEN, OVERDUE, PAID }
 
     static final class Loan {
@@ -105,7 +105,9 @@ final class EconomyLife {
                         String reason,List<TownLife.Event> truth,List<TownLife.Observation> observations) {
         if(amount<=0)throw new IllegalArgumentException("Bills must be positive.");
         p.unpaidBills=Math.addExact(p.unpaidBills,amount);
-        town.pendingEconomy.add(new Entry(clock.day,clock.minute,Kind.BILL,p.id,"housing",null,
+        boolean medical=reason.equals("medical costs");
+        town.pendingEconomy.add(new Entry(clock.day,clock.minute,
+                medical?Kind.MEDICAL_BILL:Kind.BILL,p.id,medical?"clinic":"housing",null,
                 amount,reason));
         // Do not publish a person's personal financial statement to nearby strangers.
         payBills(town,clock,p,truth,observations);
@@ -117,8 +119,10 @@ final class EconomyLife {
         if(amount<=0)return 0;
         p.money-=amount;p.unpaidBills-=amount;
         if(p.id.equals("marco"))clock.money=p.money;
+        // Arrears are currently pooled; a payment is deliberately not attributed to
+        // an individual rent/medical invoice when that allocation is unknown.
         town.pendingEconomy.add(new Entry(clock.day,clock.minute,Kind.BILL_PAYMENT,
-                p.id,"housing",null,amount,"Household bill payment"));
+                p.id,"payables",null,amount,"Payment on pooled outstanding bills"));
         return amount;
     }
 

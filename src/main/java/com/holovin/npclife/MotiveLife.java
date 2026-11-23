@@ -22,6 +22,7 @@ final class MotiveLife {
         for(var loan:town.loans.values())
             if(loan.borrowerId.equals(person.id))owed+=loan.outstanding;
         int financial=clamp(110-person.money+person.hunger/4 + Math.min(65,owed/3) +
+                (!person.employed?Math.min(35,person.unemploymentDays*2):0) +
                 (person.id.equals("marco")?Math.min(60,clock.debt/6):0));
         var relation=person.id.equals(victim.id)?null:town.existingRelationship(person.id,victim.id);
         int conflict=relation==null?0:clamp(relation.tension*2-relation.trust/3);

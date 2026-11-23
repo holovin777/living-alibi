@@ -27,12 +27,13 @@ final class PopulationLife {
         boolean sleeping=minute<390||minute>=1320;
         if(minute%15==0)c.fatigue=clamp(c.fatigue+(sleeping?-3:1));
         boolean workday=(clock.day-1)%7<5;
-        boolean working=workday && minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset;
+        boolean sick=EmploymentLife.sick(c,clock.day);
+        boolean working=c.employed && !sick && workday && minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset;
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && c.money>=9;
         boolean needWater=c.water<2 && c.money>=3;
         TownLife.Place desired;
-        if(sleeping)desired=c.home;
+        if(sleeping || sick)desired=c.home;
         else if(marketOpen && (needFood||needWater)) desired=TownLife.Place.MARKET;
         else if(working)desired=c.workplace;
         else if(minute>=960 && minute<1200) {
@@ -43,6 +44,17 @@ final class PopulationLife {
         if(c.travelRemaining>0 || c.place!=desired) {
             TownLife.move(town,c,desired,clock,events,observations);
             if(c.travelRemaining>0){c.activity="TRAVELING";return;}
+        }
+        // During a short illness, essential supplies may be delivered to the private unit.
+        if(sick && c.place==c.home && marketOpen) {
+            if(c.food<2 && c.money>=12) {
+                c.money-=12;c.food+=3;
+                TownLife.publish(town,clock,c.id,c.place,c.name+" received groceries at home.",events,observations);
+            }
+            if(c.water<2 && c.money>=6) {
+                c.money-=6;c.water+=3;
+                TownLife.publish(town,clock,c.id,c.place,c.name+" received drinking water at home.",events,observations);
+            }
         }
         if(c.place==TownLife.Place.MARKET && marketOpen) {
             if(c.food<2 && c.money>=9) {
@@ -63,6 +75,8 @@ final class PopulationLife {
             TownLife.publish(town,clock,c.id,c.place,c.name+" drank water.",events,observations);
         }
         if(sleeping)c.activity="SLEEPING";
+        else if(sick)c.activity="SICK_LEAVE";
+        else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){

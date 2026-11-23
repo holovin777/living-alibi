@@ -97,3 +97,11 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.EconomyDatabaseSmokeTest' exec:exec
+      - name: Test job loss, re-employment and temporary illness expenses
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.EmploymentSmokeTest
+      - name: Test autonomous resident life changes over 35 days
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.EmploymentIntegrationSmokeTest
+      - name: Test career events and medical arrears SQLite migration
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.EmploymentDatabaseSmokeTest' exec:exec

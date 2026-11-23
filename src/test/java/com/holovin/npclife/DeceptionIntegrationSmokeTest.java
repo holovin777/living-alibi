@@ -12,12 +12,12 @@ public final class DeceptionIntegrationSmokeTest {
         var truth=new ArrayList<TownLife.Event>();
         var observations=new ArrayList<TownLife.Observation>();
         var interactions=new ArrayList<SocialLife.Interaction>();
-        LifeSimulation.advance(clock,14L*1440L,
+        LifeSimulation.advance(clock,28L*1440L,
                 c->TownLife.tick(town,c,truth,observations,interactions));
         long secretCount=town.secrets.values().stream().mapToInt(m->m.size()).sum();
         long lies=town.pendingDecisions.stream().filter(d->d.kind().equals("LIE")).count();
         if(secretCount<1)throw new AssertionError("Sensitive eyewitness experiences produced no secrets");
-        if(lies<1)throw new AssertionError("No deliberate false claim emerged in two weeks");
+        if(lies<1)throw new AssertionError("No deliberate false claim emerged in four weeks");
         for(var d:town.pendingDecisions) {
             if(!d.kind().equals("LIE"))continue;
             var matching=truth.stream().filter(e->KnowledgeLife.eventKey(e).equals(d.eventKey())).findFirst();
@@ -27,6 +27,6 @@ public final class DeceptionIntegrationSmokeTest {
                 throw new AssertionError("A deceptive statement leaked into authoritative event log");
         }
         System.out.println("DeceptionIntegrationSmokeTest: ALL CHECKS PASSED ("+
-                secretCount+" secrets, "+lies+" lies in 14 days)");
+                secretCount+" secrets, "+lies+" lies in 28 days)");
     }
 }

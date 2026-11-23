@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.12.0 — Employment & Life Events
+
+- Add daily seeded job-market decisions for generated residents: occasional layoffs, multi-day unemployed job searches, and subsequent hiring (possibly into a new occupation and work location). Unemployed citizens stop earning hourly pay.
+- Model brief sick leaves (two or three days), during which generated residents stay home and cannot earn wages. Optional essential home deliveries help avoid starvation; a medical expense is registered as a real payable household bill or arrears.
+- A resident's employment and illness state survives a restart with additive `town_people` columns. A dedicated append-only `resident_life_changes` table stores the date, resident, event kind and private description without creating false historic records.
+- Include developer-only `career` and `life-events` inspection commands. Existing `finances` and `ledger` commands show the impact of medical costs and reduced earnings.
+- Future motive calculations account for time spent unemployed and newly accumulated debts. Existing case backgrounds remain immutable incident-time snapshots; v1.12 does not retcon the player world's previous cases.
+- Add new deterministic job/illness unit tests, an integrated 35-day simulation test and a JDBC migration/round-trip test in GitHub CI. Marco and Elena retain their existing special-case career systems.
+- Still no employment contracts, job vacancies, official institutions or simulation-wide employment equilibrium. This is a rule-based prototype, not a realistic health or labor economics model.
+
 ## 1.11.0 — Economy & Debts
 
 - Add weekly housing/utilities bills and occasional repairs to procedurally generated households. Residents can pay what they can afford; unpaid amounts become persistent `unpaid_bills` instead of negative cash.

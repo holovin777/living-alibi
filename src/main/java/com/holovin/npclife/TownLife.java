@@ -22,7 +22,7 @@ final class TownLife {
     static final class Citizen {
         final String id;
         final String name;
-        final String occupation;
+        String occupation;
         Place place;
         Place destination;
         int travelRemaining;
@@ -33,6 +33,11 @@ final class TownLife {
         int health;
         int money;
         int unpaidBills;
+        boolean employed=true;
+        int unemploymentDays;
+        int sickUntilDay;
+        int lastHiredDay;
+        int jobChanges;
         int food;
         int water;
         int age;
@@ -66,6 +71,8 @@ final class TownLife {
             c.carefulness=carefulness;c.curiosity=curiosity;c.scheduleOffset=scheduleOffset;
             c.generationIndex=generationIndex;c.personalSeed=personalSeed;c.goal=goal;
             c.home=home;c.workplace=workplace;c.homeUnit=homeUnit;
+            c.employed=employed;c.unemploymentDays=unemploymentDays;
+            c.sickUntilDay=sickUntilDay;c.lastHiredDay=lastHiredDay;c.jobChanges=jobChanges;
             return c;
         }
         boolean presentAt(Place p) {return alive && travelRemaining==0 && place==p;}
@@ -95,6 +102,7 @@ final class TownLife {
         final Map<String,InvestigationLife.CaseFile> cases=new LinkedHashMap<>();
         final Map<String,EconomyLife.Loan> loans=new LinkedHashMap<>();
         final List<EconomyLife.Entry> pendingEconomy=new ArrayList<>();
+        final List<EmploymentLife.Event> pendingLifeEvents=new ArrayList<>();
         SocialLife.Relationship existingRelationship(String id1,String id2) {
             String a=id1.compareTo(id2)<=0?id1:id2;
             String b=id1.compareTo(id2)<=0?id2:id1;
@@ -119,6 +127,7 @@ final class TownLife {
             for(var e:cases.entrySet())t.cases.put(e.getKey(),e.getValue().copy());
             for(var e:loans.entrySet())t.loans.put(e.getKey(),e.getValue().copy());
             t.pendingEconomy.addAll(pendingEconomy);
+            t.pendingLifeEvents.addAll(pendingLifeEvents);
             return t;
         }
         void copyFrom(Town other) {
@@ -136,6 +145,7 @@ final class TownLife {
             cases.clear();for(var e:other.cases.entrySet())cases.put(e.getKey(),e.getValue().copy());
             loans.clear();for(var e:other.loans.entrySet())loans.put(e.getKey(),e.getValue().copy());
             pendingEconomy.clear();pendingEconomy.addAll(other.pendingEconomy);
+            pendingLifeEvents.clear();pendingLifeEvents.addAll(other.pendingLifeEvents);
         }
     }
 
@@ -179,6 +189,7 @@ final class TownLife {
         if(m.alive)move(town,m,desiredMarco(marco,m.place),marco,truth,observations);
         elenaNeeds(e,marco,truth,observations,town);
         if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e),marco,truth,observations);
+        EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
         EconomyLife.tick(town,marco,truth,observations);
         InvestigationLife.tick(town,marco,truth,observations);

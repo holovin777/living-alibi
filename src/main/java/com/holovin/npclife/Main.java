@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.11 — Economy & Debts");
+            System.out.println("Living Alibi v1.12 — Employment & Life Events");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -89,6 +89,37 @@ public final class Main {
                         if(entries.isEmpty())System.out.println("No social conversations recorded yet.");
                         for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
                                 " | "+e.kind()+" | "+e.place().label+" | "+e.description());
+                        continue;
+                    }
+                    if(lower.startsWith("career ")) {
+                        var person=town.get(arg(input));
+                        if(person.generationIndex<=0) {
+                            System.out.println(person.name+" uses the legacy life model; employment changes apply to procedural residents.");
+                        } else {
+                            String status=person.employed?"EMPLOYED":"UNEMPLOYED ("+person.unemploymentDays+" day(s))";
+                            System.out.println(person.name+" | "+status+" | Last/current role: "+person.occupation+
+                                    " | Workplace: "+person.workplace.label+" | New jobs: "+person.jobChanges);
+                            System.out.println("Health: "+(EmploymentLife.sick(person,state.day)?
+                                    "on sick leave through day "+person.sickUntilDay:"not on sick leave")+
+                                    " | Activity: "+person.activity);
+                        }
+                        System.out.println("Developer-only employment and health state.");
+                        continue;
+                    }
+                    if(lower.equals("life-events") || lower.startsWith("life-events ")) {
+                        String[] parts=input.split("\\s+");
+                        String resident=null;int limit=20;
+                        if(parts.length>=2) {
+                            if(parts[1].matches("[0-9]+"))limit=Integer.parseInt(parts[1]);
+                            else {resident=town.get(parts[1].toLowerCase(Locale.ROOT)).id;
+                                if(parts.length==3)limit=Integer.parseInt(parts[2]);}
+                        }
+                        if(parts.length>3 || limit<1 || limit>100)
+                            throw new IllegalArgumentException("Use life-events [count] or life-events <id> [count], limit 1–100.");
+                        var entries=db.residentLifeEvents(resident,limit);
+                        if(entries.isEmpty())System.out.println("No new life events recorded yet.");
+                        for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
+                                " | "+e.residentId()+" | "+e.kind()+" | "+e.detail());
                         continue;
                     }
                     if(lower.startsWith("finances ")) {
@@ -456,7 +487,11 @@ public final class Main {
                 " | Food "+c.food+" | Water "+c.water);
         System.out.println("Sociability "+c.sociability+" | Carefulness "+c.carefulness+
                 " | Curiosity "+c.curiosity+" | Goal: "+c.goal);
-        if(c.generationIndex>0)System.out.println("Procedurally generated citizen (no API calls).");
+        if(c.generationIndex>0) {
+            System.out.println("Employment: "+(c.employed?"EMPLOYED":"UNEMPLOYED for "+c.unemploymentDays+" day(s)")+
+                    " | Sick leave end day: "+(c.sickUntilDay==0?"none":c.sickUntilDay)+" | Job changes: "+c.jobChanges);
+            System.out.println("Procedurally generated citizen (no API calls).");
+        }
     }
     private static void relationshipOverview(TownLife.Town town,int limit) {
         List<SocialLife.Relationship> all=new ArrayList<>();
@@ -500,6 +535,7 @@ public final class Main {
         System.out.println(" check-alibi <case-id> <resident-id> | background <case-id> <resident-id>");
         System.out.println(" accuse <case-id> <resident-id>");
         System.out.println(" finances <id> | debts | ledger [count] | ledger <id> [count] — developer finance diagnostics");
+        System.out.println(" career <id> | life-events [count] | life-events <id> [count] — developer life diagnostics");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");

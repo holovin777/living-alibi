@@ -236,6 +236,27 @@ final class WorldDatabase implements AutoCloseable {
                 """);
             st.execute("CREATE INDEX IF NOT EXISTS idx_economy_ledger_actor ON economy_ledger(from_id,to_id,id)");
         }
+        // v1.12: existing residents keep their jobs; no retroactive illnesses or unemployment.
+        LinkedHashMap<String,String> careerColumns=new LinkedHashMap<>();
+        careerColumns.put("employed","INTEGER NOT NULL DEFAULT 1");
+        careerColumns.put("unemployment_days","INTEGER NOT NULL DEFAULT 0");
+        careerColumns.put("sick_until_day","INTEGER NOT NULL DEFAULT 0");
+        careerColumns.put("last_hired_day","INTEGER NOT NULL DEFAULT 0");
+        careerColumns.put("job_changes","INTEGER NOT NULL DEFAULT 0");
+        for(var col:careerColumns.entrySet())if(!columnExists("town_people",col.getKey())) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE town_people ADD COLUMN "+col.getKey()+" "+col.getValue());
+            }
+        }
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS resident_life_changes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,day INTEGER NOT NULL,
+                    minute INTEGER NOT NULL,resident_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,detail TEXT NOT NULL)
+                """);
+            st.execute("CREATE INDEX IF NOT EXISTS idx_life_changes_person ON resident_life_changes(resident_id,id)");
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -364,12 +385,14 @@ final class WorldDatabase implements AutoCloseable {
                 persistDeception(town);
                 persistInvestigations(town);
                 persistEconomy(town);
+                persistLifeChanges(town);
             }
             db.commit();
             if(town!=null) {
                 town.pendingTransfers.clear();
                 town.pendingDecisions.clear();
                 town.pendingEconomy.clear();
+                town.pendingLifeEvents.clear();
             }
         } catch(SQLException ex) {db.rollback();throw ex;}
         finally{db.setAutoCommit(true);}
@@ -436,6 +459,11 @@ final class WorldDatabase implements AutoCloseable {
                 p.hunger=rs.getInt("hunger");p.thirst=rs.getInt("thirst");p.fatigue=rs.getInt("fatigue");
                 p.health=rs.getInt("health");p.money=rs.getInt("money");
                 p.unpaidBills=rs.getInt("unpaid_bills");p.food=rs.getInt("food");
+                p.employed=rs.getInt("employed")!=0;
+                p.unemploymentDays=rs.getInt("unemployment_days");
+                p.sickUntilDay=rs.getInt("sick_until_day");
+                p.lastHiredDay=rs.getInt("last_hired_day");
+                p.jobChanges=rs.getInt("job_changes");
                 p.water=rs.getInt("water");p.age=rs.getInt("age");p.alive=rs.getInt("alive")!=0;
                 String savedHomeUnit=rs.getString("home_unit");
                 // Upgrading v1.3 saves assigns each existing resident a distinct unit.
@@ -579,8 +607,8 @@ final class WorldDatabase implements AutoCloseable {
         try(PreparedStatement p=db.prepareStatement("""
             INSERT INTO town_people(id,place,destination,travel_remaining,activity,hunger,thirst,fatigue,
                                     health,money,food,water,age,alive,name,occupation,home_place,work_place,
-                                    sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed,home_unit,unpaid_bills)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                    sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed,home_unit,unpaid_bills,employed,unemployment_days,sick_until_day,last_hired_day,job_changes)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,activity=excluded.activity,
@@ -593,7 +621,10 @@ final class WorldDatabase implements AutoCloseable {
                 curiosity=excluded.curiosity,goal=excluded.goal,
                 schedule_offset=excluded.schedule_offset,generation_index=excluded.generation_index,
                 personal_seed=excluded.personal_seed,home_unit=excluded.home_unit,
-                unpaid_bills=excluded.unpaid_bills
+                unpaid_bills=excluded.unpaid_bills,
+                employed=excluded.employed,unemployment_days=excluded.unemployment_days,
+                sick_until_day=excluded.sick_until_day,last_hired_day=excluded.last_hired_day,
+                job_changes=excluded.job_changes
             """)) {
             for(var c:town.people.values()) {
                 p.setString(1,c.id);p.setString(2,c.place.name());p.setString(3,c.destination.name());
@@ -607,6 +638,8 @@ final class WorldDatabase implements AutoCloseable {
                 p.setInt(21,c.curiosity);p.setString(22,c.goal);
                 p.setInt(23,c.scheduleOffset);p.setInt(24,c.generationIndex);
                 p.setLong(25,c.personalSeed);p.setString(26,c.homeUnit);p.setInt(27,c.unpaidBills);
+                p.setInt(28,c.employed?1:0);p.setInt(29,c.unemploymentDays);
+                p.setInt(30,c.sickUntilDay);p.setInt(31,c.lastHiredDay);p.setInt(32,c.jobChanges);
                 p.addBatch();
             }
             p.executeBatch();
@@ -957,6 +990,36 @@ final class WorldDatabase implements AutoCloseable {
                 while(rs.next())result.add(new EconomyLife.Entry(rs.getInt(1),rs.getInt(2),
                         EconomyLife.Kind.valueOf(rs.getString(3)),rs.getString(4),rs.getString(5),
                         rs.getString(6),rs.getInt(7),rs.getString(8)));
+            }
+        }
+        Collections.reverse(result);return result;
+    }
+
+
+    private void persistLifeChanges(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO resident_life_changes(day,minute,resident_id,kind,detail) VALUES(?,?,?,?,?)
+            """)) {
+            for(var e:town.pendingLifeEvents) {
+                p.setInt(1,e.day());p.setInt(2,e.minute());p.setString(3,e.residentId());
+                p.setString(4,e.kind().name());p.setString(5,e.detail());p.addBatch();
+            }
+            if(!town.pendingLifeEvents.isEmpty())p.executeBatch();
+        }
+    }
+
+    List<EmploymentLife.Event> residentLifeEvents(String residentId,int limit) throws SQLException {
+        List<EmploymentLife.Event> result=new ArrayList<>();
+        String sql=residentId==null
+                ? "SELECT day,minute,resident_id,kind,detail FROM resident_life_changes ORDER BY id DESC LIMIT ?"
+                : "SELECT day,minute,resident_id,kind,detail FROM resident_life_changes WHERE resident_id=? ORDER BY id DESC LIMIT ?";
+        try(PreparedStatement p=db.prepareStatement(sql)) {
+            int i=1;
+            if(residentId!=null)p.setString(i++,residentId);
+            p.setInt(i,limit);
+            try(ResultSet rs=p.executeQuery()) {
+                while(rs.next())result.add(new EmploymentLife.Event(rs.getInt(1),rs.getInt(2),rs.getString(3),
+                        EmploymentLife.Kind.valueOf(rs.getString(4)),rs.getString(5)));
             }
         }
         Collections.reverse(result);return result;

@@ -74,6 +74,13 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Transaction history and contract state persist; financial strain affects only future incident snapshots.
 - Developer diagnostics are kept separate from detective-visible background clues.
 
+### Employment & Life Events v1.12 — Income interruptions and brief illnesses
+
+- Generated citizens can lose work, seek new employment, change occupations, and earn wages only while employed and present at a workplace.
+- Short illness episodes suspend work and charge a medical expense through the existing household arrears system.
+- Career and health events have append-only SQLite history; no personal history is inferred retroactively for pre-v1.12 saves.
+- Existing investigator case snapshots remain unchanged, and these personal diagnostics are not detective evidence.
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.
