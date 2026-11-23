@@ -1,6 +1,6 @@
 # Living Alibi
 
-**v1.12 — Employment & Life Events** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.13 — Property & Possessions** · Java 21+ · Maven · SQLite · headless console prototype
 
 > An independent town, private observations, and a detective who must discover what really happened.
 
@@ -27,6 +27,8 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 - **Incident-time background:** `background <case-id> <resident-id>` becomes available after examining the scene and interviewing the resident. It shows broad categories for financial strain, interpersonal friction, and impulsivity from the incident instant, not a guilt score. Profiles persist separately in SQLite; old cases gain no fabricated history.
 - **Economy & Debts (v1.11):** generated residents pay periodic housing/utilities bills and occasional household repairs. Unpaid expenses become arrears; trusted residents can make small zero-interest loans only if they meet in a public location and the lender has enough cash. Repayment moves existing money between residents; a late loan harms trust and increases tension. New finances affect future motive calculations, never historical case backgrounds.
 - **Employment & Life Events (v1.12):** procedural residents can lose jobs, search for new work after a realistic delay, be hired into another occupation, and suffer short illnesses that prevent wage earning. Medical costs become actual household bills, paid or overdue. A daily deterministic decision rule uses a resident's fixed personal seed and the simulated calendar, not real clock time or paid AI calls.
+- **Physical property (v1.13):** every resident has stable, individually identified wallets and phones; some own bicycles kept at their private units. The owner of an object is not necessarily its current holder. New wallet thefts transfer real custody without transferring title, and future cases reference their stolen item IDs privately in SQLite. A victim may buy a distinct replacement wallet at the market; the old stolen object stays in the world. Existing cases retain a null physical-item link because their past objects cannot be reconstructed.
+- **Developer property diagnostics:** `inventory <id>`, `item <item-id>`, `property-events [count]` show current custody and an append-only property audit. These disclose hidden perpetrator information and are never a fair-play detective interface.
 - **Developer life diagnostics:** `career <id>`, `life-events [count]`, and `life-events <id> [count]` show present employment and append-only job/health changes. Private illness details are not automatically broadcast to every nearby NPC or revealed to the detective. Marco and Elena retain their previous special-case work simulation; only generated residents use the v1.12 employment subsystem.
 - **Developer finance tools:** `finances <resident-id>`, `debts`, `ledger [count]`, and `ledger <resident-id> [count]`. Loan contracts, household arrears and an append-only accounting history persist in SQLite. These reveal private information and should not be used during a blind detective run.
 - **Epistemic separation:** `town-events` is authoritative developer truth, `known` is a direct sensory event log, `beliefs` is a filtered attributed claim journal, and `rumors` is a relay log.
@@ -35,7 +37,7 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 
 ## Upgrading an existing world
 
-Quit the console with `exit`, back up `data/world.db` while it is closed, and extract the ZIP from the `~/Repositories` parent folder. The archive never includes your personal SQLite database. v1.12 adds five `town_people` columns and a new `resident_life_changes` table. Existing people, cases and old witness logs are retained; previous financial or medical events are not fabricated retrospectively. The old `world.db` remains the active save when starting the updated game.
+Quit the console with `exit`, back up `data/world.db` while it is closed, and extract the ZIP from the `~/Repositories` parent folder. The archive never includes your personal SQLite database. v1.13 adds `property_items`, `property_changes` and a nullable `investigation_cases.physical_item_id` column. Existing people, jobs, cases and old witness logs are retained. The items assigned on migration are initial inventory *as of the migration day*, not a claim about prior ownership or previous crimes. The old `world.db` remains the active save when starting the updated game.
 
 ## Quick start
 
@@ -46,6 +48,20 @@ mvn -q compile exec:java
 ```
 
 The application creates `data/world.db` if missing. That directory is ignored by Git. No API key is required.
+
+### Property & Possessions (v1.13)
+
+```text
+inventory resident-0001
+inventory elena
+item wallet-elena
+property-events 20
+simulate 14
+cases
+inventory resident-0001
+```
+
+**Developer-only data:** `inventory`, `item`, and `property-events` reveal object ownership, actual custody and potentially hidden thieves. Avoid them when solving a case. Each new reported wallet theft carries the ID of a particular wallet in the *authoritative database*, while the detective UI continues to display only imperfect clues and attributed interviews. Wallets follow their actual holder as people travel; bicycles are currently stored at home, not rideable vehicles. New wallets are purchased at the market after a loss if the resident can afford them. There are no gift, trade, formal recovery, police seizure or persistent ground-drop mechanics yet. Old reports (case IDs created before v1.13) do not magically gain an item history.
 
 ### Employment and short life events (v1.12)
 
@@ -94,7 +110,7 @@ case case-0001
 
 Use `interview <resident-id> <case-id>` to question other residents. Try `check-alibi <case-id> <resident-id>` after interviewing that resident, then interview a possible public-place corroborator and repeat the check. Only once you have enough evidence, try `accuse <case-id> <resident-id>` with your own suspect, **not an example ID supplied by this guide**. The culprit is not shown in `cases`, `case`, or `inspect` for newly generated cases. For debugging, `town-events` may expose authoritative events; avoid it while playing detective.
 
-Prototype limitations: incident opportunities are now checked in sparse, deterministic daytime windows with a probability based on motivation; a case requires at least three residents co-present at a public location, so case counts and times depend on the town. Stronger incentives do not guarantee crime. The only incident type is an abstract wallet theft; this is a rules-based experiment, not yet a physically modeled crime. Scene inspection and interviewing are instantaneous and location-independent, and the final accusation is judged against hidden engine truth rather than legal proof. Evidence remains basic and ambiguous, and interrogation uses fixed rules, not open-ended AI speech. Witness accounts may be uncertain or mistaken. The accusation outcome still compares against hidden engine truth, not a judicial standard. Legacy pre-v1.9 cases have no incident-time location snapshots; the engine does not invent old alibis or reconstruct physical clues from the culprit's identity. Pre-v1.10 cases likewise have no recorded motive profiles and the detective cannot reconstruct them retrospectively.
+Prototype limitations: incident opportunities are now checked in sparse, deterministic daytime windows with a probability based on motivation; a case requires at least three residents co-present at a public location, so case counts and times depend on the town. Stronger incentives do not guarantee crime. The only incident type is wallet theft: v1.13 now links new reports to actual inventory objects, but investigation, forensics, return of goods and criminal justice remain simplified. Scene inspection and interviewing are instantaneous and location-independent, and the final accusation is judged against hidden engine truth rather than legal proof. Evidence remains basic and ambiguous, and interrogation uses fixed rules, not open-ended AI speech. Witness accounts may be uncertain or mistaken. The accusation outcome still compares against hidden engine truth, not a judicial standard. Legacy pre-v1.9 cases have no incident-time location snapshots; the engine does not invent old alibis or reconstruct physical clues from the culprit's identity. Pre-v1.10 cases likewise have no recorded motive profiles and the detective cannot reconstruct them retrospectively.
 
 ### Try a generated town
 

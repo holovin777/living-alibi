@@ -26,6 +26,8 @@ final class InvestigationLife {
         final Map<String,String> alibiChecks=new LinkedHashMap<>();
         /** Empty for pre-v1.9 cases, whose historic scene evidence cannot be rewritten. */
         String fabricColor;
+        /** Only post-v1.13 incidents link to a real, movable world item. */
+        String physicalItemId;
         /** Private engine reason. Legacy cases do not acquire fabricated motives. */
         String motiveCode;
         int motiveStrength;
@@ -44,6 +46,7 @@ final class InvestigationLife {
             c.inspected=inspected;c.solved=solved;c.witnesses.addAll(witnesses);
             c.interviews.putAll(interviews);c.incidentSpaces.putAll(incidentSpaces);
             c.alibiChecks.putAll(alibiChecks);c.fabricColor=fabricColor;
+            c.physicalItemId=physicalItemId;
             c.motiveCode=motiveCode;c.motiveStrength=motiveStrength;
             c.incidentProfiles.putAll(incidentProfiles);
             return c;
@@ -87,7 +90,7 @@ final class InvestigationLife {
                         {recentlyOffended=true;break;}
                 if(recentlyOffended)continue;
                 for(var victim:people) {
-                    if(victim==offender || victim.money<30)continue;
+                    if(victim==offender || victim.money<30 || PropertyLife.carriedWallet(town,victim)==null)continue;
                     var assessment=MotiveLife.assess(town,clock,offender,victim);
                     if(assessment.strength()<59)continue;
                     int jitter=(int)Math.floorMod(mix(now^offender.id.hashCode()^
@@ -120,9 +123,11 @@ final class InvestigationLife {
                                    TownLife.Citizen offender,TownLife.Citizen victim,
                                    MotiveLife.Assessment motive,List<TownLife.Event> truth,
                                    List<TownLife.Observation> observations) {
+        PropertyLife.ensureStarterItems(town,clock);
         if(offender==victim || !offender.presentAt(place) || !victim.presentAt(place) ||
                 !offender.currentSpace().equals(TownLife.publicSpace(place)) ||
-                !victim.currentSpace().equals(TownLife.publicSpace(place)) || victim.money<15)
+                !victim.currentSpace().equals(TownLife.publicSpace(place)) || victim.money<15 ||
+                PropertyLife.carriedWallet(town,victim)==null)
             throw new IllegalArgumentException("An incident needs two co-present people and a solvent victim.");
         for(var prior:town.cases.values())
             if(prior.day==clock.day && prior.minute==clock.minute)
@@ -141,6 +146,8 @@ final class InvestigationLife {
                 c.witnesses.add(p.id);
         }
         // Freeze motives BEFORE changing balances: post-theft wealth would rewrite context.
+        // This wallet remains legally owned by the victim but is now carried by the offender.
+        c.physicalItemId=PropertyLife.stealWallet(town,clock,offender,victim);
         victim.money-=amount;offender.money+=amount;
         if(victim.id.equals("marco"))clock.money-=amount;
         if(offender.id.equals("marco"))clock.money+=amount;

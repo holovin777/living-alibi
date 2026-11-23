@@ -257,6 +257,28 @@ final class WorldDatabase implements AutoCloseable {
                 """);
             st.execute("CREATE INDEX IF NOT EXISTS idx_life_changes_person ON resident_life_changes(resident_id,id)");
         }
+        // v1.13: item custody is separate from legal title and from historic case reports.
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS property_items (
+                    id TEXT PRIMARY KEY, type TEXT NOT NULL, owner_id TEXT NOT NULL,
+                    holder_id TEXT, stored_space TEXT, stolen INTEGER NOT NULL,
+                    value INTEGER NOT NULL, created_day INTEGER NOT NULL)
+                """);
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS property_changes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,day INTEGER NOT NULL,
+                    minute INTEGER NOT NULL,action TEXT NOT NULL,
+                    item_id TEXT NOT NULL,from_id TEXT NOT NULL,to_id TEXT NOT NULL,
+                    details TEXT NOT NULL)
+                """);
+            st.execute("CREATE INDEX IF NOT EXISTS idx_property_changes_item ON property_changes(item_id,id)");
+        }
+        if(!columnExists("investigation_cases","physical_item_id")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE investigation_cases ADD COLUMN physical_item_id TEXT");
+            }
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -379,6 +401,7 @@ final class WorldDatabase implements AutoCloseable {
                 if(!messages.isEmpty())p.executeBatch();
             }
             if(town!=null) {
+                PropertyLife.ensureStarterItems(town,s);
                 persistTown(town,townEvents,observations);
                 persistSocial(town,socialEvents);
                 persistKnowledge(town);
@@ -386,6 +409,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistInvestigations(town);
                 persistEconomy(town);
                 persistLifeChanges(town);
+                persistProperty(town);
             }
             db.commit();
             if(town!=null) {
@@ -393,6 +417,7 @@ final class WorldDatabase implements AutoCloseable {
                 town.pendingDecisions.clear();
                 town.pendingEconomy.clear();
                 town.pendingLifeEvents.clear();
+                town.pendingProperty.clear();
             }
         } catch(SQLException ex) {db.rollback();throw ex;}
         finally{db.setAutoCommit(true);}
@@ -545,6 +570,7 @@ final class WorldDatabase implements AutoCloseable {
                 c.fabricColor=rs.getString("fabric_color");
                 c.motiveCode=rs.getString("motive_code");
                 c.motiveStrength=rs.getInt("motive_strength");
+                c.physicalItemId=rs.getString("physical_item_id");
                 town.cases.put(c.id,c);
             }
         }
@@ -599,6 +625,20 @@ final class WorldDatabase implements AutoCloseable {
                 town.loans.put(loan.id,loan);
             }
         }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT * FROM property_items ORDER BY id")) {
+            while(rs.next()) {
+                String owner=rs.getString("owner_id"),holder=rs.getString("holder_id");
+                if(!town.people.containsKey(owner) ||
+                        (holder!=null && !town.people.containsKey(holder)))continue;
+                var item=new PropertyLife.Item(rs.getString("id"),
+                        PropertyLife.Type.valueOf(rs.getString("type")),owner,holder,
+                        rs.getString("stored_space"),rs.getInt("stolen")!=0,
+                        rs.getInt("value"),rs.getInt("created_day"));
+                town.items.put(item.id,item);
+            }
+        }
+        PropertyLife.ensureStarterItems(town,state);
         return town;
     }
 
@@ -884,11 +924,12 @@ final class WorldDatabase implements AutoCloseable {
 
     private void persistInvestigations(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved,fabric_color,motive_code,motive_strength)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved,fabric_color,motive_code,motive_strength,physical_item_id)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(id) DO UPDATE SET inspected=excluded.inspected,solved=excluded.solved,
                                          fabric_color=excluded.fabric_color,
-                                         motive_code=excluded.motive_code,motive_strength=excluded.motive_strength
+                                         motive_code=excluded.motive_code,motive_strength=excluded.motive_strength,
+                                         physical_item_id=excluded.physical_item_id
             """)) {
             for(var c:town.cases.values()) {
                 p.setString(1,c.id);p.setInt(2,c.day);p.setInt(3,c.minute);
@@ -898,6 +939,7 @@ final class WorldDatabase implements AutoCloseable {
                 p.setString(11,c.fabricColor);p.setString(12,c.motiveCode);
                 if(c.motiveCode==null)p.setNull(13,java.sql.Types.INTEGER);
                 else p.setInt(13,c.motiveStrength);
+                p.setString(14,c.physicalItemId);
                 p.addBatch();
             }
             p.executeBatch();
@@ -1020,6 +1062,52 @@ final class WorldDatabase implements AutoCloseable {
             try(ResultSet rs=p.executeQuery()) {
                 while(rs.next())result.add(new EmploymentLife.Event(rs.getInt(1),rs.getInt(2),rs.getString(3),
                         EmploymentLife.Kind.valueOf(rs.getString(4)),rs.getString(5)));
+            }
+        }
+        Collections.reverse(result);return result;
+    }
+
+    private void persistProperty(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO property_items(id,type,owner_id,holder_id,stored_space,stolen,value,created_day)
+            VALUES(?,?,?,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET
+                owner_id=excluded.owner_id,holder_id=excluded.holder_id,
+                stored_space=excluded.stored_space,stolen=excluded.stolen
+            """)) {
+            for(var item:town.items.values()) {
+                p.setString(1,item.id);p.setString(2,item.type.name());
+                p.setString(3,item.ownerId);p.setString(4,item.holderId);
+                p.setString(5,item.storedSpace);p.setInt(6,item.stolen?1:0);
+                p.setInt(7,item.value);p.setInt(8,item.createdDay);p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO property_changes(day,minute,action,item_id,from_id,to_id,details)
+            VALUES(?,?,?,?,?,?,?)
+            """)) {
+            for(var change:town.pendingProperty) {
+                p.setInt(1,change.day());p.setInt(2,change.minute());
+                p.setString(3,change.action().name());p.setString(4,change.itemId());
+                p.setString(5,change.fromId());p.setString(6,change.toId());
+                p.setString(7,change.details());p.addBatch();
+            }
+            if(!town.pendingProperty.isEmpty())p.executeBatch();
+        }
+    }
+
+    List<PropertyLife.Change> propertyChanges(int limit) throws SQLException {
+        List<PropertyLife.Change> result=new ArrayList<>();
+        try(PreparedStatement p=db.prepareStatement("""
+                SELECT day,minute,action,item_id,from_id,to_id,details
+                FROM property_changes ORDER BY id DESC LIMIT ?
+                """)) {
+            p.setInt(1,limit);
+            try(ResultSet rs=p.executeQuery()) {
+                while(rs.next())result.add(new PropertyLife.Change(
+                        rs.getInt(1),rs.getInt(2),PropertyLife.Action.valueOf(rs.getString(3)),
+                        rs.getString(4),rs.getString(5),rs.getString(6),rs.getString(7)));
             }
         }
         Collections.reverse(result);return result;

@@ -105,3 +105,11 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.EmploymentDatabaseSmokeTest' exec:exec
+      - name: Test physically identified items, legal title and theft custody
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PropertySmokeTest
+      - name: Test real item transfers in autonomous 21-day investigations
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PropertyIntegrationSmokeTest
+      - name: Test SQLite physical items, property audit and case linkage
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PropertyDatabaseSmokeTest' exec:exec

@@ -101,6 +101,8 @@ final class TownLife {
         final List<DeceptionLife.Decision> pendingDecisions=new ArrayList<>();
         final Map<String,InvestigationLife.CaseFile> cases=new LinkedHashMap<>();
         final Map<String,EconomyLife.Loan> loans=new LinkedHashMap<>();
+        final Map<String,PropertyLife.Item> items=new LinkedHashMap<>();
+        final List<PropertyLife.Change> pendingProperty=new ArrayList<>();
         final List<EconomyLife.Entry> pendingEconomy=new ArrayList<>();
         final List<EmploymentLife.Event> pendingLifeEvents=new ArrayList<>();
         SocialLife.Relationship existingRelationship(String id1,String id2) {
@@ -126,6 +128,8 @@ final class TownLife {
             t.pendingDecisions.addAll(pendingDecisions);
             for(var e:cases.entrySet())t.cases.put(e.getKey(),e.getValue().copy());
             for(var e:loans.entrySet())t.loans.put(e.getKey(),e.getValue().copy());
+            for(var e:items.entrySet())t.items.put(e.getKey(),e.getValue().copy());
+            t.pendingProperty.addAll(pendingProperty);
             t.pendingEconomy.addAll(pendingEconomy);
             t.pendingLifeEvents.addAll(pendingLifeEvents);
             return t;
@@ -145,6 +149,8 @@ final class TownLife {
             cases.clear();for(var e:other.cases.entrySet())cases.put(e.getKey(),e.getValue().copy());
             loans.clear();for(var e:other.loans.entrySet())loans.put(e.getKey(),e.getValue().copy());
             pendingEconomy.clear();pendingEconomy.addAll(other.pendingEconomy);
+            items.clear();for(var e:other.items.entrySet())items.put(e.getKey(),e.getValue().copy());
+            pendingProperty.clear();pendingProperty.addAll(other.pendingProperty);
             pendingLifeEvents.clear();pendingLifeEvents.addAll(other.pendingLifeEvents);
         }
     }
@@ -179,6 +185,7 @@ final class TownLife {
     }
     static void tick(Town town,WorldState marco,List<Event> truth,List<Observation> observations,
                      List<SocialLife.Interaction> interactions) {
+        PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;
         m.carefulness=marco.personalityCareful;
@@ -192,6 +199,7 @@ final class TownLife {
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
         EconomyLife.tick(town,marco,truth,observations);
+        PropertyLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {

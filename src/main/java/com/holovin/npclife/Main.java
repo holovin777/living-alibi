@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.12 — Employment & Life Events");
+            System.out.println("Living Alibi v1.13 — Property & Possessions");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -89,6 +89,37 @@ public final class Main {
                         if(entries.isEmpty())System.out.println("No social conversations recorded yet.");
                         for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
                                 " | "+e.kind()+" | "+e.place().label+" | "+e.description());
+                        continue;
+                    }
+                    if(lower.startsWith("inventory ")) {
+                        var resident=town.get(arg(input));
+                        var belongings=PropertyLife.relevantItems(town,resident.id);
+                        System.out.println("Property connected to "+resident.name+": "+belongings.size()+" item(s) (developer view)");
+                        for(var item:belongings)
+                            System.out.println("  "+item.id+" | "+item.type+" | legal owner: "+item.ownerId+
+                                    " | held by: "+(item.holderId==null?"stored":item.holderId)+
+                                    " | "+item.currentSpace(town)+" | "+(item.stolen?"STOLEN":"normal"));
+                        continue;
+                    }
+                    if(lower.startsWith("item ")) {
+                        String id=arg(input).toLowerCase(Locale.ROOT);
+                        var item=town.items.get(id);
+                        if(item==null)throw new IllegalArgumentException("Unknown item ID: "+id);
+                        System.out.println(id+" | "+item.type+" | legal owner: "+item.ownerId+
+                                " | holder: "+(item.holderId==null?"stored":item.holderId)+
+                                " | location: "+item.currentSpace(town)+" | stolen: "+item.stolen+
+                                " | value EUR "+item.value+" | first recorded day "+item.createdDay);
+                        System.out.println("Developer-only authoritative inventory, not detective evidence.");
+                        continue;
+                    }
+                    if(lower.equals("property-events") || lower.startsWith("property-events ")) {
+                        var changes=db.propertyChanges(optionalLimit(input,20));
+                        if(changes.isEmpty())System.out.println("No property changes recorded yet.");
+                        for(var change:changes)
+                            System.out.println("Day "+change.day()+" "+clock(change.minute())+
+                                    " | "+change.action()+" | "+change.itemId()+
+                                    " | "+change.fromId()+" -> "+change.toId()+" | "+change.details());
+                        System.out.println("Developer-only property history; do not use during a fair investigation.");
                         continue;
                     }
                     if(lower.startsWith("career ")) {
@@ -536,6 +567,7 @@ public final class Main {
         System.out.println(" accuse <case-id> <resident-id>");
         System.out.println(" finances <id> | debts | ledger [count] | ledger <id> [count] — developer finance diagnostics");
         System.out.println(" career <id> | life-events [count] | life-events <id> [count] — developer life diagnostics");
+        System.out.println(" inventory <id> | item <item-id> | property-events [count] — developer property diagnostics");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");

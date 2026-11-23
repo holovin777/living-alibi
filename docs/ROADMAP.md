@@ -81,6 +81,13 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Career and health events have append-only SQLite history; no personal history is inferred retroactively for pre-v1.12 saves.
 - Existing investigator case snapshots remain unchanged, and these personal diagnostics are not detective evidence.
 
+### Physical Property v1.13 — Real belongings and custody
+
+- Stable wallet, phone and bicycle IDs with legal owner, actual holder and location (current carrier vs private home storage).
+- Wallet-theft cases now involve a specific carried object; victim retains legal ownership. Purchase a distinct replacement after a theft.
+- Append-only custody audit and private case-to-object linkage; historical cases are preserved without fabricated property records.
+- Developer-only inventory views never substitute for detective evidence. Item recovery, gifts/trades and detailed item forensics are future features.
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.0 — Property & Possessions
+
+- Add stable physical wallet, phone and bicycle items, with separate legal owner, current holder and stored home space; moving people carry held objects with them.
+- New wallet thefts move the specific wallet to the perpetrator without granting legal title. A new case stores a private `physical_item_id` referencing the immutable item identity; public reports do not expose this ID or the offender.
+- A victim missing their carried wallet may purchase a separately identified replacement while at the Market, paying EUR 12. This never deletes the original stolen wallet or fabricates a new ownership record for it.
+- Preserve previous cases and their evidence with a nullable `physical_item_id`; do not infer pre-v1.13 ownership or material evidence retrospectively.
+- Persist inventory via `property_items` and an append-only `property_changes` audit; seed legacy residents with baseline belongings once when the updated world is first saved.
+- Add `inventory`, `item` and `property-events` strictly as developer tools, plus dedicated rules/integration/JDBC regression tests and GitHub CI coverage.
+- Limitations: no gift/trade, ground drops, formal item recovery, vehicle riding, or player-accessible property forensics yet.
+
 ## 1.12.0 — Employment & Life Events
 
 - Add daily seeded job-market decisions for generated residents: occasional layoffs, multi-day unemployed job searches, and subsequent hiring (possibly into a new occupation and work location). Unemployed citizens stop earning hourly pay.
