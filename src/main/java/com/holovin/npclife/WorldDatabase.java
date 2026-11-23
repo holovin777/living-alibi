@@ -210,6 +210,32 @@ final class WorldDatabase implements AutoCloseable {
                     impulse INTEGER NOT NULL, PRIMARY KEY(case_id,resident_id))
                 """);
         }
+        // v1.11: additive household arrears, bilateral loans and append-only ledger.
+        // No historical debt is inferred from a resident's old cash balance.
+        if(!columnExists("town_people","unpaid_bills")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE town_people ADD COLUMN unpaid_bills INTEGER NOT NULL DEFAULT 0");
+            }
+        }
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS economy_loans (
+                    id TEXT PRIMARY KEY, lender_id TEXT NOT NULL, borrower_id TEXT NOT NULL,
+                    original INTEGER NOT NULL CHECK(original>0),
+                    outstanding INTEGER NOT NULL CHECK(outstanding>=0),
+                    start_day INTEGER NOT NULL, due_day INTEGER NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('OPEN','OVERDUE','PAID')))
+                """);
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS economy_ledger (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+                    minute INTEGER NOT NULL, kind TEXT NOT NULL,
+                    from_id TEXT NOT NULL, to_id TEXT NOT NULL,
+                    loan_id TEXT, amount INTEGER NOT NULL CHECK(amount>0),
+                    detail TEXT NOT NULL)
+                """);
+            st.execute("CREATE INDEX IF NOT EXISTS idx_economy_ledger_actor ON economy_ledger(from_id,to_id,id)");
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -337,11 +363,13 @@ final class WorldDatabase implements AutoCloseable {
                 persistKnowledge(town);
                 persistDeception(town);
                 persistInvestigations(town);
+                persistEconomy(town);
             }
             db.commit();
             if(town!=null) {
                 town.pendingTransfers.clear();
                 town.pendingDecisions.clear();
+                town.pendingEconomy.clear();
             }
         } catch(SQLException ex) {db.rollback();throw ex;}
         finally{db.setAutoCommit(true);}
@@ -406,7 +434,8 @@ final class WorldDatabase implements AutoCloseable {
                 p.destination=TownLife.Place.valueOf(rs.getString("destination"));
                 p.travelRemaining=rs.getInt("travel_remaining");p.activity=rs.getString("activity");
                 p.hunger=rs.getInt("hunger");p.thirst=rs.getInt("thirst");p.fatigue=rs.getInt("fatigue");
-                p.health=rs.getInt("health");p.money=rs.getInt("money");p.food=rs.getInt("food");
+                p.health=rs.getInt("health");p.money=rs.getInt("money");
+                p.unpaidBills=rs.getInt("unpaid_bills");p.food=rs.getInt("food");
                 p.water=rs.getInt("water");p.age=rs.getInt("age");p.alive=rs.getInt("alive")!=0;
                 String savedHomeUnit=rs.getString("home_unit");
                 // Upgrading v1.3 saves assigns each existing resident a distinct unit.
@@ -530,6 +559,18 @@ final class WorldDatabase implements AutoCloseable {
                             rs.getInt(3),rs.getInt(4),rs.getInt(5)));
             }
         }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT * FROM economy_loans ORDER BY id")) {
+            while(rs.next()) {
+                String lender=rs.getString("lender_id"),borrower=rs.getString("borrower_id");
+                if(!town.people.containsKey(lender)||!town.people.containsKey(borrower))continue;
+                var loan=new EconomyLife.Loan(rs.getString("id"),lender,borrower,
+                        rs.getInt("original"),rs.getInt("start_day"),rs.getInt("due_day"));
+                loan.outstanding=rs.getInt("outstanding");
+                loan.status=EconomyLife.Status.valueOf(rs.getString("status"));
+                town.loans.put(loan.id,loan);
+            }
+        }
         return town;
     }
 
@@ -538,8 +579,8 @@ final class WorldDatabase implements AutoCloseable {
         try(PreparedStatement p=db.prepareStatement("""
             INSERT INTO town_people(id,place,destination,travel_remaining,activity,hunger,thirst,fatigue,
                                     health,money,food,water,age,alive,name,occupation,home_place,work_place,
-                                    sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed,home_unit)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                    sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed,home_unit,unpaid_bills)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,activity=excluded.activity,
@@ -551,7 +592,8 @@ final class WorldDatabase implements AutoCloseable {
                 sociability=excluded.sociability,carefulness=excluded.carefulness,
                 curiosity=excluded.curiosity,goal=excluded.goal,
                 schedule_offset=excluded.schedule_offset,generation_index=excluded.generation_index,
-                personal_seed=excluded.personal_seed,home_unit=excluded.home_unit
+                personal_seed=excluded.personal_seed,home_unit=excluded.home_unit,
+                unpaid_bills=excluded.unpaid_bills
             """)) {
             for(var c:town.people.values()) {
                 p.setString(1,c.id);p.setString(2,c.place.name());p.setString(3,c.destination.name());
@@ -564,7 +606,7 @@ final class WorldDatabase implements AutoCloseable {
                 p.setInt(19,c.sociability);p.setInt(20,c.carefulness);
                 p.setInt(21,c.curiosity);p.setString(22,c.goal);
                 p.setInt(23,c.scheduleOffset);p.setInt(24,c.generationIndex);
-                p.setLong(25,c.personalSeed);p.setString(26,c.homeUnit);
+                p.setLong(25,c.personalSeed);p.setString(26,c.homeUnit);p.setInt(27,c.unpaidBills);
                 p.addBatch();
             }
             p.executeBatch();
@@ -873,6 +915,51 @@ final class WorldDatabase implements AutoCloseable {
             }
             p.executeBatch();
         }
+    }
+
+    private void persistEconomy(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO economy_loans(id,lender_id,borrower_id,original,outstanding,start_day,due_day,status)
+            VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                outstanding=excluded.outstanding,status=excluded.status
+            """)) {
+            for(var loan:town.loans.values()) {
+                p.setString(1,loan.id);p.setString(2,loan.lenderId);p.setString(3,loan.borrowerId);
+                p.setInt(4,loan.original);p.setInt(5,loan.outstanding);
+                p.setInt(6,loan.day);p.setInt(7,loan.dueDay);p.setString(8,loan.status.name());p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT INTO economy_ledger(day,minute,kind,from_id,to_id,loan_id,amount,detail)
+            VALUES(?,?,?,?,?,?,?,?)
+            """)) {
+            for(var entry:town.pendingEconomy) {
+                p.setInt(1,entry.day());p.setInt(2,entry.minute());p.setString(3,entry.kind().name());
+                p.setString(4,entry.fromId());p.setString(5,entry.toId());
+                p.setString(6,entry.loanId());p.setInt(7,entry.amount());
+                p.setString(8,entry.detail());p.addBatch();
+            }
+            if(!town.pendingEconomy.isEmpty())p.executeBatch();
+        }
+    }
+
+    List<EconomyLife.Entry> economyLedger(String residentId,int limit) throws SQLException {
+        List<EconomyLife.Entry> result=new ArrayList<>();
+        String sql=residentId==null
+                ?"SELECT day,minute,kind,from_id,to_id,loan_id,amount,detail FROM economy_ledger ORDER BY id DESC LIMIT ?"
+                :"SELECT day,minute,kind,from_id,to_id,loan_id,amount,detail FROM economy_ledger WHERE from_id=? OR to_id=? ORDER BY id DESC LIMIT ?";
+        try(PreparedStatement p=db.prepareStatement(sql)) {
+            int i=1;
+            if(residentId!=null){p.setString(i++,residentId);p.setString(i++,residentId);}
+            p.setInt(i,limit);
+            try(ResultSet rs=p.executeQuery()){
+                while(rs.next())result.add(new EconomyLife.Entry(rs.getInt(1),rs.getInt(2),
+                        EconomyLife.Kind.valueOf(rs.getString(3)),rs.getString(4),rs.getString(5),
+                        rs.getString(6),rs.getInt(7),rs.getString(8)));
+            }
+        }
+        Collections.reverse(result);return result;
     }
 
     @Override public void close() throws SQLException {db.close();}

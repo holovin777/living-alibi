@@ -89,3 +89,11 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.MotiveDatabaseSmokeTest' exec:exec
+      - name: Test conserved peer transfers, late payments and bill arrears
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.EconomySmokeTest
+      - name: Test autonomous household economy and lending over 14 days
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.EconomyIntegrationSmokeTest
+      - name: Test SQLite financial ledger and contract persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.EconomyDatabaseSmokeTest' exec:exec

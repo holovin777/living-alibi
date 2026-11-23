@@ -18,7 +18,10 @@ final class MotiveLife {
     static Indicators indicators(TownLife.Town town,WorldState clock,
                                  TownLife.Citizen person,TownLife.Citizen victim) {
         // Current money and recorded personality are meaningful only at the incident time.
-        int financial=clamp(110-person.money+person.hunger/4 +
+        int owed=person.unpaidBills;
+        for(var loan:town.loans.values())
+            if(loan.borrowerId.equals(person.id))owed+=loan.outstanding;
+        int financial=clamp(110-person.money+person.hunger/4 + Math.min(65,owed/3) +
                 (person.id.equals("marco")?Math.min(60,clock.debt/6):0));
         var relation=person.id.equals(victim.id)?null:town.existingRelationship(person.id,victim.id);
         int conflict=relation==null?0:clamp(relation.tension*2-relation.trust/3);

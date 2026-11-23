@@ -50,3 +50,7 @@ mvn -o -Dexec.executable=java -Dexec.classpathScope=test '-Dexec.args=-ea -cp %c
 ## Still missing
 
 Theft still occurs abstractly, without item inventories, surveillance, paths, or plausible interrogation time budgets. Financial conditions are simple money/need numbers (generated citizens do not yet have debts). Social conflicts are rare in a friendly town. The scene clue and eyewitness system are unchanged from v1.9. No legal evidence threshold or courtroom process exists. A future version can add property ownership, debt/lending, varied crimes, evidence decay, and actual travel for detectives.
+
+## Update in v1.11
+
+The above limitations describe v1.10 as originally released. Since v1.11, generated residents can acquire unpaid household bills and zero-interest personal loans. These balances affect **new** incident-time financial strain; stored v1.10 profiles remain historical snapshots and are not recalculated.

@@ -67,6 +67,13 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Separate secret engine motives from broad detective-accessible background clues.
 - Preserve historical cases through nullable columns and new snapshot tables.
 
+### Economy & Debts v1.11 — Household arrears and trusted lending
+
+- Recurring housing and repair charges for generated citizens, with explicit unpaid balances.
+- Small zero-interest personal lending, repayments, due dates and consequences for overdue contracts.
+- Transaction history and contract state persist; financial strain affects only future incident snapshots.
+- Developer diagnostics are kept separate from detective-visible background clues.
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.

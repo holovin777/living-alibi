@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.11.0 — Economy & Debts
+
+- Add weekly housing/utilities bills and occasional repairs to procedurally generated households. Residents can pay what they can afford; unpaid amounts become persistent `unpaid_bills` instead of negative cash.
+- Allow small, voluntary zero-interest loans between living, trusted, physically co-present citizens who can afford the transfer. An already indebted borrower cannot receive another personal loan until the first is settled.
+- Repay principal from later earnings while retaining a cash reserve; mark unpaid contracts overdue after the due day, and apply a one-time trust/tension consequence.
+- Make subsequent motive assessments reflect current unpaid bills and personal debt. Existing case background snapshots and earlier incidents remain unchanged.
+- Store contracts and an append-only transaction ledger separately in SQLite. Add `finances`, `debts`, and `ledger` developer diagnostics, explicitly distinct from detective-visible evidence.
+- Preserve the existing player world's state with an additive `town_people.unpaid_bills` column, plus new `economy_loans` and `economy_ledger` tables. Prior residents begin with zero new arrears, rather than imagined backdated debts.
+- Add economic unit, 14-day integration and JDBC persistence/regression tests. Loans remain simplistic: no interest, court collection, bankruptcy, unemployment, property inventory or macroeconomics.
+
 ## 1.10.0 — Motives & Opportunity
 
 - Replace one fixed weekly theft check with daytime opportunity windows, influenced by actual co-presence and a reproducible probability roll.

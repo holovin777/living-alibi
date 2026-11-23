@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.10 — Motives & Opportunity");
+            System.out.println("Living Alibi v1.11 — Economy & Debts");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -89,6 +89,42 @@ public final class Main {
                         if(entries.isEmpty())System.out.println("No social conversations recorded yet.");
                         for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
                                 " | "+e.kind()+" | "+e.place().label+" | "+e.description());
+                        continue;
+                    }
+                    if(lower.startsWith("finances ")) {
+                        var person=town.get(arg(input));
+                        long owes=town.loans.values().stream().filter(l->l.borrowerId.equals(person.id))
+                                .mapToLong(l->l.outstanding).sum();
+                        long lent=town.loans.values().stream().filter(l->l.lenderId.equals(person.id))
+                                .mapToLong(l->l.outstanding).sum();
+                        System.out.println(person.name+" | Cash EUR "+person.money+
+                                " | Unpaid bills EUR "+person.unpaidBills+
+                                " | Personal loans owed EUR "+owes+" | Receivable EUR "+lent);
+                        System.out.println("Developer-only current finances; detective evidence requires an incident-time background.");
+                        continue;
+                    }
+                    if(lower.equals("debts")) {
+                        System.out.println("Loan contracts: "+town.loans.size()+" (developer view)");
+                        for(var loan:town.loans.values())System.out.println(loan.id+" | "+loan.borrowerId+
+                                " owes "+loan.lenderId+" | EUR "+loan.outstanding+"/"+
+                                loan.original+" | due day "+loan.dueDay+" | "+loan.status);
+                        continue;
+                    }
+                    if(lower.equals("ledger")||lower.startsWith("ledger ")) {
+                        String[] parts=input.split("\\s+");
+                        String resident=null;int limit=20;
+                        if(parts.length>=2) {
+                            if(parts[1].matches("[0-9]+"))limit=Integer.parseInt(parts[1]);
+                            else {resident=town.get(parts[1].toLowerCase(Locale.ROOT)).id;
+                                if(parts.length==3)limit=Integer.parseInt(parts[2]);}
+                        }
+                        if(parts.length>3 || limit<1 || limit>100)
+                            throw new IllegalArgumentException("Use ledger [count] or ledger <id> [count], limit 1–100.");
+                        var entries=db.economyLedger(resident,limit);
+                        if(entries.isEmpty())System.out.println("No economy transactions recorded yet.");
+                        for(var e:entries)System.out.println("Day "+e.day()+" "+clock(e.minute())+
+                                " | "+e.kind()+" | "+e.fromId()+" -> "+e.toId()+
+                                " | EUR "+e.amount()+" | "+(e.loanId()==null?"-":e.loanId()));
                         continue;
                     }
                     if(lower.equals("cases")) {
@@ -463,6 +499,7 @@ public final class Main {
         System.out.println(" cases | case <id> | inspect <id> | interview <resident-id> <case-id>");
         System.out.println(" check-alibi <case-id> <resident-id> | background <case-id> <resident-id>");
         System.out.println(" accuse <case-id> <resident-id>");
+        System.out.println(" finances <id> | debts | ledger [count] | ledger <id> [count] — developer finance diagnostics");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");
