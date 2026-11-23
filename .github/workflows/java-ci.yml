@@ -75,3 +75,9 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.InvestigationDatabaseSmokeTest' exec:exec
+      - name: Test ambiguous scene evidence and independently corroborated alibis
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.AlibiSmokeTest
+      - name: Test alibi SQLite persistence and migration from v1.8 cases
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.AlibiDatabaseSmokeTest' exec:exec

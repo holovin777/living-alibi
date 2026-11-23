@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.8 — First Investigation");
+            System.out.println("Living Alibi v1.9 — Evidence & Alibis");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -101,9 +101,10 @@ public final class Main {
                         var c=InvestigationLife.caseById(town,arg(input));
                         System.out.println(c.publicSummary(town));
                         System.out.println("Scene inspected: "+c.inspected+" | Interviews: "+c.interviews.size());
-                        if(c.inspected)System.out.println("Scene clue: torn receipt with initials '"+
-                                InvestigationLife.initials(town.get(c.offenderId).name)+"' (unverified).");
+                        if(c.inspected)System.out.println("Scene clue: "+InvestigationLife.sceneClue(town,c));
                         for(var entry:c.interviews.entrySet())System.out.println("  "+town.get(entry.getKey()).name+": "+entry.getValue());
+                        for(var entry:c.alibiChecks.entrySet())System.out.println("  Alibi check ("+
+                                town.get(entry.getKey()).name+"): "+entry.getValue());
                         continue;
                     }
                     if(lower.startsWith("inspect ")) {
@@ -117,6 +118,14 @@ public final class Main {
                         if(parts.length!=2)throw new IllegalArgumentException("Use interview <resident-id> <case-id>.");
                         var candidate=town.copy();
                         String result=InvestigationLife.interview(candidate,parts[1],parts[0]);
+                        db.save(state,List.of(),List.of(),candidate,List.of(),List.of(),List.of());
+                        town.copyFrom(candidate);System.out.println(result);continue;
+                    }
+                    if(lower.startsWith("check-alibi ")) {
+                        String[] parts=arg(input).split("\\s+");
+                        if(parts.length!=2)throw new IllegalArgumentException("Use check-alibi <case-id> <resident-id>.");
+                        var candidate=town.copy();
+                        String result=InvestigationLife.checkAlibi(candidate,parts[0],parts[1]);
                         db.save(state,List.of(),List.of(),candidate,List.of(),List.of(),List.of());
                         town.copyFrom(candidate);System.out.println(result);continue;
                     }
@@ -444,7 +453,8 @@ public final class Main {
         System.out.println(" relationships [count] | relationship <id> <id> | social-events [count]");
         System.out.println(" beliefs <id> [count] | rumors [count] — attributed claims (developer view)");
         System.out.println(" secrets <id> [count] | deceptions [count] — confidential developer diagnostics");
-        System.out.println(" cases | case <id> | inspect <id> | interview <resident-id> <case-id> | accuse <case-id> <resident-id>");
+        System.out.println(" cases | case <id> | inspect <id> | interview <resident-id> <case-id>");
+        System.out.println(" check-alibi <case-id> <resident-id> | accuse <case-id> <resident-id>");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");

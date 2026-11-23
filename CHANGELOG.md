@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.0 — Evidence & Alibis
+
+- Remove the perfect offender-initials clue from newly generated cases: inspect finds ambiguous fabric and an illegible receipt.
+- Preserve contemporary positions for every resident at the incident instant, without exposing a global location map to the detective.
+- Add `check-alibi <case-id> <resident-id>`: first interview the resident; an alibi at a public scene is corroborated only after interviewing a separate co-present resident and obtaining their follow-up confirmation.
+- Add daily jacket color descriptions to incident eyewitness interviews; shared colors are leads, not proof.
+- Make cautious witness identification imperfect, instead of revealing the offender in every careful interview.
+- Persist incident snapshots, fabric descriptions and detective alibi notes with additive SQLite migration.
+- Do not reconstruct incident-time locations for pre-v1.9 saved cases; legacy cases remain open or solved exactly as before.
+- Add alibi unit and JDBC regression tests and GitHub Actions steps.
+- This remains a rules-based console prototype; accusations are validated against hidden engine truth, not legal proof.
+
 ## 1.8.0 — First Investigation
 
 - Generate the first authoritative missing-wallet incident from living, co-present residents at periodic public-scene opportunities.

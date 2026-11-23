@@ -21,6 +21,12 @@ final class InvestigationLife {
         final int amount;
         final Set<String> witnesses=new LinkedHashSet<>();
         final Map<String,String> interviews=new LinkedHashMap<>();
+        /** Snapshot captured at the moment of the incident, never reconstructed later. */
+        final Map<String,String> incidentSpaces=new LinkedHashMap<>();
+        /** Detective notes, not authoritative evidence. May be updated after new interviews. */
+        final Map<String,String> alibiChecks=new LinkedHashMap<>();
+        /** Empty for pre-v1.9 cases, whose historic scene evidence cannot be rewritten. */
+        String fabricColor;
         boolean inspected, solved;
 
         CaseFile(String id,int day,int minute,TownLife.Place place,
@@ -32,7 +38,8 @@ final class InvestigationLife {
         CaseFile copy() {
             var c=new CaseFile(id,day,minute,place,victimId,offenderId,item,amount);
             c.inspected=inspected;c.solved=solved;c.witnesses.addAll(witnesses);
-            c.interviews.putAll(interviews);
+            c.interviews.putAll(interviews);c.incidentSpaces.putAll(incidentSpaces);
+            c.alibiChecks.putAll(alibiChecks);c.fabricColor=fabricColor;
             return c;
         }
         String publicSummary(TownLife.Town town) {
@@ -73,7 +80,13 @@ final class InvestigationLife {
             if(offender.id.equals("marco"))clock.money+=amount;
             String id="case-%04d".formatted(town.cases.size()+1);
             var c=new CaseFile(id,clock.day,clock.minute,place,victim.id,offender.id,"wallet",amount);
+            c.fabricColor=coatColor(offender,clock.day);
             for(var p:present)c.witnesses.add(p.id);
+            // Freeze contemporary location evidence before anybody travels away.
+            for(var p:town.people.values()) {
+                if(p.alive && p.travelRemaining==0)
+                    c.incidentSpaces.put(p.id,p.currentSpace());
+            }
             town.cases.put(id,c);
             // The event text does not identify the offender, even to co-present witnesses.
             TownLife.publish(town,clock,offender.id,place,
@@ -83,15 +96,32 @@ final class InvestigationLife {
         }
     }
 
+    private static final String[] COAT_COLORS={"blue", "brown", "olive", "charcoal"};
+
+    /** Clothing is a reproducible daily trait, not a unique identifier or proof. */
+    static String coatColor(TownLife.Citizen p,int day) {
+        int index=Math.floorMod(p.id.hashCode() ^ Long.hashCode(p.personalSeed) ^ (day*97),COAT_COLORS.length);
+        return COAT_COLORS[index];
+    }
+
+    static String sceneClue(TownLife.Town town,CaseFile c) {
+        if(c.fabricColor==null) {
+            // Pre-v1.9 evidence did not retain reliable chain of custody. Do not
+            // reconstruct a clue from the secret offender ID and spoil old cases.
+            return "A torn receipt was reported in v1.8, but its original marking cannot "+
+                    "be verified. No new physical evidence can be inferred retrospectively.";
+        }
+        return "A "+c.fabricColor+" fabric thread and a torn receipt with no legible name. "+
+                "The fabric color is not unique and neither item proves who took the wallet.";
+    }
+
     static String investigate(TownLife.Town town,String caseId) {
         var c=caseById(town,caseId);
         c.inspected=true;
-        var offender=town.get(c.offenderId);
-        String initials=initials(offender.name);
-        return "Scene examined: "+c.place.label+". A torn receipt was found bearing initials '"+
-                initials+"'. This is a lead, not proof of ownership or guilt.";
+        return "Scene examined: "+c.place.label+". "+sceneClue(town,c);
     }
 
+    /** Interviews are self-reports and uncertain eyewitness recollections, never engine truth. */
     static String interview(TownLife.Town town,String caseId,String residentId) {
         var c=caseById(town,caseId);
         var p=town.get(residentId);
@@ -100,14 +130,37 @@ final class InvestigationLife {
         String statement;
         if(p.id.equals(c.victimId))
             statement="My wallet went missing at "+c.place.label+". I did not see anyone take it.";
-        else if(p.id.equals(c.offenderId))
-            statement="I was nearby that evening. I'd rather not discuss the missing wallet.";
         else if(c.witnesses.contains(p.id)) {
-            if(p.carefulness>=60)statement="I noticed "+town.get(c.offenderId).name+
-                    " near the belongings that evening, but I didn't see a theft.";
-            else statement="I was there, but I only heard that a wallet was missing.";
+            // The culprit does not give a uniquely evasive answer: evasiveness alone
+            // must not be a perfect, deterministic offender detector.
+            String color=c.fabricColor==null?"dark":c.fabricColor;
+            if(p.id.equals(c.offenderId) || p.carefulness<60) {
+                statement="I was there. I recall people nearby, but I didn't see a theft.";
+            } else {
+                // Observers can misidentify someone near the victim's belongings.
+                // Such a statement is a lead, NOT authoritative identification.
+                var bystanders=new ArrayList<String>();
+                for(var id:c.witnesses)if(!id.equals(c.victimId) && !id.equals(p.id) &&
+                        !id.equals(c.offenderId))bystanders.add(id);
+                int roll=Math.floorMod((p.id+":"+c.id).hashCode(),5);
+                String personId=roll==0 && !bystanders.isEmpty()
+                        ?bystanders.get(Math.floorMod(p.id.hashCode(),bystanders.size()))
+                        :c.offenderId;
+                statement="I recall a "+color+" coat and noticed "+town.get(personId).name+
+                        " near the belongings. I didn't see anyone take the wallet.";
+            }
+        } else if(!c.incidentSpaces.isEmpty() && c.incidentSpaces.containsKey(p.id)) {
+            // A resident's location claim can be corroborated independently only
+            // if another interviewed person occupied the same PUBLIC space.
+            String space=c.incidentSpaces.get(p.id);
+            if(space.startsWith("public:")) {
+                String label=TownLife.Place.valueOf(space.substring(7)).label;
+                statement="I remember being at "+label+" around that time, not at "+c.place.label+".";
+            } else {
+                statement="I was at home then, as far as I remember. I was not at the scene.";
+            }
         } else {
-            // A non-witness can know about the incident only through an attributed belief.
+            // Legacy v1.8 cases lack position snapshots. Do not invent their history.
             String report="A wallet belonging to "+town.get(c.victimId).name+
                     " disappeared at "+c.place.label+".";
             String key=KnowledgeLife.eventKey(new TownLife.Event(c.day,c.minute,c.offenderId,
@@ -117,11 +170,50 @@ final class InvestigationLife {
             if(belief!=null && belief.origin().equals("HEARD"))
                 statement="I heard from "+town.get(belief.learnedFrom()).name+
                         " that a wallet was missing. I wasn't there myself.";
-            else statement="I was not at "+c.place.label+" when that happened.";
+            else statement="I don't have a reliable account of where I was when that happened.";
         }
-        // This is attributed testimony, not a change to the world's authoritative history.
+        // A concrete clothing description makes fabric evidence useful, but not unique.
+        if(c.fabricColor!=null && c.witnesses.contains(p.id))
+            statement += " I wore a "+coatColor(p,c.day)+" jacket that evening.";
         c.interviews.put(p.id,statement);
         return p.name+": \""+statement+"\"";
+    }
+
+    /** A checked alibi requires separate interviews and an independent, co-present witness.
+     *  Snapshots establish the engine's reference truth; they are never printed directly.
+     */
+    static String checkAlibi(TownLife.Town town,String caseId,String residentId) {
+        var c=caseById(town,caseId);
+        var target=town.get(residentId);
+        if(!c.interviews.containsKey(target.id))
+            return "Interview "+target.name+" before checking their alibi.";
+        if(c.incidentSpaces.isEmpty())
+            return "No incident-time location snapshot exists for this pre-v1.9 case. "+
+                   "An independent alibi cannot be reconstructed retrospectively.";
+        String space=c.incidentSpaces.get(target.id);
+        if(space==null || !space.startsWith("public:") || space.equals(TownLife.publicSpace(c.place))) {
+            String result="UNVERIFIED: No independent elsewhere alibi has been established for "+
+                          target.name+". This is not proof of guilt.";
+            c.alibiChecks.put(target.id,result);
+            return result;
+        }
+        String confirmedBy=null;
+        for(var e:c.incidentSpaces.entrySet()) {
+            if(e.getKey().equals(target.id) || !space.equals(e.getValue()))continue;
+            if(c.interviews.containsKey(e.getKey())) {confirmedBy=e.getKey();break;}
+        }
+        String result;
+        if(confirmedBy==null) {
+            result="UNVERIFIED: "+target.name+" reports being elsewhere, but no interviewed independent "+
+                   "person corroborates it. Interview more residents.";
+        } else {
+            String label=TownLife.Place.valueOf(space.substring(7)).label;
+            result="CORROBORATED (follow-up): "+town.get(confirmedBy).name+
+                   " confirms seeing "+target.name+" at "+label+
+                   " around the incident time. This supports an alibi but is not judicial proof.";
+        }
+        c.alibiChecks.put(target.id,result);
+        return result;
     }
 
     static String accuse(TownLife.Town town,String caseId,String residentId) {
