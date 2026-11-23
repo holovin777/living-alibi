@@ -95,13 +95,21 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Search outcomes survive SQLite restarts and repeated actions are idempotent.
 - A two-week repeat-victim cooldown reduces unrealistic wallet-theft loops without modifying old reports.
 
+### Anonymous Visitor v1.15 — Optional investigation and voluntary identity
+
+- A player can move freely between public places and stay anonymous as long as they wish.
+- Resident contacts preserve only names explicitly volunteered to that resident, never a global player ID/name.
+- No missions are required, and the simulation continues while the visitor explores.
+- Future: NPCs independently notice and approach visitors, fuller player life simulation,
+  deeper contact memory, real anonymity-respecting dialogues, and a Godot visual client.
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.
 2. **Dynamic society:** births and migration, shared households, detailed room geometry, and scalable work schedules. General relationships are implemented at a basic level.
 3. **Advanced memory and belief:** basic attributed information exchange is implemented; deception and simple motive pressure are implemented; fading memory, genuine contradictions, and deep psychological drivers remain to be developed.
 4. **Incidents and evidence:** theft/lost property, alibis, trails, witnesses, event causality, evidence acquisition.
-5. **Playable detective:** first console interviews, case summaries, background leads, and accusations are implemented; rich deduction tools, travel, case linkage, and fair legal outcomes remain future work.
+5. **Playable detective:** first console interviews, case summaries, background leads, and accusations are implemented; free walking has been added for the visitor, while rich deduction tools, case linkage, and fair legal outcomes remain future work.
 6. **Organized crime and social power:** emergent groups with ranks, territorial influence, debts, intimidation and leverage over witnesses. Authority must be built through interactions and history, never attached as a static "criminal" flag.
 7. **Human vulnerability and addiction:** nuanced dependency, harm, support and recovery mechanics grounded in character histories; substance use or a health vulnerability must never automatically imply violence or criminal behavior.
 8. **Continuous hosting and presentation:** headless daemon first, then an optional Godot client that reads the same authoritative events without controlling world truth.

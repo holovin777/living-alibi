@@ -1,13 +1,14 @@
 # Living Alibi
 
-**v1.14 — Recovery & Chain of Custody** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.15 — Anonymous Visitor** · Java 21+ · Maven · SQLite · headless console prototype
 
-> An independent town, private observations, and a detective who must discover what really happened.
+> A living town where you can be an unknown visitor, build relationships, or investigate when you choose.
 
-Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The first detective commands are playable in the console; there is no 3D world or unrestricted investigation system yet.** Code, documentation, and game text are English-only.
+Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player can now roam anonymously in public places; detective cases are optional. There is no 3D world yet.** Code, documentation, and game text are English-only.
 
 ## Implemented
 
+- **Anonymous visitor (v1.15):** player has a separate persistent position and private identity. Walk freely between public places with `go`, inspect people actually nearby with `look`, speak face-to-face, introduce yourself by choice, and keep an independent per-NPC contact memory. Nothing obliges the player to investigate a case. No NPC learns the player's private name automatically.
 - **Marco Bianchi:** baker with richer physiological needs, economic goals, permanent mortality, personal memory, and optional paid OpenAI dialogue.
 - **Elena Rossi:** shopkeeper with a simpler independent needs/work system and a persistent friendship with Marco.
 - **Procedural population:** generate up to 40 *additional* unique, stable residents (`resident-0001`, etc.), 1–20 per command, without any AI/API calls.
@@ -38,7 +39,7 @@ Living Alibi is an early prototype for an emergent detective simulation. Its res
 
 ## Upgrading an existing world
 
-Quit the console with `exit`, back up `data/world.db` while it is closed, and extract the ZIP from the `~/Repositories` parent folder. The archive never includes your personal SQLite database. v1.14 adds `investigation_searches` and an `investigation_cases.returned` flag to the v1.13 property inventory and investigation tables. The new table is initialized empty for existing cases; no historical search is fabricated. Existing people, jobs, cases and old witness logs are retained. The items assigned on migration are initial inventory *as of the migration day*, not a claim about prior ownership or previous crimes. The old `world.db` remains the active save when starting the updated game.
+Quit the console with `exit`, back up `data/world.db` while it is closed, and extract the ZIP from the `~/Repositories` parent folder. The archive never includes your personal SQLite database. v1.15 adds `player_state` and `player_contacts` alongside the existing v1.14 recovery tables. They start with an anonymous visitor at Park and no known contacts in migrated worlds. No historical social introductions are fabricated. Existing people, jobs, cases and old witness logs are retained. The items assigned on migration are initial inventory *as of the migration day*, not a claim about prior ownership or previous crimes. The old `world.db` remains the active save when starting the updated game.
 
 ## Quick start
 
@@ -49,6 +50,28 @@ mvn -q compile exec:java
 ```
 
 The application creates `data/world.db` if missing. That directory is ignored by Git. No API key is required.
+
+### Walk around without a mission (v1.15)
+
+```text
+explore
+me
+locations
+look
+go library
+look
+identity Viktor
+speak resident-0001 Hello there!
+introduce resident-0001
+contacts
+```
+
+First set `identity` **privately**, then choose whom to tell with `introduce`.
+If you prefer, stay unnamed and just talk. A resident you introduce yourself to
+will remember the name after reopening the world; others will not magically
+know it. The `look` and `speak` commands require actual shared public space.
+The `speak` replies are currently simple offline rules; Godot and more natural
+resident conversations remain future work. See `docs/PLAYER_PRESENCE.md`.
 
 ### Recovery & Chain of Custody (v1.14)
 

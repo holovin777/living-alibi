@@ -121,3 +121,11 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.RecoveryDatabaseSmokeTest' exec:exec
+      - name: Test anonymous roaming and voluntary identity disclosure
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PlayerPresenceSmokeTest
+      - name: Test free exploration without mandatory investigations
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PlayerPresenceIntegrationSmokeTest
+      - name: Test SQLite player position and private per-resident introductions
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerPresenceDatabaseSmokeTest' exec:exec

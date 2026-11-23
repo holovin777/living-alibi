@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.14 — Recovery & Chain of Custody");
+            System.out.println("Living Alibi v1.15 — Anonymous Visitor");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -41,6 +41,96 @@ public final class Main {
                     if(lower.equals("help")) {help();continue;}
                     if(lower.equals("status")||lower.equals("observe")) {status(state);continue;}
                     if(lower.equals("personality")) {personality(state);continue;}
+                    if(lower.equals("me")||lower.equals("whereami")) {
+                        System.out.println("You | "+PlayerLife.position(town.player)+
+                                " | private name: "+(town.player.privateName==null?"not set":town.player.privateName));
+                        System.out.println("Your name is NOT automatically known by any resident. Investigations are optional.");
+                        continue;
+                    }
+                    if(lower.equals("explore")) {
+                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias]");
+                        System.out.println("You can simply wander, wait, and meet people. No cases or missions are required.");
+                        continue;
+                    }
+                    if(lower.equals("locations")) {
+                        System.out.println("Public places (no access to private apartments):");
+                        for(var place:PlayerLife.publicPlaces())
+                            System.out.println("  "+place.name().toLowerCase(Locale.ROOT).replace('_','-')+" | "+place.label);
+                        continue;
+                    }
+                    if(lower.equals("look")) {
+                        System.out.println("Location: "+PlayerLife.position(town.player));
+                        var nearby=PlayerLife.visible(town);
+                        if(nearby.isEmpty())System.out.println("No residents are visible here now. You can wait or visit another place.");
+                        else for(var person:nearby)
+                            System.out.println("  "+person.id+" | "+person.name+" | "+person.activity);
+                        continue;
+                    }
+                    if(lower.startsWith("go ")) {
+                        var destination=PlayerLife.destination(arg(input));
+                        var candidate=town.copy();
+                        int duration=PlayerLife.startTravel(candidate.player,destination);
+                        if(duration==0)System.out.println("You are already at "+destination.label+".");
+                        else {
+                            advanceAndSave(db,state,candidate,duration);
+                            town.copyFrom(candidate);
+                            System.out.println("You walked to "+destination.label+" ("+duration+" game minutes).");
+                        }
+                        continue;
+                    }
+                    if(lower.startsWith("identity ")) {
+                        var candidate=town.copy();
+                        PlayerLife.setPrivateName(candidate.player,arg(input));
+                        db.save(state,List.of(),List.of(),candidate,List.of(),List.of(),List.of());
+                        town.copyFrom(candidate);
+                        System.out.println("Private identity saved. No resident was told your name.");
+                        continue;
+                    }
+                    if(lower.startsWith("introduce ")) {
+                        String[] parts=arg(input).split("\\s+",2);
+                        if(parts.length==0 || parts[0].isBlank())
+                            throw new IllegalArgumentException("Use introduce <resident-id> [name or alias].");
+                        String alias=parts.length>1?parts[1]:town.player.privateName;
+                        if(alias==null)throw new IllegalArgumentException("Use identity <name> privately first, or supply introduce <id> <name>.");
+                        var candidate=town.copy();
+                        var contact=PlayerLife.introduce(candidate,parts[0],alias,state.day,state.minute);
+                        advanceAndSave(db,state,candidate,2);
+                        town.copyFrom(candidate);
+                        System.out.println(candidate.get(contact.residentId).name+" now remembers you as "+contact.knownName+". Others were not informed.");
+                        continue;
+                    }
+                    if(lower.startsWith("speak ")) {
+                        String[] parts=arg(input).split("\\s+",2);
+                        if(parts.length!=2)throw new IllegalArgumentException("Use speak <resident-id> <message>.");
+                        var candidate=town.copy();
+                        String response=PlayerLife.speak(candidate,parts[0],parts[1],state.day,state.minute);
+                        String residentName=candidate.get(parts[0]).name;
+                        advanceAndSave(db,state,candidate,3);
+                        town.copyFrom(candidate);
+                        System.out.println(residentName+": "+response+" (offline, rule-based)");
+                        continue;
+                    }
+                    if(lower.equals("contacts")) {
+                        if(town.player.contacts.isEmpty())System.out.println("You have not spoken to anyone yet.");
+                        for(var c:town.player.contacts.values())
+                            System.out.println("  "+c.residentId+" | knows you as: "+
+                                    (c.knownName==null?"unnamed visitor":c.knownName)+
+                                    " | conversations: "+c.conversations);
+                        continue;
+                    }
+                    if(lower.startsWith("contact ")) {
+                        var resident=town.get(arg(input));
+                        var c=town.player.contacts.get(resident.id);
+                        if(c==null)System.out.println(resident.name+" has no recorded conversation or introduction with you.");
+                        else {
+                            System.out.println(resident.name+" remembers: "+
+                                    (c.knownName==null?"an unnamed visitor":c.knownName)+
+                                    " | conversations: "+c.conversations+
+                                    " | last contact: Day "+c.lastDay+" "+clock(c.lastMinute));
+                            if(c.lastHeard!=null)System.out.println("Last thing they heard: "+c.lastHeard);
+                        }
+                        continue;
+                    }
                     if(lower.equals("town")) {townStatus(town,state);continue;}
                     if(lower.equals("population") || lower.startsWith("population ")) {
                         String[] parts=input.split("\\s+");
@@ -357,8 +447,17 @@ public final class Main {
                     }
                     if(lower.startsWith("remember ")) {
                         if(!state.alive){System.out.println("Marco is deceased; memories are read-only.");continue;}
+                        PlayerLife.nearby(town,"marco"); // No remote disclosure to Marco.
                         String fact=arg(input);
                         if(fact.isBlank()||fact.length()>280){System.out.println("Save a fact of 1–280 characters.");continue;}
+                        if(fact.regionMatches(true,0,"My name is ",0,11)) {
+                            String disclosed=fact.substring(11).strip();
+                            if(disclosed.endsWith("."))disclosed=disclosed.substring(0,disclosed.length()-1);
+                            var candidate=town.copy();
+                            PlayerLife.introduce(candidate,"marco",disclosed,state.day,state.minute);
+                            db.save(state,List.of(),List.of(),candidate,List.of(),List.of(),List.of());
+                            town.copyFrom(candidate);
+                        }
                         db.rememberFact(state,fact);
                         System.out.println("Fact saved to Marco's long-term memory.");
                         continue;
@@ -419,6 +518,7 @@ public final class Main {
                     }
                     if(lower.startsWith("talk ")) {
                         if(!state.alive){System.out.println("Marco has passed away. You can still read his memories.");continue;}
+                        PlayerLife.nearby(town,"marco"); // Existing AI chat also requires face-to-face presence.
                         String message=arg(input);
                         if(message.isBlank()||message.length()>1000){System.out.println("Enter 1–1000 characters after talk.");continue;}
                         if(state.activity.equals("SLEEPING")) {System.out.println("Marco is sleeping. Try again when he is awake.");continue;}
@@ -428,6 +528,7 @@ public final class Main {
                                     db.observations("marco",30),message);}
                             catch(Exception ex) {System.out.println("OpenAI unavailable: "+safeError(ex));answer=demoReply(state);}
                         } else answer=demoReply(state);
+                        PlayerLife.speak(town,"marco",message,state.day,state.minute);
                         System.out.println("Marco: "+answer);
                         int day=state.day,minute=state.minute;
                         state.friendship=Math.min(100,state.friendship+1);
@@ -581,6 +682,9 @@ public final class Main {
     private static void help() {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
+        System.out.println(" explore | me | locations | look | go <place> — move freely as an anonymous visitor");
+        System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
+        System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
         System.out.println(" town | population [count] | population generate 12 | resident resident-0001");
         System.out.println(" home <id>             — inspect a resident's private home unit (developer view)");
         System.out.println(" where <id> | known <id> [count] | town-events [count]");
@@ -599,8 +703,8 @@ public final class Main {
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");
         System.out.println(" live 30               — run live simulation for 30 real seconds");
         System.out.println(" offline on|off        — catch up with elapsed real time on the next launch");
-        System.out.println(" talk Hello, Marco!    — AI reply when key is configured, otherwise demo reply");
-        System.out.println(" remember My name is ... — explicitly save a durable fact Marco can recall");
+        System.out.println(" talk Hello, Marco!    — face-to-face AI chat with Marco (optional paid call)");
+        System.out.println(" remember My name is ... — explicitly tell nearby Marco a durable fact");
         System.out.println(" reflect               — one paid AI call to reconsider Marco's long-term priority");
         System.out.println(" help | exit");
     }

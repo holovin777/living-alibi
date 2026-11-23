@@ -89,6 +89,7 @@ final class TownLife {
 
     static final class Town {
         final Map<String,Citizen> people=new LinkedHashMap<>();
+        PlayerLife.Player player=new PlayerLife.Player();
         boolean together;
         long meetingSinceTick=-1;
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
@@ -118,7 +119,7 @@ final class TownLife {
             return p;
         }
         Town copy() {
-            Town t=new Town();t.together=together;t.meetingSinceTick=meetingSinceTick;
+            Town t=new Town();t.player=player.copy();t.together=together;t.meetingSinceTick=meetingSinceTick;
             t.relationship=relationship.copy();
             for(var e:peerRelationships.entrySet())t.peerRelationships.put(e.getKey(),e.getValue().copy());
             for(var e:people.entrySet())t.people.put(e.getKey(),e.getValue().copy());
@@ -136,6 +137,7 @@ final class TownLife {
         }
         void copyFrom(Town other) {
             people.clear();for(var e:other.people.entrySet())people.put(e.getKey(),e.getValue().copy());
+            player=other.player.copy();
             together=other.together;meetingSinceTick=other.meetingSinceTick;
             relationship=other.relationship.copy();
             peerRelationships.clear();
@@ -185,6 +187,7 @@ final class TownLife {
     }
     static void tick(Town town,WorldState marco,List<Event> truth,List<Observation> observations,
                      List<SocialLife.Interaction> interactions) {
+        PlayerLife.tick(town.player);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;

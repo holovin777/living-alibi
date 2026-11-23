@@ -62,6 +62,22 @@ final class WorldDatabase implements AutoCloseable {
 
 
         }
+        // v1.15: voluntary visitor presence and per-resident identity disclosure.
+        // Neither table is included in world NPC identity or investigation evidence.
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS player_state (
+                    id INTEGER PRIMARY KEY CHECK(id=1), place TEXT NOT NULL,
+                    destination TEXT NOT NULL, travel_remaining INTEGER NOT NULL,
+                    private_name TEXT)
+                """);
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS player_contacts (
+                    resident_id TEXT PRIMARY KEY, known_name TEXT,
+                    conversations INTEGER NOT NULL, last_day INTEGER NOT NULL,
+                    last_minute INTEGER NOT NULL, last_heard TEXT)
+                """);
+        }
         // Additive migration for databases created by v1.1.
         if(!columnExists("town_meta","meeting_since")) {
             try(Statement st=db.createStatement()) {
@@ -426,6 +442,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistEconomy(town);
                 persistLifeChanges(town);
                 persistProperty(town);
+                persistPlayer(town.player);
             }
             db.commit();
             if(town!=null) {
@@ -663,8 +680,56 @@ final class WorldDatabase implements AutoCloseable {
                 town.items.put(item.id,item);
             }
         }
+        // Anonymous by default on migration. No resident learns the player's identity.
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_state WHERE id=1")) {
+            if(rs.next()) {
+                town.player.place=TownLife.Place.valueOf(rs.getString("place"));
+                town.player.destination=TownLife.Place.valueOf(rs.getString("destination"));
+                town.player.travelRemaining=rs.getInt("travel_remaining");
+                town.player.privateName=rs.getString("private_name");
+            }
+        }
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_contacts")) {
+            while(rs.next()) {
+                String id=rs.getString("resident_id");
+                if(!town.people.containsKey(id))continue;
+                PlayerLife.Contact c=new PlayerLife.Contact(id);
+                c.knownName=rs.getString("known_name");
+                c.conversations=rs.getInt("conversations");
+                c.lastDay=rs.getInt("last_day");c.lastMinute=rs.getInt("last_minute");
+                c.lastHeard=rs.getString("last_heard");
+                town.player.contacts.put(id,c);
+            }
+        }
         PropertyLife.ensureStarterItems(town,state);
         return town;
+    }
+
+    private void persistPlayer(PlayerLife.Player player) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO player_state(id,place,destination,travel_remaining,private_name)
+                VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                place=excluded.place,destination=excluded.destination,
+                travel_remaining=excluded.travel_remaining,private_name=excluded.private_name
+                """)) {
+            p.setString(1,player.place.name());p.setString(2,player.destination.name());
+            p.setInt(3,player.travelRemaining);p.setString(4,player.privateName);
+            p.executeUpdate();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO player_contacts(resident_id,known_name,conversations,last_day,last_minute,last_heard)
+                VALUES(?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
+                known_name=excluded.known_name,conversations=excluded.conversations,
+                last_day=excluded.last_day,last_minute=excluded.last_minute,
+                last_heard=excluded.last_heard
+                """)) {
+            for(var c:player.contacts.values()) {
+                p.setString(1,c.residentId);p.setString(2,c.knownName);
+                p.setInt(3,c.conversations);p.setInt(4,c.lastDay);
+                p.setInt(5,c.lastMinute);p.setString(6,c.lastHeard);p.addBatch();
+            }
+            p.executeBatch();
+        }
     }
 
     private void persistTown(TownLife.Town town,List<TownLife.Event> events,

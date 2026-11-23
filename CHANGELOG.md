@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.15.0 — Anonymous Visitor
+
+- Introduce a separate player position and private identity, entirely optional for investigation.
+- Add `explore`, `me`, `locations`, `go`, `look`, `speak`, `identity`, `introduce`, `contacts`, and `contact` console commands.
+- Model 8–10-minute public walking and 2–3-minute face-to-face contact; private NPC homes remain inaccessible.
+- Make each resident remember only a voluntarily disclosed name or alias, with persistent latest heard statement and last meeting time. Player private names are not broadcast.
+- Require proximity for old paid `talk` and explicit `remember` actions involving Marco.
+- Add additive SQLite tables `player_state` and `player_contacts`, preserving all pre-v1.15 people, relationships, finances, crimes and items.
+- Add anonymous player unit, non-mandatory roaming integration, and SQLite persistence regression tests, plus CI hooks.
+- Limitations: NPCs do not yet initiate talks, player lacks full survival simulation, and developer commands remain available. Existing explicit facts previously shared with Marco are not erased.
+
+
 ## 1.14.0 — Recovery & Chain of Custody
 
 - Add `search <case-id> <resident-id>` as a detective-only evidence search. An inspected scene, two interviews (including the resident being searched), and a supporting name/clothing lead are necessary. The result is based on the concrete wallet associated with the case, never on an arbitrary generated duplicate.
