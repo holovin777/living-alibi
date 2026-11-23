@@ -15,7 +15,8 @@ public final class InvestigationIntegrationSmokeTest {
         for(var c:town.cases.values()) {
             check(c.witnesses.contains(c.victimId)&&c.witnesses.contains(c.offenderId),
                   "theft only when participants share public space");
-            check(c.day%7==0,"incident follows opportunity sampling schedule");
+            check(c.motiveCode!=null && c.motiveStrength>=59,
+                  "incident has a contemporary motive and sufficient pressure");
         }
         check(truth.stream().anyMatch(e->e.text().contains("wallet")&&e.text().contains("disappeared")),
               "a report exists in the world event log");

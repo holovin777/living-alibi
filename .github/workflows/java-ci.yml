@@ -81,3 +81,11 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.AlibiDatabaseSmokeTest' exec:exec
+      - name: Test motivation, background leads and legacy privacy
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.MotiveSmokeTest
+      - name: Test motive-driven incident opportunities over 21 days
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.MotiveIntegrationSmokeTest
+      - name: Test historical motive persistence and additive SQLite migration
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.MotiveDatabaseSmokeTest' exec:exec

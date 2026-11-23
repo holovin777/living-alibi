@@ -191,6 +191,25 @@ final class WorldDatabase implements AutoCloseable {
                     PRIMARY KEY(case_id,resident_id))
                 """);
         }
+        // v1.10: optional incident-time motive context, never reconstructed for old cases.
+        if(!columnExists("investigation_cases","motive_code")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE investigation_cases ADD COLUMN motive_code TEXT");
+            }
+        }
+        if(!columnExists("investigation_cases","motive_strength")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE investigation_cases ADD COLUMN motive_strength INTEGER");
+            }
+        }
+        try(Statement st=db.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS investigation_backgrounds (
+                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL,
+                    financial INTEGER NOT NULL, conflict INTEGER NOT NULL,
+                    impulse INTEGER NOT NULL, PRIMARY KEY(case_id,resident_id))
+                """);
+        }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
         add.put("hunger", "INTEGER NOT NULL DEFAULT 25");
@@ -467,6 +486,8 @@ final class WorldDatabase implements AutoCloseable {
                         rs.getString("item"),rs.getInt("amount"));
                 c.inspected=rs.getInt("inspected")!=0;c.solved=rs.getInt("solved")!=0;
                 c.fabricColor=rs.getString("fabric_color");
+                c.motiveCode=rs.getString("motive_code");
+                c.motiveStrength=rs.getInt("motive_strength");
                 town.cases.put(c.id,c);
             }
         }
@@ -498,6 +519,15 @@ final class WorldDatabase implements AutoCloseable {
                 var c=town.cases.get(rs.getString(1));
                 if(c!=null && town.people.containsKey(rs.getString(2)))
                     c.alibiChecks.put(rs.getString(2),rs.getString(3));
+            }
+        }
+        try(Statement st=db.createStatement();
+            ResultSet rs=st.executeQuery("SELECT case_id,resident_id,financial,conflict,impulse FROM investigation_backgrounds")) {
+            while(rs.next()) {
+                var c=town.cases.get(rs.getString(1));
+                if(c!=null && town.people.containsKey(rs.getString(2)))
+                    c.incidentProfiles.put(rs.getString(2),new MotiveLife.Indicators(
+                            rs.getInt(3),rs.getInt(4),rs.getInt(5)));
             }
         }
         return town;
@@ -779,17 +809,32 @@ final class WorldDatabase implements AutoCloseable {
 
     private void persistInvestigations(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved,fabric_color)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved,fabric_color,motive_code,motive_strength)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(id) DO UPDATE SET inspected=excluded.inspected,solved=excluded.solved,
-                                         fabric_color=excluded.fabric_color
+                                         fabric_color=excluded.fabric_color,
+                                         motive_code=excluded.motive_code,motive_strength=excluded.motive_strength
             """)) {
             for(var c:town.cases.values()) {
                 p.setString(1,c.id);p.setInt(2,c.day);p.setInt(3,c.minute);
                 p.setString(4,c.place.name());p.setString(5,c.victimId);p.setString(6,c.offenderId);
                 p.setString(7,c.item);p.setInt(8,c.amount);
                 p.setInt(9,c.inspected?1:0);p.setInt(10,c.solved?1:0);
-                p.setString(11,c.fabricColor);p.addBatch();
+                p.setString(11,c.fabricColor);p.setString(12,c.motiveCode);
+                if(c.motiveCode==null)p.setNull(13,java.sql.Types.INTEGER);
+                else p.setInt(13,c.motiveStrength);
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+            INSERT OR IGNORE INTO investigation_backgrounds(case_id,resident_id,financial,conflict,impulse)
+            VALUES(?,?,?,?,?)
+            """)) {
+            for(var c:town.cases.values())for(var entry:c.incidentProfiles.entrySet()) {
+                p.setString(1,c.id);p.setString(2,entry.getKey());
+                var v=entry.getValue();p.setInt(3,v.financial());p.setInt(4,v.conflict());
+                p.setInt(5,v.impulse());p.addBatch();
             }
             p.executeBatch();
         }

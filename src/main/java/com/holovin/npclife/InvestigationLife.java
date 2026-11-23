@@ -1,7 +1,6 @@
 package com.holovin.npclife;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,6 +26,11 @@ final class InvestigationLife {
         final Map<String,String> alibiChecks=new LinkedHashMap<>();
         /** Empty for pre-v1.9 cases, whose historic scene evidence cannot be rewritten. */
         String fabricColor;
+        /** Private engine reason. Legacy cases do not acquire fabricated motives. */
+        String motiveCode;
+        int motiveStrength;
+        /** Contemporary circumstances for every resident, not an accusation. */
+        final Map<String,MotiveLife.Indicators> incidentProfiles=new LinkedHashMap<>();
         boolean inspected, solved;
 
         CaseFile(String id,int day,int minute,TownLife.Place place,
@@ -40,6 +44,8 @@ final class InvestigationLife {
             c.inspected=inspected;c.solved=solved;c.witnesses.addAll(witnesses);
             c.interviews.putAll(interviews);c.incidentSpaces.putAll(incidentSpaces);
             c.alibiChecks.putAll(alibiChecks);c.fabricColor=fabricColor;
+            c.motiveCode=motiveCode;c.motiveStrength=motiveStrength;
+            c.incidentProfiles.putAll(incidentProfiles);
             return c;
         }
         String publicSummary(TownLife.Town town) {
@@ -49,51 +55,109 @@ final class InvestigationLife {
         }
     }
 
+    /** Check real opportunities at irregular incident times, not on a fixed weekday. */
     static void tick(TownLife.Town town,WorldState clock,List<TownLife.Event> truth,
                      List<TownLife.Observation> observations) {
-        // Incident opportunities are assessed on one evening per week for the console MVP.
-        // Participants and outcomes depend on the current living population and its positions.
-        if(clock.day%7!=0 || clock.minute!=1050 || town.people.size()<3)return;
-        // Cap at one new incident per week. The case IDs persist across restarts.
-        for(var c:town.cases.values())if(c.day==clock.day)return;
-        for(var place:List.of(TownLife.Place.PARK,TownLife.Place.CAFE,TownLife.Place.MARKET)) {
-            var present=new ArrayList<TownLife.Citizen>();
-            for(var p:town.people.values()) {
-                if(p.presentAt(place) && p.currentSpace().equals(TownLife.publicSpace(place)) &&
-                        !p.activity.equals("SLEEPING") && p.money>=0)present.add(p);
-            }
-            if(present.size()<3)continue;
-            // No fixed suspect or victim: choose from real co-present people and persistent traits.
-            present.sort(Comparator.comparingInt(p -> p.carefulness*2+p.money/30 +
-                    Math.floorMod((p.personalSeed ^ (clock.day*17L)),19)));
-            TownLife.Citizen offender=present.getFirst();
-            TownLife.Citizen victim=null;
-            for(var p:present) {
-                if(p.id.equals(offender.id) || p.money<25)continue;
-                if(victim==null || p.money>victim.money)victim=p;
-            }
-            if(victim==null)continue;
-            int amount=15;
-            victim.money-=amount;offender.money+=amount;
-            // Marco's authoritative physiology ledger is separate from his spatial citizen snapshot.
-            if(victim.id.equals("marco"))clock.money-=amount;
-            if(offender.id.equals("marco"))clock.money+=amount;
-            String id="case-%04d".formatted(town.cases.size()+1);
-            var c=new CaseFile(id,clock.day,clock.minute,place,victim.id,offender.id,"wallet",amount);
-            c.fabricColor=coatColor(offender,clock.day);
-            for(var p:present)c.witnesses.add(p.id);
-            // Freeze contemporary location evidence before anybody travels away.
-            for(var p:town.people.values()) {
-                if(p.alive && p.travelRemaining==0)
-                    c.incidentSpaces.put(p.id,p.currentSpace());
-            }
-            town.cases.put(id,c);
-            // The event text does not identify the offender, even to co-present witnesses.
-            TownLife.publish(town,clock,offender.id,place,
-                    "A wallet belonging to "+victim.name+" disappeared at "+place.label+".",
-                    truth,observations);
-            return;
+        // A bounded number of decision windows, not an expensive per-minute N^2 search.
+        if(clock.minute<660 || clock.minute>1170 || clock.minute%13!=0 ||
+                town.people.size()<3)return;
+        // Avoid floods; no more than one incident within the preceding three days.
+        for(var incident:town.cases.values()) {
+            long age=((long)clock.day-incident.day)*1440L+clock.minute-incident.minute;
+            if(age>=0 && age<3L*1440L)return;
         }
+        TownLife.Citizen chosen=null, target=null;
+        MotiveLife.Assessment winning=null;
+        TownLife.Place scene=null;
+        int best=-1;
+        long now=((long)clock.day-1)*1440L+clock.minute;
+        for(var place:List.of(TownLife.Place.PARK,TownLife.Place.CAFE,
+                              TownLife.Place.MARKET,TownLife.Place.LIBRARY)) {
+            var people=new ArrayList<TownLife.Citizen>();
+            for(var person:town.people.values())
+                if(person.presentAt(place) && person.currentSpace().equals(TownLife.publicSpace(place)) &&
+                        !person.activity.equals("SLEEPING") && !person.activity.equals("TRAVELING"))
+                    people.add(person);
+            if(people.size()<3)continue;
+            for(var offender:people) {
+                // One impulsive character cannot repeatedly generate every crime.
+                boolean recentlyOffended=false;
+                for(var c:town.cases.values())
+                    if(c.offenderId.equals(offender.id) && clock.day-c.day<10)
+                        {recentlyOffended=true;break;}
+                if(recentlyOffended)continue;
+                for(var victim:people) {
+                    if(victim==offender || victim.money<30)continue;
+                    var assessment=MotiveLife.assess(town,clock,offender,victim);
+                    if(assessment.strength()<59)continue;
+                    int jitter=(int)Math.floorMod(mix(now^offender.id.hashCode()^
+                            Long.rotateLeft(victim.id.hashCode(),17)),13);
+                    int rank=assessment.strength()+jitter;
+                    if(rank>best) {
+                        best=rank;chosen=offender;target=victim;
+                        winning=assessment;scene=place;
+                    }
+                }
+            }
+        }
+        if(chosen==null)return;
+        // A strong temptation increases risk but never guarantees a crime.
+        long entropy=mix(now^chosen.id.hashCode()^
+                Long.rotateLeft(target.id.hashCode(),31)^chosen.personalSeed);
+        int chance=Math.min(95,Math.max(8,winning.strength()-38)); // rare per-window chance; motivation changes probability
+        if(Math.floorMod(entropy,1000)>=chance)return;
+        recordIncident(town,clock,scene,chosen,target,winning,truth,observations);
+    }
+
+    private static long mix(long n) {
+        n=(n^(n>>>30))*0xbf58476d1ce4e5b9L;
+        n=(n^(n>>>27))*0x94d049bb133111ebL;
+        return n^(n>>>31);
+    }
+
+    /** Shared by simulation and deterministic regression fixtures; always checks scene truth. */
+    static CaseFile recordIncident(TownLife.Town town,WorldState clock,TownLife.Place place,
+                                   TownLife.Citizen offender,TownLife.Citizen victim,
+                                   MotiveLife.Assessment motive,List<TownLife.Event> truth,
+                                   List<TownLife.Observation> observations) {
+        if(offender==victim || !offender.presentAt(place) || !victim.presentAt(place) ||
+                !offender.currentSpace().equals(TownLife.publicSpace(place)) ||
+                !victim.currentSpace().equals(TownLife.publicSpace(place)) || victim.money<15)
+            throw new IllegalArgumentException("An incident needs two co-present people and a solvent victim.");
+        for(var prior:town.cases.values())
+            if(prior.day==clock.day && prior.minute==clock.minute)
+                throw new IllegalArgumentException("An incident already exists for this instant.");
+        int amount=15;
+        String id="case-%04d".formatted(town.cases.size()+1);
+        var c=new CaseFile(id,clock.day,clock.minute,place,victim.id,offender.id,"wallet",amount);
+        c.fabricColor=coatColor(offender,clock.day);
+        c.motiveCode=motive.reason();c.motiveStrength=motive.strength();
+        for(var p:town.people.values()) {
+            if(!p.alive)continue;
+            // A travelling resident retains a background, but has no confirmed scene.
+            if(p.travelRemaining==0)c.incidentSpaces.put(p.id,p.currentSpace());
+            c.incidentProfiles.put(p.id,MotiveLife.indicators(town,clock,p,victim));
+            if(p.presentAt(place) && p.currentSpace().equals(TownLife.publicSpace(place)))
+                c.witnesses.add(p.id);
+        }
+        // Freeze motives BEFORE changing balances: post-theft wealth would rewrite context.
+        victim.money-=amount;offender.money+=amount;
+        if(victim.id.equals("marco"))clock.money-=amount;
+        if(offender.id.equals("marco"))clock.money+=amount;
+        town.cases.put(c.id,c);
+        // Public report never includes offender, motive, or protected profiles.
+        TownLife.publish(town,clock,offender.id,place,
+                "A wallet belonging to "+victim.name+" disappeared at "+place.label+".",
+                truth,observations);
+        return c;
+    }
+
+    /** Backward-compatible test helper for manually staged, known-location incidents. */
+    static CaseFile recordIncident(TownLife.Town town,WorldState clock,TownLife.Place place,
+                                   TownLife.Citizen offender,TownLife.Citizen victim,
+                                   List<TownLife.Event> truth,List<TownLife.Observation> observations) {
+        return recordIncident(town,clock,place,offender,victim,
+                MotiveLife.assess(town,clock,offender,victim),truth,observations);
     }
 
     private static final String[] COAT_COLORS={"blue", "brown", "olive", "charcoal"};
@@ -214,6 +278,20 @@ final class InvestigationLife {
         }
         c.alibiChecks.put(target.id,result);
         return result;
+    }
+
+    /** A detective-accessible lead, gated by an actual interview; not a guilt score. */
+    static String background(TownLife.Town town,String caseId,String residentId) {
+        var c=caseById(town,caseId);
+        var person=town.get(residentId);
+        if(!c.inspected)return "Inspect the scene before researching a resident's background.";
+        if(!c.interviews.containsKey(person.id))
+            return "Interview "+person.name+" before reviewing their circumstances.";
+        var data=c.incidentProfiles.get(person.id);
+        if(data==null)
+            return "No contemporaneous background snapshot is available for this older case. "+
+                   "Do not infer past circumstances from today's information.";
+        return person.name+" | Incident-time leads | "+data.publicSummary();
     }
 
     static String accuse(TownLife.Town town,String caseId,String residentId) {

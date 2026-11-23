@@ -16,7 +16,8 @@ public final class InvestigationSmokeTest {
         }
         var truth=new ArrayList<TownLife.Event>();
         var seen=new ArrayList<TownLife.Observation>();
-        InvestigationLife.tick(town,clock,truth,seen);
+        InvestigationLife.recordIncident(town,clock,TownLife.Place.PARK,
+                town.get("marco"),town.get("elena"),truth,seen);
         check(town.cases.size()==1,"one reported incident");
         var c=town.cases.values().iterator().next();
         check(c.witnesses.size()==town.people.size(),"only co-present witnesses recorded");

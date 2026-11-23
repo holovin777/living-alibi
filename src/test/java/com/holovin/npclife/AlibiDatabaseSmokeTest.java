@@ -23,7 +23,8 @@ public final class AlibiDatabaseSmokeTest {
                 }
                 var truth=new ArrayList<TownLife.Event>();
                 var observed=new ArrayList<TownLife.Observation>();
-                InvestigationLife.tick(town,clock,truth,observed);
+                InvestigationLife.recordIncident(town,clock,TownLife.Place.PARK,
+                        town.get("marco"),town.get("elena"),truth,observed);
                 var c=town.cases.get("case-0001");
                 InvestigationLife.investigate(town,c.id);
                 InvestigationLife.interview(town,c.id,"resident-0002");

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.10.0 — Motives & Opportunity
+
+- Replace one fixed weekly theft check with daytime opportunity windows, influenced by actual co-presence and a reproducible probability roll.
+- Evaluate motive strength from financial hardship, tensions with a particular victim, envy and poor impulse control. The highest-scoring co-present pair is only eligible, never guaranteed to offend.
+- Require at least three people in a public scene, a solvent victim, and cooldowns of three days between cases and ten days between offenses by the same citizen.
+- Record hidden authoritative motive type and strength on new case files, with contemporaneous background categories for all living residents.
+- Add `background <case-id> <resident-id>` after scene inspection and a resident interview. Display only broad incident-time circumstances, not guilt or hidden culprit information.
+- Add additive SQLite columns and a separate `investigation_backgrounds` table, preserving all pre-v1.10 cases, interviews, alibis and existing world state.
+- Update existing incident fixtures to stage specific situations without relying on the deprecated fixed weekly trigger; add motive unit, full-town and JDBC persistence tests.
+- These remain abstract, rule-based wallet thefts. There are no stolen items in a real inventory, no justice standard for accusations, and no complete psychological simulation.
+
 ## 1.9.0 — Evidence & Alibis
 
 - Remove the perfect offender-initials clue from newly generated cases: inspect finds ambiguous fabric and an illegible receipt.

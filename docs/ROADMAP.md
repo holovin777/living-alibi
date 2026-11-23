@@ -56,13 +56,24 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Persist claims and the history of information exchanges to new SQLite tables.
 - **Not implemented:** deliberate deception, mistaken identity, distortion, evidence search or interviews by the detective.
 
+### Evidence & Alibis v1.9 — Detective evidence and witness checking
+
+- Preserve contemporary scene and location evidence, ambiguous physical clues, and interview-dependent corroborated alibis.
+- Legacy events remain historically uncertain rather than having invented snapshots.
+
+### Motives & Opportunity v1.10 — Contextual incidents
+
+- Replace fixed-weekday thefts with probabilistic, time-local incentives and opportunities.
+- Separate secret engine motives from broad detective-accessible background clues.
+- Preserve historical cases through nullable columns and new snapshot tables.
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.
 2. **Dynamic society:** births and migration, shared households, detailed room geometry, and scalable work schedules. General relationships are implemented at a basic level.
-3. **Advanced memory and belief:** basic attributed information exchange is implemented; deception, fading memory, contradictory reports and private motives remain to be developed.
+3. **Advanced memory and belief:** basic attributed information exchange is implemented; deception and simple motive pressure are implemented; fading memory, genuine contradictions, and deep psychological drivers remain to be developed.
 4. **Incidents and evidence:** theft/lost property, alibis, trails, witnesses, event causality, evidence acquisition.
-5. **Playable detective:** interviews, case notebook, deduction, accusations and feedback grounded in world truth.
+5. **Playable detective:** first console interviews, case summaries, background leads, and accusations are implemented; rich deduction tools, travel, case linkage, and fair legal outcomes remain future work.
 6. **Continuous hosting:** headless daemon + eventual optional Godot 3D client.
 
 ## Principles

@@ -20,7 +20,8 @@ public final class InvestigationDatabaseSmokeTest {
                 }
                 var events=new ArrayList<TownLife.Event>();
                 var observations=new ArrayList<TownLife.Observation>();
-                InvestigationLife.tick(town,clock,events,observations);
+                InvestigationLife.recordIncident(town,clock,TownLife.Place.PARK,
+                        town.get("marco"),town.get("elena"),events,observations);
                 var c=town.cases.get("case-0001");
                 InvestigationLife.investigate(town,c.id);
                 InvestigationLife.interview(town,c.id,c.victimId);

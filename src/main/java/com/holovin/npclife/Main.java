@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.9 — Evidence & Alibis");
+            System.out.println("Living Alibi v1.10 — Motives & Opportunity");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -128,6 +128,13 @@ public final class Main {
                         String result=InvestigationLife.checkAlibi(candidate,parts[0],parts[1]);
                         db.save(state,List.of(),List.of(),candidate,List.of(),List.of(),List.of());
                         town.copyFrom(candidate);System.out.println(result);continue;
+                    }
+                    if(lower.startsWith("background ")) {
+                        String[] parts=arg(input).split("\\s+");
+                        if(parts.length!=2)throw new IllegalArgumentException(
+                                "Use background <case-id> <resident-id>.");
+                        System.out.println(InvestigationLife.background(town,parts[0],parts[1]));
+                        continue;
                     }
                     if(lower.startsWith("accuse ")) {
                         String[] parts=arg(input).split("\\s+");
@@ -454,7 +461,8 @@ public final class Main {
         System.out.println(" beliefs <id> [count] | rumors [count] — attributed claims (developer view)");
         System.out.println(" secrets <id> [count] | deceptions [count] — confidential developer diagnostics");
         System.out.println(" cases | case <id> | inspect <id> | interview <resident-id> <case-id>");
-        System.out.println(" check-alibi <case-id> <resident-id> | accuse <case-id> <resident-id>");
+        System.out.println(" check-alibi <case-id> <resident-id> | background <case-id> <resident-id>");
+        System.out.println(" accuse <case-id> <resident-id>");
         System.out.println(" wait 60               — advance 60 game minutes");
         System.out.println(" simulate 7            — simulate seven game days (up to 365)");
         System.out.println(" speed 60              — game minutes per real second in live mode (1,10,60,1440)");

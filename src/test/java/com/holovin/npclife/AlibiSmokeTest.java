@@ -17,7 +17,8 @@ public final class AlibiSmokeTest {
             else p.place=p.home;
             p.destination=p.place;p.travelRemaining=0;p.activity="FREE_TIME";p.money=80;
         }
-        InvestigationLife.tick(town,clock,new ArrayList<>(),new ArrayList<>());
+        InvestigationLife.recordIncident(town,clock,TownLife.Place.PARK,
+                town.get("marco"),town.get("elena"),new ArrayList<>(),new ArrayList<>());
         var c=town.cases.get("case-0001");
         check(c!=null,"case generated");
         check(c.witnesses.size()==3,"only three scene witnesses");
