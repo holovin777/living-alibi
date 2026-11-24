@@ -87,10 +87,14 @@ See [Godot controls](godot/README.md). Requires a running local Spring
 API and an installed Godot 4.6.1 editor.
 
 Repairs also affect the people living in the town: a repaired pump
-supplies a limited park water fountain for residents and the player,
-while functioning streetlights reduce extra outdoor nighttime fatigue.
-Water comes from the existing finite river stock, and the public
-reservoir survives restarts. See [City Utilities](docs/CITY_UTILITIES.md).
+supplies a limited park water fountain for residents and the player.
+Thirsty NPCs can choose to travel there rather than buy water at the
+market, conserving their own money while using finite public stock.
+When streetlights fail, some NPCs avoid the park after dusk; when an
+engineer restores them, their evening park visits return, and extra
+outdoor nighttime fatigue disappears. The water supply is drawn from
+finite river stock, and the reservoir survives restarts.
+See [City Utilities](docs/CITY_UTILITIES.md).
 
 For a new empty world, first build the engine:
 
