@@ -110,8 +110,10 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Persistent hunger, thirst, fatigue and health for the anonymous player.
 - Clock-driven needs continue during walks, waits, live mode and offline replay.
 - `needs` and `rest` console commands; public breaks consume world time.
-- Next: earned or purchased food/water, housing and sleep. Health penalties will
-  wait for a functioning care loop rather than punishing players without options.
+- `sleep [hours]` works in any accessible public area, with an early
+  place-based exposure/health heuristic, persistent visitor mortality and
+  no mandatory property ownership. Next: climate, shelters, medicine and
+  player access to the existing town economy.
 - Details: [Player Daily Life](PLAYER_DAILY_LIFE.md).
 - Early natural-resource slice: finite river/puddle water and wild berries, local
   harvesting and saved depletion ([Natural Resources](NATURAL_RESOURCES.md)).
