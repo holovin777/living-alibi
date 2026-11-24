@@ -157,6 +157,8 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.FreshWorldSmokeTest' exec:exec
+      - name: Test stable seasons across game years
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.CalendarSmokeTest
       - name: Install Java engine so the separate Spring adapter can use it
         run: mvn --batch-mode --no-transfer-progress -DskipTests install
       - name: Build and test Spring Boot Godot API
