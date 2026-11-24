@@ -109,12 +109,16 @@ final class TechnicalWorkLife {
                     town.technicalMaterials.get(o.materialB)-o.requiredB);
         int previous=o.condition;
         o.condition=Math.min(100,o.condition+(o.jobId.equals("engineer")?40:55));
+        if(o.id.equals("water-pump"))UtilityLife.pumpRepaired(town);
         o.phase=Phase.COMPLETED;
         o.completedDay=day;
         town.player.lastTechnicalDay=day;
         town.player.fatigue=Math.min(100,town.player.fatigue+7);
         return "Completed "+o.title+": city infrastructure "+previous+" -> "+
-                o.condition+"/100. Consumed stocked materials. Today's technical shift is now earned.";
+                o.condition+"/100. Consumed stocked materials. Today's technical shift is now earned."+
+                (o.id.equals("water-pump")?
+                    " Park fountain now has "+town.cleanWater+" clean-water unit(s).":
+                    " Better street lighting reduces night fatigue for people outdoors.");
     }
 
     /** Slow wear makes failures reappear; consumable supplies never regenerate for free. */
