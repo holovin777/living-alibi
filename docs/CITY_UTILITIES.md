@@ -22,11 +22,16 @@ score in SQLite.
   boundary, a working pump can move at most **4 additional units** from the
   same finite river supply into the tank. If river stock is low or the pump
   is broken, water is not created or refilled.
-- Residents physically present at the **Park** with low carried drinking
-  water can refill a bottle from the common tank. Each refill consumes one
-  unit and creates a witnessable public event. Other residents still have
-  existing market water purchases; this first model does **not** simulate
-  district-wide household pipe delivery.
+- Generated residents with low drinking-water inventory now make an
+  **autonomous destination choice**. When the repaired fountain has stocked
+  water and they do not need food, they travel to the Park to refill; when
+  it is broken or empty, those who can afford it go to the Market instead.
+  This changes their actual journey, water stock and personal spending,
+  rather than merely displaying the pump condition.
+- Each refill consumes one common water unit and creates a witnessable
+  public event. If the reservoir empties, residents resume their market
+  route instead of pretending free water exists. This first model does
+  **not** simulate district-wide household pipe delivery.
 - Players may use `drink park-fountain` in the Park (5 minutes). This
   reduces thirst by 35, consumes one unit from the same limited tank,
   and fails if the pump is broken, the tank is empty, or the player is
@@ -41,6 +46,12 @@ score in SQLite.
   and 06:00**. Residents safely inside their private homes do **not**
   receive this exposure penalty. The woods remain outside the scope of
   the city's urban lamps.
+- A second, observable behavior is evening destination choice: from 18:00
+  to 20:00, generated residents who would otherwise enjoy the Park prefer
+  a covered Cafe when the street lights are faulty. Elena makes a similar
+  choice. When the engineer fixes the street lights, their preferred park
+  visit resumes. This is a simplified evening safety rule, not a detailed
+  solar/daylight model.
 - Once the engineer completes the upgrade, the additional urban night
   fatigue penalty disappears until ongoing infrastructure wear again
   reduces lighting condition. This is intentionally a mild, fictional
@@ -69,6 +80,10 @@ public fountain as a voluntary alternative to a puddle.
   resident bottle refill events, player use of finite water, river-stock
   conservation, exactly-once daily transfers, and extra nighttime fatigue
   disappearing after a lighting upgrade.
+- `UtilityBehaviorSmokeTest` proves that working public water changes an
+  NPC's destination from market to park, avoids the market expense, and
+  actually consumes finite fountain water; it also verifies NPC leisure
+  choices with repaired or broken lighting.
 - `UtilityDatabaseSmokeTest` starts without a database, reopens several
   times, checks extraction is not duplicated at midnight, and verifies
   a successor after death inherits the same shared municipal water stock.
