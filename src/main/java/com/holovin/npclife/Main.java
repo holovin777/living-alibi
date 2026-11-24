@@ -67,6 +67,13 @@ public final class Main {
                                     "not set":life.privateName()));
                         continue;
                     }
+                    if(lower.equals("weather")) {
+                        var climate=WeatherLife.at(state.day,state.minute);
+                        System.out.println("Year "+CalendarLife.year(state.day)+
+                                " | "+climate.season()+" | "+climate.sky()+
+                                " | "+climate.temperatureC()+" C");
+                        continue;
+                    }
                     if(lower.equals("needs")) {
                         System.out.println(PlayerLife.condition(town.player));
                         continue;
@@ -100,7 +107,7 @@ public final class Main {
                         int hours=lower.equals("sleep")?8:Integer.parseInt(arg(input));
                         var candidate=town.copy();
                         String sleepingPlace=candidate.player.place.label;
-                        var result=PlayerLife.sleep(candidate.player,hours);
+                        var result=PlayerLife.sleep(candidate.player,hours,state.day,state.minute);
                         advanceAndSave(db,state,candidate,result.minutes());
                         town.copyFrom(candidate);
                         System.out.println("You slept for "+hours+" hour(s) at "+
@@ -761,7 +768,7 @@ public final class Main {
     private static void help() {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
-        System.out.println(" explore | me | needs | lives | locations | look | go <place> — visitor presence and history");
+        System.out.println(" explore | me | needs | lives | weather | locations | look | go <place>");
         System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
         System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
         System.out.println(" rest [minutes]        — pause for 15–240 game minutes (default: 60)");
