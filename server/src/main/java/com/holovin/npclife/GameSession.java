@@ -43,11 +43,12 @@ public final class GameSession implements AutoCloseable {
         }
     }
 
-    public record PlayerView(int incarnation,String place,String privateName,
+    public record PlayerView(int incarnation,String place,String placeId,String privateName,
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill) { }
     public record JobView(String id,String title,String workplace,String subject,
                           int requiredSkill,int wage,int remainingPayroll) { }
+    public record DestinationView(String id,String label,int travelMinutes) { }
     public record ResidentView(String id,String name,String activity) { }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
     public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
@@ -58,7 +59,7 @@ public final class GameSession implements AutoCloseable {
 
     public synchronized WorldView snapshot() {
         var p=town.player;
-        var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.privateName,
+        var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.place.name(),p.privateName,
                 p.hunger,p.thirst,p.fatigue,p.health,p.alive,
                 p.money,p.jobId,p.engineeringSkill,p.investigationSkill);
         var residents=PlayerLife.visible(town).stream()
@@ -71,6 +72,13 @@ public final class GameSession implements AutoCloseable {
                 new WeatherView(weather.sky().name(),weather.temperatureC(),
                         weather.raining(),weather.snowing()),
                 player,residents,resources);
+    }
+
+    /** Travel is visible to the client, but distance and time remain Java-owned. */
+    public synchronized List<DestinationView> destinations() {
+        return PlayerLife.publicPlaces().stream()
+                .map(place->new DestinationView(place.name(),place.label,
+                        PlayerLife.travelMinutes(town.player,place))).toList();
     }
 
     public synchronized List<JobView> jobs() {
