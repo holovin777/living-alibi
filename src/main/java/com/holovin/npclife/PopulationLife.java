@@ -28,7 +28,12 @@ final class PopulationLife {
         if(minute%15==0)c.fatigue=clamp(c.fatigue+(sleeping?-3:1));
         boolean workday=(clock.day-1)%7<5;
         boolean sick=EmploymentLife.sick(c,clock.day);
-        boolean working=c.employed && !sick && workday && minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset;
+        // Independent workshops use short real two-hour shifts, not fictitious
+        // wages for eight hours to fabricate one small batch of parts.
+        boolean shopEmployee=BusinessLife.isEmployee(town,c);
+        boolean working=c.employed && !sick && workday &&
+                (shopEmployee?(minute>=660 && minute<840):
+                (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && c.money>=9;
         boolean needWater=c.water<2;
@@ -91,7 +96,8 @@ final class PopulationLife {
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){
-                if(!IndustryLife.payHourly(town,c,clock,events,observations)) {
+                if(!BusinessLife.payHourly(town,c,clock,events,observations) &&
+                        !IndustryLife.payHourly(town,c,clock,events,observations)) {
                     // Existing unrelated occupations retain their original
                     // placeholder wage model until their companies are modeled.
                     c.money+=11;
