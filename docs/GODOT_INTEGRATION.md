@@ -61,7 +61,7 @@ A dedicated, single-authority game session prevents unsynchronized writes.
 
 | Method | Path | JSON body | Response |
 |---|---|---|---|
-| GET | `/api/v1/world` | — | Day, year, season, visitor needs, nearby NPCs, accessible local resources |
+| GET | `/api/v1/world` | — | Day, year, season, weather sky, temperature, visitor needs, nearby NPCs and local resources |
 | GET | `/api/v1/locations` | — | Public destinations |
 | POST | `/api/v1/actions/go` | `{"destination":"RIVER"}` | Action outcome + updated world |
 | POST | `/api/v1/actions/wait` | `{"minutes":60}` | Action outcome + updated world |
@@ -112,11 +112,15 @@ GDScript sprite shader. The authoritative engine determines season, weather,
 resource growth, exposure and NPC consequences. Godot simply displays
 snow/rain and adjusts lighting from that state.
 
-The API already reports `year`, `dayOfYear` and `season` from a
-365-day four-season game calendar. **Weather and temperature are not yet
-simulated**; a season label is not a weather forecast.
+The API reports `year`, `dayOfYear` and `season` from the world
+calendar, plus an authoritative `weather` object: `sky` (`CLEAR`,
+`CLOUDY`, `RAIN`, `SNOW`), `temperatureC`, `raining` and `snowing`.
+It is **fictional, deterministic gameplay climate**, not real weather.
+The Java engine already applies rain to water stocks and cold/snow/rain
+to outdoor sleeping. See [Weather](WEATHER.md).
 
-Next steps: a server-backed Godot scene, weather/temperature snapshots,
-clock subscription or event streaming, visibility-aware NPC snapshots,
-then navigation/animation. Optimize for a reliable first game launch;
+Next steps: a server-backed Godot scene, clock subscription or event
+streaming, visibility-aware NPC snapshots and then navigation/animation.
+Weather should be rendered from the API response, never recomputed
+independently in Godot. Optimize for a reliable first game launch;
 compatibility with disposable pre-release saves is a secondary priority.
