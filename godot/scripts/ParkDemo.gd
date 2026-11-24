@@ -394,6 +394,15 @@ func _render_actions() -> void:
     var player: Dictionary = _last_snapshot.get("player", {})
     var employed := str(player.get("jobId", ""))
     match _current_place:
+        "QUARRY":
+            _action_choices.add_child(_button("Apply: quarry miner",
+                    _apply_job.bind("miner")))
+            if employed == "miner":
+                _action_choices.add_child(_button("Survey western mineral deposit · 2h",
+                        _prospect))
+        "FACTORY":
+            _action_choices.add_child(_button("Apply: factory machinist",
+                    _apply_job.bind("machinist")))
         "MARKET":
             _action_choices.add_child(_button("Apply: market assistant",
                     _apply_job.bind("shop-assistant")))
@@ -432,6 +441,10 @@ func _render_actions() -> void:
     match employed:
         "shop-assistant":
             work_site = "MARKET"
+        "miner":
+            work_site = "QUARRY"
+        "machinist":
+            work_site = "FACTORY"
         "technician":
             work_site = "WORKSHOP"
         "engineer", "investigator":
@@ -474,6 +487,11 @@ func _repair(order_id: String) -> void:
     if _near_kiosk() and not _api.is_busy():
         _action_panel.visible = false
         _api.repair(order_id)
+
+func _prospect() -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.prospect()
 
 func _work() -> void:
     if _near_kiosk() and not _api.is_busy():
@@ -589,8 +607,16 @@ func _on_industry_updated(report: Dictionary) -> void:
         str(report.get("workshopSteel", 0)), str(report.get("workshopCopper", 0)),
         str(report.get("workshopParts", 0))
     ]
-    _jobs.text += "Working now: miners %s, machinists %s" % [
+    _jobs.text += "Working now: miners %s, machinists %s\n" % [
         str(report.get("minersAtWork", 0)), str(report.get("factoryWorkersAtWork", 0))
+    ]
+    _jobs.text += "Freight on truck %s | Scrap %s | West seam surveyed: %s\n" % [
+        str(report.get("oreOnTruck", 0)), str(report.get("scrapRemaining", 0)),
+        str(report.get("westDepositDiscovered", false))
+    ]
+    _jobs.text += "Enterprise budgets: Quarry %s EUR | Factory %s EUR | City %s EUR" % [
+        str(report.get("quarryPayroll", 0)), str(report.get("factoryPayroll", 0)),
+        str(report.get("cityBudget", 0))
     ]
 
 func _on_work_orders_updated(orders: Array) -> void:
