@@ -59,6 +59,45 @@ class GameSessionTest {
     }
 
     @Test
+    void paidTechnicalShiftRequiresRealRepairAndSurvivesRestart() throws Exception {
+        Path file=directory.resolve("technical-game.db");
+        try(var game=new GameSession(file)) {
+            assertEquals("OPEN",game.workOrders().stream()
+                    .filter(o->o.id().equals("water-pump"))
+                    .findFirst().orElseThrow().phase());
+            game.move("school");
+            game.waitMinutes(20); // Day 1 08:00
+            for(int i=0;i<3;i++)game.study("engineering");
+            game.move("workshop");
+            game.applyJob("technician");
+            assertThrows(IllegalArgumentException.class,game::work);
+            game.diagnose("water-pump");
+            var task=game.workOrders().stream()
+                    .filter(o->o.id().equals("water-pump"))
+                    .findFirst().orElseThrow();
+            assertEquals("INSPECTED",task.phase());
+            var finished=game.repair("water-pump");
+            assertTrue(finished.message().contains("45 -> 100"));
+            assertEquals(100,game.workOrders().stream()
+                    .filter(o->o.id().equals("water-pump"))
+                    .findFirst().orElseThrow().condition());
+            assertEquals(20,game.snapshot().player().money());
+            var paid=game.work();
+            assertEquals(58,paid.world().player().money());
+            assertThrows(IllegalArgumentException.class,()->game.repair("water-pump"));
+        }
+        try(var reopened=new GameSession(file)) {
+            assertEquals(58,reopened.snapshot().player().money());
+            var task=reopened.workOrders().stream()
+                    .filter(o->o.id().equals("water-pump"))
+                    .findFirst().orElseThrow();
+            assertEquals(100,task.condition());
+            assertEquals("COMPLETED",task.phase());
+            assertThrows(IllegalArgumentException.class,reopened::work);
+        }
+    }
+
+    @Test
     void newWorldActionsAndRestart() throws Exception {
         Path file=directory.resolve("fresh-world.db");
         try(var game=new GameSession(file)) {
