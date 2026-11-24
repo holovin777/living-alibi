@@ -14,7 +14,8 @@ final class TownLife {
         MARKET("Market"), PARK("Park"), CAFE("Cafe"),
         NORTH_RESIDENCES("North residences"), SOUTH_RESIDENCES("South residences"),
         OFFICE("Office"), CLINIC("Clinic"), SCHOOL("School"),
-        WORKSHOP("Workshop"), LIBRARY("Library");
+        WORKSHOP("Workshop"), LIBRARY("Library"),
+        RIVER("River"), WOODS("Woods");
         final String label;
         Place(String label) { this.label=label; }
     }
@@ -90,6 +91,7 @@ final class TownLife {
     static final class Town {
         final Map<String,Citizen> people=new LinkedHashMap<>();
         PlayerLife.Player player=new PlayerLife.Player();
+        final Map<String,NatureLife.Source> naturalResources=new LinkedHashMap<>();
         boolean together;
         long meetingSinceTick=-1;
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
@@ -123,6 +125,8 @@ final class TownLife {
             t.relationship=relationship.copy();
             for(var e:peerRelationships.entrySet())t.peerRelationships.put(e.getKey(),e.getValue().copy());
             for(var e:people.entrySet())t.people.put(e.getKey(),e.getValue().copy());
+            for(var e:naturalResources.entrySet())
+                t.naturalResources.put(e.getKey(),e.getValue().copy());
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
             for(var e:secrets.entrySet())t.secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
@@ -138,6 +142,9 @@ final class TownLife {
         void copyFrom(Town other) {
             people.clear();for(var e:other.people.entrySet())people.put(e.getKey(),e.getValue().copy());
             player=other.player.copy();
+            naturalResources.clear();
+            for(var e:other.naturalResources.entrySet())
+                naturalResources.put(e.getKey(),e.getValue().copy());
             together=other.together;meetingSinceTick=other.meetingSinceTick;
             relationship=other.relationship.copy();
             peerRelationships.clear();
@@ -177,6 +184,7 @@ final class TownLife {
         t.people.put("elena",new Citizen("elena","Elena Rossi","Shopkeeper",desiredElena(marco.day,marco.minute)));
         t.get("elena").home=Place.ELENA_HOME;t.get("elena").workplace=Place.MARKET;
         t.get("elena").activity="WORKING";
+        NatureLife.ensureSources(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -188,6 +196,7 @@ final class TownLife {
     static void tick(Town town,WorldState marco,List<Event> truth,List<Observation> observations,
                      List<SocialLife.Interaction> interactions) {
         PlayerLife.tick(town.player,marco.minute);
+        NatureLife.tick(town,marco.minute);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;
