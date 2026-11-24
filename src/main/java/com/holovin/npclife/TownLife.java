@@ -96,6 +96,8 @@ final class TownLife {
         final Map<String,Integer> employerFunds=new LinkedHashMap<>();
         final Map<String,Integer> technicalMaterials=new LinkedHashMap<>();
         final Map<String,TechnicalWorkLife.Order> technicalOrders=new LinkedHashMap<>();
+        int cleanWater;
+        int lastWaterPumpDay;
         boolean together;
         long meetingSinceTick=-1;
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
@@ -136,6 +138,7 @@ final class TownLife {
             t.technicalMaterials.putAll(technicalMaterials);
             for(var e:technicalOrders.entrySet())
                 t.technicalOrders.put(e.getKey(),e.getValue().copy());
+            t.cleanWater=cleanWater;t.lastWaterPumpDay=lastWaterPumpDay;
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
             for(var e:secrets.entrySet())t.secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
@@ -160,6 +163,7 @@ final class TownLife {
             technicalOrders.clear();
             for(var e:other.technicalOrders.entrySet())
                 technicalOrders.put(e.getKey(),e.getValue().copy());
+            cleanWater=other.cleanWater;lastWaterPumpDay=other.lastWaterPumpDay;
             naturalResources.clear();
             for(var e:other.naturalResources.entrySet())
                 naturalResources.put(e.getKey(),e.getValue().copy());
@@ -234,6 +238,7 @@ final class TownLife {
         EconomyLife.tick(town,marco,truth,observations);
         PropertyLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);
+        UtilityLife.tick(town,marco,truth,observations);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {
             town.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
