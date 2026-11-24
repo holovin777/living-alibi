@@ -187,7 +187,7 @@ final class TownLife {
     }
     static void tick(Town town,WorldState marco,List<Event> truth,List<Observation> observations,
                      List<SocialLife.Interaction> interactions) {
-        PlayerLife.tick(town.player);
+        PlayerLife.tick(town.player,marco.minute);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;
