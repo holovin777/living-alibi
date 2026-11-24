@@ -14,8 +14,9 @@ gather wild berries. A mortality event creates a **new visitor in the same
 continuous city**, without resetting NPCs, resources, or historic cases.
 
 A deterministic **four-season calendar** (spring, summer, autumn, winter)
-is now derived from the authoritative day count. Weather, temperature and
-seasonal growth will follow in later increments.
+now drives fictional weather, temperature, seasonal berry growth, rain-fed
+puddles and the health consequences of sleeping outdoors. Weather changes
+are calculated from game time and require no separate weather database.
 
 An optional **Spring Boot 4.2 API** is available under `server/` as the
 first bridge to Godot. The standalone Java simulation and console remain
@@ -23,8 +24,9 @@ independent of Spring. The backend exposes world snapshots and accepts
 validated player actions over versioned REST/JSON endpoints.
 
 See [Godot / Spring integration](docs/GODOT_INTEGRATION.md),
-[Player Daily Life](docs/PLAYER_DAILY_LIFE.md) and
-[Natural Resources](docs/NATURAL_RESOURCES.md). The sample GDScript
+[Player Daily Life](docs/PLAYER_DAILY_LIFE.md),
+[Natural Resources](docs/NATURAL_RESOURCES.md) and
+[Weather](docs/WEATHER.md). The sample GDScript
 client is [`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd).
 
 For a new empty world, first build the engine:
