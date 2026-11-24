@@ -155,6 +155,67 @@ public final class Main {
                         System.out.println(PlayerLife.condition(town.player));
                         continue;
                     }
+                    if(lower.equals("business")) {
+                        var status=BusinessLife.status(town,state.day);
+                        System.out.println("Independent workshop: "+
+                                (status.registered()?"REGISTERED":"NOT YET OPEN"));
+                        System.out.println("Owner: visitor #"+status.ownerIncarnation()+
+                                " | yours: "+status.yours()+" | company cash EUR "+
+                                status.cash()+" | machine: "+status.machine());
+                        System.out.println("Worker: "+status.employeeName()+
+                                " | spare parts: "+status.spareParts()+
+                                " | paid hours today: "+status.paidHoursToday());
+                        System.out.println("Go to Workshop to register, invest, buy a machine and hire.");
+                        continue;
+                    }
+                    if(lower.equals("business candidates")) {
+                        for(var c:BusinessLife.candidates(town,state.day))
+                            System.out.println("  "+c.id+" | "+c.name+" | "+c.occupation);
+                        continue;
+                    }
+                    if(lower.equals("business open")) {
+                        var candidate=town.copy();
+                        String result=BusinessLife.open(candidate);
+                        advanceAndSave(db,state,candidate,15);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.startsWith("business invest ")) {
+                        var candidate=town.copy();
+                        int amount=Integer.parseInt(input.substring("business invest ".length()).strip());
+                        String result=BusinessLife.invest(candidate,amount);
+                        advanceAndSave(db,state,candidate,5);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.equals("business machine")) {
+                        var candidate=town.copy();
+                        String result=BusinessLife.machine(candidate);
+                        advanceAndSave(db,state,candidate,30);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.startsWith("business hire ")) {
+                        var candidate=town.copy();
+                        String id=input.substring("business hire ".length()).strip();
+                        String result=BusinessLife.hire(candidate,id,state.day);
+                        advanceAndSave(db,state,candidate,15);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.startsWith("business withdraw ")) {
+                        var candidate=town.copy();
+                        int amount=Integer.parseInt(input.substring("business withdraw ".length()).strip());
+                        String result=BusinessLife.withdraw(candidate,amount);
+                        advanceAndSave(db,state,candidate,5);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
                     if(lower.equals("industry")) {
                         var r=IndustryLife.report(town);
                         System.out.println("QUARRY deposits: iron "+r.ironRemaining()+
@@ -885,6 +946,9 @@ public final class Main {
         System.out.println(" jobs | apply <job-id>   — find work voluntarily at the listed workplace");
         System.out.println(" work                    — paid two-hour shift, once daily (08:00–18:00)");
         System.out.println(" industry | utilities — public natural resources, firms and services");
+        System.out.println(" business | business candidates — manage your local fabrication company");
+        System.out.println(" business open | business invest <EUR> | business machine");
+        System.out.println(" business hire <resident-id> | business withdraw <EUR>");
         System.out.println(" prospect — employed quarry miner can fund a two-hour geological survey");
         System.out.println(" work-orders | diagnose <order-id> | repair <order-id> — city infrastructure tasks");
         System.out.println(" technicians and engineers must finish a technical task before paid work");
