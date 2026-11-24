@@ -9,21 +9,22 @@ animal or player harvesting must use these same conserved stocks.
 
 Source quantities are **accessible harvest units**. For a flowing river
 they model currently obtainable usable water, not every liter in the river.
-They are intentionally simple abstractions until weather, catchments,
-seasons and hydrology are simulated.
+They are intentionally simple abstractions. The first rain/season rules now
+exist, but catchments, soil moisture and detailed hydrology do not.
 
 ## Playable sources
 
 | Source ID | Place | Initial stock | Daily recovery | Gameplay |
 |---|---|---:|---:|---|
 | `river-water` | river | 120 | 40 (max 120) | Drink 1 unit; 10% simulated immediate health risk |
-| `puddle-water` | park | 5 | 0 | Drink 1 unit; 50% simulated immediate health risk |
-| `wild-berries` | woods | 16 | 2 (max 16) | Forage and eat 1 unit |
+| `puddle-water` | park | 5 | +3 on rainy day transitions | Drink 1 unit; 50% simulated immediate health risk |
+| `wild-berries` | woods | 16 | spring +2, summer +3, autumn +1, winter 0 | Forage and eat 1 unit |
 
 These are game-balancing probabilities, not public-health data or clinical
 estimates. Untreated water from a river may contain contaminants even if
-no immediate penalty occurs. Puddles will only refill once rainfall has an
-actual weather mechanic; they do not refill magically every day.
+no immediate penalty occurs. Puddles only refill when the deterministic daily
+weather is rainy, and never magically on clear days. Snow does not immediately
+count as liquid water. See [Weather](WEATHER.md).
 
 Commands:
 ```text
@@ -57,9 +58,10 @@ No resource collection shares the player's private identity.
 1. **Sleep anywhere (first slice implemented):** public parks, riverbanks,
    woods and streets are possible sleeping places. A location-dependent
    exposure heuristic already affects health and can cause visitor death
-   over repeated risky nights. No forced property ownership. Future weather,
-   proper shelters, clothing, illness, climate and seasonal effects should
-   replace this intentionally simple prototype.
+   over repeated risky nights. The new deterministic climate adds cold, rain
+   and snow risk during each exposed sleeping hour. No forced property
+   ownership. Future shelters, clothing, illness and realistic exposure
+   should replace this intentionally simple prototype.
 2. **Ecology:** animals with births/deaths, plants with seasons and growth,
    rainfall, rivers, soil, extractable stone and wood, harvesting labor,
    spoilage and actual material conservation.
