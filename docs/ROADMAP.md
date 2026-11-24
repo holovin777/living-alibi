@@ -103,6 +103,17 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Future: NPCs independently notice and approach visitors, fuller player life simulation,
   deeper contact memory, real anonymity-respecting dialogues, and a Godot visual client.
 
+## In progress
+
+### Player Daily Life v1.16 — Physical condition and short rest
+
+- Persistent hunger, thirst, fatigue and health for the anonymous player.
+- Clock-driven needs continue during walks, waits, live mode and offline replay.
+- `needs` and `rest` console commands; public breaks consume world time.
+- Next: earned or purchased food/water, housing and sleep. Health penalties will
+  wait for a functioning care loop rather than punishing players without options.
+- Details: [Player Daily Life](PLAYER_DAILY_LIFE.md).
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.
