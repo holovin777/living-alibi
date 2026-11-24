@@ -63,7 +63,8 @@ A dedicated, single-authority game session prevents unsynchronized writes.
 |---|---|---|---|
 | GET | `/api/v1/world` | — | Day, year, season, weather sky, temperature, visitor needs, nearby NPCs and local resources |
 | GET | `/api/v1/utilities` | — | Pump state, finite clean-water tank and street-lighting condition |
-| GET | `/api/v1/industry` | — | Finite quarry deposits, factory cargo, spare parts, NPC workers on shift |
+| GET | `/api/v1/industry` | — | Finite deposits, paid firms, truck inventory, factory scrap and salvage |
+| POST | `/api/v1/actions/prospect` | `{}` | Employed quarry miner pays for one finite western geological discovery |
 | POST | `/api/v1/actions/drink` | `{"sourceId":"park-fountain"}` | Spend one clean-water unit if the park pump works |
 | GET | `/api/v1/locations` | — | Public destinations with stable IDs and Java-computed travel minutes |
 | GET | `/api/v1/jobs` | — | Optional vacancies, qualifications and remaining employer payroll |
