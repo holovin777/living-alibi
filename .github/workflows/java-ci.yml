@@ -19,6 +19,10 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      - name: Validate one-command Linux game launcher
+        run: |
+          bash -n play.sh
+          bash play.sh --help | grep -q 'bash play.sh'
       - name: Compile sources and tests
         run: mvn --batch-mode --no-transfer-progress test-compile
       - name: Test Marco life simulation
