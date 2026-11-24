@@ -91,6 +91,7 @@ final class TownLife {
     static final class Town {
         final Map<String,Citizen> people=new LinkedHashMap<>();
         PlayerLife.Player player=new PlayerLife.Player();
+        BusinessLife.Shop business=new BusinessLife.Shop();
         final Map<Integer,PlayerLife.LifeRecord> pastLives=new LinkedHashMap<>();
         final Map<String,NatureLife.Source> naturalResources=new LinkedHashMap<>();
         final Map<String,Integer> employerFunds=new LinkedHashMap<>();
@@ -142,6 +143,7 @@ final class TownLife {
             t.technicalMaterials.putAll(technicalMaterials);
             for(var e:technicalOrders.entrySet())
                 t.technicalOrders.put(e.getKey(),e.getValue().copy());
+            t.business=business.copy();
             t.industryStocks.putAll(industryStocks);
             t.lastIndustryExtractDay=lastIndustryExtractDay;
             t.lastIndustryTransportDay=lastIndustryTransportDay;
@@ -175,6 +177,7 @@ final class TownLife {
             technicalOrders.clear();
             for(var e:other.technicalOrders.entrySet())
                 technicalOrders.put(e.getKey(),e.getValue().copy());
+            business=other.business.copy();
             industryStocks.clear();industryStocks.putAll(other.industryStocks);
             lastIndustryExtractDay=other.lastIndustryExtractDay;
             lastIndustryTransportDay=other.lastIndustryTransportDay;
@@ -228,6 +231,7 @@ final class TownLife {
         t.get("elena").activity="WORKING";
         NatureLife.ensureSources(t);
         CareerLife.ensureEmployers(t);
+        BusinessLife.ensure(t);
         TechnicalWorkLife.ensure(t);
         IndustryLife.ensure(t);
         t.together=initial==t.get("elena").place;
@@ -257,6 +261,7 @@ final class TownLife {
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
         IndustryLife.tick(town,marco,truth,observations);
+        BusinessLife.tick(town,marco,truth,observations);
         EconomyLife.tick(town,marco,truth,observations);
         PropertyLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);
