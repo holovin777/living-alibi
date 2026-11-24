@@ -192,7 +192,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _environment.background_color = Color(0.63, 0.80, 0.96)
 
 func _on_job_offers_updated(offers: Array) -> void:
-    var lines: Array[String] = ["Job board (apply at the actual workplace):"]
+    var lines := PackedStringArray(["Job board (apply at the actual workplace):"])
     for offer in offers:
         lines.append("%s — %s EUR/shift, skill %s %s" % [
             str(offer.get("title", "?")), str(offer.get("wage", 0)),
