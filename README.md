@@ -86,6 +86,12 @@ these actions and time costs before Godot changes districts.
 See [Godot controls](godot/README.md). Requires a running local Spring
 API and an installed Godot 4.6.1 editor.
 
+Repairs also affect the people living in the town: a repaired pump
+supplies a limited park water fountain for residents and the player,
+while functioning streetlights reduce extra outdoor nighttime fatigue.
+Water comes from the existing finite river stock, and the public
+reservoir survives restarts. See [City Utilities](docs/CITY_UTILITIES.md).
+
 For a new empty world, first build the engine:
 
 ```bash
