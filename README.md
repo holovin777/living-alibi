@@ -30,9 +30,14 @@ See [Godot / Spring integration](docs/GODOT_INTEGRATION.md),
 [Natural Resources](docs/NATURAL_RESOURCES.md) and
 [Weather](docs/WEATHER.md) and
 [Careers](docs/PLAYER_CAREERS.md). The GDScript client is
-[`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd) and the
-first visual park scene starts at [`godot/project.godot`](godot/project.godot)
-(requires an installed Godot 4 editor, plus the running local Java API).
+[`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd). A first
+connected 3D town preview starts from [`godot/project.godot`](godot/project.godot):
+walk within a district using WASD, press E at the yellow travel gate to
+visit market/school/workshop/office, and press F at a blue kiosk to
+apply for work, study or collect a local resource. The Java server validates
+these actions and time costs before Godot changes districts.
+See [Godot controls](godot/README.md). Requires a running local Spring
+API and an installed Godot 4.6.1 editor.
 
 For a new empty world, first build the engine:
 
