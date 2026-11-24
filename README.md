@@ -74,9 +74,13 @@ See [Godot / Spring integration](docs/GODOT_INTEGRATION.md),
 [Natural Resources](docs/NATURAL_RESOURCES.md) and
 [Weather](docs/WEATHER.md) and
 [Careers](docs/PLAYER_CAREERS.md) and
-[Technical Work](docs/TECHNICAL_WORK.md). Trained technicians and engineers
+[Technical Work](docs/TECHNICAL_WORK.md) and
+[Industry](docs/INDUSTRY.md). Trained technicians and engineers
 now inspect and fix real persistent equipment using finite material stocks
-before receiving a technical wage. The GDScript client is
+before receiving a technical wage. Working NPC miners and factory machinists
+extract finite iron/copper ore, refine it and deliver new parts to the
+shared maintenance warehouse. Production and inventory persist across
+restarts without duplicating supplies. The GDScript client is
 [`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd). A first
 connected 3D town preview starts from [`godot/project.godot`](godot/project.godot):
 walk within a district using WASD, press E at the yellow travel gate to
