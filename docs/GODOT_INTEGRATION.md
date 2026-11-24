@@ -63,6 +63,10 @@ A dedicated, single-authority game session prevents unsynchronized writes.
 |---|---|---|---|
 | GET | `/api/v1/world` | — | Day, year, season, weather sky, temperature, visitor needs, nearby NPCs and local resources |
 | GET | `/api/v1/locations` | — | Public destinations |
+| GET | `/api/v1/jobs` | — | Optional vacancies, qualifications and remaining employer payroll |
+| POST | `/api/v1/actions/apply` | `{"jobId":"shop-assistant"}` | Apply at actual workplace |
+| POST | `/api/v1/actions/study` | `{"subject":"engineering"}` | One-hour paid class (School / Library) |
+| POST | `/api/v1/actions/work` | `{}` | One paid two-hour shift if qualified and funded |
 | POST | `/api/v1/actions/go` | `{"destination":"RIVER"}` | Action outcome + updated world |
 | POST | `/api/v1/actions/wait` | `{"minutes":60}` | Action outcome + updated world |
 | POST | `/api/v1/actions/rest` | `{"minutes":60}` | Action outcome + updated world |
@@ -85,13 +89,29 @@ inventory or NPC knowledge; it accepts *intent* and validates action rules
 using the same engine as the console. Each action is serialized, simulated,
 and saved transactionally before a JSON response is sent.
 
-## Godot starter client
+## Godot starter project — visible park
 
-A small `HTTPRequest`-based GDScript example is in
-[`godot/examples/WorldApi.gd`](../godot/examples/WorldApi.gd).
-Attach it to a Node; the script emits `world_updated` when the server
-returns its state. The client must run on the same computer as the server
-for the default localhost URL.
+A minimal Godot 4 project now lives in [`godot/`](../godot/project.godot).
+Open **`godot/project.godot`** in the Godot 4 editor and run it.
+The `scenes/park.tscn` scene creates a placeholder visitor in a green park
+with a walking path, trees, a bench, a camera, an on-screen wallet/career
+display and a **Find jobs** button. WASD/arrow keys move the visual avatar
+**only within the park preview**. This local movement is *not yet a
+server-authoritative world position or full 3D navigation*; movement between
+abstract town locations still uses the Java game actions.
+
+The project communicates with the local Spring API using
+[`godot/examples/WorldApi.gd`](../godot/examples/WorldApi.gd). The script
+emits `world_updated` for state and `job_offers_updated` for vacancies.
+A missing server leaves the preview visible and shows a connection error.
+The server must currently run on the same machine, on localhost port 8080.
+
+The Java and Spring tests are automated in GitHub Actions; **Godot 4 editor
+scene import/runtime is not yet part of CI**, so this graphical scene is
+an unverified visual prototype rather than a polished game release.
+
+The player is not automatically a detective. See
+[Careers](PLAYER_CAREERS.md) for jobs, engineering and investigation training.
 
 ## Security and offline considerations
 
@@ -119,8 +139,9 @@ It is **fictional, deterministic gameplay climate**, not real weather.
 The Java engine already applies rain to water stocks and cold/snow/rain
 to outdoor sleeping. See [Weather](WEATHER.md).
 
-Next steps: a server-backed Godot scene, clock subscription or event
-streaming, visibility-aware NPC snapshots and then navigation/animation.
+Next steps: validate and iterate on the first Godot park scene, add
+server-authoritative navigation between real scene coordinates, clock
+subscription or event streaming, visible NPCs and character animations.
 Weather should be rendered from the API response, never recomputed
 independently in Godot. Optimize for a reliable first game launch;
 compatibility with disposable pre-release saves is a secondary priority.
