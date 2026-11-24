@@ -41,6 +41,9 @@ error appears.
   Market offers shop-assistant jobs; Workshop offers technician jobs;
   Office offers engineer or private investigator positions; School
   offers engineering lessons; Library offers investigation lessons.
+  A qualified employee can **inspect** the workshop pump or an office
+  lighting project, then **repair / implement** it with real stocked
+  materials. Technical wages require one completed task that day.
   The parked visitor can drink puddle water, the river visitor can
   drink untreated river water, and the woods visitor can forage berries.
   All choices can fail if time, location, skill, money or resource
@@ -53,7 +56,10 @@ Example optional life path: walk to the yellow gate and travel to
 Market (10 game minutes from Park); walk to the blue kiosk and apply
 for the shop-assistant job; work during business hours and earn money;
 travel to School and study engineering, then to Workshop to apply
-for a more technical role.
+for a more technical role. Once qualified and employed, inspect the
+`water-pump` at the workshop kiosk, repair it using two spare parts,
+then collect an earned technical wage. The Java engine keeps the
+infrastructure condition and material inventory in SQLite.
 
 ## Boundaries
 
