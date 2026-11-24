@@ -122,6 +122,21 @@ The eventual game is an emergent detective simulation. The player investigates e
   harvesting and saved depletion ([Natural Resources](NATURAL_RESOURCES.md)).
   Shared NPC extraction, wildlife, shelter and enterprises remain future work.
 
+### Player freedom: jobs, education and careers (v1.16 draft)
+
+- New anonymous visitor starts **in the park with 50 EUR** and no occupation,
+  criminal case, detective status or preassigned mission.
+- `jobs`, `apply <job>`, `work`, `study engineering`,
+  `study investigation`, and `career` form the first voluntary career loop.
+- Shop assistant, workshop technician, junior engineer and private investigator
+  have workplace, qualification and bounded salary requirements. Education
+  costs tuition and takes actual world time; wages draw from finite institutional
+  accounts persisted in SQLite. This is an initial employer-budget model,
+  not yet the full NPC business economy.
+- A successor visitor never inherits an old career, money or qualifications.
+- Spring API adds job listings and matching voluntary player actions.
+- See [Player Careers](PLAYER_CAREERS.md).
+
 ### New world calendar and Godot API bridge (v1.16 draft)
 
 - Four recurring seasons follow the authoritative 365-day Java clock,
@@ -136,8 +151,10 @@ The eventual game is an emergent detective simulation. The player investigates e
   simulation and SQLite storage. `GET /api/v1/world` exposes time, season,
   weather and temperature, nearby NPCs, resources and visitor condition. Commands
   over HTTP validate movement, rest, sleep, drinking, gathering and waiting.
-- An example Godot 4 `HTTPRequest` adapter is available; a rendered Godot
-  game world and real-time multiplayer synchronization are not implemented.
+- A minimal Godot 4 **3D park preview** now has a placeholder person,
+  trees, bench, WASD controls, a wallet/career display and live job listings
+  through the HTTP adapter. The visual scene is not yet verified in Godot CI;
+  navigation across the real world map and multiplayer are not implemented.
 - Details: [Godot / Spring Boot integration](GODOT_INTEGRATION.md).
 
 ## Proposed, not implemented
