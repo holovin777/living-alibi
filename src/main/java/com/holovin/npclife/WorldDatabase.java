@@ -73,7 +73,8 @@ final class WorldDatabase implements AutoCloseable {
                         hunger INTEGER NOT NULL DEFAULT 0,
                         thirst INTEGER NOT NULL DEFAULT 0,
                         fatigue INTEGER NOT NULL DEFAULT 0,
-                        health INTEGER NOT NULL DEFAULT 100)
+                        health INTEGER NOT NULL DEFAULT 100,
+                        alive INTEGER NOT NULL DEFAULT 1)
                     """);
             st.execute("""
                     CREATE TABLE IF NOT EXISTS player_contacts (
@@ -94,6 +95,7 @@ final class WorldDatabase implements AutoCloseable {
         playerColumns.put("thirst","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("fatigue","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("health","INTEGER NOT NULL DEFAULT 100");
+        playerColumns.put("alive","INTEGER NOT NULL DEFAULT 1");
 
         for(var col:playerColumns.entrySet()) {
             if(!columnExists("player_state",col.getKey())) {
@@ -729,6 +731,7 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.thirst=rs.getInt("thirst");
                 town.player.fatigue=rs.getInt("fatigue");
                 town.player.health=rs.getInt("health");
+                town.player.alive=rs.getInt("alive")!=0;
             }
         }
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_contacts")) {
@@ -764,12 +767,13 @@ final class WorldDatabase implements AutoCloseable {
     private void persistPlayer(PlayerLife.Player player) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
                 INSERT INTO player_state(id,place,destination,travel_remaining,private_name,
-                                         hunger,thirst,fatigue,health)
-                VALUES(1,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                                         hunger,thirst,fatigue,health,alive)
+                VALUES(1,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,private_name=excluded.private_name,
                 hunger=excluded.hunger,thirst=excluded.thirst,
-                fatigue=excluded.fatigue,health=excluded.health
+                fatigue=excluded.fatigue,health=excluded.health,
+                alive=excluded.alive
                 """)) {
             p.setString(1,player.place.name());
             p.setString(2,player.destination.name());
@@ -779,6 +783,7 @@ final class WorldDatabase implements AutoCloseable {
             p.setInt(6,player.thirst);
             p.setInt(7,player.fatigue);
             p.setInt(8,player.health);
+            p.setInt(9,player.alive?1:0);
             p.executeUpdate();
         }
         try(PreparedStatement p=db.prepareStatement("""
