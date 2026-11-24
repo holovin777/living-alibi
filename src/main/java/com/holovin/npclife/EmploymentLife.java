@@ -43,13 +43,18 @@ final class EmploymentLife {
             // they still earn wages. Former industrial workers can search the
             // wider local job market instead of starving in an unpaid post.
             String industryAccount=IndustryLife.companyFor(p.occupation);
-            if(p.employed && industryAccount!=null &&
-                    town.employerFunds.getOrDefault(industryAccount,0)<IndustryLife.HOURLY_WAGE) {
+            boolean workshopEmployee=BusinessLife.isEmployee(town,p);
+            boolean insolventWorkshop=workshopEmployee &&
+                    town.business.cash<BusinessLife.HOURLY_WAGE;
+            if(p.employed && ((industryAccount!=null &&
+                    town.employerFunds.getOrDefault(industryAccount,0)<IndustryLife.HOURLY_WAGE) ||
+                    insolventWorkshop)) {
                 loseJob(town,clock,p);
             }
             if(!p.employed) {
                 p.unemploymentDays++;
-                if(industryAccount!=null && p.unemploymentDays>=2) {
+                if((industryAccount!=null || workshopEmployee) &&
+                        p.unemploymentDays>=2) {
                     // Simplified emergency placement after a factory closure:
                     // the old industrial career and physical production end.
                     hire(town,clock,p,roll(p,clock.day,0xC2L,JOBS.length));
