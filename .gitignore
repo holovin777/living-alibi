@@ -1,5 +1,7 @@
 # Build output
 /target/
+/server/target/
+/godot/.godot/
 *.class
 
 # Local game state and conversation history
