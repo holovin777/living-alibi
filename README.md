@@ -1,10 +1,43 @@
 # Living Alibi
 
-**v1.15 — Anonymous Visitor** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.16 — Living Visitor (draft)** · Java 21+ · Maven · SQLite · console + optional Spring Boot API
 
 > A living town where you can be an unknown visitor, build relationships, or investigate when you choose.
 
 Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player can now roam anonymously in public places; detective cases are optional. There is no 3D world yet.** Code, documentation, and game text are English-only.
+
+## New in v1.16 (draft)
+
+The game still launches **from an empty SQLite file**. A new visitor is anonymous,
+can roam, rest, sleep in public places, drink from finite natural sources and
+gather wild berries. A mortality event creates a **new visitor in the same
+continuous city**, without resetting NPCs, resources, or historic cases.
+
+A deterministic **four-season calendar** (spring, summer, autumn, winter)
+is now derived from the authoritative day count. Weather, temperature and
+seasonal growth will follow in later increments.
+
+An optional **Spring Boot 4.2 API** is available under `server/` as the
+first bridge to Godot. The standalone Java simulation and console remain
+independent of Spring. The backend exposes world snapshots and accepts
+validated player actions over versioned REST/JSON endpoints.
+
+See [Godot / Spring integration](docs/GODOT_INTEGRATION.md),
+[Player Daily Life](docs/PLAYER_DAILY_LIFE.md) and
+[Natural Resources](docs/NATURAL_RESOURCES.md). The sample GDScript
+client is [`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd).
+
+For a new empty world, first build the engine:
+
+```bash
+mvn -q clean test-compile
+mvn -q -DskipTests install
+mvn -f server/pom.xml spring-boot:run
+```
+
+The local API is available at `http://127.0.0.1:8080/api/v1/world`.
+It requires no previous save. Do not run the console and Spring server
+against the same SQLite database simultaneously.
 
 ## Implemented
 
