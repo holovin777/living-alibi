@@ -147,6 +147,16 @@ public final class Main {
                         System.out.println(PlayerLife.condition(town.player));
                         continue;
                     }
+                    if(lower.equals("utilities")) {
+                        var utilities=UtilityLife.status(town);
+                        System.out.println("Park water pump: "+utilities.pumpCondition()+"/100 | fountain "+
+                                (utilities.fountainWorking()?"WORKING":"CLOSED"));
+                        System.out.println("Clean water stored: "+utilities.cleanWater()+"/"+
+                                utilities.cleanWaterCapacity()+" units");
+                        System.out.println("Street lights: "+utilities.lightingCondition()+"/100 | "+
+                                (utilities.lightsWorking()?"LIT":"DARK at night"));
+                        continue;
+                    }
                     if(lower.equals("sources")) {
                         var available=NatureLife.available(town);
                         System.out.println("Natural resources at "+PlayerLife.position(town.player)+":");
@@ -158,7 +168,11 @@ public final class Main {
                     }
                     if(lower.startsWith("drink ")) {
                         var candidate=town.copy();
-                        String result=NatureLife.drink(candidate,arg(input),state.day,state.minute);
+                        String source=arg(input);
+                        String result=(source.equalsIgnoreCase("park-fountain")||
+                                source.equalsIgnoreCase("fountain"))
+                                ? UtilityLife.drinkAtFountain(candidate)
+                                : NatureLife.drink(candidate,source,state.day,state.minute);
                         advanceAndSave(db,state,candidate,5);
                         town.copyFrom(candidate);
                         System.out.println(result+" "+PlayerLife.condition(town.player));
@@ -848,6 +862,8 @@ public final class Main {
         System.out.println(" rest [minutes]        — pause for 15–240 game minutes (default: 60)");
         System.out.println(" sleep [hours]         — sleep anywhere for 1–12 hours (default: 8), with exposure risks");
         System.out.println(" sources               — inspect finite resources at your location");
+        System.out.println(" utilities             — check park pump, water supply and street lights");
+        System.out.println(" drink park-fountain    — use limited clean water if the pump works (5 min)");
         System.out.println(" drink <source-id>     — drink local water (5 min; unsafe water can harm health)");
         System.out.println(" forage <source-id>    — gather local wild food (15 min)");
         System.out.println(" town | population [count] | population generate 12 | resident resident-0001");
