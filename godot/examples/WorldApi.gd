@@ -3,6 +3,7 @@ extends Node
 ## Attach to a Node and connect to world_updated to render the scene.
 
 signal world_updated(snapshot: Dictionary)
+signal job_offers_updated(jobs: Array)
 signal request_failed(message: String)
 
 const BASE_URL := "http://127.0.0.1:8080/api/v1"
@@ -15,6 +16,18 @@ func _ready() -> void:
 
 func refresh_world() -> void:
     _send("/world", HTTPClient.METHOD_GET, {})
+
+func list_jobs() -> void:
+    _send("/jobs", HTTPClient.METHOD_GET, {})
+
+func apply_for_job(job_id: String) -> void:
+    _send("/actions/apply", HTTPClient.METHOD_POST, {"jobId": job_id})
+
+func study_subject(subject: String) -> void:
+    _send("/actions/study", HTTPClient.METHOD_POST, {"subject": subject})
+
+func work_shift() -> void:
+    _send("/actions/work", HTTPClient.METHOD_POST, {})
 
 func go_to(destination: String) -> void:
     _send("/actions/go", HTTPClient.METHOD_POST, {"destination": destination})
@@ -43,6 +56,9 @@ func _on_request_completed(
         request_failed.emit("Connection failed: %s" % result)
         return
     var response = JSON.parse_string(body.get_string_from_utf8())
+    if typeof(response) == TYPE_ARRAY and response_code >= 200 and response_code < 300:
+        job_offers_updated.emit(response)
+        return
     if typeof(response) != TYPE_DICTIONARY:
         request_failed.emit("Server returned invalid JSON.")
         return
