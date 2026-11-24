@@ -182,6 +182,12 @@ jobs:
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.CareerDatabaseSmokeTest' exec:exec
       - name: Test physical work orders, spare parts, site condition and salary gate
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.TechnicalWorkSmokeTest
+      - name: Test real company registration, equipment, work wages, production and sale
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.BusinessSmokeTest
+      - name: Test workshop owner's capital, employee and parts across SQLite restarts
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.BusinessDatabaseSmokeTest' exec:exec
       - name: Test fresh-world repair persistence and finite technical inventory
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
