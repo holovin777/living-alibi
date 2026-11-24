@@ -153,3 +153,38 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerRebirthDatabaseSmokeTest' exec:exec
+      - name: Test starting and reopening a world without an existing SQLite file
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.FreshWorldSmokeTest' exec:exec
+      - name: Install Java engine so the separate Spring adapter can use it
+        run: mvn --batch-mode --no-transfer-progress -DskipTests install
+      - name: Build and test Spring Boot Godot API
+        run: mvn --batch-mode --no-transfer-progress -f server/pom.xml package
+      - name: Verify first-launch Spring HTTP API on an empty database
+        run: |
+          set -euo pipefail
+          mkdir -p target/api-smoke
+          java -jar server/target/living-alibi-server-1.16.0.jar \
+            --server.port=18080 --living-alibi.database=target/api-smoke/world.db \
+            >target/api-smoke/server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:18080/api/v1/world \
+                    -o target/api-smoke/world.json; then break; fi
+            sleep 1
+          done
+          test -s target/api-smoke/world.json
+          grep -q '"incarnation":1' target/api-smoke/world.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/go \
+            -H 'Content-Type: application/json' \
+            -d '{"destination":"river"}' \
+            -o target/api-smoke/move.json
+          grep -q '"place":"River"' target/api-smoke/move.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/drink \
+            -H 'Content-Type: application/json' \
+            -d '{"sourceId":"river-water"}' \
+            -o target/api-smoke/drink.json
+          grep -q '"stock":119' target/api-smoke/drink.json
+          test -f target/api-smoke/world.db
