@@ -99,6 +99,16 @@ Automated checks:
 - Java CI checks public work order listing and HTTP rejection of a remote
   unauthorized diagnosis. Godot scene CI checks contextual action buttons.
 
+## Effects on residents and the public
+
+The park pump and lighting no longer exist only as repair scores. A repaired
+pump allows the shared public fountain to supply clean water using finite
+river-accessible stock; people at the park can refill their carried water
+from the same bounded tank used by the player. Low-condition lighting adds a
+small night fatigue penalty for people outside in public streets; a repaired
+lighting system removes the extra penalty. Clean-water stock and its last
+pump day survive SQLite restarts. See [City Utilities](CITY_UTILITIES.md).
+
 ## Current limitations
 
 Workshops and offices use **placeholder 3D kiosks**, not physical tools,
