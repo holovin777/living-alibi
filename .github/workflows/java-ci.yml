@@ -183,6 +183,8 @@ jobs:
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.TechnicalWorkDatabaseSmokeTest' exec:exec
       - name: Test resident fountain use, water conservation and restored street lights
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.UtilitySmokeTest
+      - name: Test autonomous residents choose working water and avoid unlit parks
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.UtilityBehaviorSmokeTest
       - name: Test municipal water stocks survive restart and are refilled only once
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
