@@ -34,6 +34,11 @@ public class GameController {
         return session.snapshot();
     }
 
+    @GetMapping("/utilities")
+    public GameSession.ServicesView utilities() {
+        return session.services();
+    }
+
     @GetMapping("/locations")
     public List<GameSession.DestinationView> locations() {
         return session.destinations();
