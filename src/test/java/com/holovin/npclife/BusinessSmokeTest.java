@@ -74,16 +74,15 @@ public final class BusinessSmokeTest {
 
         var other=town.copy();
         other.player.money=0;
-        boolean rejected=false;
-        try {BusinessLife.withdraw(other,1);}
-        catch(IllegalArgumentException expected) {rejected=false;}
-        check(other.business.cash==69 && town.business.cash==69,
+        BusinessLife.withdraw(other,1);
+        check(other.business.cash==68 && other.player.money==1 &&
+                town.business.cash==69,
                 "speculative branch cannot mutate original company before save");
 
         BusinessLife.withdraw(town,10);
         check(town.player.money==45 && town.business.cash==59,
                 "owner can withdraw real available profit, but not create it");
-        rejected=false;
+        boolean rejected=false;
         try {BusinessLife.withdraw(town,1000);}
         catch(IllegalArgumentException expected) {rejected=true;}
         check(rejected,"owner cannot overdraw company reserves");
