@@ -23,6 +23,11 @@ final class PlayerLife {
         int health = 100;
         boolean alive = true;
         int incarnation = 1; // A fresh visitor receives the next generation.
+        int money=50; // Modest personal cash on first entry; no preset profession.
+        String jobId; // Null until the player voluntarily applies.
+        int engineeringSkill;
+        int investigationSkill;
+        int lastWorkDay; // 0 means no paid shift yet.
         final Map<String,Contact> contacts=new LinkedHashMap<>();
         Player copy() {
             Player p=new Player();
@@ -34,6 +39,11 @@ final class PlayerLife {
             p.health=health;
             p.alive=alive;
             p.incarnation=incarnation;
+            p.money=money;
+            p.jobId=jobId;
+            p.engineeringSkill=engineeringSkill;
+            p.investigationSkill=investigationSkill;
+            p.lastWorkDay=lastWorkDay;
             for(var e:contacts.entrySet())p.contacts.put(e.getKey(),e.getValue().copy());
             return p;
         }
