@@ -37,7 +37,9 @@ Run the optional Spring adapter:
 mvn -f server/pom.xml spring-boot:run
 ```
 
-The server listens on **127.0.0.1:8080** by default. It creates
+The server listens on **127.0.0.1:8080** by default. On a genuinely new
+save it generates **12 procedural residents** alongside Marco and Elena, so
+the town is populated on first launch. It creates
 `data/world.db` if the file does not already exist (relative to the shell's
 current working directory). For an isolated fresh save:
 
