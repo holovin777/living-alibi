@@ -110,6 +110,31 @@ public final class Main {
                         System.out.println(result+" "+CareerLife.status(town.player));
                         continue;
                     }
+                    if(lower.equals("work-orders")) {
+                        System.out.println("City technical jobs (shared assets, finite materials):");
+                        for(var order:TechnicalWorkLife.orders(town))
+                            System.out.println("  "+order.id+" | "+order.title+" | "+
+                                    order.place.label+" | "+order.phase+" | condition "+
+                                    order.condition+"/100");
+                        System.out.println("Materials: "+town.technicalMaterials);
+                        continue;
+                    }
+                    if(lower.startsWith("diagnose ")) {
+                        var candidate=town.copy();
+                        String message=TechnicalWorkLife.inspect(candidate,arg(input),state.minute);
+                        advanceAndSave(db,state,candidate,TechnicalWorkLife.INSPECTION_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(message);
+                        continue;
+                    }
+                    if(lower.startsWith("repair ")) {
+                        var candidate=town.copy();
+                        String message=TechnicalWorkLife.complete(candidate,arg(input),state.day,state.minute);
+                        advanceAndSave(db,state,candidate,TechnicalWorkLife.COMPLETION_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(message);
+                        continue;
+                    }
                     if(lower.equals("work")) {
                         var candidate=town.copy();
                         String result=CareerLife.work(candidate,state.day,state.minute);
@@ -815,6 +840,8 @@ public final class Main {
         System.out.println(" explore | me | career | needs | lives | weather | locations | look | go <place>");
         System.out.println(" jobs | apply <job-id>   — find work voluntarily at the listed workplace");
         System.out.println(" work                    — paid two-hour shift, once daily (08:00–18:00)");
+        System.out.println(" work-orders | diagnose <order-id> | repair <order-id> — city infrastructure tasks");
+        System.out.println(" technicians and engineers must finish a technical task before paid work");
         System.out.println(" study engineering | study investigation — paid lesson at school/library");
         System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
         System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
