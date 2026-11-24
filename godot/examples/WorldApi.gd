@@ -6,6 +6,7 @@ signal world_updated(snapshot: Dictionary)
 signal locations_updated(locations: Array)
 signal job_offers_updated(jobs: Array)
 signal work_orders_updated(orders: Array)
+signal industry_updated(report: Dictionary)
 signal action_feedback(message: String)
 signal request_started(route: String)
 signal request_finished(route: String)
@@ -35,6 +36,9 @@ func list_jobs() -> void:
 
 func list_work_orders() -> void:
     _send("/work-orders", HTTPClient.METHOD_GET, {})
+
+func view_industry() -> void:
+    _send("/industry", HTTPClient.METHOD_GET, {})
 
 func diagnose(order_id: String) -> void:
     _send("/actions/diagnose", HTTPClient.METHOD_POST, {"orderId": order_id})
@@ -116,6 +120,9 @@ func _on_request_completed(
 
     if typeof(response) != TYPE_DICTIONARY:
         request_failed.emit("Server returned invalid world JSON.")
+        return
+    if route == "/industry":
+        industry_updated.emit(response)
         return
     if route.begins_with("/actions/"):
         action_feedback.emit(str(response.get("message", "Action completed.")))
