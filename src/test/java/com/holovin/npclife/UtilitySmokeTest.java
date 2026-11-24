@@ -68,6 +68,7 @@ public final class UtilitySmokeTest {
         } catch(IllegalArgumentException expected) {rejected=true;}
         check(rejected,"remote public water access rejected");
 
+        resident.water=2; // Isolate daily pump refill from voluntary citizen withdrawals.
         now.day=2;now.minute=0;
         UtilityLife.tick(town,now,events,seen);
         check(town.cleanWater==8 &&
