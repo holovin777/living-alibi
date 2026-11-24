@@ -1,0 +1,135 @@
+package com.holovin.npclife;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Optional jobs and vocational study for the player. No mandatory quests,
+ * free detective badge, or wages created from an unlimited money faucet.
+ */
+final class CareerLife {
+    private CareerLife() { }
+
+    record Offer(String id,String title,TownLife.Place workplace,
+                 String subject,int requiredSkill,int wage,int startingPayroll) { }
+
+    static final int LESSON_FEE=10;
+    static final int LESSON_MINUTES=60;
+    static final int SHIFT_MINUTES=120;
+
+    private static final List<Offer> OFFERS=List.of(
+            new Offer("shop-assistant","Market assistant",TownLife.Place.MARKET,
+                    "none",0,24,480),
+            new Offer("technician","Workshop technician",TownLife.Place.WORKSHOP,
+                    "engineering",3,38,760),
+            new Offer("engineer","Junior engineer",TownLife.Place.OFFICE,
+                    "engineering",8,62,1240),
+            new Offer("investigator","Private investigator",TownLife.Place.OFFICE,
+                    "investigation",8,54,1080)
+    );
+
+    static List<Offer> offers() {return OFFERS;}
+
+    static void ensureEmployers(TownLife.Town town) {
+        for(var offer:OFFERS)
+            town.employerFunds.putIfAbsent(offer.id,offer.startingPayroll);
+    }
+
+    private static Offer offer(String id) {
+        if(id==null)throw new IllegalArgumentException("Choose an occupation from jobs.");
+        String normalized=id.strip().toLowerCase(Locale.ROOT);
+        for(var offer:OFFERS)
+            if(offer.id.equals(normalized))return offer;
+        throw new IllegalArgumentException("Unknown job: "+id+". Use jobs to see vacancies.");
+    }
+
+    static Map<String,Integer> payrolls(TownLife.Town town) {
+        return new LinkedHashMap<>(town.employerFunds);
+    }
+
+    private static void requirePresent(PlayerLife.Player player,TownLife.Place where) {
+        PlayerLife.requireAlive(player);
+        if(player.travelRemaining>0)
+            throw new IllegalArgumentException("Finish traveling before interacting.");
+        if(player.place!=where)
+            throw new IllegalArgumentException("Travel to "+where.label+" first.");
+    }
+
+    static int skill(PlayerLife.Player player,String subject) {
+        return switch(subject) {
+            case "engineering" -> player.engineeringSkill;
+            case "investigation" -> player.investigationSkill;
+            default -> 0;
+        };
+    }
+
+    /** All offers are public. Applying requires visiting the actual workplace. */
+    static String apply(TownLife.Town town,String job) {
+        var p=town.player;
+        var vacancy=offer(job);
+        requirePresent(p,vacancy.workplace);
+        if(vacancy.id.equals(p.jobId))
+            throw new IllegalArgumentException("You already hold this job.");
+        if(skill(p,vacancy.subject)<vacancy.requiredSkill)
+            throw new IllegalArgumentException("Study "+vacancy.subject+" first: "+
+                    vacancy.requiredSkill+" skill required.");
+        if(town.employerFunds.getOrDefault(vacancy.id,0)<vacancy.wage)
+            throw new IllegalArgumentException("Employer cannot fund another shift right now.");
+        p.jobId=vacancy.id;
+        return "Hired as "+vacancy.title+". You may work a paid two-hour shift each day.";
+    }
+
+    /** Paid instruction requires a physical school or library and available cash. */
+    static String study(TownLife.Town town,String subject,int minute) {
+        var p=town.player;
+        String normalized=subject==null?"":subject.strip().toLowerCase(Locale.ROOT);
+        TownLife.Place where=switch(normalized) {
+            case "engineering" -> TownLife.Place.SCHOOL;
+            case "investigation" -> TownLife.Place.LIBRARY;
+            default -> throw new IllegalArgumentException(
+                    "Choose study engineering or study investigation.");
+        };
+        requirePresent(p,where);
+        if(minute<480 || minute+LESSON_MINUTES>1080)
+            throw new IllegalArgumentException("Lessons take place 08:00–18:00.");
+        if(p.money<LESSON_FEE)
+            throw new IllegalArgumentException("Need "+LESSON_FEE+" EUR for a lesson.");
+        p.money-=LESSON_FEE;
+        if(normalized.equals("engineering"))p.engineeringSkill++;
+        else p.investigationSkill++;
+        return "Completed "+normalized+" lesson (+1 skill, -"+
+                LESSON_FEE+" EUR).";
+    }
+
+    /** A finite employer fund pays once per day, not the game's money printer. */
+    static String work(TownLife.Town town,int day,int minute) {
+        var p=town.player;
+        PlayerLife.requireAlive(p);
+        if(p.jobId==null)
+            throw new IllegalArgumentException("Find and apply for a job first.");
+        var vacancy=offer(p.jobId);
+        requirePresent(p,vacancy.workplace);
+        if(minute<480 || minute+SHIFT_MINUTES>1080)
+            throw new IllegalArgumentException("Two-hour shifts start between 08:00 and 16:00.");
+        if(p.lastWorkDay==day)
+            throw new IllegalArgumentException("Already completed a shift today.");
+        int funds=town.employerFunds.getOrDefault(vacancy.id,0);
+        if(funds<vacancy.wage)
+            throw new IllegalArgumentException("Employer has insufficient payroll funds.");
+        // One conserved transfer: employer cash -> player cash.
+        town.employerFunds.put(vacancy.id,funds-vacancy.wage);
+        p.money=Math.addExact(p.money,vacancy.wage);
+        p.lastWorkDay=day;
+        p.fatigue=Math.min(100,p.fatigue+8);
+        return "Worked two hours as "+vacancy.title+
+                ". Earned "+vacancy.wage+" EUR from employer funds.";
+    }
+
+    static String status(PlayerLife.Player p) {
+        String job=p.jobId==null?"unemployed":offer(p.jobId).title;
+        return "Cash "+p.money+" EUR | Job: "+job+" | Engineering "+
+                p.engineeringSkill+" | Investigation "+p.investigationSkill;
+    }
+}
