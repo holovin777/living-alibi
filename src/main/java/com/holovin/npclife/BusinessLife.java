@@ -76,6 +76,8 @@ final class BusinessLife {
 
     /** Hiring a co-present neighbor prevents invisible global recruitment. */
     static List<TownLife.Citizen> candidates(TownLife.Town town,int day) {
+        if(!town.player.alive || town.player.place!=TownLife.Place.WORKSHOP ||
+                town.player.travelRemaining>0)return List.of();
         return town.people.values().stream().filter(c->
                 c.generationIndex>0 && c.alive && c.presentAt(TownLife.Place.WORKSHOP) &&
                 !EmploymentLife.sick(c,day) &&
