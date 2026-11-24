@@ -95,7 +95,10 @@ final class NatureLife {
         // A deterministic exposure event, not a clinical probability model.
         boolean unhealthy=Math.floorMod((long)day*127+minute*17L+id.hashCode(),100)
                 <source.healthRiskPercent;
-        if(unhealthy)town.player.health=Math.max(0,town.player.health-4);
+        if(unhealthy) {
+            town.player.health=Math.max(0,town.player.health-4);
+            if(town.player.health==0)town.player.alive=false;
+        }
         return "You drank "+source.label+". "+
                 (unhealthy?"It made you feel unwell (-4 health).":
                         "No immediate illness was observed; untreated water is not guaranteed safe.");
