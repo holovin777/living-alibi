@@ -23,6 +23,13 @@ func _exercise() -> void:
     if not _check(world._scenery.name == "PublicScene_PARK",
             "park scenery was generated"):
         return
+    world._avatar.position = world.KIOSK_POSITION
+    world._toggle_actions()
+    if not _check(_has_button(world._action_choices, "Drink from park fountain"),
+            "public park offers the limited fountain separately from unsafe puddles"):
+        return
+    world._action_panel.visible = false
+
 
     world._on_locations_updated([
         {"id": "PARK", "label": "Park", "travelMinutes": 0},
