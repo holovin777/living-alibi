@@ -123,9 +123,11 @@ func _build_world() -> void:
     add_child(_camera)
     _follow_player()
     _render_place("PARK")
+    _current_place = "PARK"
 
 func _render_place(place_id: String) -> void:
     if _scenery != null:
+        remove_child(_scenery)
         _scenery.queue_free()
     _scenery = Node3D.new()
     _scenery.name = "PublicScene_" + place_id
