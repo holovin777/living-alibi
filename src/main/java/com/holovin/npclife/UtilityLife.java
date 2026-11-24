@@ -55,6 +55,7 @@ final class UtilityLife {
         if(clock.minute%60==0) {
             for(var c:town.people.values()) {
                 if(!c.alive || c.id.equals("marco"))continue;
+                if(c.travelRemaining==0 && c.place==c.home)continue; // Private indoor home
                 if(nightExposure(town,c.place,clock.minute)) {
                     c.fatigue=Math.min(100,c.fatigue+1);
                 }
