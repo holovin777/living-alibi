@@ -75,7 +75,12 @@ final class WorldDatabase implements AutoCloseable {
                         fatigue INTEGER NOT NULL DEFAULT 0,
                         health INTEGER NOT NULL DEFAULT 100,
                         alive INTEGER NOT NULL DEFAULT 1,
-                        incarnation INTEGER NOT NULL DEFAULT 1)
+                        incarnation INTEGER NOT NULL DEFAULT 1,
+                        money INTEGER NOT NULL DEFAULT 50,
+                        job_id TEXT,
+                        engineering_skill INTEGER NOT NULL DEFAULT 0,
+                        investigation_skill INTEGER NOT NULL DEFAULT 0,
+                        last_work_day INTEGER NOT NULL DEFAULT 0)
                     """);
             st.execute("""
                     CREATE TABLE IF NOT EXISTS player_contacts (
@@ -98,6 +103,11 @@ final class WorldDatabase implements AutoCloseable {
                         private_name TEXT)
                     """);
             st.execute("""
+                    CREATE TABLE IF NOT EXISTS career_accounts (
+                        account_id TEXT PRIMARY KEY,
+                        balance INTEGER NOT NULL CHECK(balance>=0))
+                    """);
+            st.execute("""
                     CREATE TABLE IF NOT EXISTS natural_resources (
                         id TEXT PRIMARY KEY, quantity INTEGER NOT NULL CHECK(quantity>=0))
                     """);
@@ -112,6 +122,11 @@ final class WorldDatabase implements AutoCloseable {
         playerColumns.put("health","INTEGER NOT NULL DEFAULT 100");
         playerColumns.put("alive","INTEGER NOT NULL DEFAULT 1");
         playerColumns.put("incarnation","INTEGER NOT NULL DEFAULT 1");
+        playerColumns.put("money","INTEGER NOT NULL DEFAULT 50");
+        playerColumns.put("job_id","TEXT");
+        playerColumns.put("engineering_skill","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("investigation_skill","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("last_work_day","INTEGER NOT NULL DEFAULT 0");
 
         for(var col:playerColumns.entrySet()) {
             if(!columnExists("player_state",col.getKey())) {
@@ -490,6 +505,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistPlayer(town.player);
                 persistLives(town);
                 persistNature(town);
+                persistCareerAccounts(town);
             }
             db.commit();
             if(town!=null) {
@@ -737,6 +753,16 @@ final class WorldDatabase implements AutoCloseable {
                     source.stock=Math.max(0,Math.min(source.capacity,rs.getInt("quantity")));
             }
         }
+        // Conserved employer/school balances survive restarts and worker payments.
+        CareerLife.ensureEmployers(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT account_id,balance FROM career_accounts")) {
+            while(rs.next()) {
+                if(town.employerFunds.containsKey(rs.getString("account_id")))
+                    town.employerFunds.put(rs.getString("account_id"),
+                            Math.max(0,rs.getInt("balance")));
+            }
+        }
         // Anonymous by default on migration. No resident learns the player's identity.
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_state WHERE id=1")) {
             if(rs.next()) {
@@ -750,6 +776,11 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.health=rs.getInt("health");
                 town.player.alive=rs.getInt("alive")!=0;
                 town.player.incarnation=Math.max(1,rs.getInt("incarnation"));
+                town.player.money=rs.getInt("money");
+                town.player.jobId=rs.getString("job_id");
+                town.player.engineeringSkill=rs.getInt("engineering_skill");
+                town.player.investigationSkill=rs.getInt("investigation_skill");
+                town.player.lastWorkDay=rs.getInt("last_work_day");
             }
         }
         // v1.15 contacts belong to the first visitor; later visitors have
@@ -801,6 +832,20 @@ final class WorldDatabase implements AutoCloseable {
         }
     }
 
+    private void persistCareerAccounts(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO career_accounts(account_id,balance) VALUES(?,?)
+                ON CONFLICT(account_id) DO UPDATE SET balance=excluded.balance
+                """)) {
+            for(var entry:town.employerFunds.entrySet()) {
+                p.setString(1,entry.getKey());
+                p.setInt(2,entry.getValue());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+    }
+
     private void persistNature(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
                 INSERT INTO natural_resources(id,quantity) VALUES(?,?)
@@ -818,13 +863,18 @@ final class WorldDatabase implements AutoCloseable {
     private void persistPlayer(PlayerLife.Player player) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
                 INSERT INTO player_state(id,place,destination,travel_remaining,private_name,
-                                         hunger,thirst,fatigue,health,alive,incarnation)
-                VALUES(1,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                                         hunger,thirst,fatigue,health,alive,incarnation,
+                                         money,job_id,engineering_skill,investigation_skill,last_work_day)
+                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,private_name=excluded.private_name,
                 hunger=excluded.hunger,thirst=excluded.thirst,
                 fatigue=excluded.fatigue,health=excluded.health,
-                alive=excluded.alive,incarnation=excluded.incarnation
+                alive=excluded.alive,incarnation=excluded.incarnation,
+                money=excluded.money,job_id=excluded.job_id,
+                engineering_skill=excluded.engineering_skill,
+                investigation_skill=excluded.investigation_skill,
+                last_work_day=excluded.last_work_day
                 """)) {
             p.setString(1,player.place.name());
             p.setString(2,player.destination.name());
@@ -836,6 +886,11 @@ final class WorldDatabase implements AutoCloseable {
             p.setInt(8,player.health);
             p.setInt(9,player.alive?1:0);
             p.setInt(10,player.incarnation);
+            p.setInt(11,player.money);
+            p.setString(12,player.jobId);
+            p.setInt(13,player.engineeringSkill);
+            p.setInt(14,player.investigationSkill);
+            p.setInt(15,player.lastWorkDay);
             p.executeUpdate();
         }
         String contactSql=player.incarnation==1 ? """
