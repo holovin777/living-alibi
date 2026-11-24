@@ -91,8 +91,13 @@ final class PopulationLife {
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){
-                c.money+=11;
-                TownLife.publish(town,clock,c.id,c.place,c.name+" earned EUR 11 for one hour of work.",events,observations);
+                if(!IndustryLife.payHourly(town,c,clock,events,observations)) {
+                    // Existing unrelated occupations retain their original
+                    // placeholder wage model until their companies are modeled.
+                    c.money+=11;
+                    TownLife.publish(town,clock,c.id,c.place,
+                            c.name+" earned EUR 11 for one hour of work.",events,observations);
+                }
             }
         } else c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"FREE_TIME";
         if(minute%60==0 && (c.hunger>93||c.thirst>93))c.health=clamp(c.health-2);
