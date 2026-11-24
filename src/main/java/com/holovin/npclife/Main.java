@@ -147,6 +147,22 @@ public final class Main {
                         System.out.println(PlayerLife.condition(town.player));
                         continue;
                     }
+                    if(lower.equals("industry")) {
+                        var r=IndustryLife.report(town);
+                        System.out.println("QUARRY deposits: iron "+r.ironRemaining()+
+                                " | copper "+r.copperRemaining());
+                        System.out.println("Ore at quarry "+r.oreAtQuarry()+
+                                " | ore at factory "+r.oreAtFactory());
+                        System.out.println("FACTORY: steel "+r.factorySteel()+
+                                " | copper "+r.factoryCopper()+
+                                " | spare parts "+r.factoryParts());
+                        System.out.println("MAINTENANCE: steel "+r.workshopSteel()+
+                                " | copper "+r.workshopCopper()+
+                                " | spare parts "+r.workshopParts());
+                        System.out.println("Workers on shift: miners "+r.minersAtWork()+
+                                " | factory machinists "+r.factoryWorkersAtWork());
+                        continue;
+                    }
                     if(lower.equals("utilities")) {
                         var utilities=UtilityLife.status(town);
                         System.out.println("Park water pump: "+utilities.pumpCondition()+"/100 | fountain "+
@@ -854,6 +870,7 @@ public final class Main {
         System.out.println(" explore | me | career | needs | lives | weather | locations | look | go <place>");
         System.out.println(" jobs | apply <job-id>   — find work voluntarily at the listed workplace");
         System.out.println(" work                    — paid two-hour shift, once daily (08:00–18:00)");
+        System.out.println(" industry | utilities — public natural resources, firms and services");
         System.out.println(" work-orders | diagnose <order-id> | repair <order-id> — city infrastructure tasks");
         System.out.println(" technicians and engineers must finish a technical task before paid work");
         System.out.println(" study engineering | study investigation — paid lesson at school/library");
