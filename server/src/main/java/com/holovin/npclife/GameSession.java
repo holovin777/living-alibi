@@ -55,9 +55,11 @@ public final class GameSession implements AutoCloseable {
     public record ResidentView(String id,String name,String activity) { }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
     public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
+    public record ServicesView(int pumpCondition,boolean fountainWorking,int cleanWater,
+                               int cleanWaterCapacity,int lightingCondition,boolean lightsWorking) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources) { }
+                            List<SourceView> sources,ServicesView services) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -74,7 +76,14 @@ public final class GameSession implements AutoCloseable {
                 CalendarLife.dayOfYear(state.day),weather.season().name(),
                 new WeatherView(weather.sky().name(),weather.temperatureC(),
                         weather.raining(),weather.snowing()),
-                player,residents,resources);
+                player,residents,resources,services());
+    }
+
+    /** Authoritative condition of water and lighting infrastructure for the UI. */
+    public synchronized ServicesView services() {
+        var u=UtilityLife.status(town);
+        return new ServicesView(u.pumpCondition(),u.fountainWorking(),u.cleanWater(),
+                u.cleanWaterCapacity(),u.lightingCondition(),u.lightsWorking());
     }
 
     /** Travel is visible to the client, but distance and time remain Java-owned. */
@@ -158,7 +167,9 @@ public final class GameSession implements AutoCloseable {
 
     public synchronized ActionView drink(String sourceId) throws SQLException {
         var copy=town.copy();
-        String message=NatureLife.drink(copy,sourceId,state.day,state.minute);
+        String message="park-fountain".equals(sourceId)
+                ? UtilityLife.drinkAtFountain(copy)
+                : NatureLife.drink(copy,sourceId,state.day,state.minute);
         return apply(copy,5,message);
     }
 
