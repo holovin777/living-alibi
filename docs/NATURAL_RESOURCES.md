@@ -54,10 +54,12 @@ No resource collection shares the player's private identity.
 
 ## Next systems: not yet implemented
 
-1. **Sleep anywhere:** outdoors and streets are possible sleeping places,
-   but exposure, shelter, weather, clothing, illness and long-term health
-   should affect the outcome; no forced property ownership. Do not add
-   punitive mortality until the player has real survival options.
+1. **Sleep anywhere (first slice implemented):** public parks, riverbanks,
+   woods and streets are possible sleeping places. A location-dependent
+   exposure heuristic already affects health and can cause visitor death
+   over repeated risky nights. No forced property ownership. Future weather,
+   proper shelters, clothing, illness, climate and seasonal effects should
+   replace this intentionally simple prototype.
 2. **Ecology:** animals with births/deaths, plants with seasons and growth,
    rainfall, rivers, soil, extractable stone and wood, harvesting labor,
    spoilage and actual material conservation.
