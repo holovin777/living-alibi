@@ -15,7 +15,7 @@ final class TownLife {
         NORTH_RESIDENCES("North residences"), SOUTH_RESIDENCES("South residences"),
         OFFICE("Office"), CLINIC("Clinic"), SCHOOL("School"),
         WORKSHOP("Workshop"), LIBRARY("Library"),
-        RIVER("River"), WOODS("Woods");
+        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory");
         final String label;
         Place(String label) { this.label=label; }
     }
@@ -96,6 +96,9 @@ final class TownLife {
         final Map<String,Integer> employerFunds=new LinkedHashMap<>();
         final Map<String,Integer> technicalMaterials=new LinkedHashMap<>();
         final Map<String,TechnicalWorkLife.Order> technicalOrders=new LinkedHashMap<>();
+        final Map<String,Integer> industryStocks=new LinkedHashMap<>();
+        int lastIndustryExtractDay,lastIndustryTransportDay,lastIndustryRefineDay;
+        int lastIndustryFabricateDay,lastIndustryDeliverDay;
         int cleanWater;
         int lastWaterPumpDay;
         boolean together;
@@ -138,6 +141,12 @@ final class TownLife {
             t.technicalMaterials.putAll(technicalMaterials);
             for(var e:technicalOrders.entrySet())
                 t.technicalOrders.put(e.getKey(),e.getValue().copy());
+            t.industryStocks.putAll(industryStocks);
+            t.lastIndustryExtractDay=lastIndustryExtractDay;
+            t.lastIndustryTransportDay=lastIndustryTransportDay;
+            t.lastIndustryRefineDay=lastIndustryRefineDay;
+            t.lastIndustryFabricateDay=lastIndustryFabricateDay;
+            t.lastIndustryDeliverDay=lastIndustryDeliverDay;
             t.cleanWater=cleanWater;t.lastWaterPumpDay=lastWaterPumpDay;
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
@@ -163,6 +172,12 @@ final class TownLife {
             technicalOrders.clear();
             for(var e:other.technicalOrders.entrySet())
                 technicalOrders.put(e.getKey(),e.getValue().copy());
+            industryStocks.clear();industryStocks.putAll(other.industryStocks);
+            lastIndustryExtractDay=other.lastIndustryExtractDay;
+            lastIndustryTransportDay=other.lastIndustryTransportDay;
+            lastIndustryRefineDay=other.lastIndustryRefineDay;
+            lastIndustryFabricateDay=other.lastIndustryFabricateDay;
+            lastIndustryDeliverDay=other.lastIndustryDeliverDay;
             cleanWater=other.cleanWater;lastWaterPumpDay=other.lastWaterPumpDay;
             naturalResources.clear();
             for(var e:other.naturalResources.entrySet())
@@ -209,6 +224,7 @@ final class TownLife {
         NatureLife.ensureSources(t);
         CareerLife.ensureEmployers(t);
         TechnicalWorkLife.ensure(t);
+        IndustryLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -235,6 +251,7 @@ final class TownLife {
         if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e,town),marco,truth,observations);
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
+        IndustryLife.tick(town,marco,truth,observations);
         EconomyLife.tick(town,marco,truth,observations);
         PropertyLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);
