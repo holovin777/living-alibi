@@ -27,6 +27,9 @@ Jobs are voluntary. `jobs` shows the public vacancy board, `apply` only
 works **in person at the specified workplace**, and `work` requires
 remaining employed there. Working occupies 120 game minutes, with
 08:00–18:00 business hours and **only one paid shift per world day**.
+**Workshop technicians and junior engineers must first diagnose and complete
+an actual city work order**; merely having a job title no longer produces
+their salary. See [Technical Work](TECHNICAL_WORK.md).
 You can change professions when qualified; certificates/skills remain
 with that visitor. The `investigator` job is private investigation,
 **not an automatic police badge or permission to read secret evidence**.
@@ -86,6 +89,9 @@ The authoritative API returns `player.money`, `player.jobId`,
 - `GET /api/v1/jobs` lists vacancies, prerequisites and payroll.
 - `POST /api/v1/actions/apply` with `{"jobId":"shop-assistant"}`.
 - `POST /api/v1/actions/study` with `{"subject":"engineering"}`.
+- `GET /api/v1/work-orders` lists real broken equipment and city upgrade tasks.
+- `POST /api/v1/actions/diagnose` and `POST /api/v1/actions/repair`
+  accept `{"orderId":"water-pump"}`, validated by the Java engine.
 - `POST /api/v1/actions/work` with `{}`.
 
 All state modifications use the **same career rules** as the Java console,
@@ -105,6 +111,8 @@ launch, SQLite persistence, payroll, and restarts.
 Still missing: resumes and interviews, employer vacancies depending on
 business demand, real university programs, certifications, licensing,
 worker contracts/rights, taxation, detailed skill use in mechanical tasks,
-a police/detective career, engineering projects, and employment of the
-player by real agent-owned businesses. None of those are represented as
+a police/detective career, advanced interactive engineering designs, and employment of the
+player by real agent-owned businesses. The first physical workshop repair
+and public-lighting upgrade do now exist as shared, finite-material
+work orders rather than automatic pay. None of those are represented as
 implemented.
