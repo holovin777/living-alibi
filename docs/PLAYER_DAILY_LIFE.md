@@ -50,8 +50,10 @@ Exposure currently follows a simple **gameplay-only** location heuristic:
 riverbank (high risk), woods/park/streets (medium risk), other outdoor
 public places (low risk), and covered public approaches by cafe, library
 and clinic (lowest risk). Those covered spaces do not grant indoor access,
-a bed or any legal right to stay there. Future weather, clothing, season,
-ownership and permissions will refine the model. A sufficiently depleted
+a bed or any legal right to stay there. Weather already adds a simple
+hourly rain, snow and temperature penalty during outdoor sleep, including
+across midnight. Future clothing, real shelters, wind, building ownership
+and permissions will refine the model. See [Weather](WEATHER.md). A sufficiently depleted
 player health score reaches 0 and causes a persistent visitor death; the
 town and its people do not stop. No NPC automatically learns who the visitor
 was. Severe hunger and thirst make outdoor sleep riskier, but passive
@@ -95,8 +97,8 @@ deaths, player anonymity, and repeated SQLite restarts.
 
 ## Deliberately not implemented yet
 
-Player-owned food and water, purchasing, private housing, weather, actual
-clothing/shelters, medicine, disease progression, NPC discovery of a sleeping
+Player-owned food and water, purchasing, private housing, advanced weather
+and clothing/shelters, medicine, disease progression, NPC discovery of a sleeping
 player, and mortality from prolonged hunger/thirst **without sleep** are not yet
 implemented. The exposed-sleep consequence is the first incomplete mortality
 rule; safer public sleeping places exist and the player is not forced to
