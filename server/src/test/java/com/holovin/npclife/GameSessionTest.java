@@ -13,6 +13,43 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void visitorChoosesCareerAndKeepsItAcrossRestart() throws Exception {
+        Path file=directory.resolve("career-world.db");
+        try(var game=new GameSession(file)) {
+            var visitor=game.snapshot().player();
+            assertEquals("Park",visitor.place());
+            assertEquals(50,visitor.money());
+            assertNull(visitor.jobId());
+            assertEquals(0,visitor.engineeringSkill());
+            assertEquals(4,game.jobs().size());
+
+            assertThrows(IllegalArgumentException.class,
+                    ()->game.applyJob("shop-assistant"));
+            assertEquals(50,game.snapshot().player().money());
+            game.move("market");
+            game.applyJob("shop-assistant");
+            assertEquals("shop-assistant",game.snapshot().player().jobId());
+            game.waitMinutes(5);
+            var shift=game.work();
+            assertEquals(74,shift.world().player().money());
+            assertThrows(IllegalArgumentException.class,game::work);
+            game.move("school");
+            var lesson=game.study("engineering");
+            assertEquals(64,lesson.world().player().money());
+            assertEquals(1,lesson.world().player().engineeringSkill());
+            assertEquals(456,game.jobs().stream()
+                    .filter(j->j.id().equals("shop-assistant"))
+                    .findFirst().orElseThrow().remainingPayroll());
+        }
+        try(var restarted=new GameSession(file)) {
+            assertEquals(64,restarted.snapshot().player().money());
+            assertEquals("shop-assistant",restarted.snapshot().player().jobId());
+            assertEquals(1,restarted.snapshot().player().engineeringSkill());
+            assertEquals(4,restarted.jobs().size(),"job board remains stable");
+        }
+    }
+
+    @Test
     void newWorldActionsAndRestart() throws Exception {
         Path file=directory.resolve("fresh-world.db");
         try(var game=new GameSession(file)) {
