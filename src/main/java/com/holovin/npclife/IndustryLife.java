@@ -184,6 +184,18 @@ final class IndustryLife {
         return "Western ore seam discovered: 30 finite iron and 15 copper units.";
     }
 
+    /** Geological survey is tied to player presence and employer funding. */
+    static String prospectPlayer(TownLife.Town town,int minute) {
+        var p=town.player;
+        PlayerLife.requireAlive(p);
+        if(p.place!=TownLife.Place.QUARRY || p.travelRemaining>0 ||
+                !"miner".equals(p.jobId))
+            throw new IllegalArgumentException("Only a hired miner at the quarry can prospect.");
+        if(minute<480 || minute+120>1080)
+            throw new IllegalArgumentException("Surveys take two hours during 08:00–18:00.");
+        return prospect(town);
+    }
+
     /** A player's paid industrial shift must create physical output first. */
     static String playerShift(TownLife.Town town,String jobId) {
         if("miner".equals(jobId)) {
