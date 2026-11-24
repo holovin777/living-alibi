@@ -64,6 +64,35 @@ func _exercise() -> void:
     if not _check(_has_button(world._action_choices, "Apply: technician"),
             "workshop provides technician applications"):
         return
+    world._on_work_orders_updated([{
+        "id": "water-pump", "place": "WORKSHOP",
+        "title": "Park water-pump maintenance",
+        "phase": "OPEN", "condition": 45
+    }])
+    if not _check(_has_button(world._action_choices, "Diagnose: water-pump"),
+            "actual workshop fault offers diagnosis rather than free wages"):
+        return
+    world._on_work_orders_updated([{
+        "id": "water-pump", "place": "WORKSHOP",
+        "title": "Park water-pump maintenance",
+        "phase": "INSPECTED", "condition": 45
+    }])
+    if not _check(_has_button(world._action_choices, "Repair / implement: water-pump"),
+            "inspected workshop fault offers repair"):
+        return
+
+    world._on_world_updated(_world("OFFICE", "Office"))
+    world._avatar.position = world.KIOSK_POSITION
+    world._toggle_actions()
+    world._on_work_orders_updated([{
+        "id": "street-lights", "place": "OFFICE",
+        "title": "Public lighting efficiency upgrade",
+        "phase": "OPEN", "condition": 50
+    }])
+    if not _check(_has_button(world._action_choices, "Diagnose: street-lights"),
+            "office offers engineering task rather than magically paying salary"):
+        return
+
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 
