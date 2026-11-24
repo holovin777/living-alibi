@@ -35,6 +35,8 @@ of one undiscovered western ore seam. See [Industry](INDUSTRY.md).
 | `technician` | Workshop | Engineering, 3 | 38 EUR |
 | `engineer` | Office | Engineering, 8 | 62 EUR |
 | `investigator` | Office | Investigation, 8 | 54 EUR |
+| `miner` | Quarry | None, 0 | 30 EUR |
+| `machinist` | Factory | None, 0 | 34 EUR |
 
 Jobs are voluntary. `jobs` shows the public vacancy board, `apply` only
 works **in person at the specified workplace**, and `work` requires
@@ -124,8 +126,10 @@ launch, SQLite persistence, payroll, and restarts.
 Still missing: resumes and interviews, employer vacancies depending on
 business demand, real university programs, certifications, licensing,
 worker contracts/rights, taxation, detailed skill use in mechanical tasks,
-a police/detective career, advanced interactive engineering designs, and employment of the
-player by real agent-owned businesses. The first physical workshop repair
+a police/detective career, advanced interactive engineering designs,
+and many competing owner-operated enterprises. A **first player-owned
+fabrication company with real wage and procurement transfers** now exists;
+see [Player Business](PLAYER_BUSINESS.md). The first physical workshop repair
 and public-lighting upgrade do now exist as shared, finite-material
 work orders rather than automatic pay. None of those are represented as
 implemented.
