@@ -62,7 +62,7 @@ A dedicated, single-authority game session prevents unsynchronized writes.
 | Method | Path | JSON body | Response |
 |---|---|---|---|
 | GET | `/api/v1/world` | — | Day, year, season, weather sky, temperature, visitor needs, nearby NPCs and local resources |
-| GET | `/api/v1/locations` | — | Public destinations |
+| GET | `/api/v1/locations` | — | Public destinations with stable IDs and Java-computed travel minutes |
 | GET | `/api/v1/jobs` | — | Optional vacancies, qualifications and remaining employer payroll |
 | POST | `/api/v1/actions/apply` | `{"jobId":"shop-assistant"}` | Apply at actual workplace |
 | POST | `/api/v1/actions/study` | `{"subject":"engineering"}` | One-hour paid class (School / Library) |
@@ -89,26 +89,42 @@ inventory or NPC knowledge; it accepts *intent* and validates action rules
 using the same engine as the console. Each action is serialized, simulated,
 and saved transactionally before a JSON response is sent.
 
-## Godot starter project — visible park
+## Connected Godot town preview
 
-A minimal Godot 4 project now lives in [`godot/`](../godot/project.godot).
-Open **`godot/project.godot`** in the Godot 4 editor and run it.
-The `scenes/park.tscn` scene creates a placeholder visitor in a green park
-with a walking path, trees, a bench, a camera, an on-screen wallet/career
-display and a **Find jobs** button. WASD/arrow keys move the visual avatar
-**only within the park preview**. This local movement is *not yet a
-server-authoritative world position or full 3D navigation*; movement between
-abstract town locations still uses the Java game actions.
+A small Godot 4 project now lives in [`godot/`](../godot/project.godot).
+Open `godot/project.godot` in Godot 4.6.1 and run the project. The
+single `scenes/park.tscn` entry scene builds the currently visited public
+district using `scripts/ParkDemo.gd`: a park, market, school, library,
+workshop, office, river or woods (other places use generic public scenery).
+The visuals are primitive placeholder geometry.
 
-The project communicates with the local Spring API using
-[`godot/examples/WorldApi.gd`](../godot/examples/WorldApi.gd). The script
-emits `world_updated` for state and `job_offers_updated` for vacancies.
-A missing server leaves the preview visible and shows a connection error.
-The server must currently run on the same machine, on localhost port 8080.
+**WASD/arrow keys** walk within the visible district. Walk to the
+**yellow gate** and press **E** to open the destination menu. The menu
+requests `GET /api/v1/locations` and shows travel minutes calculated by
+Java. Choosing a destination issues `POST /api/v1/actions/go`; only
+after the Java world saves and returns its canonical `player.placeId`
+does Godot switch its scene and reset the local avatar position.
 
-The Java and Spring tests are automated in GitHub Actions; **Godot 4 editor
-scene import/runtime is not yet part of CI**, so this graphical scene is
-an unverified visual prototype rather than a polished game release.
+Walk to a **blue kiosk** and press **F** to access local actions:
+market job applications, school/library lessons, workshop/office career
+applications and paid shifts, plus local water/berry gathering. The Java
+server checks town location, business hours, qualifications, resources
+and finances before advancing game time. The kiosk proximity check itself
+is currently client-side; real meter-level server navigation will follow.
+
+The HTTP adapter [`godot/examples/WorldApi.gd`](../godot/examples/WorldApi.gd)
+serializes requests to avoid duplicate/out-of-order actions. It provides
+`world_updated`, `locations_updated`, `job_offers_updated`,
+`action_feedback` and failure signals. The local server must be running
+on the same machine at `127.0.0.1:8080`. Without it, the graphical
+prototype still opens but cannot move between authoritative locations.
+
+**Testing:** GitHub Actions tests Godot 4.6.1 import and headless startup,
+plus a specific `SceneNavigationSmoke` script that changes districts and
+checks job/study kiosk UI. Java CI separately boots a fresh server and
+tests park/market/school travel, hiring and studying over HTTP. This is
+not yet a fully automated click-through test with Godot and Spring in
+the same process; see [Godot README](../godot/README.md).
 
 The player is not automatically a detective. See
 [Careers](PLAYER_CAREERS.md) for jobs, engineering and investigation training.
@@ -139,9 +155,9 @@ It is **fictional, deterministic gameplay climate**, not real weather.
 The Java engine already applies rain to water stocks and cold/snow/rain
 to outdoor sleeping. See [Weather](WEATHER.md).
 
-Next steps: validate and iterate on the first Godot park scene, add
-server-authoritative navigation between real scene coordinates, clock
-subscription or event streaming, visible NPCs and character animations.
+Next steps: replace abstract travel gates with connected 3D streets,
+persist/map exact player coordinates in Java, add a clock subscription or
+event streaming, render actually visible NPCs, and animate the characters.
 Weather should be rendered from the API response, never recomputed
 independently in Godot. Optimize for a reliable first game launch;
 compatibility with disposable pre-release saves is a secondary priority.
