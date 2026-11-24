@@ -28,6 +28,7 @@ final class PlayerLife {
         int engineeringSkill;
         int investigationSkill;
         int lastWorkDay; // 0 means no paid shift yet.
+        int lastTechnicalDay; // Requires physical completion before a technical salary.
         final Map<String,Contact> contacts=new LinkedHashMap<>();
         Player copy() {
             Player p=new Player();
@@ -44,6 +45,7 @@ final class PlayerLife {
             p.engineeringSkill=engineeringSkill;
             p.investigationSkill=investigationSkill;
             p.lastWorkDay=lastWorkDay;
+            p.lastTechnicalDay=lastTechnicalDay;
             for(var e:contacts.entrySet())p.contacts.put(e.getKey(),e.getValue().copy());
             return p;
         }
