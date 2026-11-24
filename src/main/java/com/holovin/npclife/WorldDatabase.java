@@ -81,6 +81,10 @@ final class WorldDatabase implements AutoCloseable {
                         conversations INTEGER NOT NULL, last_day INTEGER NOT NULL,
                         last_minute INTEGER NOT NULL, last_heard TEXT)
                     """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS natural_resources (
+                        id TEXT PRIMARY KEY, quantity INTEGER NOT NULL CHECK(quantity>=0))
+                    """);
         }
         // v1.16: player physical needs.
         // Existing worlds receive healthy default values.
@@ -466,6 +470,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistLifeChanges(town);
                 persistProperty(town);
                 persistPlayer(town.player);
+                persistNature(town);
             }
             db.commit();
             if(town!=null) {
@@ -703,6 +708,16 @@ final class WorldDatabase implements AutoCloseable {
                 town.items.put(item.id,item);
             }
                 }
+        // Resources are shared town state; old worlds receive unclaimed starter stocks.
+        NatureLife.ensureSources(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT id,quantity FROM natural_resources")) {
+            while(rs.next()) {
+                var source=town.naturalResources.get(rs.getString("id"));
+                if(source!=null)
+                    source.stock=Math.max(0,Math.min(source.capacity,rs.getInt("quantity")));
+            }
+        }
         // Anonymous by default on migration. No resident learns the player's identity.
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_state WHERE id=1")) {
             if(rs.next()) {
@@ -730,6 +745,20 @@ final class WorldDatabase implements AutoCloseable {
         }
         PropertyLife.ensureStarterItems(town,state);
         return town;
+    }
+
+    private void persistNature(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO natural_resources(id,quantity) VALUES(?,?)
+                ON CONFLICT(id) DO UPDATE SET quantity=excluded.quantity
+                """)) {
+            for(var source:town.naturalResources.values()) {
+                p.setString(1,source.id);
+                p.setInt(2,source.stock);
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
     }
 
     private void persistPlayer(PlayerLife.Player player) throws SQLException {
