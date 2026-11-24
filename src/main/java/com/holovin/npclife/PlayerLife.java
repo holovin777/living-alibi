@@ -170,6 +170,20 @@ final class PlayerLife {
         return new SleepResult(hours*60,recovered,player.health-beforeHealth,player.alive);
     }
 
+    /** Weather-aware sleep on the authoritative game clock.
+     *  The older two-arg helper remains for isolated baseline rule tests. */
+    static SleepResult sleep(Player player,int hours,int day,int minute) {
+        if(day<1 || minute<0 || minute>=1440)
+            throw new IllegalArgumentException("Invalid game date.");
+        SleepResult basic=sleep(player,hours);
+        int before=player.health;
+        int penalty=WeatherLife.sleepPenalty(player.place,day,minute,hours);
+        player.health=Math.max(0,player.health-penalty);
+        if(player.health==0)player.alive=false;
+        return new SleepResult(basic.minutes(),basic.fatigueRecovered(),
+                basic.healthChange()+player.health-before,player.alive);
+    }
+
     static void requireAlive(Player player) {
         if(!player.alive)
             throw new IllegalArgumentException("The visitor is deceased. The town continues without them.");
