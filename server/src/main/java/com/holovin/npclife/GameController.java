@@ -34,6 +34,11 @@ public class GameController {
         return session.snapshot();
     }
 
+    @GetMapping("/industry")
+    public GameSession.IndustryView industry() {
+        return session.industry();
+    }
+
     @GetMapping("/utilities")
     public GameSession.ServicesView utilities() {
         return session.services();
