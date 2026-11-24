@@ -181,6 +181,12 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.TechnicalWorkDatabaseSmokeTest' exec:exec
+      - name: Test resident fountain use, water conservation and restored street lights
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.UtilitySmokeTest
+      - name: Test municipal water stocks survive restart and are refilled only once
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.UtilityDatabaseSmokeTest' exec:exec
       - name: Install Java engine so the separate Spring adapter can use it
         run: mvn --batch-mode --no-transfer-progress -DskipTests install
       - name: Build and test Spring Boot Godot API
@@ -205,6 +211,16 @@ jobs:
           grep -q '"weather":' target/api-smoke/world.json
           grep -q '"temperatureC":' target/api-smoke/world.json
           grep -q '"placeId":"PARK"' target/api-smoke/world.json
+          grep -q '"services":' target/api-smoke/world.json
+          grep -q '"fountainWorking":false' target/api-smoke/world.json
+          curl -fsS http://127.0.0.1:18080/api/v1/utilities \
+            -o target/api-smoke/utilities.json
+          grep -q '"cleanWater":0' target/api-smoke/utilities.json
+          test "$(curl --silent -o target/api-smoke/fountain-error.json -w '%{http_code}' \
+            -X POST http://127.0.0.1:18080/api/v1/actions/drink \
+            -H 'Content-Type: application/json' \
+            -d '{"sourceId":"park-fountain"}')" = "400"
+          grep -q 'pump is broken' target/api-smoke/fountain-error.json
           curl -fsS http://127.0.0.1:18080/api/v1/locations \
             -o target/api-smoke/locations.json
           grep -q '"travelMinutes":10' target/api-smoke/locations.json
