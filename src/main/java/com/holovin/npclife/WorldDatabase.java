@@ -121,6 +121,20 @@ final class WorldDatabase implements AutoCloseable {
                         completed_day INTEGER NOT NULL DEFAULT 0)
                     """);
             st.execute("""
+                    CREATE TABLE IF NOT EXISTS industry_stocks (
+                        stock_id TEXT PRIMARY KEY,
+                        quantity INTEGER NOT NULL CHECK(quantity>=0))
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS industry_schedule (
+                        id INTEGER PRIMARY KEY CHECK(id=1),
+                        extract_day INTEGER NOT NULL DEFAULT 0,
+                        transport_day INTEGER NOT NULL DEFAULT 0,
+                        refine_day INTEGER NOT NULL DEFAULT 0,
+                        fabricate_day INTEGER NOT NULL DEFAULT 0,
+                        deliver_day INTEGER NOT NULL DEFAULT 0)
+                    """);
+            st.execute("""
                     CREATE TABLE IF NOT EXISTS municipal_services (
                         id INTEGER PRIMARY KEY CHECK(id=1),
                         clean_water INTEGER NOT NULL DEFAULT 0 CHECK(clean_water>=0),
@@ -527,6 +541,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistNature(town);
                 persistCareerAccounts(town);
                 persistTechnicalWork(town);
+                persistIndustry(town);
                 persistCityUtilities(town);
             }
             db.commit();
@@ -803,6 +818,27 @@ final class WorldDatabase implements AutoCloseable {
                 }
             }
         }
+        IndustryLife.ensure(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT stock_id,quantity FROM industry_stocks")) {
+            while(rs.next()) {
+                if(town.industryStocks.containsKey(rs.getString(1)))
+                    town.industryStocks.put(rs.getString(1),Math.max(0,rs.getInt(2)));
+            }
+        }
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("""
+                        SELECT extract_day,transport_day,refine_day,fabricate_day,deliver_day
+                        FROM industry_schedule WHERE id=1
+                        """)) {
+            if(rs.next()) {
+                town.lastIndustryExtractDay=Math.max(0,rs.getInt(1));
+                town.lastIndustryTransportDay=Math.max(0,rs.getInt(2));
+                town.lastIndustryRefineDay=Math.max(0,rs.getInt(3));
+                town.lastIndustryFabricateDay=Math.max(0,rs.getInt(4));
+                town.lastIndustryDeliverDay=Math.max(0,rs.getInt(5));
+            }
+        }
         try(Statement st=db.createStatement();
                 ResultSet rs=st.executeQuery("SELECT clean_water,last_pump_day FROM municipal_services WHERE id=1")) {
             if(rs.next()) {
@@ -920,6 +956,37 @@ final class WorldDatabase implements AutoCloseable {
                 p.addBatch();
             }
             p.executeBatch();
+        }
+    }
+
+    private void persistIndustry(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO industry_stocks(stock_id,quantity) VALUES(?,?)
+                ON CONFLICT(stock_id) DO UPDATE SET quantity=excluded.quantity
+                """)) {
+            for(var entry:town.industryStocks.entrySet()) {
+                p.setString(1,entry.getKey());
+                p.setInt(2,entry.getValue());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO industry_schedule(id,extract_day,transport_day,
+                                              refine_day,fabricate_day,deliver_day)
+                VALUES(1,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                extract_day=excluded.extract_day,
+                transport_day=excluded.transport_day,
+                refine_day=excluded.refine_day,
+                fabricate_day=excluded.fabricate_day,
+                deliver_day=excluded.deliver_day
+                """)) {
+            p.setInt(1,town.lastIndustryExtractDay);
+            p.setInt(2,town.lastIndustryTransportDay);
+            p.setInt(3,town.lastIndustryRefineDay);
+            p.setInt(4,town.lastIndustryFabricateDay);
+            p.setInt(5,town.lastIndustryDeliverDay);
+            p.executeUpdate();
         }
     }
 
