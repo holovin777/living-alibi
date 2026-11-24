@@ -27,7 +27,9 @@ public final class Main {
             System.out.println("Living Alibi v1.16 — Living Visitor (work in progress)");
             System.out.println("You arrive at "+town.player.place.label+
                     ", with "+town.player.money+" EUR in your pockets.");
-            System.out.println("No profession or mission is assigned. Find work, study, or just explore.");
+            if(town.player.jobId==null)
+                System.out.println("No profession or mission is assigned. Find work, study, or explore.");
+            else System.out.println("Continuing your chosen path: "+CareerLife.status(town.player));
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
