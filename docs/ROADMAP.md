@@ -112,8 +112,8 @@ The eventual game is an emergent detective simulation. The player investigates e
 - `needs` and `rest` console commands; public breaks consume world time.
 - `sleep [hours]` works in any accessible public area, with an early
   place-based exposure/health heuristic, persistent visitor mortality and
-  no mandatory property ownership. Next: climate, shelters, medicine and
-  player access to the existing town economy.
+  no mandatory property ownership. Temperature, rain and snow now affect
+  outdoor risk. Next: shelters, medicine and player access to the town economy.
 - Death automatically starts a new anonymous visitor in the same continuous
   world; previous player lives and disclosed per-resident identities remain
   archived without leaking into the new person's memories.
@@ -125,13 +125,16 @@ The eventual game is an emergent detective simulation. The player investigates e
 ### New world calendar and Godot API bridge (v1.16 draft)
 
 - Four recurring seasons follow the authoritative 365-day Java clock,
-  beginning in spring; seasonal weather and temperatures are not simulated yet.
+  beginning in spring. Deterministic daily rain/snow/cloud/clear skies and
+  temperature affect outdoor sleep, puddles and seasonal berries. Detailed
+  weather fronts and NPC weather-aware decisions remain future work.
+  See [Weather](WEATHER.md).
 - The first launch with no saved database automatically creates a playable
   world. The Spring server starts with Marco, Elena and twelve generated
   residents, rather than requiring manual developer commands.
 - Standalone Spring Boot 4.2 API module under `server/` shares the same Java
   simulation and SQLite storage. `GET /api/v1/world` exposes time, season,
-  nearby NPCs, accessible natural resources and visitor condition. Commands
+  weather and temperature, nearby NPCs, resources and visitor condition. Commands
   over HTTP validate movement, rest, sleep, drinking, gathering and waiting.
 - An example Godot 4 `HTTPRequest` adapter is available; a rendered Godot
   game world and real-time multiplayer synchronization are not implemented.
