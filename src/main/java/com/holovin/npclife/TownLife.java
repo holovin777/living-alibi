@@ -94,6 +94,8 @@ final class TownLife {
         final Map<Integer,PlayerLife.LifeRecord> pastLives=new LinkedHashMap<>();
         final Map<String,NatureLife.Source> naturalResources=new LinkedHashMap<>();
         final Map<String,Integer> employerFunds=new LinkedHashMap<>();
+        final Map<String,Integer> technicalMaterials=new LinkedHashMap<>();
+        final Map<String,TechnicalWorkLife.Order> technicalOrders=new LinkedHashMap<>();
         boolean together;
         long meetingSinceTick=-1;
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
@@ -131,6 +133,9 @@ final class TownLife {
                 t.naturalResources.put(e.getKey(),e.getValue().copy());
             t.pastLives.putAll(pastLives); // Immutable history records.
             t.employerFunds.putAll(employerFunds);
+            t.technicalMaterials.putAll(technicalMaterials);
+            for(var e:technicalOrders.entrySet())
+                t.technicalOrders.put(e.getKey(),e.getValue().copy());
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
             for(var e:secrets.entrySet())t.secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
@@ -150,6 +155,11 @@ final class TownLife {
             pastLives.putAll(other.pastLives);
             employerFunds.clear();
             employerFunds.putAll(other.employerFunds);
+            technicalMaterials.clear();
+            technicalMaterials.putAll(other.technicalMaterials);
+            technicalOrders.clear();
+            for(var e:other.technicalOrders.entrySet())
+                technicalOrders.put(e.getKey(),e.getValue().copy());
             naturalResources.clear();
             for(var e:other.naturalResources.entrySet())
                 naturalResources.put(e.getKey(),e.getValue().copy());
@@ -194,6 +204,7 @@ final class TownLife {
         t.get("elena").activity="WORKING";
         NatureLife.ensureSources(t);
         CareerLife.ensureEmployers(t);
+        TechnicalWorkLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -206,6 +217,7 @@ final class TownLife {
                      List<SocialLife.Interaction> interactions) {
         PlayerLife.tick(town.player,marco.minute);
         NatureLife.tick(town,marco.day,marco.minute);
+        TechnicalWorkLife.tick(town,marco.day,marco.minute);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;
