@@ -1,118 +1,155 @@
-# Natural resources and working industries — v1.16 prototype
+# Living Alibi: finite industrial economy (v1.16 draft)
 
-## Why a city has industry
+The world starts with a visitor in the Park, **50 EUR and no assigned
+profession**. Mining, logistics and fabrication are normal activities
+undertaken by real NPCs. The player can choose to take part but is never
+required to become an engineer or detective.
 
-The player enters the public Park with **50 EUR, no profession and no
-mandatory mission**. Meanwhile the city has its own workers and limited
-natural materials. Engineers and technicians repairing pumps or public
-lighting no longer depend only on supplies that existed on the first day.
-
-The Java simulation is authoritative for quarry geology, NPC work attendance,
-cargo, factory stock and repair materials; Godot displays these outcomes.
-
-## First production chain
+## Material flow, labor, time and transport
 
 ```text
-Finite underground deposits — Quarry
-    80 iron-ore units + 40 copper-ore units initially
-        | Mining, 09:00 (Miner on site)
-        v
-Quarry inventory (2 iron + 1 copper per staffed working day)
-        | Cargo, 11:00 (Miner + machinist on site)
-        v
-Factory raw-ore inventory
-        | Refining, 12:00 (Factory machinist on site)
-        v
-Steel (2 units) + refined copper (1 unit)
-        | Fabrication, 14:00 (1 steel -> 2 spare parts)
-        v
-Factory products
-        | Dispatch, 15:00 (Factory machinist on site)
-        v
-City technical-material warehouse
-        1 steel + 1 copper + 2 spare parts per full batch
-        |
-        +--> Technician repairs Park water pump
-        +--> Engineer modernizes public street lighting
+Quarry: 80 iron ore + 40 copper ore in initial mineral seams
+    08:45 — once the visible deposit is exhausted, an employed miner
+             can commission a 30 EUR survey of one hidden western seam
+    09:00 — employed miner physically present extracts up to 2 iron + 1 copper
+    11:00 — miner + transport driver load a truck (capacity: 3 ore)
+             factory pays quarry EUR 3 per ore
+    11:00–11:30 — cargo is explicitly IN TRANSIT, not at the factory
+    11:30 — employed factory machinist receives truck (if present)
+    12:00 — employed factory machinist refines ore into steel and copper
+    13:00 — machinist recycles 2 existing scrap units into 1 steel unit
+    14:00 — machinist fabricates 2 spare parts from 1 steel unit
+    15:00 — machinist delivers up to 2 parts, 1 steel, 1 copper
+             city maintenance account pays factory for actual delivered items
+    Repair workshop receives bounded materials used for pump/lights tasks
 ```
 
-Quantities are simplified **fictional game units**, not real metallurgical
-yields. Iron is accounted for as steel, while each fabricated spare-part
-unit represents half a steel unit. Other ore remains in the factory/quarry
-until a later production run. **Nothing is regenerated in the geological
-seam**; once deposits are depleted, work must eventually rely on trade,
-recycling or a new deposit (not implemented).
+The second **western deposit physically exists from first world creation**,
+but it is initially unknown and unavailable. It contains **30 finite iron
+and 15 finite copper units**. Surveying it marks it as discovered and
+transfers EUR 30 from the quarry to the geological survey office. It is
+not the same as restoring ore in an exhausted deposit. Automatic NPC
+discovery needs a working quarry miner, an exhausted initial deposit and
+a solvent company.
 
-## People actually have to work
+The factory additionally starts with **10 units of old municipal metal
+scrap**. Recycling permanently consumes two scrap units to recover one
+steel unit. This loss is deliberate: neither mining, production nor
+recycling is an infinite-resource exploit. Neither the deposits nor the
+scrap pile regenerates on a timer. Actual material quantities remain
+nonnegative throughout the chain.
 
-A newly created Spring town generates twelve additional residents, including
-one **Miner** (at the Quarry) and one **Factory machinist** (at the Factory).
-They have the existing independent NPC job schedule, home, walking commute,
-sleep, needs, health, illness, job loss and mortality. Production does not
-run just because a calendar day passes: the appropriate NPC must actually
-be **alive, employed, on site and working** when the operation is scheduled.
+These are simplified **game units**, not engineering-grade metal yields.
+The truck has finite cargo capacity and a half-hour delay, but not yet a
+physical, animated vehicle or navigable freight road. A missing driver
+prevents dispatch; a missing factory worker leaves existing cargo on the
+truck for a later arrival opportunity.
 
-The shipment stage requires both a quarry worker and factory worker present;
-the later stages need the machinist. On holidays, during sick leave, when
-unemployed, while traveling, or when a deposit is empty, production can stop.
-These setbacks are a normal part of the living town, not a broken save.
+## Enterprise money and worker consequences
 
-The mining and factory jobs are initially **NPC occupations**.
-Player employment inside those two enterprises, business ownership,
-enterprise payrolls, and a full market for their products are future
-features. Generated workers continue to earn wages using the older NPC
-employment rules; their wages are **not yet booked against factory revenue**.
-Do not treat this as a complete conservation-of-money economy.
+Corporate balances are saved in the same `career_accounts` ledger used
+by existing player careers. Initial accounts include:
 
-## Persistence and truth
+| Account | Initial EUR | Role |
+|---|---:|---|
+| Quarry (`miner`) | 360 | Pays miners and transport drivers |
+| Factory (`machinist`) | 560 | Pays factory workers |
+| City maintenance | 500 | Purchases delivered steel/copper/parts |
+| Survey office | 0 | Receives paid geological surveys |
 
-The SQLite tables `industry_stocks` and `industry_schedule` contain
-the distinct deposit, quarry, factory inventories and last processed day
-for each stage. They are stored **in the same SQLite transaction** as
-workshop materials, company accounts, player state, citizens and town events.
+Actual working industrial NPCs earn **EUR 11 per hour from their firm's
+own account**, not from an unlimited money source. Freight purchases
+transfer cash **factory → quarry**. Delivered maintenance supplies move
+cash **city → factory**. No account goes negative, and repeated deliveries
+or player work cannot print extra wages. These accounts also fund the
+player's industrial shifts.
 
-Daily timestamps make each operation idempotent after a save/reload at
-the same simulated minute. A new visitor after the previous player's
-death does not reset the mine or factory. Depleted rock remains depleted;
-completed shipments are not doubled.
+If an enterprise cannot pay even one hourly wage, its NPCs are made
+redundant the next morning. After a short, modeled unemployment period,
+former industrial workers can seek a different local occupation. The
+business can consequently halt for lack of funding or workers. A solvent
+employer, labor availability, and real raw material are all needed for
+productive shifts. The existing nonindustrial NPC economy still uses
+placeholder hourly wages, so **this is not yet a complete closed economy**.
 
-Public operations use `TownLife.publish` with a real working resident
-as the actor. Other characters can observe those events only according to
-the existing location and witness rules; workers' private health details
-aren't exposed as an industrial log.
+## What the player can do
 
-## Player view
+At the Quarry, choose the `miner` job; at the Factory, choose
+`machinist`. Neither needs engineering study as a prerequisite. Jobs
+require being physically at the matching public district, an employer
+with sufficient payroll, working hours and a two-hour shift. There is
+only **one paid player shift per in-game day**.
 
-The console command `industry` shows current mineral reserves, cargo,
-factory products, workshop stock and workers on duty. `locations` includes
-`quarry` and `factory`; there is no assigned career requirement to visit
-the public parts of those districts.
+- A miner shift **consumes one iron and one copper ore unit**, when
+  available, and adds real ore to the quarry's shared warehouse; the
+  wage is **EUR 30 from quarry funds**.
+- A machinist shift **refines up to one iron and one copper ore** already
+  at the factory. If there is no ore but at least two scrap units, the
+  shift recycles them into steel. Pay: **EUR 34 from factory funds**.
+- A hired miner can separately order a **two-hour geological survey**
+  at the Quarry for EUR 30 from the quarry fund. The one hidden western
+  seam is discoverable exactly once.
 
-Spring Boot `GET /api/v1/industry` returns a public summary of the same
-authoritative inventory. The Godot preview offers an **Industry** button
-and placeholder 3D Quarry and Factory districts. Manufacturing is performed
-by autonomous NPCs in the Java engine, not by fake client-side animation.
+If raw material or funds are missing, the action is rejected without
+a speculative wage or phantom inventory. Work is not a button that
+creates free materials.
 
-## Test coverage
+Console commands: `jobs`, `go quarry`, `apply miner`, `work`,
+`prospect`, `go factory`, `apply machinist` and `industry`.
+The Spring API uses `GET /api/v1/jobs`,
+`POST /api/v1/actions/apply`, `POST /api/v1/actions/work`,
+`POST /api/v1/actions/prospect`, and `GET /api/v1/industry`.
 
-- `IndustrySmokeTest`: staffed and unstaffed production, finite geology,
-  daily idempotence, ore transport, refining, component fabrication,
-  physical warehouse delivery, and balanced iron/copper equivalents.
-- `IndustryDatabaseSmokeTest`: genuinely empty database startup, extracted
-  ore saved at mid-production, restart/resume without duplication,
-  shipment persistence, and a new player life in the same town.
-- Spring `GameSessionTest`: finite inventory on clean startup, public
-  Quarry/Factory destinations and committed inventory across server starts.
-- Java CI calls the actual Spring HTTP industry endpoint on a brand-new
-  world. Godot CI checks scene rendering and the supply dashboard.
+The Godot 4 preview offers Quarry and Factory districts with an **F**
+kiosk for job application, optional paid surveying and industrial shifts.
+The global **Industry** button shows finite ore, real truck cargo, scrap,
+company accounts, maintenance supplies and working NPC counts.
+Movement and kiosks remain provisional 3D placeholders; Java owns
+the actual district permissions and economic rules.
 
-## What's intentionally still missing
+## Database and first launch
 
-Mine exhaustion has no automatic rescue system; we need exploration,
-recycling or import contracts. Factory operations currently use abstract
-cargo transfers rather than a truck NPC with continuous coordinates.
-There is no player manufacturing mini-game, contracts, energy consumption,
-mine safety system, by-products, pollution, shipping cost, waste recovery,
-variable yields, seasonal demand, supply bidding, factory ownership, nor
-integrated wage accounting. These can be developed without replacing
-the shared Java/Spring/Godot architecture.
+SQLite `industry_stocks` tracks surface deposits, hidden pockets,
+survey discovery, quarry inventories, truck freight, factory raw ore,
+finished metal, spare parts and scrap. `industry_schedule` preserves
+last dispatch, arrival, recycling, refining and delivery days. Both are
+saved **atomically with the whole town, player money, company budgets and
+citizens**. Existing world files migrate to the two added scheduling
+columns rather than being reset. A deceased visitor's successor inherits
+the same geological depletion, truck manifests, business accounts
+and previously discovered mineral pockets.
+
+A completely **empty database works on first launch**. Run
+`bash play.sh` from the source root on Linux with the documented
+Java, Maven, curl and Godot dependencies.
+
+## Tests
+
+- `IndustrySmokeTest`: no mining without miner, no freight without
+  driver, bounded transport, money-preserving invoices, source
+  conservation, one-time geological survey and recycling loss.
+- `IndustryDatabaseSmokeTest`: a new database, normal stock movement,
+  industrial salary balances, saved work history, no duplicate shipment.
+- `IndustryTransportDatabaseSmokeTest`: stop with real ore **on the
+  truck**, reload, unload later, recycle, deliver, survey, reload again
+  and start a second visitor life without resetting business accounts.
+- `IndustryEconomySmokeTest`: productive **player** mining and machining,
+  strict salary transfers, employer bankruptcy and no double shift.
+- `IndustryEmploymentSmokeTest`: broke companies lay off industrial
+  NPCs; residents can seek other employment rather than collect phantom wages.
+- `IndustryIntegrationSmokeTest`: multiple autonomous game days
+  with worker commuting and actual finished-product deliveries.
+- Spring Boot `GameSessionTest` and the clean-world HTTP smoke test
+  verify actual persisted jobs and industrial read models.
+- Godot headless CI checks new Quarry/Factory scenes, job kiosks and
+  industrial dashboard.
+
+## Still missing
+
+Real trucks with driver coordinates, multiple transport routes,
+energy/fuel costs, workplace safety, enterprise ownership, commercial
+customer demand, procurement contracts, taxation, reinvestment, trade,
+recycling from individual replaced machine parts, ore search on a real
+terrain map and a wholly closed financial economy. Industrial jobs
+currently use abstract timed actions, not complex machinery controls.
+Each is a future extension, not a feature promised by this milestone.
