@@ -29,7 +29,10 @@ See [Godot / Spring integration](docs/GODOT_INTEGRATION.md),
 [Player Daily Life](docs/PLAYER_DAILY_LIFE.md),
 [Natural Resources](docs/NATURAL_RESOURCES.md) and
 [Weather](docs/WEATHER.md) and
-[Careers](docs/PLAYER_CAREERS.md). The GDScript client is
+[Careers](docs/PLAYER_CAREERS.md) and
+[Technical Work](docs/TECHNICAL_WORK.md). Trained technicians and engineers
+now inspect and fix real persistent equipment using finite material stocks
+before receiving a technical wage. The GDScript client is
 [`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd). A first
 connected 3D town preview starts from [`godot/project.godot`](godot/project.godot):
 walk within a district using WASD, press E at the yellow travel gate to
