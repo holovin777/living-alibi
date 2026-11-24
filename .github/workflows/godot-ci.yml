@@ -10,6 +10,10 @@ on:
       - 'godot/**'
       - '.github/workflows/godot-ci.yml'
 
+concurrency:
+  group: godot-ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
