@@ -13,6 +13,46 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void ordinaryVisitorCanBecomeMinerOrMachinistAndSurveyNewOre() throws Exception {
+        Path mine=directory.resolve("visitor-miner.db");
+        try(var game=new GameSession(mine)) {
+            assertEquals(6,game.jobs().size());
+            game.move("quarry");
+            game.applyJob("miner");
+            game.waitMinutes(30);
+            var paid=game.work();
+            assertEquals("miner",paid.world().player().jobId());
+            assertEquals(80,paid.world().player().money(),
+                    "the player earns real company cash and actually mines");
+            assertTrue(game.industry().ironRemaining()<80);
+            var surveyed=game.prospect();
+            assertTrue(surveyed.message().contains("Western"));
+            assertTrue(game.industry().westDepositDiscovered());
+            assertEquals(30,game.industry().ironRemaining()-
+                    (80-(80-game.industry().ironRemaining())),
+                    "extra bounded mineral seam is revealed without refilling old one");
+            assertThrows(IllegalArgumentException.class,game::prospect);
+        }
+        try(var restarted=new GameSession(mine)) {
+            assertEquals("miner",restarted.snapshot().player().jobId());
+            assertEquals(80,restarted.snapshot().player().money());
+            assertTrue(restarted.industry().westDepositDiscovered(),
+                    "geology and company finances survive server restarts");
+        }
+        Path factory=directory.resolve("visitor-machinist.db");
+        try(var game=new GameSession(factory)) {
+            game.move("factory");
+            game.applyJob("machinist");
+            game.waitMinutes(30);
+            var worked=game.work();
+            assertEquals("machinist",worked.world().player().jobId());
+            assertEquals(84,worked.world().player().money());
+            assertTrue(game.industry().scrapRemaining()<10,
+                    "machinist genuinely converts stored waste into steel");
+        }
+    }
+
+    @Test
     void freshWorldHasFiniteEnterprisesAndTheirStoresPersist() throws Exception {
         Path file=directory.resolve("factory-world.db");
         try(var game=new GameSession(file)) {
