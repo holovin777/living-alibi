@@ -21,7 +21,8 @@ public final class IndustryDatabaseSmokeTest {
                 var citizens=PopulationGenerator.add(town,12);
                 for(var c:citizens) {
                     if(!c.occupation.equals("Miner") &&
-                            !c.occupation.equals("Factory machinist"))continue;
+                            !c.occupation.equals("Factory machinist") &&
+                            !c.occupation.equals("Transport driver"))continue;
                     c.place=c.workplace;c.destination=c.workplace;
                     c.travelRemaining=0;c.activity="WORKING";c.employed=true;
                 }
@@ -42,6 +43,7 @@ public final class IndustryDatabaseSmokeTest {
                 check(town.industryStocks.get("seam:iron-ore")==78,
                         "repeating the saved extraction minute cannot mint new ore");
                 for(int minute:new int[]{IndustryLife.TRANSPORT_MINUTE,
+                        IndustryLife.ARRIVE_MINUTE,
                         IndustryLife.REFINE_MINUTE,IndustryLife.FABRICATE_MINUTE,
                         IndustryLife.DELIVER_MINUTE}) {
                     world.minute=minute;
@@ -60,11 +62,14 @@ public final class IndustryDatabaseSmokeTest {
                         town.industryStocks.get("seam:copper-ore")==39,
                         "finite underground seams remain depleted");
                 check(town.lastIndustryDeliverDay==1 &&
+                        town.lastIndustryArrivalDay==1 &&
                         town.technicalMaterials.get("spare-parts")==8,
                         "shipment and daily delivery receipt survive restart");
                 IndustryLife.tick(town,world,new ArrayList<>(),new ArrayList<>());
-                check(town.technicalMaterials.get("spare-parts")==8,
-                        "same-minute reload cannot ship components a second time");
+                check(town.technicalMaterials.get("spare-parts")==8 &&
+                        town.industryStocks.get("truck:iron-ore")==0 &&
+                        town.employerFunds.get("city-maintenance")==481,
+                        "same-minute reload cannot duplicate goods or city purchase");
                 town.player.health=0;town.player.alive=false;
                 PlayerLife.beginNewLife(town,world.day,world.minute);
                 db.save(world,List.of(),List.of(),town,List.of(),List.of(),List.of());
