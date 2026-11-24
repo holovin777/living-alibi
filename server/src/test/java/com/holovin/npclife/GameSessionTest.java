@@ -13,6 +13,37 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void freshWorldHasFiniteEnterprisesAndTheirStoresPersist() throws Exception {
+        Path file=directory.resolve("factory-world.db");
+        try(var game=new GameSession(file)) {
+            assertEquals(80,game.industry().ironRemaining());
+            assertEquals(40,game.industry().copperRemaining());
+            assertEquals(6,game.industry().workshopParts());
+            assertEquals(4,game.industry().workshopSteel());
+            assertEquals(3,game.industry().workshopCopper());
+            assertTrue(game.destinations().stream().anyMatch(d->d.id().equals("QUARRY")));
+            assertTrue(game.destinations().stream().anyMatch(d->d.id().equals("FACTORY")));
+            // Existing player freedoms still work; viewing a stock report
+            // never grants free components or changes the world.
+            assertEquals(80,game.industry().ironRemaining());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            town.industryStocks.put("seam:iron-ore",77);
+            town.industryStocks.put("factory:spare-parts",2);
+            db.save(state,java.util.List.of(),java.util.List.of(),
+                    town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(77,game.industry().ironRemaining());
+            assertEquals(2,game.industry().factoryParts());
+            assertEquals(6,game.industry().workshopParts(),
+                    "unfinished factory parts are not yet delivered to repairs");
+        }
+    }
+
+    @Test
     void visitorChoosesCareerAndKeepsItAcrossRestart() throws Exception {
         Path file=directory.resolve("career-world.db");
         try(var game=new GameSession(file)) {
