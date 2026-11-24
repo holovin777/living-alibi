@@ -151,10 +151,13 @@ The eventual game is an emergent detective simulation. The player investigates e
   simulation and SQLite storage. `GET /api/v1/world` exposes time, season,
   weather and temperature, nearby NPCs, resources and visitor condition. Commands
   over HTTP validate movement, rest, sleep, drinking, gathering and waiting.
-- A minimal Godot 4 **3D park preview** now has a placeholder person,
-  trees, bench, WASD controls, a wallet/career display and live job listings
-  through the HTTP adapter. The visual scene is not yet verified in Godot CI;
-  navigation across the real world map and multiplayer are not implemented.
+- Godot 4.6.1 now renders **several 3D public districts** with a
+  pedestrian avatar, travel gate (E) and local career/resource kiosk (F).
+  The Java API supplies canonical place IDs and travel time, commits movement
+  before Godot redraws the area, and validates applications, study and shifts.
+  Godot headless CI exercises park → market → school → workshop scene
+  transitions and context-specific kiosk options. Per-meter navigation,
+  real connected streets, NPC meshes and multiplayer are future work.
 - Details: [Godot / Spring Boot integration](GODOT_INTEGRATION.md).
 
 ## Proposed, not implemented
