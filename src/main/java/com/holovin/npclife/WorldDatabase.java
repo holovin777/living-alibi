@@ -121,6 +121,12 @@ final class WorldDatabase implements AutoCloseable {
                         completed_day INTEGER NOT NULL DEFAULT 0)
                     """);
             st.execute("""
+                    CREATE TABLE IF NOT EXISTS municipal_services (
+                        id INTEGER PRIMARY KEY CHECK(id=1),
+                        clean_water INTEGER NOT NULL DEFAULT 0 CHECK(clean_water>=0),
+                        last_pump_day INTEGER NOT NULL DEFAULT 0)
+                    """);
+            st.execute("""
                     CREATE TABLE IF NOT EXISTS natural_resources (
                         id TEXT PRIMARY KEY, quantity INTEGER NOT NULL CHECK(quantity>=0))
                     """);
@@ -521,6 +527,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistNature(town);
                 persistCareerAccounts(town);
                 persistTechnicalWork(town);
+                persistCityUtilities(town);
             }
             db.commit();
             if(town!=null) {
@@ -796,6 +803,13 @@ final class WorldDatabase implements AutoCloseable {
                 }
             }
         }
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT clean_water,last_pump_day FROM municipal_services WHERE id=1")) {
+            if(rs.next()) {
+                town.cleanWater=Math.max(0,Math.min(UtilityLife.TANK_CAPACITY,rs.getInt(1)));
+                town.lastWaterPumpDay=Math.max(0,rs.getInt(2));
+            }
+        }
         // Anonymous by default on migration. No resident learns the player's identity.
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_state WHERE id=1")) {
             if(rs.next()) {
@@ -906,6 +920,18 @@ final class WorldDatabase implements AutoCloseable {
                 p.addBatch();
             }
             p.executeBatch();
+        }
+    }
+
+    private void persistCityUtilities(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO municipal_services(id,clean_water,last_pump_day)
+                VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET
+                clean_water=excluded.clean_water,last_pump_day=excluded.last_pump_day
+                """)) {
+            p.setInt(1,town.cleanWater);
+            p.setInt(2,town.lastWaterPumpDay);
+            p.executeUpdate();
         }
     }
 
