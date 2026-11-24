@@ -109,6 +109,20 @@ final class WorldDatabase implements AutoCloseable {
                         balance INTEGER NOT NULL CHECK(balance>=0))
                     """);
             st.execute("""
+                    CREATE TABLE IF NOT EXISTS player_business (
+                        id INTEGER PRIMARY KEY CHECK(id=1),
+                        registered INTEGER NOT NULL DEFAULT 0,
+                        owner_incarnation INTEGER NOT NULL DEFAULT 0,
+                        cash INTEGER NOT NULL DEFAULT 0 CHECK(cash>=0),
+                        machine INTEGER NOT NULL DEFAULT 0,
+                        employee_id TEXT,
+                        spare_parts INTEGER NOT NULL DEFAULT 0 CHECK(spare_parts>=0),
+                        last_pay_day INTEGER NOT NULL DEFAULT 0,
+                        paid_hours INTEGER NOT NULL DEFAULT 0,
+                        last_production_day INTEGER NOT NULL DEFAULT 0,
+                        last_sale_day INTEGER NOT NULL DEFAULT 0)
+                    """);
+            st.execute("""
                     CREATE TABLE IF NOT EXISTS technical_materials (
                         material_id TEXT PRIMARY KEY,
                         stock INTEGER NOT NULL CHECK(stock>=0))
@@ -556,6 +570,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistCareerAccounts(town);
                 persistTechnicalWork(town);
                 persistIndustry(town);
+                persistBusiness(town);
                 persistCityUtilities(town);
             }
             db.commit();
@@ -911,6 +926,25 @@ final class WorldDatabase implements AutoCloseable {
                         rs.getString("private_name")));
             }
         }
+        // The visitor's workshop is another independent persistent company.
+        // Old save files have no row and correctly start without any business.
+        BusinessLife.ensure(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT * FROM player_business WHERE id=1")) {
+            if(rs.next()) {
+                var b=town.business;
+                b.registered=rs.getInt("registered")!=0;
+                b.ownerIncarnation=Math.max(0,rs.getInt("owner_incarnation"));
+                b.cash=Math.max(0,rs.getInt("cash"));
+                b.machine=rs.getInt("machine")!=0;
+                b.employeeId=rs.getString("employee_id");
+                b.parts=Math.max(0,rs.getInt("spare_parts"));
+                b.lastPayDay=Math.max(0,rs.getInt("last_pay_day"));
+                b.paidHours=Math.max(0,rs.getInt("paid_hours"));
+                b.lastProductionDay=Math.max(0,rs.getInt("last_production_day"));
+                b.lastSaleDay=Math.max(0,rs.getInt("last_sale_day"));
+            }
+        }
         PropertyLife.ensureStarterItems(town,state);
         return town;
     }
@@ -1008,6 +1042,39 @@ final class WorldDatabase implements AutoCloseable {
             p.setInt(5,town.lastIndustryDeliverDay);
             p.setInt(6,town.lastIndustryArrivalDay);
             p.setInt(7,town.lastIndustryRecycleDay);
+            p.executeUpdate();
+        }
+    }
+
+    private void persistBusiness(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO player_business(id,registered,owner_incarnation,cash,machine,
+                                            employee_id,spare_parts,last_pay_day,paid_hours,
+                                            last_production_day,last_sale_day)
+                VALUES(1,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET
+                registered=excluded.registered,
+                owner_incarnation=excluded.owner_incarnation,
+                cash=excluded.cash,
+                machine=excluded.machine,
+                employee_id=excluded.employee_id,
+                spare_parts=excluded.spare_parts,
+                last_pay_day=excluded.last_pay_day,
+                paid_hours=excluded.paid_hours,
+                last_production_day=excluded.last_production_day,
+                last_sale_day=excluded.last_sale_day
+                """)) {
+            var b=town.business;
+            p.setInt(1,b.registered?1:0);
+            p.setInt(2,b.ownerIncarnation);
+            p.setInt(3,b.cash);
+            p.setInt(4,b.machine?1:0);
+            p.setString(5,b.employeeId);
+            p.setInt(6,b.parts);
+            p.setInt(7,b.lastPayDay);
+            p.setInt(8,b.paidHours);
+            p.setInt(9,b.lastProductionDay);
+            p.setInt(10,b.lastSaleDay);
             p.executeUpdate();
         }
     }
