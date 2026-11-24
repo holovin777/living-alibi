@@ -19,6 +19,8 @@ class GameSessionTest {
             var initial=game.snapshot();
             assertEquals(1,initial.day());
             assertEquals(450,initial.minute());
+            assertEquals("SPRING",initial.season());
+            assertEquals(1,initial.year());
             assertEquals(1,initial.player().incarnation());
             assertTrue(initial.player().alive());
             assertNull(initial.player().privateName());
