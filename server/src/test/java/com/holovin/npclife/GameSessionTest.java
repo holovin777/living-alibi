@@ -36,6 +36,11 @@ class GameSessionTest {
             assertThrows(IllegalArgumentException.class,()->game.waitMinutes(1441));
             assertEquals(525,game.snapshot().minute());
         }
+        // The brand-new city should start populated rather than requiring debug commands.
+        try(var db=new WorldDatabase(file)) {
+            var town=db.loadTown(db.load());
+            assertEquals(14,town.people.size(),"12 generated NPCs + Marco + Elena");
+        }
         try(var reloaded=new GameSession(file)) {
             assertEquals(525,reloaded.snapshot().minute());
             assertEquals("River",reloaded.snapshot().player().place());
