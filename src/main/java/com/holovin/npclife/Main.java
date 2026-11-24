@@ -17,6 +17,13 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
+            // A legacy save may end with a dead visitor; archive and continue once.
+            if(!town.player.alive) {
+                var ended=PlayerLife.beginNewLife(town,state.day,state.minute);
+                db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+                System.out.println("Life #"+ended.incarnation()+" ended. A new visitor #"+
+                        town.player.incarnation+" begins in the same town.");
+            }
             System.out.println("Living Alibi v1.16 — Living Visitor (work in progress)");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
@@ -42,10 +49,20 @@ public final class Main {
                     if(lower.equals("status")||lower.equals("observe")) {status(state);continue;}
                     if(lower.equals("personality")) {personality(state);continue;}
                     if(lower.equals("me")||lower.equals("whereami")) {
-                        System.out.println("You | "+PlayerLife.position(town.player)+
+                        System.out.println("Visitor #"+town.player.incarnation+" | "+PlayerLife.position(town.player)+
                                 " | private name: "+(town.player.privateName==null?"not set":town.player.privateName));
                         System.out.println(PlayerLife.condition(town.player));
                         System.out.println("Your name is NOT automatically known by any resident. Investigations are optional.");
+                        continue;
+                    }
+                    if(lower.equals("lives")) {
+                        System.out.println("Past visitor lives: "+town.pastLives.size()+
+                                " | current visitor #"+town.player.incarnation);
+                        for(var life:town.pastLives.values())
+                            System.out.println("  #"+life.incarnation()+" | Day "+life.day()+
+                                    " "+clock(life.minute())+" | "+life.place().label+
+                                    " | private name: "+(life.privateName()==null?
+                                    "not set":life.privateName()));
                         continue;
                     }
                     if(lower.equals("needs")) {
@@ -80,15 +97,14 @@ public final class Main {
                     if(lower.equals("sleep")||lower.startsWith("sleep ")) {
                         int hours=lower.equals("sleep")?8:Integer.parseInt(arg(input));
                         var candidate=town.copy();
+                        String sleepingPlace=candidate.player.place.label;
                         var result=PlayerLife.sleep(candidate.player,hours);
                         advanceAndSave(db,state,candidate,result.minutes());
                         town.copyFrom(candidate);
                         System.out.println("You slept for "+hours+" hour(s) at "+
-                                town.player.place.label+". Recovered "+result.fatigueRecovered()+
+                                sleepingPlace+". Recovered "+result.fatigueRecovered()+
                                 " fatigue. Health change: "+result.healthChange()+".");
                         System.out.println(PlayerLife.condition(town.player));
-                        if(!result.survived())
-                            System.out.println("You died. Your history remains, and the town continues.");
                         continue;
                     }
                     if(lower.equals("rest")||lower.startsWith("rest ")) {
@@ -616,9 +632,16 @@ public final class Main {
         List<SocialLife.Interaction> socialEvents=new ArrayList<>();
         List<LifeSimulation.LifeEvent> events=LifeSimulation.advance(candidate,minutes,
                 current -> TownLife.tick(townCandidate,current,townEvents,observations,socialEvents));
+        PlayerLife.LifeRecord ended=null;
+        if(!townCandidate.player.alive)
+            ended=PlayerLife.beginNewLife(townCandidate,candidate.day,candidate.minute);
         db.save(candidate,events,List.of(),townCandidate,townEvents,observations,socialEvents);
         copy(candidate,s);
         town.copyFrom(townCandidate);
+        if(ended!=null)
+            System.out.println("Visitor #"+ended.incarnation()+" died on Day "+ended.day()+
+                    ". Visitor #"+town.player.incarnation+
+                    " now begins a new life in the same town.");
     }
     private static void copy(WorldState from,WorldState to) {
         // Loaded state is the only mutable reference in the console; explicit copy avoids surprising aliases.
@@ -736,7 +759,7 @@ public final class Main {
     private static void help() {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
-        System.out.println(" explore | me | needs | locations | look | go <place> — visitor presence and condition");
+        System.out.println(" explore | me | needs | lives | locations | look | go <place> — visitor presence and history");
         System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
         System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
         System.out.println(" rest [minutes]        — pause for 15–240 game minutes (default: 60)");
