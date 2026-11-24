@@ -74,13 +74,28 @@ final class WorldDatabase implements AutoCloseable {
                         thirst INTEGER NOT NULL DEFAULT 0,
                         fatigue INTEGER NOT NULL DEFAULT 0,
                         health INTEGER NOT NULL DEFAULT 100,
-                        alive INTEGER NOT NULL DEFAULT 1)
+                        alive INTEGER NOT NULL DEFAULT 1,
+                        incarnation INTEGER NOT NULL DEFAULT 1)
                     """);
             st.execute("""
                     CREATE TABLE IF NOT EXISTS player_contacts (
                         resident_id TEXT PRIMARY KEY, known_name TEXT,
                         conversations INTEGER NOT NULL, last_day INTEGER NOT NULL,
                         last_minute INTEGER NOT NULL, last_heard TEXT)
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS player_life_contacts (
+                        incarnation INTEGER NOT NULL,
+                        resident_id TEXT NOT NULL, known_name TEXT,
+                        conversations INTEGER NOT NULL, last_day INTEGER NOT NULL,
+                        last_minute INTEGER NOT NULL, last_heard TEXT,
+                        PRIMARY KEY(incarnation,resident_id))
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS player_lives (
+                        incarnation INTEGER PRIMARY KEY, died_day INTEGER NOT NULL,
+                        died_minute INTEGER NOT NULL, died_place TEXT NOT NULL,
+                        private_name TEXT)
                     """);
             st.execute("""
                     CREATE TABLE IF NOT EXISTS natural_resources (
@@ -96,6 +111,7 @@ final class WorldDatabase implements AutoCloseable {
         playerColumns.put("fatigue","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("health","INTEGER NOT NULL DEFAULT 100");
         playerColumns.put("alive","INTEGER NOT NULL DEFAULT 1");
+        playerColumns.put("incarnation","INTEGER NOT NULL DEFAULT 1");
 
         for(var col:playerColumns.entrySet()) {
             if(!columnExists("player_state",col.getKey())) {
@@ -472,6 +488,7 @@ final class WorldDatabase implements AutoCloseable {
                 persistLifeChanges(town);
                 persistProperty(town);
                 persistPlayer(town.player);
+                persistLives(town);
                 persistNature(town);
             }
             db.commit();
@@ -732,9 +749,15 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.fatigue=rs.getInt("fatigue");
                 town.player.health=rs.getInt("health");
                 town.player.alive=rs.getInt("alive")!=0;
+                town.player.incarnation=Math.max(1,rs.getInt("incarnation"));
             }
         }
-        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_contacts")) {
+        // v1.15 contacts belong to the first visitor; later visitors have
+        // their own records and never inherit somebody else's introductions.
+        String contactQuery=town.player.incarnation==1
+                ? "SELECT * FROM player_contacts"
+                : "SELECT * FROM player_life_contacts WHERE incarnation="+town.player.incarnation;
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery(contactQuery)) {
             while(rs.next()) {
                 String id=rs.getString("resident_id");
                 if(!town.people.containsKey(id))continue;
@@ -746,8 +769,36 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.contacts.put(id,c);
             }
         }
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT * FROM player_lives ORDER BY incarnation")) {
+            while(rs.next()) {
+                int generation=rs.getInt("incarnation");
+                town.pastLives.put(generation,new PlayerLife.LifeRecord(
+                        generation,rs.getInt("died_day"),rs.getInt("died_minute"),
+                        TownLife.Place.valueOf(rs.getString("died_place")),
+                        rs.getString("private_name")));
+            }
+        }
         PropertyLife.ensureStarterItems(town,state);
         return town;
+    }
+
+    private void persistLives(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT OR IGNORE INTO player_lives
+                (incarnation,died_day,died_minute,died_place,private_name)
+                VALUES(?,?,?,?,?)
+                """)) {
+            for(var life:town.pastLives.values()) {
+                p.setInt(1,life.incarnation());
+                p.setInt(2,life.day());
+                p.setInt(3,life.minute());
+                p.setString(4,life.place().name());
+                p.setString(5,life.privateName());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
     }
 
     private void persistNature(TownLife.Town town) throws SQLException {
@@ -767,13 +818,13 @@ final class WorldDatabase implements AutoCloseable {
     private void persistPlayer(PlayerLife.Player player) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
                 INSERT INTO player_state(id,place,destination,travel_remaining,private_name,
-                                         hunger,thirst,fatigue,health,alive)
-                VALUES(1,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                                         hunger,thirst,fatigue,health,alive,incarnation)
+                VALUES(1,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,private_name=excluded.private_name,
                 hunger=excluded.hunger,thirst=excluded.thirst,
                 fatigue=excluded.fatigue,health=excluded.health,
-                alive=excluded.alive
+                alive=excluded.alive,incarnation=excluded.incarnation
                 """)) {
             p.setString(1,player.place.name());
             p.setString(2,player.destination.name());
@@ -784,22 +835,41 @@ final class WorldDatabase implements AutoCloseable {
             p.setInt(7,player.fatigue);
             p.setInt(8,player.health);
             p.setInt(9,player.alive?1:0);
+            p.setInt(10,player.incarnation);
             p.executeUpdate();
         }
-        try(PreparedStatement p=db.prepareStatement("""
-                    INSERT INTO player_contacts(resident_id,known_name,conversations,last_day,last_minute,last_heard)
-                    VALUES(?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
-                    known_name=excluded.known_name,conversations=excluded.conversations,
-                    last_day=excluded.last_day,last_minute=excluded.last_minute,
-                    last_heard=excluded.last_heard
-                    """)) {
-                        for(var c:player.contacts.values()) {
-                            p.setString(1,c.residentId);p.setString(2,c.knownName);
-                            p.setInt(3,c.conversations);p.setInt(4,c.lastDay);
-                            p.setInt(5,c.lastMinute);p.setString(6,c.lastHeard);p.addBatch();
-                        }
-                        p.executeBatch();
-                    }
+        String contactSql=player.incarnation==1 ? """
+                INSERT INTO player_contacts
+                (resident_id,known_name,conversations,last_day,last_minute,last_heard)
+                VALUES(?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
+                known_name=excluded.known_name,conversations=excluded.conversations,
+                last_day=excluded.last_day,last_minute=excluded.last_minute,
+                last_heard=excluded.last_heard
+                """ : """
+                INSERT INTO player_life_contacts
+                (incarnation,resident_id,known_name,conversations,last_day,last_minute,last_heard)
+                VALUES(?,?,?,?,?,?,?) ON CONFLICT(incarnation,resident_id) DO UPDATE SET
+                known_name=excluded.known_name,conversations=excluded.conversations,
+                last_day=excluded.last_day,last_minute=excluded.last_minute,
+                last_heard=excluded.last_heard
+                """;
+        try(PreparedStatement p=db.prepareStatement(contactSql)) {
+            for(var c:player.contacts.values()) {
+                int offset=0;
+                if(player.incarnation!=1) {
+                    p.setInt(1,player.incarnation);
+                    offset=1;
+                }
+                p.setString(offset+1,c.residentId);
+                p.setString(offset+2,c.knownName);
+                p.setInt(offset+3,c.conversations);
+                p.setInt(offset+4,c.lastDay);
+                p.setInt(offset+5,c.lastMinute);
+                p.setString(offset+6,c.lastHeard);
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
     }
 
     private void persistTown(TownLife.Town town,List<TownLife.Event> events,
