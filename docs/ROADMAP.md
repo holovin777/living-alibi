@@ -113,6 +113,9 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Next: earned or purchased food/water, housing and sleep. Health penalties will
   wait for a functioning care loop rather than punishing players without options.
 - Details: [Player Daily Life](PLAYER_DAILY_LIFE.md).
+- Early natural-resource slice: finite river/puddle water and wild berries, local
+  harvesting and saved depletion ([Natural Resources](NATURAL_RESOURCES.md)).
+  Shared NPC extraction, wildlife, shelter and enterprises remain future work.
 
 ## Proposed, not implemented
 
