@@ -106,14 +106,22 @@ final class PlayerLife {
         } catch(IllegalArgumentException ignored) { }
         throw new IllegalArgumentException("Not a public destination: "+input+". Use locations to list public places.");
     }
-    static int startTravel(Player player,TownLife.Place place) {
+    /** The authoritative travel estimate used by both console and Godot. */
+    static int travelMinutes(Player player,TownLife.Place place) {
         requireAlive(player);
-        if(player.travelRemaining>0)throw new IllegalArgumentException("Already traveling to "+player.destination.label+".");
-        if(!PUBLIC_PLACES.contains(place))throw new IllegalArgumentException("Private residences are not open to visitors.");
+        if(!PUBLIC_PLACES.contains(place))
+            throw new IllegalArgumentException("Private residences are not open to visitors.");
+        if(player.travelRemaining>0)
+            throw new IllegalArgumentException("Already traveling to "+player.destination.label+".");
         if(player.place==place)return 0;
+        return player.place==TownLife.Place.PARK||place==TownLife.Place.PARK?10:8;
+    }
+    static int startTravel(Player player,TownLife.Place place) {
+        int minutes=travelMinutes(player,place);
+        if(minutes==0)return 0;
         player.destination=place;
-        player.travelRemaining=(player.place==TownLife.Place.PARK||place==TownLife.Place.PARK)?10:8;
-        return player.travelRemaining;
+        player.travelRemaining=minutes;
+        return minutes;
     }
     static void tick(Player player) {
         if(player.travelRemaining<=0)return;
