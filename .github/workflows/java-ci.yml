@@ -187,6 +187,8 @@ jobs:
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.UtilityBehaviorSmokeTest
       - name: Test finite natural ore with staffed quarry factory and real repair supplies
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.IndustrySmokeTest
+      - name: Test real worker commutes and factory shipments in five ordinary town days
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.IndustryIntegrationSmokeTest
       - name: Test ore, shipments and production timing through SQLite restart and rebirth
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
