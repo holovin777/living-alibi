@@ -52,7 +52,13 @@ public final class CareerSmokeTest {
         CareerLife.apply(town,"technician");
         check("technician".equals(p.jobId),"technical apprenticeship unlocked through study");
         int techBefore=town.employerFunds.get("technician");
-        CareerLife.work(town,2,540);
+        boolean earlySalary=false;
+        try {CareerLife.work(town,2,540);}
+        catch(IllegalArgumentException expected) {earlySalary=true;}
+        check(earlySalary,"technician needs actual completed work before wages");
+        TechnicalWorkLife.inspect(town,"water-pump",540);
+        TechnicalWorkLife.complete(town,"water-pump",2,570);
+        CareerLife.work(town,2,720);
         check(p.money==82 && town.employerFunds.get("technician")==techBefore-38,
                 "higher skilled job pays from its own employer's budget");
         check(totalMoney(town)==initialMoney,"career changes do not create new currency");
