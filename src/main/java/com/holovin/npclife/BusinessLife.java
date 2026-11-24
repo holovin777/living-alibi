@@ -22,7 +22,7 @@ final class BusinessLife {
     static final int FIRST_HOUR=720; // 12:00
     static final int LAST_HOUR=840;  // 14:00
     static final int FABRICATE_MINUTE=795; // 13:15
-    static final int SELL_MINUTE=855; // 14:15
+    static final int SELL_MINUTE=825; // 13:45, while the worker is still present
 
     static final class Shop {
         boolean registered;
@@ -198,7 +198,8 @@ final class BusinessLife {
                              List<TownLife.Observation> observations) {
         if(!"Independent fabricator".equals(person.occupation))return false;
         var b=town.business;
-        if(!isEmployee(town,person) || b.cash<HOURLY_WAGE)return true;
+        if(!workingHours(clock.minute) || !isEmployee(town,person) ||
+                b.cash<HOURLY_WAGE)return true;
         b.cash-=HOURLY_WAGE;
         person.money=Math.addExact(person.money,HOURLY_WAGE);
         if(b.lastPayDay!=clock.day) {
@@ -245,16 +246,18 @@ final class BusinessLife {
             b.lastSaleDay=day;
             int sale=Math.min(2,b.parts);
             int price=sale*PART_PRICE;
-            if(sale>0 && town.employerFunds.getOrDefault("city-maintenance",0)>=price) {
+            var worker=town.people.get(b.employeeId);
+            if(sale>0 && worker!=null && isEmployee(town,worker) &&
+                    worker.presentAt(TownLife.Place.WORKSHOP) &&
+                    worker.activity.equals("WORKING") &&
+                    town.employerFunds.getOrDefault("city-maintenance",0)>=price) {
                 b.parts-=sale;
                 b.cash=Math.addExact(b.cash,price);
                 town.employerFunds.put("city-maintenance",
                         town.employerFunds.get("city-maintenance")-price);
                 town.technicalMaterials.put("spare-parts",
                         Math.addExact(town.technicalMaterials.getOrDefault("spare-parts",0),sale));
-                var worker=town.people.get(b.employeeId);
-                String actor=worker!=null && worker.alive?worker.id:"marco";
-                TownLife.publish(town,clock,actor,TownLife.Place.WORKSHOP,
+                TownLife.publish(town,clock,worker.id,TownLife.Place.WORKSHOP,
                         "Local workshop sold "+sale+" physical spare parts to city maintenance.",
                         events,observations);
             }
