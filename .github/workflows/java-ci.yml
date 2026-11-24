@@ -254,3 +254,40 @@ jobs:
             -d '{"orderId":"water-pump"}')" = "400"
           grep -q 'requires presence' target/api-smoke/rejected.json
           test -f target/api-smoke/world.db
+      - name: Test one-command launch from an empty save and reopen existing world
+        run: |
+          set -euo pipefail
+          # The full Spring JAR is already built. Stub only Maven and the
+          # Godot GUI so this job can test the launch lifecycle headlessly.
+          mkdir -p target/launcher-test/bin
+          cat >target/launcher-test/bin/mvn <<'EOF'
+          #!/usr/bin/env bash
+          exit 0
+          EOF
+          cat >target/launcher-test/bin/godot <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          for arg in "$@"; do
+            if [[ "$arg" == "--headless" ]]; then exit 0; fi
+          done
+          curl -fsS http://127.0.0.1:8080/api/v1/world \
+            -o target/launcher-test/game.json
+          grep -q '"money":50' target/launcher-test/game.json
+          if [[ "${EXPECT_PLACE:-PARK}" == "PARK" ]]; then
+            grep -q '"placeId":"PARK"' target/launcher-test/game.json
+            curl -fsS -X POST http://127.0.0.1:8080/api/v1/actions/go \
+              -H 'Content-Type: application/json' \
+              -d '{"destination":"market"}' \
+              -o target/launcher-test/move.json
+            grep -q '"placeId":"MARKET"' target/launcher-test/move.json
+          else
+            grep -q '"placeId":"MARKET"' target/launcher-test/game.json
+          fi
+          EOF
+          chmod +x target/launcher-test/bin/mvn target/launcher-test/bin/godot
+          export PATH="$PWD/target/launcher-test/bin:$PATH"
+          test ! -f data/world.db
+          EXPECT_PLACE=PARK bash play.sh
+          test -f data/world.db
+          EXPECT_PLACE=MARKET bash play.sh
+          grep -q '"placeId":"MARKET"' target/launcher-test/game.json
