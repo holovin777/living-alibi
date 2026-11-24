@@ -1,0 +1,48 @@
+name: Godot Park Scene
+
+on:
+  push:
+    paths:
+      - 'godot/**'
+      - '.github/workflows/godot-ci.yml'
+  pull_request:
+    paths:
+      - 'godot/**'
+      - '.github/workflows/godot-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  import-and-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Godot project
+        uses: actions/checkout@v4
+      - name: Install official Godot 4.6.1 stable editor
+        run: |
+          set -euo pipefail
+          mkdir -p target/godot-bin
+          curl --fail --location --retry 3 --silent --show-error \
+            -o target/godot-bin/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.6.1-stable/Godot_v4.6.1-stable_linux.x86_64.zip
+          unzip -q target/godot-bin/godot.zip -d target/godot-bin
+          chmod +x target/godot-bin/Godot_v4.6.1-stable_linux.x86_64
+      - name: Import Godot project and check GDScript parse errors
+        run: |
+          set -euo pipefail
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 \
+            --headless --path godot --editor --quit 2>&1 | tee target/godot-bin/import.log
+          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' \
+            target/godot-bin/import.log; then
+            exit 1
+          fi
+      - name: Launch park scene headlessly without Spring
+        run: |
+          set -euo pipefail
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 \
+            --headless --path godot --quit-after 5 2>&1 | tee target/godot-bin/game.log
+          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' \
+            target/godot-bin/game.log; then
+            exit 1
+          fi
