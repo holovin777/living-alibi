@@ -1,21 +1,33 @@
 extends Node
-## Example Godot 4 adapter for the local Living Alibi Spring API.
-## Attach to a Node and connect to world_updated to render the scene.
+## Godot 4 adapter for the authoritative local Living Alibi Java world.
+## One request at a time prevents out-of-order scene changes and duplicate wages.
 
 signal world_updated(snapshot: Dictionary)
+signal locations_updated(locations: Array)
 signal job_offers_updated(jobs: Array)
+signal action_feedback(message: String)
+signal request_started(route: String)
+signal request_finished(route: String)
 signal request_failed(message: String)
 
 const BASE_URL := "http://127.0.0.1:8080/api/v1"
 var http_request: HTTPRequest
+var _busy := false
+var _pending_route := ""
 
 func _ready() -> void:
     http_request = HTTPRequest.new()
     add_child(http_request)
     http_request.request_completed.connect(_on_request_completed)
 
+func is_busy() -> bool:
+    return _busy
+
 func refresh_world() -> void:
     _send("/world", HTTPClient.METHOD_GET, {})
+
+func list_locations() -> void:
+    _send("/locations", HTTPClient.METHOD_GET, {})
 
 func list_jobs() -> void:
     _send("/jobs", HTTPClient.METHOD_GET, {})
@@ -35,6 +47,9 @@ func go_to(destination: String) -> void:
 func drink_from(source_id: String) -> void:
     _send("/actions/drink", HTTPClient.METHOD_POST, {"sourceId": source_id})
 
+func forage(source_id: String) -> void:
+    _send("/actions/forage", HTTPClient.METHOD_POST, {"sourceId": source_id})
+
 func wait_for(minutes: int) -> void:
     _send("/actions/wait", HTTPClient.METHOD_POST, {"minutes": minutes})
 
@@ -42,29 +57,58 @@ func sleep_for(hours: int) -> void:
     _send("/actions/sleep", HTTPClient.METHOD_POST, {"hours": hours})
 
 func _send(route: String, method: int, payload: Dictionary) -> void:
+    if _busy:
+        request_failed.emit("Another request is still running.")
+        return
+    _busy = true
+    _pending_route = route
+    request_started.emit(route)
     var body := "" if method == HTTPClient.METHOD_GET else JSON.stringify(payload)
     var headers := PackedStringArray(["Content-Type: application/json"])
     var error := http_request.request(BASE_URL + route, headers, method, body)
     if error != OK:
+        _busy = false
+        _pending_route = ""
+        request_finished.emit(route)
         request_failed.emit("Request could not be started: %s" % error)
 
 func _on_request_completed(
     result: int, response_code: int, _headers: PackedStringArray,
     body: PackedByteArray
 ) -> void:
+    var route := _pending_route
+    _pending_route = ""
+    _busy = false
+    request_finished.emit(route)
     if result != HTTPRequest.RESULT_SUCCESS:
-        request_failed.emit("Connection failed: %s" % result)
+        request_failed.emit("Java server connection failed: %s" % result)
         return
+
     var response = JSON.parse_string(body.get_string_from_utf8())
-    if typeof(response) == TYPE_ARRAY and response_code >= 200 and response_code < 300:
-        job_offers_updated.emit(response)
-        return
-    if typeof(response) != TYPE_DICTIONARY:
-        request_failed.emit("Server returned invalid JSON.")
-        return
     if response_code < 200 or response_code >= 300:
-        request_failed.emit(str(response.get("error", "HTTP %s" % response_code)))
+        var error_message := "HTTP %s" % response_code
+        if typeof(response) == TYPE_DICTIONARY:
+            error_message = str(response.get("error", error_message))
+        request_failed.emit(error_message)
         return
-    # GET returns a world object; POST returns {"message":..., "world":...}.
-    var snapshot: Dictionary = response.get("world", response)
+
+    if route == "/locations" or route == "/jobs":
+        if typeof(response) != TYPE_ARRAY:
+            request_failed.emit("Server returned an invalid location/job list.")
+            return
+        if route == "/locations":
+            locations_updated.emit(response)
+        else:
+            job_offers_updated.emit(response)
+        return
+
+    if typeof(response) != TYPE_DICTIONARY:
+        request_failed.emit("Server returned invalid world JSON.")
+        return
+    if route.begins_with("/actions/"):
+        action_feedback.emit(str(response.get("message", "Action completed.")))
+    var snapshot = response.get("world", response)
+    if typeof(snapshot) != TYPE_DICTIONARY:
+        request_failed.emit("Server returned invalid world state.")
+        return
     world_updated.emit(snapshot)
