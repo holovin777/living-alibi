@@ -5,26 +5,38 @@ The Java engine is the authority for time, the player's location,
 relationships, careers, resources and SQLite persistence. Godot does **not**
 grant itself money, skills, employment, or instant travel by moving a mesh.
 
-## Run it from an entirely new world
+## Run the game preview from an entirely new world
 
-From the **repository root**:
+On **Arch Linux**, install Java 21+, Maven 3.9+, curl and Godot 4 first.
+From the repository root, in the `feat/player-needs-persistence-v1.16`
+branch, run:
 
 ```bash
-mvn -q -DskipTests install
-mvn -f server/pom.xml spring-boot:run
+bash play.sh --check
+bash play.sh
 ```
 
-The Spring application binds to **127.0.0.1:8080** and creates
-`data/world.db` if it doesn't exist. A brand-new world starts in the
-park with 50 EUR, no profession, Marco, Elena and 12 additional NPCs.
+This **one-command launcher** builds the plain Java simulation and the
+separate Spring Boot server, starts the local API, prepares Godot's import
+cache on first launch, and opens the Godot window. Exit the game window to
+stop the server. The world is automatically created at `data/world.db`
+when no save exists; otherwise the same world resumes. The script **never
+deletes a save**. A brand-new game starts in the park with 50 EUR, no
+profession, Marco, Elena, and 12 additional NPCs.
 
-In **Godot 4.6.1**, import the directory `godot/` as a project by
-selecting its `project.godot` file; press **F6** to run the scene or
-**F5** to run the project. It uses `scenes/park.tscn` with
-`scripts/ParkDemo.gd`. The HTTP adapter is
-`examples/WorldApi.gd`. You can also start the Godot project
-without the Java server, but its actions will not work and a connection
-error appears.
+If you prefer manual debugging, run the server in one terminal:
+
+```bash
+bash play.sh --server-only
+```
+
+Then open the Godot 4 editor, import `godot/project.godot` and press F5.
+The main scene is `scenes/park.tscn`, its script is `scripts/ParkDemo.gd`,
+and HTTP calls are sent by `examples/WorldApi.gd`. Running without the
+server leaves a visual preview only and shows a connection error.
+
+The launcher saves logs in `data/server.log`. Don't run another world
+writer (such as the console) against the same SQLite file at the same time.
 
 ## Controls
 
