@@ -26,6 +26,8 @@ public class GameController {
     public record HoursRequest(int hours) { }
     public record DestinationRequest(String destination) { }
     public record SourceRequest(String sourceId) { }
+    public record JobRequest(String jobId) { }
+    public record StudyRequest(String subject) { }
     public record LocationView(String id,String label) { }
 
     @GetMapping("/world")
@@ -37,6 +39,28 @@ public class GameController {
     public List<LocationView> locations() {
         return PlayerLife.publicPlaces().stream()
                 .map(place->new LocationView(place.name(),place.label)).toList();
+    }
+
+    @GetMapping("/jobs")
+    public List<GameSession.JobView> jobs() {
+        return session.jobs();
+    }
+
+    @PostMapping("/actions/apply")
+    public GameSession.ActionView apply(@RequestBody JobRequest request)
+            throws SQLException {
+        return session.applyJob(request.jobId());
+    }
+
+    @PostMapping("/actions/study")
+    public GameSession.ActionView study(@RequestBody StudyRequest request)
+            throws SQLException {
+        return session.study(request.subject());
+    }
+
+    @PostMapping("/actions/work")
+    public GameSession.ActionView work() throws SQLException {
+        return session.work();
     }
 
     @PostMapping("/actions/wait")
