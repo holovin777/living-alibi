@@ -28,17 +28,14 @@ public class GameController {
     public record SourceRequest(String sourceId) { }
     public record JobRequest(String jobId) { }
     public record StudyRequest(String subject) { }
-    public record LocationView(String id,String label) { }
-
     @GetMapping("/world")
     public GameSession.WorldView world() {
         return session.snapshot();
     }
 
     @GetMapping("/locations")
-    public List<LocationView> locations() {
-        return PlayerLife.publicPlaces().stream()
-                .map(place->new LocationView(place.name(),place.label)).toList();
+    public List<GameSession.DestinationView> locations() {
+        return session.destinations();
     }
 
     @GetMapping("/jobs")
