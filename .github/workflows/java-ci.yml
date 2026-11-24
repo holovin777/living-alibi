@@ -199,6 +199,10 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.IndustryDatabaseSmokeTest' exec:exec
+      - name: Test truck freight, recycling, paid geology and world continuity through restarts
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.IndustryTransportDatabaseSmokeTest' exec:exec
       - name: Test municipal water stocks survive restart and are refilled only once
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
