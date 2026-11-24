@@ -18,6 +18,7 @@ var _last_snapshot: Dictionary = {}
 var _connected := false
 var _locations: Array = []
 var _job_offers: Array = []
+var _work_orders: Array = []
 
 var _heading: Label
 var _status: Label
@@ -40,6 +41,7 @@ func _ready() -> void:
     _api.world_updated.connect(_on_world_updated)
     _api.locations_updated.connect(_on_locations_updated)
     _api.job_offers_updated.connect(_on_job_offers_updated)
+    _api.work_orders_updated.connect(_on_work_orders_updated)
     _api.action_feedback.connect(_on_action_feedback)
     _api.request_failed.connect(_on_request_failed)
     _api.request_started.connect(_on_request_started)
@@ -367,6 +369,8 @@ func _toggle_actions() -> void:
     _action_panel.visible = not _action_panel.visible
     if _action_panel.visible:
         _render_actions()
+        if _current_place in ["WORKSHOP", "OFFICE"] and not _api.is_busy():
+            _api.list_work_orders()
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
@@ -412,6 +416,22 @@ func _render_actions() -> void:
             work_site = "WORKSHOP"
         "engineer", "investigator":
             work_site = "OFFICE"
+    if _current_place in ["WORKSHOP", "OFFICE"]:
+        for order in _work_orders:
+            if str(order.get("place", "")) != _current_place:
+                continue
+            var id := str(order.get("id", ""))
+            var phase := str(order.get("phase", "OPEN"))
+            var description := Label.new()
+            description.text = "%s | %s | condition %s/100" % [
+                str(order.get("title", id)), phase,
+                str(order.get("condition", 0))
+            ]
+            _action_choices.add_child(description)
+            if phase == "OPEN":
+                _action_choices.add_child(_button("Diagnose: " + id, _diagnose.bind(id)))
+            elif phase == "INSPECTED":
+                _action_choices.add_child(_button("Repair / implement: " + id, _repair.bind(id)))
     if work_site == _current_place:
         _action_choices.add_child(_button("Work a paid 2-hour shift", _work))
 
@@ -424,6 +444,16 @@ func _study(subject: String) -> void:
     if _near_kiosk() and not _api.is_busy():
         _action_panel.visible = false
         _api.study_subject(subject)
+
+func _diagnose(order_id: String) -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.diagnose(order_id)
+
+func _repair(order_id: String) -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.repair(order_id)
 
 func _work() -> void:
     if _near_kiosk() and not _api.is_busy():
@@ -515,6 +545,11 @@ func _on_job_offers_updated(jobs: Array) -> void:
             str(offer.get("subject", "none")), str(offer.get("requiredSkill", 0))
         ])
     _jobs.text = "\n".join(lines)
+
+func _on_work_orders_updated(orders: Array) -> void:
+    _work_orders = orders
+    if _action_panel.visible:
+        _render_actions()
 
 func _on_action_feedback(message: String) -> void:
     _message.text = message
