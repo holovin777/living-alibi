@@ -22,6 +22,7 @@ final class PlayerLife {
         int fatigue = 0;
         int health = 100;
         boolean alive = true;
+        int incarnation = 1; // A fresh visitor receives the next generation.
         final Map<String,Contact> contacts=new LinkedHashMap<>();
         Player copy() {
             Player p=new Player();
@@ -32,9 +33,32 @@ final class PlayerLife {
             p.fatigue=fatigue;
             p.health=health;
             p.alive=alive;
+            p.incarnation=incarnation;
             for(var e:contacts.entrySet())p.contacts.put(e.getKey(),e.getValue().copy());
             return p;
         }
+    }
+
+    /** Private player history, never broadcast into NPC knowledge. */
+    record LifeRecord(int incarnation,int day,int minute,TownLife.Place place,
+                      String privateName) { }
+
+    /** Start a different person without rewinding the world or inheriting old contacts. */
+    static LifeRecord beginNewLife(TownLife.Town town,int day,int minute) {
+        Player previous=town.player;
+        if(previous.alive)
+            throw new IllegalArgumentException("The current visitor is still alive.");
+        if(previous.incarnation==Integer.MAX_VALUE)
+            throw new IllegalStateException("Maximum visitor incarnation reached.");
+        if(town.pastLives.containsKey(previous.incarnation))
+            throw new IllegalStateException("This visitor's death was already recorded.");
+        LifeRecord record=new LifeRecord(previous.incarnation,day,minute,
+                previous.place,previous.privateName);
+        town.pastLives.put(record.incarnation(),record);
+        Player next=new Player();
+        next.incarnation=previous.incarnation+1;
+        town.player=next;
+        return record;
     }
 
     /** This is what one particular resident remembers about the visitor. */
