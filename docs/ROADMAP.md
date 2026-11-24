@@ -122,6 +122,21 @@ The eventual game is an emergent detective simulation. The player investigates e
   harvesting and saved depletion ([Natural Resources](NATURAL_RESOURCES.md)).
   Shared NPC extraction, wildlife, shelter and enterprises remain future work.
 
+### New world calendar and Godot API bridge (v1.16 draft)
+
+- Four recurring seasons follow the authoritative 365-day Java clock,
+  beginning in spring; seasonal weather and temperatures are not simulated yet.
+- The first launch with no saved database automatically creates a playable
+  world. The Spring server starts with Marco, Elena and twelve generated
+  residents, rather than requiring manual developer commands.
+- Standalone Spring Boot 4.2 API module under `server/` shares the same Java
+  simulation and SQLite storage. `GET /api/v1/world` exposes time, season,
+  nearby NPCs, accessible natural resources and visitor condition. Commands
+  over HTTP validate movement, rest, sleep, drinking, gathering and waiting.
+- An example Godot 4 `HTTPRequest` adapter is available; a rendered Godot
+  game world and real-time multiplayer synchronization are not implemented.
+- Details: [Godot / Spring Boot integration](GODOT_INTEGRATION.md).
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.
