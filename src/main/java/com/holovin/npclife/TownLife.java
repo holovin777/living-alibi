@@ -232,7 +232,7 @@ final class TownLife {
         m.food=marco.food;m.water=marco.water;
         if(m.alive)move(town,m,desiredMarco(marco,m.place),marco,truth,observations);
         elenaNeeds(e,marco,truth,observations,town);
-        if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e),marco,truth,observations);
+        if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e,town),marco,truth,observations);
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
         EconomyLife.tick(town,marco,truth,observations);
@@ -311,7 +311,7 @@ final class TownLife {
         if(minute>=960 && minute<1200)return (day%3==0)?Place.CAFE:Place.PARK;
         return Place.ELENA_HOME;
     }
-    private static Place desiredElena(int day,int minute,Citizen e) {
+    private static Place desiredElena(int day,int minute,Citizen e,Town town) {
         if(minute<390 || minute>=1320)return Place.ELENA_HOME;
         if(isWorkTime(day,minute))return Place.MARKET;
         // Shopping is a separate need, not an effect of having a weekday job.
@@ -319,7 +319,11 @@ final class TownLife {
         if(minute>=420 && minute<1200 &&
                 ((e.food<2 && e.money>=9) || (e.water<2 && e.money>=3)))
             return Place.MARKET;
-        if(minute>=960 && minute<1200)return (day%3==0)?Place.CAFE:Place.PARK;
+        if(minute>=960 && minute<1200) {
+            if(day%3==0 || (minute>=1080 && !UtilityLife.status(town).lightsWorking()))
+                return Place.CAFE;
+            return Place.PARK;
+        }
         return Place.ELENA_HOME;
     }
     private static Place desiredMarco(WorldState s,Place current) {
