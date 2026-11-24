@@ -114,6 +114,9 @@ The eventual game is an emergent detective simulation. The player investigates e
   place-based exposure/health heuristic, persistent visitor mortality and
   no mandatory property ownership. Next: climate, shelters, medicine and
   player access to the existing town economy.
+- Death automatically starts a new anonymous visitor in the same continuous
+  world; previous player lives and disclosed per-resident identities remain
+  archived without leaking into the new person's memories.
 - Details: [Player Daily Life](PLAYER_DAILY_LIFE.md).
 - Early natural-resource slice: finite river/puddle water and wild berries, local
   harvesting and saved depletion ([Natural Resources](NATURAL_RESOURCES.md)).
