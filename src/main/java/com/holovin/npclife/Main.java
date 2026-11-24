@@ -52,6 +52,8 @@ public final class Main {
                         System.out.println("Visitor #"+town.player.incarnation+" | "+PlayerLife.position(town.player)+
                                 " | private name: "+(town.player.privateName==null?"not set":town.player.privateName));
                         System.out.println(PlayerLife.condition(town.player));
+                        System.out.println("Year "+CalendarLife.year(state.day)+
+                                " | Season: "+CalendarLife.season(state.day));
                         System.out.println("Your name is NOT automatically known by any resident. Investigations are optional.");
                         continue;
                     }
