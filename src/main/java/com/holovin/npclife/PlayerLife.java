@@ -56,7 +56,8 @@ final class PlayerLife {
             TownLife.Place.PARK, TownLife.Place.CAFE, TownLife.Place.MARKET,
             TownLife.Place.BAKERY, TownLife.Place.LIBRARY, TownLife.Place.OFFICE,
             TownLife.Place.CLINIC, TownLife.Place.SCHOOL, TownLife.Place.WORKSHOP,
-            TownLife.Place.NORTH_RESIDENCES, TownLife.Place.SOUTH_RESIDENCES);
+            TownLife.Place.NORTH_RESIDENCES, TownLife.Place.SOUTH_RESIDENCES,
+            TownLife.Place.RIVER, TownLife.Place.WOODS);
 
     static List<TownLife.Place> publicPlaces() {return PUBLIC_PLACES;}
     static TownLife.Place destination(String input) {
