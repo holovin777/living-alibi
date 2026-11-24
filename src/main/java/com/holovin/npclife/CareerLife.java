@@ -35,6 +35,8 @@ final class CareerLife {
     static void ensureEmployers(TownLife.Town town) {
         for(var offer:OFFERS)
             town.employerFunds.putIfAbsent(offer.id,offer.startingPayroll);
+        town.employerFunds.putIfAbsent("school",200);
+        town.employerFunds.putIfAbsent("library",200);
     }
 
     private static Offer offer(String id) {
@@ -97,6 +99,9 @@ final class CareerLife {
         if(p.money<LESSON_FEE)
             throw new IllegalArgumentException("Need "+LESSON_FEE+" EUR for a lesson.");
         p.money-=LESSON_FEE;
+        String tuitionAccount=normalized.equals("engineering")?"school":"library";
+        town.employerFunds.put(tuitionAccount,
+                Math.addExact(town.employerFunds.get(tuitionAccount),LESSON_FEE));
         if(normalized.equals("engineering"))p.engineeringSkill++;
         else p.investigationSkill++;
         return "Completed "+normalized+" lesson (+1 skill, -"+
