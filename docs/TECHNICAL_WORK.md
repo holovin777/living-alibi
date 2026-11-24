@@ -21,8 +21,11 @@ use their earlier simplified employment rules.
 | `street-lights` | Office / junior engineer | 50/100 | 1 steel + 1 copper | Public lighting upgraded to 90/100 |
 
 The current city begins with **6 spare parts, 4 steel and 3 copper units**.
-Those are finite and persist in SQLite. They are not currently produced by
-mines, factories, player crafting or NPC logistics.
+Those are finite and persist in SQLite. They can now be supplemented by
+NPC miners and factory workers who extract ore, refine it, fabricate parts
+and make scheduled warehouse deliveries from finite mineral reserves.
+See [Industry](INDUSTRY.md). Player crafting and true 3D cargo logistics
+are not yet implemented.
 
 Every task has stages:
 
@@ -44,6 +47,10 @@ The work must finish during 08:00–18:00. Only one technical completion and
 one paid shift are allowed per person per day. Inspecting the same problem
 twice or repairing without inspection cannot mint pay, duplicate components,
 or secretly improve infrastructure.
+
+A first industrial supply chain now gives the city a way to replace
+consumed steel, copper and spare parts, but only while ore deposits and
+qualified NPC workers remain available.
 
 Each midnight introduces small equipment wear. When a previously completed
 asset falls to 65/100 or less, a fresh problem reopens. Finite material
@@ -119,6 +126,7 @@ machines with component-level simulation, player-controlled CAD or full
 engineering drawings. Machinery wear is a prototype game rule. Tasks now affect finite park drinking-water access and urban night
 conditions, but they do **not** yet simulate individual household taps,
 a street-by-street electrical grid, reliability-based utility bills,
-construction projects, workplace accidents, contracts or resource
-extraction. Those effects must be introduced before
-we call this a complete industrial simulation.
+construction projects, workplace accidents or real supply contracts.
+A first simplified mineral extraction chain now exists, but mine ownership,
+machinery wear, pollution and worker safety still need simulation before
+we can call this a complete industrial economy.
