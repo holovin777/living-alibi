@@ -21,6 +21,7 @@ final class PlayerLife {
         int thirst = 0;
         int fatigue = 0;
         int health = 100;
+        boolean alive = true;
         final Map<String,Contact> contacts=new LinkedHashMap<>();
         Player copy() {
             Player p=new Player();
@@ -30,6 +31,7 @@ final class PlayerLife {
             p.thirst=thirst;
             p.fatigue=fatigue;
             p.health=health;
+            p.alive=alive;
             for(var e:contacts.entrySet())p.contacts.put(e.getKey(),e.getValue().copy());
             return p;
         }
@@ -71,6 +73,7 @@ final class PlayerLife {
         throw new IllegalArgumentException("Not a public destination: "+input+". Use locations to list public places.");
     }
     static int startTravel(Player player,TownLife.Place place) {
+        requireAlive(player);
         if(player.travelRemaining>0)throw new IllegalArgumentException("Already traveling to "+player.destination.label+".");
         if(!PUBLIC_PLACES.contains(place))throw new IllegalArgumentException("Private residences are not open to visitors.");
         if(player.place==place)return 0;
@@ -87,6 +90,7 @@ final class PlayerLife {
     /** Needs follow the authoritative world clock, including waits and offline catch-up.
      *  A public visitor does not automatically consume NPC supplies or reveal their identity. */
     static void tick(Player player,int minute) {
+        if(!player.alive)return;
         tick(player);
         if(minute%30==0)player.hunger=Math.min(100,player.hunger+1);
         if(minute%20==0)player.thirst=Math.min(100,player.thirst+1);
@@ -95,6 +99,7 @@ final class PlayerLife {
 
     /** Rest is a short public break, not sleep or ownership of a private home. */
     static int rest(Player player,int minutes) {
+        requireAlive(player);
         if(minutes<15 || minutes>240 || minutes%15!=0)
             throw new IllegalArgumentException("Rest for 15–240 game minutes in multiples of 15.");
         if(player.travelRemaining>0)
@@ -104,9 +109,52 @@ final class PlayerLife {
         return restored;
     }
 
+    /** A sleeping spot is the *public* part of the current area, never a private home. */
+    static int exposure(TownLife.Place place) {
+        return switch(place) {
+            case RIVER -> 3;
+            case WOODS, PARK, NORTH_RESIDENCES, SOUTH_RESIDENCES -> 2;
+            case CLINIC, LIBRARY, CAFE -> 0; // Covered public approaches, not private interiors.
+            default -> 1;
+        };
+    }
+
+    record SleepResult(int minutes,int fatigueRecovered,int healthChange,boolean survived) { }
+
+    /** Sleeping is possible in every public scene without owning a bed or dwelling.
+     *  Exposure is a fictional deterministic model; weather is not implemented yet. */
+    static SleepResult sleep(Player player,int hours) {
+        requireAlive(player);
+        if(hours<1||hours>12)
+            throw new IllegalArgumentException("Sleep between 1 and 12 game hours.");
+        if(player.travelRemaining>0)
+            throw new IllegalArgumentException("Finish traveling before sleeping.");
+
+        int beforeHealth=player.health;
+        int recovered=Math.min(player.fatigue,hours*11);
+        player.fatigue-=recovered;
+        int exposureLoss=exposure(player.place)*hours/2;
+        int deprivation=0;
+        if(player.thirst>=85)deprivation+=hours/2;
+        if(player.hunger>=90)deprivation+=hours/3;
+        if(exposureLoss+deprivation>0) {
+            player.health=Math.max(0,player.health-exposureLoss-deprivation);
+        } else if(player.hunger<70 && player.thirst<70) {
+            player.health=Math.min(100,player.health+hours/4);
+        }
+        if(player.health==0)player.alive=false;
+        return new SleepResult(hours*60,recovered,player.health-beforeHealth,player.alive);
+    }
+
+    static void requireAlive(Player player) {
+        if(!player.alive)
+            throw new IllegalArgumentException("The visitor is deceased. The town continues without them.");
+    }
+
     static String condition(Player player) {
         return "Hunger "+player.hunger+"/100 | Thirst "+player.thirst+
-                "/100 | Fatigue "+player.fatigue+"/100 | Health "+player.health+"/100";
+                "/100 | Fatigue "+player.fatigue+"/100 | Health "+player.health+
+                "/100 | "+(player.alive?"alive":"deceased");
     }
     static String position(Player player) {
         if(player.travelRemaining>0)return "Traveling to "+player.destination.label+
@@ -115,6 +163,7 @@ final class PlayerLife {
     }
     static List<TownLife.Citizen> visible(TownLife.Town town) {
         List<TownLife.Citizen> people=new ArrayList<>();
+        if(!town.player.alive)return people;
         if(town.player.travelRemaining>0)return people;
         String scene=TownLife.publicSpace(town.player.place);
         for(var citizen:town.people.values()) {
@@ -124,6 +173,7 @@ final class PlayerLife {
         return people;
     }
     static TownLife.Citizen nearby(TownLife.Town town,String residentId) {
+        requireAlive(town.player);
         TownLife.Citizen person=town.get(residentId);
         if(!visible(town).contains(person))
             throw new IllegalArgumentException(person.name+" is not in your current public space. Use look to see nearby people.");
