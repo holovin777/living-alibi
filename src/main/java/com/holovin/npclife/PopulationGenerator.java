@@ -51,6 +51,8 @@ final class PopulationGenerator {
                 c.occupation="Miner";c.workplace=TownLife.Place.QUARRY;
             } else if(index%12==7) {
                 c.occupation="Factory machinist";c.workplace=TownLife.Place.FACTORY;
+            } else if(index%12==8) {
+                c.occupation="Transport driver";c.workplace=TownLife.Place.QUARRY;
             }
             c.age=rng.nextInt(19,71);
             c.sociability=rng.nextInt(15,91);
