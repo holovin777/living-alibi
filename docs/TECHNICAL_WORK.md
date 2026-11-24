@@ -103,19 +103,22 @@ Automated checks:
 
 The park pump and lighting no longer exist only as repair scores. A repaired
 pump allows the shared public fountain to supply clean water using finite
-river-accessible stock; people at the park can refill their carried water
-from the same bounded tank used by the player. Low-condition lighting adds a
-small night fatigue penalty for people outside in public streets; a repaired
-lighting system removes the extra penalty. Clean-water stock and its last
+river-accessible stock. Generated residents who need drinking water
+can actively choose the Park instead of paying at the Market, then
+refill from the same bounded tank used by the player.
+Low-condition lighting causes some evening visitors to prefer
+a covered Cafe instead of the Park, and adds a small nighttime fatigue
+penalty for people outside in public streets. A repaired lighting
+system restores park visits and removes the extra penalty. Clean-water stock and its last
 pump day survive SQLite restarts. See [City Utilities](CITY_UTILITIES.md).
 
 ## Current limitations
 
 Workshops and offices use **placeholder 3D kiosks**, not physical tools,
 machines with component-level simulation, player-controlled CAD or full
-engineering drawings. Machinery wear is a prototype game rule. Tasks
-currently affect infrastructure condition and material stocks, but that
-condition does not yet control citizens' tap water or street lighting,
-reliability-based utility bills, construction projects, workplace accidents,
-contracts or resource extraction. Those effects must be introduced before
+engineering drawings. Machinery wear is a prototype game rule. Tasks now affect finite park drinking-water access and urban night
+conditions, but they do **not** yet simulate individual household taps,
+a street-by-street electrical grid, reliability-based utility bills,
+construction projects, workplace accidents, contracts or resource
+extraction. Those effects must be introduced before
 we call this a complete industrial simulation.
