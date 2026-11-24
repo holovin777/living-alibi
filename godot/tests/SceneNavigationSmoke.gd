@@ -100,6 +100,26 @@ func _exercise() -> void:
             "office offers engineering task rather than magically paying salary"):
         return
 
+    world._on_world_updated(_world("QUARRY", "Quarry"))
+    if not _check(world._scenery.name == "PublicScene_QUARRY",
+            "quarry has its own physical district"):
+        return
+    world._on_world_updated(_world("FACTORY", "Factory"))
+    if not _check(world._scenery.name == "PublicScene_FACTORY",
+            "manufacturing factory has its own physical district"):
+        return
+    world._on_industry_updated({
+        "ironRemaining": 78, "copperRemaining": 39,
+        "oreAtQuarry": 0, "oreAtFactory": 0,
+        "factorySteel": 0, "factoryCopper": 0, "factoryParts": 0,
+        "workshopSteel": 5, "workshopCopper": 4, "workshopParts": 8,
+        "minersAtWork": 1, "factoryWorkersAtWork": 1
+    })
+    if not _check(world._jobs.text.contains("iron ore 78") and
+            world._jobs.text.contains("spare parts 8"),
+            "Godot displays the authoritative finite industrial inventories"):
+        return
+
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 
