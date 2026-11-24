@@ -6,6 +6,50 @@
 
 Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player is an ordinary park visitor; detective cases are optional. A first Godot 3D park preview now exists, but it is not a complete 3D world.** Code, documentation, and game text are English-only.
 
+## Play the current 3D prototype on Linux
+
+Requires **JDK 21+**, **Maven 3.9+**, **curl** and **Godot 4** installed
+locally. For Arch Linux, install the necessary packages from the official
+repositories if missing (for example `jdk21-openjdk`, `maven`, `curl`,
+`godot`). The first Maven build requires internet access to download
+dependencies; regular game logic does not require an OpenAI key.
+
+From the **v1.16 feature branch** in the repository root:
+
+```bash
+bash play.sh --check
+bash play.sh
+```
+
+The launcher builds the Java engine and Spring Boot server, starts the
+authoritative game at **127.0.0.1:8080**, imports Godot assets on the first
+launch, and opens the game window. Close Godot to stop the local server.
+The saved world stays in `data/world.db` and is **never erased by this
+script**. If there is no previous save, a new playable park visitor is
+created automatically with 50 EUR and no assigned career.
+
+Use WASD/arrow keys to walk within each placeholder district; **E** at
+the yellow gate to travel and **F** at the blue kiosk for work, education
+and other actions. See [Godot controls](godot/README.md).
+
+For troubleshooting, `bash play.sh --server-only` starts only the Java
+server and displays its output, and `data/server.log` records normal
+game-launch errors. Do not launch the console and Spring server
+simultaneously against the same save file.
+
+To get this branch into a *separate* folder without replacing your current
+checkout:
+
+```bash
+git clone --branch feat/player-needs-persistence-v1.16 \
+  https://github.com/holovin777/living-alibi.git living-alibi-preview
+cd living-alibi-preview
+bash play.sh
+```
+
+This is a development preview; distribution as a downloadable standalone
+Linux application (without installing Maven/Godot) is not yet implemented.
+
 ## New in v1.16 (draft)
 
 The game still launches **from an empty SQLite file**. A new visitor is anonymous,
