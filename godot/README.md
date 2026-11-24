@@ -65,6 +65,11 @@ writer (such as the console) against the same SQLite file at the same time.
   and every drink consumes one unit from a finite shared tank. The HUD
   shows public water and street-lighting status, which affect residents
   and the visitor. See [City Utilities](../docs/CITY_UTILITIES.md).
+- **Industry:** see the current finite iron/copper seams, quarry stock,
+  factory output, technician warehouse inventory, and working NPC crews.
+  The public Quarry and Factory districts have placeholder 3D machinery.
+  Production proceeds on its own at scheduled game times while the correct
+  NPC workers are present. See [Industry](../docs/INDUSTRY.md).
 - **Jobs:** see current job offerings without applying.
 - **Wait 60m:** advance 60 game minutes in the world.
 - **Refresh:** recover the latest committed state from Java/SQLite.
@@ -97,7 +102,7 @@ HTTP port has no authentication, so **don't expose it publicly**.
 
 GitHub Actions checks that Godot 4.6.1 imports/starts the project and
 that `tests/SceneNavigationSmoke.gd` renders Park, Market, School
-and Workshop with context-sensitive interactions without requiring
+Workshop, Quarry and Factory with context-sensitive interactions without requiring
 an existing save or live network service. Java CI separately boots
 Spring Boot with an empty SQLite file and exercises real movement,
 job applications, work and study over HTTP.
