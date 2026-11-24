@@ -64,6 +64,13 @@ A dedicated, single-authority game session prevents unsynchronized writes.
 | GET | `/api/v1/world` | — | Day, year, season, weather sky, temperature, visitor needs, nearby NPCs and local resources |
 | GET | `/api/v1/utilities` | — | Pump state, finite clean-water tank and street-lighting condition |
 | GET | `/api/v1/industry` | — | Finite deposits, paid firms, truck inventory, factory scrap and salvage |
+| GET | `/api/v1/business` | — | Whether the workshop is registered, its owner, machine, employee, stock and separate cash |
+| GET | `/api/v1/business/candidates` | — | Available actual residents co-present with the player at the Workshop |
+| POST | `/api/v1/actions/business/open` | `{}` | Pay the city 15 EUR to establish or take over the local business |
+| POST | `/api/v1/actions/business/invest` | `{"amount":25}` | Transfer 25 EUR from personal cash to the company |
+| POST | `/api/v1/actions/business/machine` | `{}` | Company buys a real 25 EUR fabrication machine |
+| POST | `/api/v1/actions/business/hire` | `{"residentId":"resident-0002"}` | Offer a real nearby NPC a paid staff contract |
+| POST | `/api/v1/actions/business/withdraw` | `{"amount":10}` | Transfer only existing company funds to its owner |
 | POST | `/api/v1/actions/prospect` | `{}` | Employed quarry miner pays for one finite western geological discovery |
 | POST | `/api/v1/actions/drink` | `{"sourceId":"park-fountain"}` | Spend one clean-water unit if the park pump works |
 | GET | `/api/v1/locations` | — | Public destinations with stable IDs and Java-computed travel minutes |
@@ -125,7 +132,10 @@ An **Industry** button now displays live material quantities from the
 authoritative `GET /api/v1/industry` API; Quarry and Factory have
 distinct placeholder scenes. NPCs perform the production chain in Java,
 and depleted deposits are never replenished by client visuals.
-See [Industry](INDUSTRY.md).
+See [Industry](INDUSTRY.md). A **Business** button and actual Workshop
+kiosk controls let visitors register a business, invest real cash, buy
+equipment, hire a nearby NPC and withdraw funds. See
+[Player Business](PLAYER_BUSINESS.md).
 
 The HTTP adapter [`godot/examples/WorldApi.gd`](../godot/examples/WorldApi.gd)
 serializes requests to avoid duplicate/out-of-order actions. It provides
