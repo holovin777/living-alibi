@@ -135,6 +135,14 @@ public final class Main {
                         System.out.println(message);
                         continue;
                     }
+                    if(lower.equals("prospect")) {
+                        var candidate=town.copy();
+                        String message=IndustryLife.prospectPlayer(candidate,state.minute);
+                        advanceAndSave(db,state,candidate,120);
+                        town.copyFrom(candidate);
+                        System.out.println(message);
+                        continue;
+                    }
                     if(lower.equals("work")) {
                         var candidate=town.copy();
                         String result=CareerLife.work(candidate,state.day,state.minute);
@@ -161,6 +169,12 @@ public final class Main {
                                 " | spare parts "+r.workshopParts());
                         System.out.println("Workers on shift: miners "+r.minersAtWork()+
                                 " | factory machinists "+r.factoryWorkersAtWork());
+                        System.out.println("Cargo on truck: "+r.oreOnTruck()+
+                                " | recycled scrap remaining: "+r.scrapRemaining()+
+                                " | western seam surveyed: "+r.westDepositDiscovered());
+                        System.out.println("Accounts: Quarry EUR "+r.quarryPayroll()+
+                                " | Factory EUR "+r.factoryPayroll()+
+                                " | City maintenance EUR "+r.cityBudget());
                         continue;
                     }
                     if(lower.equals("utilities")) {
@@ -871,6 +885,7 @@ public final class Main {
         System.out.println(" jobs | apply <job-id>   — find work voluntarily at the listed workplace");
         System.out.println(" work                    — paid two-hour shift, once daily (08:00–18:00)");
         System.out.println(" industry | utilities — public natural resources, firms and services");
+        System.out.println(" prospect — employed quarry miner can fund a two-hour geological survey");
         System.out.println(" work-orders | diagnose <order-id> | repair <order-id> — city infrastructure tasks");
         System.out.println(" technicians and engineers must finish a technical task before paid work");
         System.out.println(" study engineering | study investigation — paid lesson at school/library");
