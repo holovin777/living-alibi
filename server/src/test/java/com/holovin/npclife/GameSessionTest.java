@@ -13,6 +13,44 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void founderCanOpenCapitalFundedWorkshopWithoutCreatingMoney() throws Exception {
+        Path file=directory.resolve("first-workshop.db");
+        try(var game=new GameSession(file)) {
+            assertFalse(game.business().registered());
+            assertThrows(IllegalArgumentException.class,game::openBusiness,
+                    "you cannot register a distant company by clicking from the park");
+            game.move("workshop");
+            var opened=game.openBusiness();
+            assertTrue(opened.message().contains("Registered"));
+            assertTrue(game.business().registered());
+            assertTrue(game.business().yours());
+            assertEquals(35,game.snapshot().player().money());
+            game.investBusiness(25);
+            assertEquals(25,game.business().cash());
+            assertEquals(10,game.snapshot().player().money());
+            game.buyBusinessMachine();
+            assertTrue(game.business().machine());
+            assertEquals(0,game.business().cash());
+            assertThrows(IllegalArgumentException.class,
+                    ()->game.hireBusinessWorker("resident-0001"),
+                    "a company without enough money for wages cannot recruit people");
+            assertThrows(IllegalArgumentException.class,
+                    ()->game.withdrawBusiness(1));
+            assertThrows(IllegalArgumentException.class,
+                    ()->game.investBusiness(100));
+        }
+        try(var reopened=new GameSession(file)) {
+            assertTrue(reopened.business().registered());
+            assertTrue(reopened.business().machine());
+            assertTrue(reopened.business().yours());
+            assertEquals(0,reopened.business().cash());
+            assertEquals(10,reopened.snapshot().player().money());
+            assertTrue(reopened.businessCandidates().stream()
+                    .allMatch(c->c.id().startsWith("resident-")));
+        }
+    }
+
+    @Test
     void ordinaryVisitorCanBecomeMinerOrMachinistAndSurveyNewOre() throws Exception {
         Path mine=directory.resolve("visitor-miner.db");
         try(var game=new GameSession(mine)) {
