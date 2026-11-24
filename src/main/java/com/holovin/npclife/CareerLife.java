@@ -27,7 +27,11 @@ final class CareerLife {
             new Offer("engineer","Junior engineer",TownLife.Place.OFFICE,
                     "engineering",8,62,1240),
             new Offer("investigator","Private investigator",TownLife.Place.OFFICE,
-                    "investigation",8,54,1080)
+                    "investigation",8,54,1080),
+            new Offer("miner","Quarry miner",TownLife.Place.QUARRY,
+                    "none",0,30,360),
+            new Offer("machinist","Factory machinist",TownLife.Place.FACTORY,
+                    "none",0,34,560)
     );
 
     static List<Offer> offers() {return OFFERS;}
@@ -37,6 +41,9 @@ final class CareerLife {
             town.employerFunds.putIfAbsent(offer.id,offer.startingPayroll);
         town.employerFunds.putIfAbsent("school",200);
         town.employerFunds.putIfAbsent("library",200);
+        // Enterprise workers share real company funds with player industrial wages.
+        town.employerFunds.putIfAbsent("city-maintenance",500);
+        town.employerFunds.putIfAbsent("survey-office",0);
     }
 
     private static Offer offer(String id) {
@@ -127,13 +134,17 @@ final class CareerLife {
         int funds=town.employerFunds.getOrDefault(vacancy.id,0);
         if(funds<vacancy.wage)
             throw new IllegalArgumentException("Employer has insufficient payroll funds.");
+        // Industrial roles must produce real physical goods during the shift.
+        // A copied town is committed only after this and the rest of the action succeed.
+        String industrialOutput=IndustryLife.playerShift(town,vacancy.id);
         // One conserved transfer: employer cash -> player cash.
         town.employerFunds.put(vacancy.id,funds-vacancy.wage);
         p.money=Math.addExact(p.money,vacancy.wage);
         p.lastWorkDay=day;
         p.fatigue=Math.min(100,p.fatigue+8);
         return "Worked two hours as "+vacancy.title+
-                ". Earned "+vacancy.wage+" EUR from employer funds.";
+                ". Earned "+vacancy.wage+" EUR from employer funds."+
+                (industrialOutput.isEmpty()?"":" "+industrialOutput);
     }
 
     static String status(PlayerLife.Player p) {
