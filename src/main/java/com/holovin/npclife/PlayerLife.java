@@ -82,6 +82,31 @@ final class PlayerLife {
         player.travelRemaining--;
         if(player.travelRemaining==0)player.place=player.destination;
     }
+
+    /** Needs follow the authoritative world clock, including waits and offline catch-up.
+     *  A public visitor does not automatically consume NPC supplies or reveal their identity. */
+    static void tick(Player player,int minute) {
+        tick(player);
+        if(minute%30==0)player.hunger=Math.min(100,player.hunger+1);
+        if(minute%20==0)player.thirst=Math.min(100,player.thirst+1);
+        if(minute%30==0)player.fatigue=Math.min(100,player.fatigue+1);
+    }
+
+    /** Rest is a short public break, not sleep or ownership of a private home. */
+    static int rest(Player player,int minutes) {
+        if(minutes<15 || minutes>240 || minutes%15!=0)
+            throw new IllegalArgumentException("Rest for 15–240 game minutes in multiples of 15.");
+        if(player.travelRemaining>0)
+            throw new IllegalArgumentException("Finish traveling before you rest.");
+        int restored=Math.min(player.fatigue,minutes/6);
+        player.fatigue-=restored;
+        return restored;
+    }
+
+    static String condition(Player player) {
+        return "Hunger "+player.hunger+"/100 | Thirst "+player.thirst+
+                "/100 | Fatigue "+player.fatigue+"/100 | Health "+player.health+"/100";
+    }
     static String position(Player player) {
         if(player.travelRemaining>0)return "Traveling to "+player.destination.label+
                 " ("+player.travelRemaining+" minute(s) remaining)";
