@@ -21,6 +21,10 @@ class GameSessionTest {
             assertEquals(450,initial.minute());
             assertEquals("SPRING",initial.season());
             assertEquals(1,initial.year());
+            assertNotNull(initial.weather());
+            assertEquals(WeatherLife.at(1,450).sky().name(),initial.weather().sky());
+            assertEquals(WeatherLife.at(1,450).temperatureC(),
+                    initial.weather().temperatureC());
             assertEquals(1,initial.player().incarnation());
             assertTrue(initial.player().alive());
             assertNull(initial.player().privateName());
