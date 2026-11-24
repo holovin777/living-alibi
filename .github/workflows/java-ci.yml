@@ -218,6 +218,11 @@ jobs:
           grep -q '"season":"SPRING"' target/api-smoke/world.json
           grep -q '"weather":' target/api-smoke/world.json
           grep -q '"temperatureC":' target/api-smoke/world.json
+          curl -fsS http://127.0.0.1:18080/api/v1/industry \
+            -o target/api-smoke/industry.json
+          grep -q '"ironRemaining":80' target/api-smoke/industry.json
+          grep -q '"copperRemaining":40' target/api-smoke/industry.json
+          grep -q '"workshopParts":6' target/api-smoke/industry.json
           grep -q '"placeId":"PARK"' target/api-smoke/world.json
           grep -q '"services":' target/api-smoke/world.json
           grep -q '"fountainWorking":false' target/api-smoke/world.json
