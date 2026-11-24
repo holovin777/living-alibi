@@ -25,6 +25,9 @@ public final class Main {
                         town.player.incarnation+" begins in the same town.");
             }
             System.out.println("Living Alibi v1.16 — Living Visitor (work in progress)");
+            System.out.println("You arrive at "+town.player.place.label+
+                    ", with "+town.player.money+" EUR in your pockets.");
+            System.out.println("No profession or mission is assigned. Find work, study, or just explore.");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -52,6 +55,7 @@ public final class Main {
                         System.out.println("Visitor #"+town.player.incarnation+" | "+PlayerLife.position(town.player)+
                                 " | private name: "+(town.player.privateName==null?"not set":town.player.privateName));
                         System.out.println(PlayerLife.condition(town.player));
+                        System.out.println(CareerLife.status(town.player));
                         System.out.println("Year "+CalendarLife.year(state.day)+
                                 " | Season: "+CalendarLife.season(state.day));
                         System.out.println("Your name is NOT automatically known by any resident. Investigations are optional.");
@@ -72,6 +76,44 @@ public final class Main {
                         System.out.println("Year "+CalendarLife.year(state.day)+
                                 " | "+climate.season()+" | "+climate.sky()+
                                 " | "+climate.temperatureC()+" C");
+                        continue;
+                    }
+                    if(lower.equals("career")) {
+                        System.out.println(CareerLife.status(town.player));
+                        continue;
+                    }
+                    if(lower.equals("jobs")) {
+                        System.out.println("Public job board (visit the workplace to apply):");
+                        for(var vacancy:CareerLife.offers())
+                            System.out.println("  "+vacancy.id()+" | "+vacancy.title()+
+                                    " | "+vacancy.workplace().label+
+                                    " | skill "+vacancy.subject()+" "+vacancy.requiredSkill()+
+                                    " | "+vacancy.wage()+" EUR / 2h shift");
+                        System.out.println("Study engineering at School or investigation at Library, 10 EUR / hour.");
+                        continue;
+                    }
+                    if(lower.startsWith("apply ")) {
+                        var candidate=town.copy();
+                        String result=CareerLife.apply(candidate,arg(input));
+                        advanceAndSave(db,state,candidate,15);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.startsWith("study ")) {
+                        var candidate=town.copy();
+                        String result=CareerLife.study(candidate,arg(input),state.minute);
+                        advanceAndSave(db,state,candidate,CareerLife.LESSON_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(result+" "+CareerLife.status(town.player));
+                        continue;
+                    }
+                    if(lower.equals("work")) {
+                        var candidate=town.copy();
+                        String result=CareerLife.work(candidate,state.day,state.minute);
+                        advanceAndSave(db,state,candidate,CareerLife.SHIFT_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(result+" "+CareerLife.status(town.player));
                         continue;
                     }
                     if(lower.equals("needs")) {
@@ -127,7 +169,7 @@ public final class Main {
                         continue;
                     }
                     if(lower.equals("explore")) {
-                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias] | needs | sources | rest [minutes] | sleep [hours]");
+                        System.out.println("Free exploration: jobs | apply <job> | work | study <subject> | career | locations | look | go <place>");
                         System.out.println("You can simply wander, wait, and meet people. No cases or missions are required.");
                         continue;
                     }
@@ -768,7 +810,10 @@ public final class Main {
     private static void help() {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
-        System.out.println(" explore | me | needs | lives | weather | locations | look | go <place>");
+        System.out.println(" explore | me | career | needs | lives | weather | locations | look | go <place>");
+        System.out.println(" jobs | apply <job-id>   — find work voluntarily at the listed workplace");
+        System.out.println(" work                    — paid two-hour shift, once daily (08:00–18:00)");
+        System.out.println(" study engineering | study investigation — paid lesson at school/library");
         System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
         System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
         System.out.println(" rest [minutes]        — pause for 15–240 game minutes (default: 60)");
