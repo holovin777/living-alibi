@@ -44,7 +44,10 @@ public final class GameSession implements AutoCloseable {
     }
 
     public record PlayerView(int incarnation,String place,String privateName,
-                             int hunger,int thirst,int fatigue,int health,boolean alive) { }
+                             int hunger,int thirst,int fatigue,int health,boolean alive,
+                             int money,String jobId,int engineeringSkill,int investigationSkill) { }
+    public record JobView(String id,String title,String workplace,String subject,
+                          int requiredSkill,int wage,int remainingPayroll) { }
     public record ResidentView(String id,String name,String activity) { }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
     public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
@@ -56,7 +59,8 @@ public final class GameSession implements AutoCloseable {
     public synchronized WorldView snapshot() {
         var p=town.player;
         var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.privateName,
-                p.hunger,p.thirst,p.fatigue,p.health,p.alive);
+                p.hunger,p.thirst,p.fatigue,p.health,p.alive,
+                p.money,p.jobId,p.engineeringSkill,p.investigationSkill);
         var residents=PlayerLife.visible(town).stream()
                 .map(c->new ResidentView(c.id,c.name,c.activity)).toList();
         var resources=NatureLife.available(town).values().stream()
@@ -67,6 +71,31 @@ public final class GameSession implements AutoCloseable {
                 new WeatherView(weather.sky().name(),weather.temperatureC(),
                         weather.raining(),weather.snowing()),
                 player,residents,resources);
+    }
+
+    public synchronized List<JobView> jobs() {
+        return CareerLife.offers().stream()
+                .map(v->new JobView(v.id(),v.title(),v.workplace().name(),v.subject(),
+                        v.requiredSkill(),v.wage(),
+                        town.employerFunds.getOrDefault(v.id(),0))).toList();
+    }
+
+    public synchronized ActionView applyJob(String jobId) throws SQLException {
+        var candidate=town.copy();
+        String message=CareerLife.apply(candidate,jobId);
+        return apply(candidate,15,message);
+    }
+
+    public synchronized ActionView study(String subject) throws SQLException {
+        var candidate=town.copy();
+        String message=CareerLife.study(candidate,subject,state.minute);
+        return apply(candidate,CareerLife.LESSON_MINUTES,message);
+    }
+
+    public synchronized ActionView work() throws SQLException {
+        var candidate=town.copy();
+        String message=CareerLife.work(candidate,state.day,state.minute);
+        return apply(candidate,CareerLife.SHIFT_MINUTES,message);
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
