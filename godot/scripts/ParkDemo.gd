@@ -19,6 +19,8 @@ var _connected := false
 var _locations: Array = []
 var _job_offers: Array = []
 var _work_orders: Array = []
+var _business_report: Dictionary = {}
+var _business_candidates: Array = []
 
 var _heading: Label
 var _status: Label
@@ -43,6 +45,8 @@ func _ready() -> void:
     _api.job_offers_updated.connect(_on_job_offers_updated)
     _api.work_orders_updated.connect(_on_work_orders_updated)
     _api.industry_updated.connect(_on_industry_updated)
+    _api.business_updated.connect(_on_business_updated)
+    _api.business_candidates_updated.connect(_on_business_candidates_updated)
     _api.action_feedback.connect(_on_action_feedback)
     _api.request_failed.connect(_on_request_failed)
     _api.request_started.connect(_on_request_started)
@@ -301,6 +305,7 @@ func _create_interface() -> void:
     buttons.add_child(_button("Refresh", _refresh))
     buttons.add_child(_button("Jobs", _find_jobs))
     buttons.add_child(_button("Industry", _view_industry))
+    buttons.add_child(_button("Business", _view_business))
     buttons.add_child(_button("Wait 60m", _wait_one_hour))
     _hint = Label.new()
     _hint.text = "WASD/arrow keys to walk; E at gate; F at kiosk."
@@ -385,7 +390,9 @@ func _toggle_actions() -> void:
     _action_panel.visible = not _action_panel.visible
     if _action_panel.visible:
         _render_actions()
-        if _current_place in ["WORKSHOP", "OFFICE"] and not _api.is_busy():
+        if _current_place == "WORKSHOP" and not _api.is_busy():
+            _api.view_business()
+        elif _current_place == "OFFICE" and not _api.is_busy():
             _api.list_work_orders()
 
 func _render_actions() -> void:
@@ -409,6 +416,28 @@ func _render_actions() -> void:
         "WORKSHOP":
             _action_choices.add_child(_button("Apply: technician",
                     _apply_job.bind("technician")))
+            var business: Dictionary = _business_report
+            if not bool(business.get("registered", false)) or not bool(business.get("yours", false)):
+                _action_choices.add_child(_button("Register / acquire workshop · 15 EUR",
+                        _business_open))
+            else:
+                var cash := str(business.get("cash", 0))
+                var machine := bool(business.get("machine", false))
+                var label := Label.new()
+                label.text = "YOUR COMPANY | Bank: " + cash + " EUR | machine: " + str(machine)
+                _action_choices.add_child(label)
+                _action_choices.add_child(_button("Invest 10 EUR", _business_invest.bind(10)))
+                _action_choices.add_child(_button("Invest 25 EUR", _business_invest.bind(25)))
+                if not machine:
+                    _action_choices.add_child(_button("Buy fabrication machine · 25 EUR",
+                            _business_machine))
+                if machine and str(business.get("employeeId", "")) in ["", "<null>"]:
+                    for candidate in _business_candidates:
+                        var id := str(candidate.get("id", ""))
+                        var name := str(candidate.get("name", id))
+                        _action_choices.add_child(_button("Hire " + name + " · 10 EUR bonus",
+                                _business_hire.bind(id)))
+                _action_choices.add_child(_button("Withdraw 10 EUR", _business_withdraw.bind(10)))
         "OFFICE":
             _action_choices.add_child(_button("Apply: engineer",
                     _apply_job.bind("engineer")))
@@ -468,6 +497,31 @@ func _render_actions() -> void:
     if work_site == _current_place:
         _action_choices.add_child(_button("Work a paid 2-hour shift", _work))
 
+func _business_open() -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.business_open()
+
+func _business_invest(amount: int) -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.business_invest(amount)
+
+func _business_machine() -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.business_machine()
+
+func _business_hire(resident_id: String) -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.business_hire(resident_id)
+
+func _business_withdraw(amount: int) -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.business_withdraw(amount)
+
 func _apply_job(job_id: String) -> void:
     if _near_kiosk() and not _api.is_busy():
         _action_panel.visible = false
@@ -519,6 +573,10 @@ func _find_jobs() -> void:
 func _view_industry() -> void:
     if not _api.is_busy():
         _api.view_industry()
+
+func _view_business() -> void:
+    if not _api.is_busy():
+        _api.view_business()
 
 func _wait_one_hour() -> void:
     if not _api.is_busy():
@@ -593,6 +651,30 @@ func _on_job_offers_updated(jobs: Array) -> void:
             str(offer.get("subject", "none")), str(offer.get("requiredSkill", 0))
         ])
     _jobs.text = "\n".join(lines)
+
+func _on_business_updated(report: Dictionary) -> void:
+    _business_report = report
+    var employee := str(report.get("employeeName", "unemployed"))
+    var state := "NOT REGISTERED"
+    if bool(report.get("registered", false)):
+        state = "OWNED" if bool(report.get("yours", false)) else "SOMEONE ELSE'S BUSINESS"
+    _jobs.text = "SMALL WORKSHOP: %s | bank %s EUR | machine %s\n" % [
+        state, str(report.get("cash", 0)), str(report.get("machine", false))
+    ]
+    _jobs.text += "Employee %s | parts in stock %s | paid hours today %s" % [
+        employee, str(report.get("spareParts", 0)), str(report.get("paidHoursToday", 0))
+    ]
+    if _action_panel.visible and _current_place == "WORKSHOP":
+        _render_actions()
+        if not _api.is_busy():
+            _api.business_candidates()
+
+func _on_business_candidates_updated(candidates: Array) -> void:
+    _business_candidates = candidates
+    if _action_panel.visible and _current_place == "WORKSHOP":
+        _render_actions()
+        if not _api.is_busy():
+            _api.list_work_orders()
 
 func _on_industry_updated(report: Dictionary) -> void:
     _jobs.text = "QUARRY: iron ore %s, copper ore %s | mined cargo %s\n" % [
