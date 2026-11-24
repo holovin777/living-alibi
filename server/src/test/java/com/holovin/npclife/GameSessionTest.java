@@ -23,7 +23,8 @@ class GameSessionTest {
             assertTrue(initial.player().alive());
             assertNull(initial.player().privateName());
             assertEquals("Park",initial.player().place());
-            assertFalse(game.snapshot().residents().isEmpty());
+            assertTrue(initial.sources().stream()
+                    .anyMatch(s->s.id().equals("puddle-water")));
             var walk=game.move("river");
             assertEquals("River",walk.world().player().place());
             assertEquals(460,walk.world().minute());
