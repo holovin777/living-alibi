@@ -177,9 +177,26 @@ The eventual game is an emergent detective simulation. The player investigates e
   dispatch and arrival. Factory workers can recycle two finite scrap
   units into one steel unit, with lossy recovery.
 - Fully modeled wages in other economic sectors, animated trucks,
-  enterprise ownership, external trade and energy consumption are
-  future work. See [Industry](INDUSTRY.md).
+  external trade and energy consumption are future work.
   See [Industry](INDUSTRY.md).
+
+### Player-owned small fabrication company (v1.16 draft)
+
+- An ordinary visitor can register one independent workshop business
+  at the public Workshop for a real 15 EUR license cost.
+- The business has separate persistent cash, a purchased machine,
+  a contract with one actually co-present procedural resident, finite
+  11 EUR hourly wages and a physical stock of manufactured spare parts.
+- With two paid work hours and workshop steel bought from the municipality,
+  the employee fabricates two parts. The municipality can purchase only
+  actually manufactured goods from its finite city maintenance budget.
+- The founder can invest and withdraw real cash; losing ownership on
+  death does **not** erase company assets. A future visitor can purchase
+  the existing company for a new license fee; no automatic inheritance.
+- One local workshop is the current limit; competing owners, realistic
+  employer negotiations, business loans, equipment wear, taxes and
+  a detailed construction economy remain future work.
+  See [Player Business](PLAYER_BUSINESS.md).
 
 ### New world calendar and Godot API bridge (v1.16 draft)
 
