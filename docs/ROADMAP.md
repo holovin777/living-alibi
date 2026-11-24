@@ -133,6 +133,12 @@ The eventual game is an emergent detective simulation. The player investigates e
   costs tuition and takes actual world time; wages draw from finite institutional
   accounts persisted in SQLite. This is an initial employer-budget model,
   not yet the full NPC business economy.
+- Workshop technicians and engineers must now complete a **physical work
+  order** (inspection, material-consuming repair or upgrade) before their
+  paid technical shift. The park water pump and public street lighting have
+  persistent condition, shared finite component stocks, daily wear and
+  archived completion state. Repeated work will eventually need new
+  material supply chains. See [Technical Work](TECHNICAL_WORK.md).
 - A successor visitor never inherits an old career, money or qualifications.
 - Spring API adds job listings and matching voluntary player actions.
 - See [Player Careers](PLAYER_CAREERS.md).
