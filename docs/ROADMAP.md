@@ -139,6 +139,11 @@ The eventual game is an emergent detective simulation. The player investigates e
   persistent condition, shared finite component stocks, daily wear and
   archived completion state. Repeated work will eventually need new
   material supply chains. See [Technical Work](TECHNICAL_WORK.md).
+- Shared city water and lighting now alter both NPC well-being and **NPC choices**:
+  the park's finite public fountain gives thirsty residents a cheaper
+  destination than the market, while poor street lights send some evening
+  visitors to the cafe rather than the park. Actual source use and citizen
+  travel remain world events; see [City Utilities](CITY_UTILITIES.md).
 - A successor visitor never inherits an old career, money or qualifications.
 - Spring API adds job listings and matching voluntary player actions.
 - See [Player Careers](PLAYER_CAREERS.md).
