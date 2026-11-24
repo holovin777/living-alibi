@@ -46,6 +46,11 @@ public final class GameSession implements AutoCloseable {
     public record PlayerView(int incarnation,String place,String placeId,String privateName,
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill) { }
+    public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
+                               boolean machine,int cash,String employeeId,
+                               String employeeName,int spareParts,int paidHoursToday,
+                               int lastProductionDay,int lastSaleDay) { }
+    public record CandidateView(String id,String name,String currentOccupation) { }
     public record JobView(String id,String title,String workplace,String subject,
                           int requiredSkill,int wage,int remainingPayroll) { }
     public record WorkOrderView(String id,String title,String jobId,String place,
@@ -83,6 +88,50 @@ public final class GameSession implements AutoCloseable {
                 new WeatherView(weather.sky().name(),weather.temperatureC(),
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services());
+    }
+
+    public synchronized BusinessView business() {
+        var b=BusinessLife.status(town,state.day);
+        return new BusinessView(b.registered(),b.yours(),b.ownerIncarnation(),
+                b.machine(),b.cash(),b.employeeId(),b.employeeName(),
+                b.spareParts(),b.paidHoursToday(),b.lastProductionDay(),b.lastSaleDay());
+    }
+
+    public synchronized List<CandidateView> businessCandidates() {
+        // Only names of actual nearby, available town residents.
+        return BusinessLife.candidates(town,state.day).stream()
+                .map(c->new CandidateView(c.id,c.name,c.occupation)).toList();
+    }
+
+    public synchronized ActionView openBusiness() throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.open(copy);
+        return apply(copy,15,message);
+    }
+
+    public synchronized ActionView investBusiness(int amount) throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.invest(copy,amount);
+        return apply(copy,5,message);
+    }
+
+    public synchronized ActionView buyBusinessMachine() throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.machine(copy);
+        return apply(copy,30,message);
+    }
+
+    public synchronized ActionView hireBusinessWorker(String residentId)
+            throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.hire(copy,residentId,state.day);
+        return apply(copy,15,message);
+    }
+
+    public synchronized ActionView withdrawBusiness(int amount) throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.withdraw(copy,amount);
+        return apply(copy,5,message);
     }
 
     /** Authoritative condition of water and lighting infrastructure for the UI. */
