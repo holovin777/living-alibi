@@ -18,6 +18,11 @@ class GameSessionTest {
         try(var game=new GameSession(file)) {
             var visitor=game.snapshot().player();
             assertEquals("Park",visitor.place());
+            assertEquals("PARK",visitor.placeId());
+            assertEquals(0,game.destinations().stream()
+                    .filter(d->d.id().equals("PARK")).findFirst().orElseThrow().travelMinutes());
+            assertEquals(10,game.destinations().stream()
+                    .filter(d->d.id().equals("MARKET")).findFirst().orElseThrow().travelMinutes());
             assertEquals(50,visitor.money());
             assertNull(visitor.jobId());
             assertEquals(0,visitor.engineeringSkill());
@@ -27,6 +32,9 @@ class GameSessionTest {
                     ()->game.applyJob("shop-assistant"));
             assertEquals(50,game.snapshot().player().money());
             game.move("market");
+            assertEquals("MARKET",game.snapshot().player().placeId());
+            assertEquals(8,game.destinations().stream()
+                    .filter(d->d.id().equals("SCHOOL")).findFirst().orElseThrow().travelMinutes());
             game.applyJob("shop-assistant");
             assertEquals("shop-assistant",game.snapshot().player().jobId());
             game.waitMinutes(5);
@@ -43,6 +51,7 @@ class GameSessionTest {
         }
         try(var restarted=new GameSession(file)) {
             assertEquals(64,restarted.snapshot().player().money());
+            assertEquals("SCHOOL",restarted.snapshot().player().placeId());
             assertEquals("shop-assistant",restarted.snapshot().player().jobId());
             assertEquals(1,restarted.snapshot().player().engineeringSkill());
             assertEquals(4,restarted.jobs().size(),"job board remains stable");
