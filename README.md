@@ -4,13 +4,15 @@
 
 > A living town where you can be an unknown visitor, build relationships, or investigate when you choose.
 
-Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player can now roam anonymously in public places; detective cases are optional. There is no 3D world yet.** Code, documentation, and game text are English-only.
+Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player is an ordinary park visitor; detective cases are optional. A first Godot 3D park preview now exists, but it is not a complete 3D world.** Code, documentation, and game text are English-only.
 
 ## New in v1.16 (draft)
 
 The game still launches **from an empty SQLite file**. A new visitor is anonymous,
 can roam, rest, sleep in public places, drink from finite natural sources and
-gather wild berries. A mortality event creates a **new visitor in the same
+gather wild berries. The new visitor starts with **50 EUR in their pocket**
+and no mandatory job, detective role or qualifications. Jobs, paid lessons,
+career changes and two-hour work shifts are optional. A mortality event creates a **new visitor in the same
 continuous city**, without resetting NPCs, resources, or historic cases.
 
 A deterministic **four-season calendar** (spring, summer, autumn, winter)
@@ -26,8 +28,11 @@ validated player actions over versioned REST/JSON endpoints.
 See [Godot / Spring integration](docs/GODOT_INTEGRATION.md),
 [Player Daily Life](docs/PLAYER_DAILY_LIFE.md),
 [Natural Resources](docs/NATURAL_RESOURCES.md) and
-[Weather](docs/WEATHER.md). The sample GDScript
-client is [`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd).
+[Weather](docs/WEATHER.md) and
+[Careers](docs/PLAYER_CAREERS.md). The GDScript client is
+[`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd) and the
+first visual park scene starts at [`godot/project.godot`](godot/project.godot)
+(requires an installed Godot 4 editor, plus the running local Java API).
 
 For a new empty world, first build the engine:
 
