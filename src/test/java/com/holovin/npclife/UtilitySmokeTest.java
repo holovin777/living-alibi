@@ -84,6 +84,12 @@ public final class UtilitySmokeTest {
                 "streetlights don't affect noon");
         check(!UtilityLife.nightExposure(town,TownLife.Place.WOODS,1260),
                 "urban street lamps are not assigned to remote forests");
+        resident.water=2;
+        resident.fatigue=25;
+        now.minute=1260;
+        UtilityLife.tick(town,now,events,seen);
+        check(resident.fatigue==26,
+                "actual resident becomes more fatigued at night with broken lighting");
 
         worker.place=TownLife.Place.OFFICE;
         worker.destination=worker.place;
@@ -95,6 +101,10 @@ public final class UtilitySmokeTest {
                 "engineer upgrade restores public lighting");
         check(!UtilityLife.nightExposure(town,TownLife.Place.PARK,1260),
                 "working lights remove extra night fatigue");
+        now.minute=1320;
+        UtilityLife.tick(town,now,events,seen);
+        check(resident.fatigue==26,
+                "lit streets remove extra fatigue for the same outdoor resident");
         var clone=town.copy();
         clone.cleanWater=0;
         clone.technicalOrders.get("street-lights").condition=0;
