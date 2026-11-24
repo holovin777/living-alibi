@@ -45,6 +45,13 @@ final class PopulationGenerator {
             String id="resident-%04d".formatted(index);
             var c=new TownLife.Citizen(id,name,JOBS[job],home);
             c.home=home;c.workplace=WORKPLACES[job];
+            // Two genuinely employed industrial workers per initial 12 residents,
+            // with real wages, hours, travel, sickness and independent choices.
+            if(index%12==6) {
+                c.occupation="Miner";c.workplace=TownLife.Place.QUARRY;
+            } else if(index%12==7) {
+                c.occupation="Factory machinist";c.workplace=TownLife.Place.FACTORY;
+            }
             c.age=rng.nextInt(19,71);
             c.sociability=rng.nextInt(15,91);
             c.carefulness=rng.nextInt(15,91);
