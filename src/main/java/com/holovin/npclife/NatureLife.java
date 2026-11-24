@@ -64,6 +64,26 @@ final class NatureLife {
             source.stock=Math.min(source.capacity,source.stock+source.dailyReplenishment);
     }
 
+    /** Actual world-clock replenishment: rain refills puddles, seasonal plants
+     *  grow at different rates, and snow does not produce immediate rainwater. */
+    static void tick(TownLife.Town town,int day,int minute) {
+        if(minute!=0)return;
+        var weather=WeatherLife.at(day,minute);
+        for(Source source:town.naturalResources.values()) {
+            int amount=switch(source.id) {
+                case "puddle-water" -> weather.raining()?3:0;
+                case "wild-berries" -> switch(weather.season()) {
+                    case SPRING -> 2;
+                    case SUMMER -> 3;
+                    case AUTUMN -> 1;
+                    case WINTER -> 0;
+                };
+                default -> source.dailyReplenishment;
+            };
+            source.stock=Math.min(source.capacity,source.stock+amount);
+        }
+    }
+
     static Map<String,Source> available(TownLife.Town town) {
         Map<String,Source> result=new LinkedHashMap<>();
         if(town.player.travelRemaining>0)return result;
