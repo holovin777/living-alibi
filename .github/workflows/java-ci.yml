@@ -129,3 +129,9 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerPresenceDatabaseSmokeTest' exec:exec
+      - name: Test visitor needs over time, public rest and travel isolation
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PlayerNeedsSmokeTest
+      - name: Test visitor needs SQLite migration and restart persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerNeedsDatabaseSmokeTest' exec:exec
