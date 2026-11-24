@@ -75,7 +75,8 @@ See [Godot / Spring integration](docs/GODOT_INTEGRATION.md),
 [Weather](docs/WEATHER.md) and
 [Careers](docs/PLAYER_CAREERS.md) and
 [Technical Work](docs/TECHNICAL_WORK.md) and
-[Industry](docs/INDUSTRY.md). Trained technicians and engineers
+[Industry](docs/INDUSTRY.md) and
+[Player Business](docs/PLAYER_BUSINESS.md). Trained technicians and engineers
 now inspect and fix real persistent equipment using finite material stocks
 before receiving a technical wage. Working NPC miners, freight drivers and factory machinists
 extract finite iron/copper ore, move it by bounded timed truck,
@@ -84,7 +85,13 @@ A 10-unit finite scrap stock can be recycled; surveying can reveal one
 additional bounded mineral deposit. Industrial pay comes from finite
 company accounts, and the visitor may **choose to work as a miner
 or factory machinist**. Production, money and inventory persist
-across restarts without duplication. See [Industry](docs/INDUSTRY.md). The GDScript client is
+across restarts without duplication. A visitor can now also **register a
+small repair-parts business**, invest personal savings, purchase equipment,
+hire an actual co-present resident and sell physical manufactured supplies
+to the municipality. The independent company keeps its own wallet, staff,
+machine and records in SQLite, and never transfers ownership silently to
+a new character after death. See [Industry](docs/INDUSTRY.md) and
+[Player Business](docs/PLAYER_BUSINESS.md). The GDScript client is
 [`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd). A first
 connected 3D town preview starts from [`godot/project.godot`](godot/project.godot):
 walk within a district using WASD, press E at the yellow travel gate to
