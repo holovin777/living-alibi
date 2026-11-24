@@ -99,6 +99,7 @@ final class TownLife {
         final Map<String,Integer> industryStocks=new LinkedHashMap<>();
         int lastIndustryExtractDay,lastIndustryTransportDay,lastIndustryRefineDay;
         int lastIndustryFabricateDay,lastIndustryDeliverDay;
+        int lastIndustryArrivalDay,lastIndustryRecycleDay;
         int cleanWater;
         int lastWaterPumpDay;
         boolean together;
@@ -147,6 +148,8 @@ final class TownLife {
             t.lastIndustryRefineDay=lastIndustryRefineDay;
             t.lastIndustryFabricateDay=lastIndustryFabricateDay;
             t.lastIndustryDeliverDay=lastIndustryDeliverDay;
+            t.lastIndustryArrivalDay=lastIndustryArrivalDay;
+            t.lastIndustryRecycleDay=lastIndustryRecycleDay;
             t.cleanWater=cleanWater;t.lastWaterPumpDay=lastWaterPumpDay;
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
@@ -178,6 +181,8 @@ final class TownLife {
             lastIndustryRefineDay=other.lastIndustryRefineDay;
             lastIndustryFabricateDay=other.lastIndustryFabricateDay;
             lastIndustryDeliverDay=other.lastIndustryDeliverDay;
+            lastIndustryArrivalDay=other.lastIndustryArrivalDay;
+            lastIndustryRecycleDay=other.lastIndustryRecycleDay;
             cleanWater=other.cleanWater;lastWaterPumpDay=other.lastWaterPumpDay;
             naturalResources.clear();
             for(var e:other.naturalResources.entrySet())
