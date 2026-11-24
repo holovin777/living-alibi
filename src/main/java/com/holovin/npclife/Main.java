@@ -17,7 +17,7 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.15 — Anonymous Visitor");
+            System.out.println("Living Alibi v1.16 — Living Visitor (work in progress)");
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -77,6 +77,20 @@ public final class Main {
                         System.out.println(result+" "+PlayerLife.condition(town.player));
                         continue;
                     }
+                    if(lower.equals("sleep")||lower.startsWith("sleep ")) {
+                        int hours=lower.equals("sleep")?8:Integer.parseInt(arg(input));
+                        var candidate=town.copy();
+                        var result=PlayerLife.sleep(candidate.player,hours);
+                        advanceAndSave(db,state,candidate,result.minutes());
+                        town.copyFrom(candidate);
+                        System.out.println("You slept for "+hours+" hour(s) at "+
+                                town.player.place.label+". Recovered "+result.fatigueRecovered()+
+                                " fatigue. Health change: "+result.healthChange()+".");
+                        System.out.println(PlayerLife.condition(town.player));
+                        if(!result.survived())
+                            System.out.println("You died. Your history remains, and the town continues.");
+                        continue;
+                    }
                     if(lower.equals("rest")||lower.startsWith("rest ")) {
                         int minutes=lower.equals("rest")?60:Integer.parseInt(arg(input));
                         var candidate=town.copy();
@@ -88,7 +102,7 @@ public final class Main {
                         continue;
                     }
                     if(lower.equals("explore")) {
-                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias] | needs | sources | rest [minutes]");
+                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias] | needs | sources | rest [minutes] | sleep [hours]");
                         System.out.println("You can simply wander, wait, and meet people. No cases or missions are required.");
                         continue;
                     }
@@ -726,6 +740,7 @@ public final class Main {
         System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
         System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
         System.out.println(" rest [minutes]        — pause for 15–240 game minutes (default: 60)");
+        System.out.println(" sleep [hours]         — sleep anywhere for 1–12 hours (default: 8), with exposure risks");
         System.out.println(" sources               — inspect finite resources at your location");
         System.out.println(" drink <source-id>     — drink local water (5 min; unsafe water can harm health)");
         System.out.println(" forage <source-id>    — gather local wild food (15 min)");
