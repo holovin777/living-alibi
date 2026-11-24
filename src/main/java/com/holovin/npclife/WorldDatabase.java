@@ -132,7 +132,9 @@ final class WorldDatabase implements AutoCloseable {
                         transport_day INTEGER NOT NULL DEFAULT 0,
                         refine_day INTEGER NOT NULL DEFAULT 0,
                         fabricate_day INTEGER NOT NULL DEFAULT 0,
-                        deliver_day INTEGER NOT NULL DEFAULT 0)
+                        deliver_day INTEGER NOT NULL DEFAULT 0,
+                        arrival_day INTEGER NOT NULL DEFAULT 0,
+                        recycle_day INTEGER NOT NULL DEFAULT 0)
                     """);
             st.execute("""
                     CREATE TABLE IF NOT EXISTS municipal_services (
@@ -144,6 +146,18 @@ final class WorldDatabase implements AutoCloseable {
                     CREATE TABLE IF NOT EXISTS natural_resources (
                         id TEXT PRIMARY KEY, quantity INTEGER NOT NULL CHECK(quantity>=0))
                     """);
+        }
+        // Industrial migration: preserve existing ore, completed shipments,
+        // and old saves made before freight and recycling were added.
+        if(!columnExists("industry_schedule","arrival_day")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE industry_schedule ADD COLUMN arrival_day INTEGER NOT NULL DEFAULT 0");
+            }
+        }
+        if(!columnExists("industry_schedule","recycle_day")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE industry_schedule ADD COLUMN recycle_day INTEGER NOT NULL DEFAULT 0");
+            }
         }
         // v1.16: player physical needs.
         // Existing worlds receive healthy default values.
@@ -828,7 +842,8 @@ final class WorldDatabase implements AutoCloseable {
         }
         try(Statement st=db.createStatement();
                 ResultSet rs=st.executeQuery("""
-                        SELECT extract_day,transport_day,refine_day,fabricate_day,deliver_day
+                        SELECT extract_day,transport_day,refine_day,fabricate_day,deliver_day,
+                               arrival_day,recycle_day
                         FROM industry_schedule WHERE id=1
                         """)) {
             if(rs.next()) {
@@ -837,6 +852,8 @@ final class WorldDatabase implements AutoCloseable {
                 town.lastIndustryRefineDay=Math.max(0,rs.getInt(3));
                 town.lastIndustryFabricateDay=Math.max(0,rs.getInt(4));
                 town.lastIndustryDeliverDay=Math.max(0,rs.getInt(5));
+                town.lastIndustryArrivalDay=Math.max(0,rs.getInt(6));
+                town.lastIndustryRecycleDay=Math.max(0,rs.getInt(7));
             }
         }
         try(Statement st=db.createStatement();
@@ -973,19 +990,24 @@ final class WorldDatabase implements AutoCloseable {
         }
         try(PreparedStatement p=db.prepareStatement("""
                 INSERT INTO industry_schedule(id,extract_day,transport_day,
-                                              refine_day,fabricate_day,deliver_day)
-                VALUES(1,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                                              refine_day,fabricate_day,deliver_day,
+                                              arrival_day,recycle_day)
+                VALUES(1,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                 extract_day=excluded.extract_day,
                 transport_day=excluded.transport_day,
                 refine_day=excluded.refine_day,
                 fabricate_day=excluded.fabricate_day,
-                deliver_day=excluded.deliver_day
+                deliver_day=excluded.deliver_day,
+                arrival_day=excluded.arrival_day,
+                recycle_day=excluded.recycle_day
                 """)) {
             p.setInt(1,town.lastIndustryExtractDay);
             p.setInt(2,town.lastIndustryTransportDay);
             p.setInt(3,town.lastIndustryRefineDay);
             p.setInt(4,town.lastIndustryFabricateDay);
             p.setInt(5,town.lastIndustryDeliverDay);
+            p.setInt(6,town.lastIndustryArrivalDay);
+            p.setInt(7,town.lastIndustryRecycleDay);
             p.executeUpdate();
         }
     }
