@@ -70,6 +70,29 @@ conditions, travel restrictions and mortality. `PlayerSleepDatabaseSmokeTest`
 covers upgrading a player table without an `alive` column, death persistence
 and the continued privacy of the player's name. GitHub Actions runs all tests.
 
+## Life succession — the world survives the player
+
+After a player death, the console **automatically starts a new visitor in
+the very same world**. The visitor is physically independent, anonymous,
+and begins at the public park with healthy initial needs. They receive the
+next `incarnation` number, no private name, no contacts, and no access to
+the previous person's personal relationships. The player can use `lives`
+to inspect the private chronology of earlier player deaths.
+
+The town clock is never rewound. NPC identities, private knowledge,
+relationships, property and custody, detective cases, environmental resources
+and historical events persist exactly as they were. A dead character's
+previously disclosed names remain stored for **that particular visitor**,
+not newly given to the next character. The original `player_contacts`
+table continues to store first-generation contacts. Subsequent visitors
+use `player_life_contacts` indexed by both incarnation and resident;
+`player_lives` stores immutable death snapshots. Older SQLite saves get
+these tables and the `incarnation=1` field through additive migration.
+
+`PlayerRebirthSmokeTest` covers successive visitors and town continuity.
+`PlayerRebirthDatabaseSmokeTest` covers archived contacts, multiple
+deaths, player anonymity, and repeated SQLite restarts.
+
 ## Deliberately not implemented yet
 
 Player-owned food and water, purchasing, private housing, weather, actual
