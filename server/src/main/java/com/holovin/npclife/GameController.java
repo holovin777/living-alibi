@@ -29,9 +29,49 @@ public class GameController {
     public record JobRequest(String jobId) { }
     public record StudyRequest(String subject) { }
     public record OrderRequest(String orderId) { }
+    public record AmountRequest(int amount) { }
+    public record ResidentRequest(String residentId) { }
     @GetMapping("/world")
     public GameSession.WorldView world() {
         return session.snapshot();
+    }
+
+    @GetMapping("/business")
+    public GameSession.BusinessView business() {
+        return session.business();
+    }
+
+    @GetMapping("/business/candidates")
+    public List<GameSession.CandidateView> businessCandidates() {
+        return session.businessCandidates();
+    }
+
+    @PostMapping("/actions/business/open")
+    public GameSession.ActionView openBusiness() throws SQLException {
+        return session.openBusiness();
+    }
+
+    @PostMapping("/actions/business/invest")
+    public GameSession.ActionView investBusiness(@RequestBody AmountRequest request)
+            throws SQLException {
+        return session.investBusiness(request.amount());
+    }
+
+    @PostMapping("/actions/business/machine")
+    public GameSession.ActionView buyMachine() throws SQLException {
+        return session.buyBusinessMachine();
+    }
+
+    @PostMapping("/actions/business/hire")
+    public GameSession.ActionView hireWorker(@RequestBody ResidentRequest request)
+            throws SQLException {
+        return session.hireBusinessWorker(request.residentId());
+    }
+
+    @PostMapping("/actions/business/withdraw")
+    public GameSession.ActionView withdrawBusiness(@RequestBody AmountRequest request)
+            throws SQLException {
+        return session.withdrawBusiness(request.amount());
     }
 
     @GetMapping("/industry")
