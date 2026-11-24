@@ -185,6 +185,12 @@ jobs:
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.UtilitySmokeTest
       - name: Test autonomous residents choose working water and avoid unlit parks
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.UtilityBehaviorSmokeTest
+      - name: Test finite natural ore with staffed quarry factory and real repair supplies
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.IndustrySmokeTest
+      - name: Test ore, shipments and production timing through SQLite restart and rebirth
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.IndustryDatabaseSmokeTest' exec:exec
       - name: Test municipal water stocks survive restart and are refilled only once
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
