@@ -91,6 +91,7 @@ final class TownLife {
     static final class Town {
         final Map<String,Citizen> people=new LinkedHashMap<>();
         PlayerLife.Player player=new PlayerLife.Player();
+        final Map<Integer,PlayerLife.LifeRecord> pastLives=new LinkedHashMap<>();
         final Map<String,NatureLife.Source> naturalResources=new LinkedHashMap<>();
         boolean together;
         long meetingSinceTick=-1;
@@ -127,6 +128,7 @@ final class TownLife {
             for(var e:people.entrySet())t.people.put(e.getKey(),e.getValue().copy());
             for(var e:naturalResources.entrySet())
                 t.naturalResources.put(e.getKey(),e.getValue().copy());
+            t.pastLives.putAll(pastLives); // Immutable history records.
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
             for(var e:secrets.entrySet())t.secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
@@ -142,6 +144,8 @@ final class TownLife {
         void copyFrom(Town other) {
             people.clear();for(var e:other.people.entrySet())people.put(e.getKey(),e.getValue().copy());
             player=other.player.copy();
+            pastLives.clear();
+            pastLives.putAll(other.pastLives);
             naturalResources.clear();
             for(var e:other.naturalResources.entrySet())
                 naturalResources.put(e.getKey(),e.getValue().copy());
