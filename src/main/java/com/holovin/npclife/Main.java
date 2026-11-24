@@ -52,6 +52,31 @@ public final class Main {
                         System.out.println(PlayerLife.condition(town.player));
                         continue;
                     }
+                    if(lower.equals("sources")) {
+                        var available=NatureLife.available(town);
+                        System.out.println("Natural resources at "+PlayerLife.position(town.player)+":");
+                        if(available.isEmpty())System.out.println("  No accessible resources here.");
+                        for(var source:available.values())
+                            System.out.println("  "+source.id+" | "+source.label+" | "+
+                                    source.stock+"/"+source.capacity+" available");
+                        continue;
+                    }
+                    if(lower.startsWith("drink ")) {
+                        var candidate=town.copy();
+                        String result=NatureLife.drink(candidate,arg(input),state.day,state.minute);
+                        advanceAndSave(db,state,candidate,5);
+                        town.copyFrom(candidate);
+                        System.out.println(result+" "+PlayerLife.condition(town.player));
+                        continue;
+                    }
+                    if(lower.startsWith("forage ")) {
+                        var candidate=town.copy();
+                        String result=NatureLife.forage(candidate,arg(input));
+                        advanceAndSave(db,state,candidate,15);
+                        town.copyFrom(candidate);
+                        System.out.println(result+" "+PlayerLife.condition(town.player));
+                        continue;
+                    }
                     if(lower.equals("rest")||lower.startsWith("rest ")) {
                         int minutes=lower.equals("rest")?60:Integer.parseInt(arg(input));
                         var candidate=town.copy();
@@ -63,7 +88,7 @@ public final class Main {
                         continue;
                     }
                     if(lower.equals("explore")) {
-                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias] | needs | rest [minutes]");
+                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias] | needs | sources | rest [minutes]");
                         System.out.println("You can simply wander, wait, and meet people. No cases or missions are required.");
                         continue;
                     }
@@ -701,6 +726,9 @@ public final class Main {
         System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
         System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
         System.out.println(" rest [minutes]        — pause for 15–240 game minutes (default: 60)");
+        System.out.println(" sources               — inspect finite resources at your location");
+        System.out.println(" drink <source-id>     — drink local water (5 min; unsafe water can harm health)");
+        System.out.println(" forage <source-id>    — gather local wild food (15 min)");
         System.out.println(" town | population [count] | population generate 12 | resident resident-0001");
         System.out.println(" home <id>             — inspect a resident's private home unit (developer view)");
         System.out.println(" where <id> | known <id> [count] | town-events [count]");
