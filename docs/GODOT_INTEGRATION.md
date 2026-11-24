@@ -59,7 +59,7 @@ A dedicated, single-authority game session prevents unsynchronized writes.
 
 | Method | Path | JSON body | Response |
 |---|---|---|---|
-| GET | `/api/v1/world` | — | Time, visitor needs, nearby NPCs, accessible local resources |
+| GET | `/api/v1/world` | — | Day, year, season, visitor needs, nearby NPCs, accessible local resources |
 | GET | `/api/v1/locations` | — | Public destinations |
 | POST | `/api/v1/actions/go` | `{"destination":"RIVER"}` | Action outcome + updated world |
 | POST | `/api/v1/actions/wait` | `{"minutes":60}` | Action outcome + updated world |
@@ -110,7 +110,11 @@ GDScript sprite shader. The authoritative engine determines season, weather,
 resource growth, exposure and NPC consequences. Godot simply displays
 snow/rain and adjusts lighting from that state.
 
-Next steps: a server-backed Godot scene, time/season/weather snapshot,
+The API already reports `year`, `dayOfYear` and `season` from a
+365-day four-season game calendar. **Weather and temperature are not yet
+simulated**; a season label is not a weather forecast.
+
+Next steps: a server-backed Godot scene, weather/temperature snapshots,
 clock subscription or event streaming, visibility-aware NPC snapshots,
 then navigation/animation. Optimize for a reliable first game launch;
 compatibility with disposable pre-release saves is a secondary priority.
