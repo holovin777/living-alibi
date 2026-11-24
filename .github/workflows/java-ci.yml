@@ -135,3 +135,9 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerNeedsDatabaseSmokeTest' exec:exec
+      - name: Test finite natural resources, local access and daily regeneration
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.NatureSmokeTest
+      - name: Test nature source migration, depletion and SQLite persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.NatureDatabaseSmokeTest' exec:exec
