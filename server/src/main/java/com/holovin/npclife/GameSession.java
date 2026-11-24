@@ -47,8 +47,9 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive) { }
     public record ResidentView(String id,String name,String activity) { }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
+    public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
-                            PlayerView player,List<ResidentView> residents,
+                            WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources) { }
     public record ActionView(String message,WorldView world) { }
 
@@ -60,8 +61,11 @@ public final class GameSession implements AutoCloseable {
                 .map(c->new ResidentView(c.id,c.name,c.activity)).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
+        var weather=WeatherLife.at(state.day,state.minute);
         return new WorldView(state.day,state.minute,CalendarLife.year(state.day),
-                CalendarLife.dayOfYear(state.day),CalendarLife.season(state.day).name(),
+                CalendarLife.dayOfYear(state.day),weather.season().name(),
+                new WeatherView(weather.sky().name(),weather.temperatureC(),
+                        weather.raining(),weather.snowing()),
                 player,residents,resources);
     }
 
@@ -88,7 +92,7 @@ public final class GameSession implements AutoCloseable {
 
     public synchronized ActionView sleep(int hours) throws SQLException {
         var copy=town.copy();
-        var result=PlayerLife.sleep(copy.player,hours);
+        var result=PlayerLife.sleep(copy.player,hours,state.day,state.minute);
         return apply(copy,result.minutes(),
                 "Slept "+hours+" hour(s). Health changed by "+result.healthChange()+".");
     }
