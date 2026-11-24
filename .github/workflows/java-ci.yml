@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: java-ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -198,9 +202,21 @@ jobs:
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.UtilityDatabaseSmokeTest' exec:exec
       - name: Install Java engine so the separate Spring adapter can use it
-        run: mvn --batch-mode --no-transfer-progress -DskipTests install
+        run: |
+          for attempt in 1 2 3; do
+            if mvn --batch-mode --no-transfer-progress -DskipTests install; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "Transient Maven dependency error; retrying install ($attempt/3)"
+            sleep $((attempt*15))
+          done
       - name: Build and test Spring Boot Godot API
-        run: mvn --batch-mode --no-transfer-progress -f server/pom.xml package
+        run: |
+          for attempt in 1 2 3; do
+            if mvn --batch-mode --no-transfer-progress -f server/pom.xml package; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "Transient Maven dependency error; retrying Spring build ($attempt/3)"
+            sleep $((attempt*15))
+          done
       - name: Verify first-launch Spring HTTP API on an empty database
         run: |
           set -euo pipefail
