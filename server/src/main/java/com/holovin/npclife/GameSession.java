@@ -1,6 +1,7 @@
 package com.holovin.npclife;
 
 import jakarta.annotation.PreDestroy;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -26,9 +27,15 @@ public final class GameSession implements AutoCloseable {
     }
 
     GameSession(Path databasePath) throws Exception {
+        boolean firstLaunch=Files.notExists(databasePath);
         db=new WorldDatabase(databasePath);
         state=db.load();
         town=db.loadTown(state);
+        if(firstLaunch) {
+            // A fresh city should already contain a small, active population.
+            PopulationGenerator.add(town,12);
+            db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+        }
         // Old save files might contain a deceased visitor.
         if(!town.player.alive) {
             PlayerLife.beginNewLife(town,state.day,state.minute);
