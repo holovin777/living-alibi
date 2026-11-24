@@ -73,6 +73,7 @@ final class NatureLife {
     }
 
     private static Source accessible(TownLife.Town town,String id,Kind kind) {
+        PlayerLife.requireAlive(town.player);
         if(town.player.travelRemaining>0)
             throw new IllegalArgumentException("Finish traveling before gathering resources.");
         Source source=town.naturalResources.get(id);
