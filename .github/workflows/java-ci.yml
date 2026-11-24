@@ -159,6 +159,12 @@ jobs:
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.FreshWorldSmokeTest' exec:exec
       - name: Test stable seasons across game years
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.CalendarSmokeTest
+      - name: Test deterministic temperature, rain, snow and seasonal resource growth
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.WeatherSmokeTest
+      - name: Test weather-derived rain effects after SQLite restart
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.WeatherDatabaseSmokeTest' exec:exec
       - name: Install Java engine so the separate Spring adapter can use it
         run: mvn --batch-mode --no-transfer-progress -DskipTests install
       - name: Build and test Spring Boot Godot API
@@ -179,6 +185,9 @@ jobs:
           done
           test -s target/api-smoke/world.json
           grep -q '"incarnation":1' target/api-smoke/world.json
+          grep -q '"season":"SPRING"' target/api-smoke/world.json
+          grep -q '"weather":' target/api-smoke/world.json
+          grep -q '"temperatureC":' target/api-smoke/world.json
           curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/go \
             -H 'Content-Type: application/json' \
             -d '{"destination":"river"}' \
