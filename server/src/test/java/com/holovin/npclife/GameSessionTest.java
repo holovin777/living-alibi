@@ -25,12 +25,12 @@ class GameSessionTest {
             assertEquals(80,paid.world().player().money(),
                     "the player earns real company cash and actually mines");
             assertTrue(game.industry().ironRemaining()<80);
+            int beforeSurveyIron=game.industry().ironRemaining();
             var surveyed=game.prospect();
             assertTrue(surveyed.message().contains("Western"));
             assertTrue(game.industry().westDepositDiscovered());
-            assertEquals(30,game.industry().ironRemaining()-
-                    (80-(80-game.industry().ironRemaining())),
-                    "extra bounded mineral seam is revealed without refilling old one");
+            assertEquals(beforeSurveyIron+30,game.industry().ironRemaining(),
+                    "geological survey reveals thirty additional finite iron units");
             assertThrows(IllegalArgumentException.class,game::prospect);
         }
         try(var restarted=new GameSession(mine)) {
