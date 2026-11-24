@@ -136,6 +136,35 @@ func _exercise() -> void:
             "Godot displays the authoritative finite industrial inventories"):
         return
 
+    world._on_world_updated(_world("WORKSHOP", "Workshop"))
+    world._avatar.position = world.KIOSK_POSITION
+    world._action_panel.visible = true
+    world._on_business_updated({
+        "registered": false, "yours": false, "ownerIncarnation": 0,
+        "machine": false, "cash": 0, "employeeId": null,
+        "employeeName": null, "spareParts": 0, "paidHoursToday": 0
+    })
+    if not _check(_has_button(world._action_choices, "Register / acquire workshop"),
+            "the visitor can register a first business at the actual Workshop"):
+        return
+    world._on_business_updated({
+        "registered": true, "yours": true, "ownerIncarnation": 1,
+        "machine": true, "cash": 70, "employeeId": null,
+        "employeeName": null, "spareParts": 2, "paidHoursToday": 2
+    })
+    world._on_business_candidates_updated([{
+        "id": "resident-0002", "name": "A local mechanic",
+        "currentOccupation": "Mechanic"
+    }])
+    if not _check(_has_button(world._action_choices, "Invest 25 EUR") and
+            _has_button(world._action_choices, "Hire A local mechanic") and
+            _has_button(world._action_choices, "Withdraw 10 EUR"),
+            "owner sees actual investment, local hiring and available profit controls"):
+        return
+    if not _check(world._jobs.text.contains("bank 70 EUR"),
+            "business dashboard exposes the authoritative company account"):
+        return
+
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 
