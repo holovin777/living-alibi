@@ -64,6 +64,9 @@ A dedicated, single-authority game session prevents unsynchronized writes.
 | GET | `/api/v1/world` | — | Day, year, season, weather sky, temperature, visitor needs, nearby NPCs and local resources |
 | GET | `/api/v1/locations` | — | Public destinations with stable IDs and Java-computed travel minutes |
 | GET | `/api/v1/jobs` | — | Optional vacancies, qualifications and remaining employer payroll |
+| GET | `/api/v1/work-orders` | — | Physical town faults, condition, task stage and necessary components |
+| POST | `/api/v1/actions/diagnose` | `{"orderId":"water-pump"}` | Inspect a real technical problem for 30 minutes |
+| POST | `/api/v1/actions/repair` | `{"orderId":"water-pump"}` | Consume parts and complete a 90-minute city repair |
 | POST | `/api/v1/actions/apply` | `{"jobId":"shop-assistant"}` | Apply at actual workplace |
 | POST | `/api/v1/actions/study` | `{"subject":"engineering"}` | One-hour paid class (School / Library) |
 | POST | `/api/v1/actions/work` | `{}` | One paid two-hour shift if qualified and funded |
@@ -107,7 +110,8 @@ does Godot switch its scene and reset the local avatar position.
 
 Walk to a **blue kiosk** and press **F** to access local actions:
 market job applications, school/library lessons, workshop/office career
-applications and paid shifts, plus local water/berry gathering. The Java
+applications, real inspection/repair tasks and earned paid shifts, plus
+local water/berry gathering. The Java
 server checks town location, business hours, qualifications, resources
 and finances before advancing game time. The kiosk proximity check itself
 is currently client-side; real meter-level server navigation will follow.
@@ -127,7 +131,9 @@ not yet a fully automated click-through test with Godot and Spring in
 the same process; see [Godot README](../godot/README.md).
 
 The player is not automatically a detective. See
-[Careers](PLAYER_CAREERS.md) for jobs, engineering and investigation training.
+[Careers](PLAYER_CAREERS.md) for jobs, engineering and investigation training;
+[Technical Work](TECHNICAL_WORK.md) for persistent faults, finite materials
+and salary prerequisites.
 
 ## Security and offline considerations
 
