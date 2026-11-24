@@ -42,6 +42,7 @@ func _ready() -> void:
     _api.locations_updated.connect(_on_locations_updated)
     _api.job_offers_updated.connect(_on_job_offers_updated)
     _api.work_orders_updated.connect(_on_work_orders_updated)
+    _api.industry_updated.connect(_on_industry_updated)
     _api.action_feedback.connect(_on_action_feedback)
     _api.request_failed.connect(_on_request_failed)
     _api.request_started.connect(_on_request_started)
@@ -182,6 +183,20 @@ func _render_place(place_id: String) -> void:
             for offset in [-10.0, -7.0, -4.0]:
                 _box(_scenery, Vector3(1.6, 1.8, 0.12), Color(0.61, 0.83, 0.94),
                         Vector3(offset, 2.3, 4.9))
+        "QUARRY":
+            # Placeholder rock face and ore heaps; the finite seam is Java-owned.
+            _box(_scenery, Vector3(11.0, 7.0, 3.0), Color(0.42, 0.43, 0.46),
+                    Vector3(-8.0, 3.4, 9.0))
+            for offset in [-11.0, -8.0, -5.0]:
+                _box(_scenery, Vector3(1.8, 1.1, 2.0), Color(0.57, 0.38, 0.28),
+                        Vector3(offset, 0.55, 3.0))
+        "FACTORY":
+            _building("Parts factory", Color(0.50, 0.53, 0.56))
+            _box(_scenery, Vector3(1.5, 8.0, 1.5), Color(0.36, 0.37, 0.40),
+                    Vector3(-10.0, 8.0, 7.0))
+            for offset in [-8.0, -5.0, -2.0]:
+                _box(_scenery, Vector3(2.0, 1.0, 1.6), Color(0.32, 0.38, 0.42),
+                        Vector3(offset, 0.5, 2.2))
         "RIVER":
             _box(_scenery, Vector3(10.0, 0.11, 35.0), Color(0.12, 0.40, 0.67),
                     Vector3(-11.0, 0.02, 0.0))
@@ -285,6 +300,7 @@ func _create_interface() -> void:
     column.add_child(buttons)
     buttons.add_child(_button("Refresh", _refresh))
     buttons.add_child(_button("Jobs", _find_jobs))
+    buttons.add_child(_button("Industry", _view_industry))
     buttons.add_child(_button("Wait 60m", _wait_one_hour))
     _hint = Label.new()
     _hint.text = "WASD/arrow keys to walk; E at gate; F at kiosk."
@@ -482,6 +498,10 @@ func _find_jobs() -> void:
     if not _api.is_busy():
         _api.list_jobs()
 
+func _view_industry() -> void:
+    if not _api.is_busy():
+        _api.view_industry()
+
 func _wait_one_hour() -> void:
     if not _api.is_busy():
         _api.wait_for(60)
@@ -555,6 +575,23 @@ func _on_job_offers_updated(jobs: Array) -> void:
             str(offer.get("subject", "none")), str(offer.get("requiredSkill", 0))
         ])
     _jobs.text = "\n".join(lines)
+
+func _on_industry_updated(report: Dictionary) -> void:
+    _jobs.text = "QUARRY: iron ore %s, copper ore %s | mined cargo %s\n" % [
+        str(report.get("ironRemaining", 0)), str(report.get("copperRemaining", 0)),
+        str(report.get("oreAtQuarry", 0))
+    ]
+    _jobs.text += "FACTORY: ore %s, steel %s, copper %s, spare parts %s\n" % [
+        str(report.get("oreAtFactory", 0)), str(report.get("factorySteel", 0)),
+        str(report.get("factoryCopper", 0)), str(report.get("factoryParts", 0))
+    ]
+    _jobs.text += "REPAIRS: steel %s, copper %s, spare parts %s\n" % [
+        str(report.get("workshopSteel", 0)), str(report.get("workshopCopper", 0)),
+        str(report.get("workshopParts", 0))
+    ]
+    _jobs.text += "Working now: miners %s, machinists %s" % [
+        str(report.get("minersAtWork", 0)), str(report.get("factoryWorkersAtWork", 0))
+    ]
 
 func _on_work_orders_updated(orders: Array) -> void:
     _work_orders = orders
