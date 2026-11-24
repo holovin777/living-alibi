@@ -57,7 +57,7 @@ class GameSessionTest {
             assertEquals(50,visitor.money());
             assertNull(visitor.jobId());
             assertEquals(0,visitor.engineeringSkill());
-            assertEquals(4,game.jobs().size());
+            assertEquals(6,game.jobs().size());
 
             assertThrows(IllegalArgumentException.class,
                     ()->game.applyJob("shop-assistant"));
@@ -85,7 +85,7 @@ class GameSessionTest {
             assertEquals("SCHOOL",restarted.snapshot().player().placeId());
             assertEquals("shop-assistant",restarted.snapshot().player().jobId());
             assertEquals(1,restarted.snapshot().player().engineeringSkill());
-            assertEquals(4,restarted.jobs().size(),"job board remains stable");
+            assertEquals(6,restarted.jobs().size(),"job board remains stable");
         }
     }
 
