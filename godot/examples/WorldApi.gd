@@ -5,6 +5,7 @@ extends Node
 signal world_updated(snapshot: Dictionary)
 signal locations_updated(locations: Array)
 signal job_offers_updated(jobs: Array)
+signal work_orders_updated(orders: Array)
 signal action_feedback(message: String)
 signal request_started(route: String)
 signal request_finished(route: String)
@@ -31,6 +32,15 @@ func list_locations() -> void:
 
 func list_jobs() -> void:
     _send("/jobs", HTTPClient.METHOD_GET, {})
+
+func list_work_orders() -> void:
+    _send("/work-orders", HTTPClient.METHOD_GET, {})
+
+func diagnose(order_id: String) -> void:
+    _send("/actions/diagnose", HTTPClient.METHOD_POST, {"orderId": order_id})
+
+func repair(order_id: String) -> void:
+    _send("/actions/repair", HTTPClient.METHOD_POST, {"orderId": order_id})
 
 func apply_for_job(job_id: String) -> void:
     _send("/actions/apply", HTTPClient.METHOD_POST, {"jobId": job_id})
@@ -92,14 +102,16 @@ func _on_request_completed(
         request_failed.emit(error_message)
         return
 
-    if route == "/locations" or route == "/jobs":
+    if route == "/locations" or route == "/jobs" or route == "/work-orders":
         if typeof(response) != TYPE_ARRAY:
             request_failed.emit("Server returned an invalid location/job list.")
             return
         if route == "/locations":
             locations_updated.emit(response)
-        else:
+        elif route == "/jobs":
             job_offers_updated.emit(response)
+        else:
+            work_orders_updated.emit(response)
         return
 
     if typeof(response) != TYPE_DICTIONARY:
