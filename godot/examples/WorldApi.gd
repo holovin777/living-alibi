@@ -7,6 +7,8 @@ signal locations_updated(locations: Array)
 signal job_offers_updated(jobs: Array)
 signal work_orders_updated(orders: Array)
 signal industry_updated(report: Dictionary)
+signal business_updated(report: Dictionary)
+signal business_candidates_updated(candidates: Array)
 signal action_feedback(message: String)
 signal request_started(route: String)
 signal request_finished(route: String)
@@ -39,6 +41,27 @@ func list_work_orders() -> void:
 
 func view_industry() -> void:
     _send("/industry", HTTPClient.METHOD_GET, {})
+
+func view_business() -> void:
+    _send("/business", HTTPClient.METHOD_GET, {})
+
+func business_candidates() -> void:
+    _send("/business/candidates", HTTPClient.METHOD_GET, {})
+
+func business_open() -> void:
+    _send("/actions/business/open", HTTPClient.METHOD_POST, {})
+
+func business_invest(amount: int) -> void:
+    _send("/actions/business/invest", HTTPClient.METHOD_POST, {"amount": amount})
+
+func business_machine() -> void:
+    _send("/actions/business/machine", HTTPClient.METHOD_POST, {})
+
+func business_hire(resident_id: String) -> void:
+    _send("/actions/business/hire", HTTPClient.METHOD_POST, {"residentId": resident_id})
+
+func business_withdraw(amount: int) -> void:
+    _send("/actions/business/withdraw", HTTPClient.METHOD_POST, {"amount": amount})
 
 func diagnose(order_id: String) -> void:
     _send("/actions/diagnose", HTTPClient.METHOD_POST, {"orderId": order_id})
@@ -109,7 +132,7 @@ func _on_request_completed(
         request_failed.emit(error_message)
         return
 
-    if route == "/locations" or route == "/jobs" or route == "/work-orders":
+    if route == "/locations" or route == "/jobs" or route == "/work-orders" or route == "/business/candidates":
         if typeof(response) != TYPE_ARRAY:
             request_failed.emit("Server returned an invalid location/job list.")
             return
@@ -117,6 +140,8 @@ func _on_request_completed(
             locations_updated.emit(response)
         elif route == "/jobs":
             job_offers_updated.emit(response)
+        elif route == "/business/candidates":
+            business_candidates_updated.emit(response)
         else:
             work_orders_updated.emit(response)
         return
@@ -126,6 +151,9 @@ func _on_request_completed(
         return
     if route == "/industry":
         industry_updated.emit(response)
+        return
+    if route == "/business":
+        business_updated.emit(response)
         return
     if route.begins_with("/actions/"):
         action_feedback.emit(str(response.get("message", "Action completed.")))
