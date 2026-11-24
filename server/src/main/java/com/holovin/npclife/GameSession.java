@@ -40,8 +40,9 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive) { }
     public record ResidentView(String id,String name,String activity) { }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
-    public record WorldView(int day,int minute,PlayerView player,
-                            List<ResidentView> residents,List<SourceView> sources) { }
+    public record WorldView(int day,int minute,int year,int dayOfYear,String season,
+                            PlayerView player,List<ResidentView> residents,
+                            List<SourceView> sources) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -52,7 +53,9 @@ public final class GameSession implements AutoCloseable {
                 .map(c->new ResidentView(c.id,c.name,c.activity)).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
-        return new WorldView(state.day,state.minute,player,residents,resources);
+        return new WorldView(state.day,state.minute,CalendarLife.year(state.day),
+                CalendarLife.dayOfYear(state.day),CalendarLife.season(state.day).name(),
+                player,residents,resources);
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
