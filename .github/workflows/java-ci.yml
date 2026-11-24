@@ -165,6 +165,12 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.WeatherDatabaseSmokeTest' exec:exec
+      - name: Test freely chosen jobs, paid education and conserved company payroll
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.CareerSmokeTest
+      - name: Test fresh-world career saves and separation between visitor lives
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.CareerDatabaseSmokeTest' exec:exec
       - name: Install Java engine so the separate Spring adapter can use it
         run: mvn --batch-mode --no-transfer-progress -DskipTests install
       - name: Build and test Spring Boot Godot API
@@ -198,4 +204,18 @@ jobs:
             -d '{"sourceId":"river-water"}' \
             -o target/api-smoke/drink.json
           grep -q '"stock":119' target/api-smoke/drink.json
+          curl -fsS http://127.0.0.1:18080/api/v1/jobs \
+            -o target/api-smoke/jobs.json
+          grep -q '"shop-assistant"' target/api-smoke/jobs.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/go \
+            -H 'Content-Type: application/json' \
+            -d '{"destination":"market"}' > target/api-smoke/market.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/apply \
+            -H 'Content-Type: application/json' \
+            -d '{"jobId":"shop-assistant"}' > target/api-smoke/apply.json
+          grep -q '"jobId":"shop-assistant"' target/api-smoke/apply.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/work \
+            -H 'Content-Type: application/json' \
+            -d '{}' > target/api-smoke/work.json
+          grep -q '"money":74' target/api-smoke/work.json
           test -f target/api-smoke/world.db
