@@ -14,6 +14,19 @@ a real person. New visitor generations start again with 50 EUR, an
 independent identity, no inherited job or qualifications; NPC city history
 and company accounts remain intact.
 
+## Industrial careers
+
+Players can now voluntarily join a quarry as a **miner** (no prior skills,
+EUR 30 per productive two-hour shift) or a parts factory as a
+**machinist** (no prior skills, EUR 34 per productive shift).
+The quarry consumes real finite mineral deposits; the factory
+refines stockpiled ore or recycles limited historical scrap.
+Both roles are paid directly from the same finite enterprise
+accounts as industrial NPC workers. If the company cannot afford a
+shift or usable materials are unavailable, no pay is created.
+A hired miner may commission a two-hour, EUR 30 geological survey
+of one undiscovered western ore seam. See [Industry](INDUSTRY.md).
+
 ## First playable opportunities
 
 | Job ID | Workplace | Required subject / skill | Wages per two-hour shift |
