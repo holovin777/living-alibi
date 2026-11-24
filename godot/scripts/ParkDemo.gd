@@ -401,6 +401,10 @@ func _render_actions() -> void:
         "WOODS":
             _action_choices.add_child(_button("Gather wild berries", _gather))
         "PARK":
+            var utilities: Dictionary = _last_snapshot.get("services", {})
+            var clean := str(utilities.get("cleanWater", 0))
+            _action_choices.add_child(_button("Drink from park fountain (clean: " + clean + ")",
+                    _drink.bind("park-fountain")))
             _action_choices.add_child(_button("Drink puddle water (unsafe)",
                     _drink.bind("puddle-water")))
         _:
@@ -511,6 +515,12 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         str(player.get("hunger", 0)), str(player.get("thirst", 0)),
         str(player.get("fatigue", 0)), str(player.get("health", 100)),
         str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
+    ]
+    var utilities: Dictionary = snapshot.get("services", {})
+    var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
+    var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
+    _needs.text += "\nPark fountain: %s (%s clean units) | Street lights: %s" % [
+        fountain, str(utilities.get("cleanWater", 0)), lighting
     ]
     _apply_weather()
     _render_actions()
