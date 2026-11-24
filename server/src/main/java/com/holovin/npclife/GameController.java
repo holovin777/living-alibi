@@ -28,6 +28,7 @@ public class GameController {
     public record SourceRequest(String sourceId) { }
     public record JobRequest(String jobId) { }
     public record StudyRequest(String subject) { }
+    public record OrderRequest(String orderId) { }
     @GetMapping("/world")
     public GameSession.WorldView world() {
         return session.snapshot();
@@ -36,6 +37,23 @@ public class GameController {
     @GetMapping("/locations")
     public List<GameSession.DestinationView> locations() {
         return session.destinations();
+    }
+
+    @GetMapping("/work-orders")
+    public List<GameSession.WorkOrderView> workOrders() {
+        return session.workOrders();
+    }
+
+    @PostMapping("/actions/diagnose")
+    public GameSession.ActionView diagnose(@RequestBody OrderRequest request)
+            throws SQLException {
+        return session.diagnose(request.orderId());
+    }
+
+    @PostMapping("/actions/repair")
+    public GameSession.ActionView repair(@RequestBody OrderRequest request)
+            throws SQLException {
+        return session.repair(request.orderId());
     }
 
     @GetMapping("/jobs")
