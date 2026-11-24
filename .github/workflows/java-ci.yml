@@ -147,3 +147,9 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerSleepDatabaseSmokeTest' exec:exec
+      - name: Test successive visitors and independent town continuity
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PlayerRebirthSmokeTest
+      - name: Test private contact histories and SQLite generations
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerRebirthDatabaseSmokeTest' exec:exec
