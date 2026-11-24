@@ -60,6 +60,11 @@ writer (such as the console) against the same SQLite file at the same time.
   drink untreated river water, and the woods visitor can forage berries.
   All choices can fail if time, location, skill, money or resource
   requirements aren't met.
+- **Park fountain:** the blue Park kiosk also has an optional source of
+  drinkable public water. It only works after the city pump is repaired,
+  and every drink consumes one unit from a finite shared tank. The HUD
+  shows public water and street-lighting status, which affect residents
+  and the visitor. See [City Utilities](../docs/CITY_UTILITIES.md).
 - **Jobs:** see current job offerings without applying.
 - **Wait 60m:** advance 60 game minutes in the world.
 - **Refresh:** recover the latest committed state from Java/SQLite.
