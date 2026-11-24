@@ -104,9 +104,25 @@ func _exercise() -> void:
     if not _check(world._scenery.name == "PublicScene_QUARRY",
             "quarry has its own physical district"):
         return
+    world._avatar.position = world.KIOSK_POSITION
+    world._toggle_actions()
+    if not _check(_has_button(world._action_choices, "Apply: quarry miner"),
+            "quarry offers a real paid mining career"):
+        return
+    var employed_miner = _world("QUARRY", "Quarry")
+    employed_miner["player"]["jobId"] = "miner"
+    world._on_world_updated(employed_miner)
+    if not _check(_has_button(world._action_choices, "Survey western mineral deposit"),
+            "employed quarry miner can explore a second finite deposit"):
+        return
     world._on_world_updated(_world("FACTORY", "Factory"))
     if not _check(world._scenery.name == "PublicScene_FACTORY",
             "manufacturing factory has its own physical district"):
+        return
+    world._avatar.position = world.KIOSK_POSITION
+    world._toggle_actions()
+    if not _check(_has_button(world._action_choices, "Apply: factory machinist"),
+            "factory lets the visitor become a worker rather than only watch NPCs"):
         return
     world._on_industry_updated({
         "ironRemaining": 78, "copperRemaining": 39,
