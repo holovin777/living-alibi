@@ -60,7 +60,9 @@ public final class GameSession implements AutoCloseable {
     public record IndustryView(int ironRemaining,int copperRemaining,int oreAtQuarry,
                                int oreAtFactory,int factorySteel,int factoryCopper,
                                int factoryParts,int workshopSteel,int workshopCopper,
-                               int workshopParts,int minersAtWork,int factoryWorkersAtWork) { }
+                               int workshopParts,int minersAtWork,int factoryWorkersAtWork,
+                               int oreOnTruck,int scrapRemaining,boolean westDepositDiscovered,
+                               int quarryPayroll,int factoryPayroll,int cityBudget) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources,ServicesView services) { }
@@ -96,7 +98,9 @@ public final class GameSession implements AutoCloseable {
         return new IndustryView(r.ironRemaining(),r.copperRemaining(),r.oreAtQuarry(),
                 r.oreAtFactory(),r.factorySteel(),r.factoryCopper(),r.factoryParts(),
                 r.workshopSteel(),r.workshopCopper(),r.workshopParts(),
-                r.minersAtWork(),r.factoryWorkersAtWork());
+                r.minersAtWork(),r.factoryWorkersAtWork(),r.oreOnTruck(),
+                r.scrapRemaining(),r.westDepositDiscovered(),r.quarryPayroll(),
+                r.factoryPayroll(),r.cityBudget());
     }
 
     /** Travel is visible to the client, but distance and time remain Java-owned. */
@@ -148,6 +152,12 @@ public final class GameSession implements AutoCloseable {
         var candidate=town.copy();
         String message=CareerLife.work(candidate,state.day,state.minute);
         return apply(candidate,CareerLife.SHIFT_MINUTES,message);
+    }
+
+    public synchronized ActionView prospect() throws SQLException {
+        var copy=town.copy();
+        String message=IndustryLife.prospectPlayer(copy,state.minute);
+        return apply(copy,120,message);
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
