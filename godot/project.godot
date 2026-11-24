@@ -1,0 +1,11 @@
+; Living Alibi — first visual park prototype.
+; The Java engine and local Spring Boot server remain authoritative.
+config_version=5
+
+[application]
+config/name="Living Alibi"
+run/main_scene="res://scenes/park.tscn"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
