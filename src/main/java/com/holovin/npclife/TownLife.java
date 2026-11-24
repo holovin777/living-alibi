@@ -93,6 +93,7 @@ final class TownLife {
         PlayerLife.Player player=new PlayerLife.Player();
         final Map<Integer,PlayerLife.LifeRecord> pastLives=new LinkedHashMap<>();
         final Map<String,NatureLife.Source> naturalResources=new LinkedHashMap<>();
+        final Map<String,Integer> employerFunds=new LinkedHashMap<>();
         boolean together;
         long meetingSinceTick=-1;
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
@@ -129,6 +130,7 @@ final class TownLife {
             for(var e:naturalResources.entrySet())
                 t.naturalResources.put(e.getKey(),e.getValue().copy());
             t.pastLives.putAll(pastLives); // Immutable history records.
+            t.employerFunds.putAll(employerFunds);
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
             for(var e:secrets.entrySet())t.secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
@@ -146,6 +148,8 @@ final class TownLife {
             player=other.player.copy();
             pastLives.clear();
             pastLives.putAll(other.pastLives);
+            employerFunds.clear();
+            employerFunds.putAll(other.employerFunds);
             naturalResources.clear();
             for(var e:other.naturalResources.entrySet())
                 naturalResources.put(e.getKey(),e.getValue().copy());
@@ -189,6 +193,7 @@ final class TownLife {
         t.get("elena").home=Place.ELENA_HOME;t.get("elena").workplace=Place.MARKET;
         t.get("elena").activity="WORKING";
         NatureLife.ensureSources(t);
+        CareerLife.ensureEmployers(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
