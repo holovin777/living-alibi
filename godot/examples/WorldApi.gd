@@ -55,6 +55,9 @@ func study_subject(subject: String) -> void:
 func work_shift() -> void:
     _send("/actions/work", HTTPClient.METHOD_POST, {})
 
+func prospect() -> void:
+    _send("/actions/prospect", HTTPClient.METHOD_POST, {})
+
 func go_to(destination: String) -> void:
     _send("/actions/go", HTTPClient.METHOD_POST, {"destination": destination})
 
