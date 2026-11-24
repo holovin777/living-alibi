@@ -12,7 +12,7 @@ public final class CareerSmokeTest {
                 "visitor arrives at park with 50 EUR and no assigned job");
         check(p.engineeringSkill==0 && p.investigationSkill==0,
                 "no professional training on entry");
-        check(CareerLife.offers().size()==4,"vacancies include multiple career paths");
+        check(CareerLife.offers().size()==6,"vacancies include multiple career paths");
         long initialMoney=totalMoney(town);
 
         boolean rejected=false;
