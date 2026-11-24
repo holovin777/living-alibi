@@ -59,12 +59,44 @@ class GameSessionTest {
     }
 
     @Test
+    void parkFountainTransfersLimitedWaterAndSurvivesRestart() throws Exception {
+        Path file=directory.resolve("public-utilities.db");
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            town.technicalOrders.get("water-pump").condition=100;
+            town.cleanWater=3;
+            db.save(state,java.util.List.of(),java.util.List.of(),
+                    town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertTrue(game.snapshot().services().fountainWorking());
+            assertEquals(3,game.services().cleanWater());
+            assertEquals(50,game.snapshot().services().lightingCondition());
+            var result=game.drink("park-fountain");
+            assertEquals(2,result.world().services().cleanWater());
+            assertEquals(0,result.world().player().thirst());
+        }
+        try(var reopened=new GameSession(file)) {
+            assertEquals(2,reopened.snapshot().services().cleanWater());
+            reopened.drink("park-fountain");
+            reopened.drink("park-fountain");
+            assertEquals(0,reopened.snapshot().services().cleanWater());
+            assertThrows(IllegalArgumentException.class,
+                    ()->reopened.drink("park-fountain"));
+            assertEquals(0,reopened.snapshot().services().cleanWater());
+        }
+    }
+
+    @Test
     void paidTechnicalShiftRequiresRealRepairAndSurvivesRestart() throws Exception {
         Path file=directory.resolve("technical-game.db");
         try(var game=new GameSession(file)) {
             assertEquals("OPEN",game.workOrders().stream()
                     .filter(o->o.id().equals("water-pump"))
                     .findFirst().orElseThrow().phase());
+            assertFalse(game.services().fountainWorking());
+            assertFalse(game.services().lightsWorking());
             game.move("school");
             game.waitMinutes(20); // Day 1 08:00
             for(int i=0;i<3;i++)game.study("engineering");
@@ -78,6 +110,8 @@ class GameSessionTest {
             assertEquals("INSPECTED",task.phase());
             var finished=game.repair("water-pump");
             assertTrue(finished.message().contains("45 -> 100"));
+            assertTrue(game.snapshot().services().fountainWorking());
+            assertEquals(6,game.services().cleanWater());
             assertEquals(100,game.workOrders().stream()
                     .filter(o->o.id().equals("water-pump"))
                     .findFirst().orElseThrow().condition());
