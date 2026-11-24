@@ -710,6 +710,10 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.destination=TownLife.Place.valueOf(rs.getString("destination"));
                 town.player.travelRemaining=rs.getInt("travel_remaining");
                 town.player.privateName=rs.getString("private_name");
+                town.player.hunger=rs.getInt("hunger");
+                town.player.thirst=rs.getInt("thirst");
+                town.player.fatigue=rs.getInt("fatigue");
+                town.player.health=rs.getInt("health");
             }
         }
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_contacts")) {
@@ -730,15 +734,24 @@ final class WorldDatabase implements AutoCloseable {
 
     private void persistPlayer(PlayerLife.Player player) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-                    INSERT INTO player_state(id,place,destination,travel_remaining,private_name)
-                    VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
-                    place=excluded.place,destination=excluded.destination,
-                    travel_remaining=excluded.travel_remaining,private_name=excluded.private_name
-                    """)) {
-                        p.setString(1,player.place.name());p.setString(2,player.destination.name());
-                        p.setInt(3,player.travelRemaining);p.setString(4,player.privateName);
-                        p.executeUpdate();
-                    }
+                INSERT INTO player_state(id,place,destination,travel_remaining,private_name,
+                                         hunger,thirst,fatigue,health)
+                VALUES(1,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                place=excluded.place,destination=excluded.destination,
+                travel_remaining=excluded.travel_remaining,private_name=excluded.private_name,
+                hunger=excluded.hunger,thirst=excluded.thirst,
+                fatigue=excluded.fatigue,health=excluded.health
+                """)) {
+            p.setString(1,player.place.name());
+            p.setString(2,player.destination.name());
+            p.setInt(3,player.travelRemaining);
+            p.setString(4,player.privateName);
+            p.setInt(5,player.hunger);
+            p.setInt(6,player.thirst);
+            p.setInt(7,player.fatigue);
+            p.setInt(8,player.health);
+            p.executeUpdate();
+        }
         try(PreparedStatement p=db.prepareStatement("""
                     INSERT INTO player_contacts(resident_id,known_name,conversations,last_day,last_minute,last_heard)
                     VALUES(?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
