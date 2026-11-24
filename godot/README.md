@@ -65,11 +65,17 @@ writer (such as the console) against the same SQLite file at the same time.
   and every drink consumes one unit from a finite shared tank. The HUD
   shows public water and street-lighting status, which affect residents
   and the visitor. See [City Utilities](../docs/CITY_UTILITIES.md).
-- **Industry:** see the current finite iron/copper seams, quarry stock,
-  factory output, technician warehouse inventory, and working NPC crews.
-  The public Quarry and Factory districts have placeholder 3D machinery.
-  Production proceeds on its own at scheduled game times while the correct
-  NPC workers are present. See [Industry](../docs/INDUSTRY.md).
+- **Industry:** see the finite iron/copper seams, freight truck inventory,
+  historical scrap, factory stock, maintenance warehouse, working NPC
+  crews and three independent company/city budgets. The public Quarry
+  and Factory districts have placeholder 3D machinery. Production proceeds
+  only when the matching NPC workers are on site and the company has cash.
+- **Quarry or Factory job:** walk to the blue kiosk (**F**) and apply to be
+  a `miner` or `machinist`. Once employed, the paid two-hour shift
+  extracts ore or refines/recycles actual factory materials. These shifts
+  are limited by real stock and payroll. A hired miner may also survey
+  one hidden western ore pocket using the kiosk's **Survey** action.
+  See [Industry](../docs/INDUSTRY.md).
 - **Jobs:** see current job offerings without applying.
 - **Wait 60m:** advance 60 game minutes in the world.
 - **Refresh:** recover the latest committed state from Java/SQLite.
