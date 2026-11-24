@@ -166,9 +166,19 @@ The eventual game is an emergent detective simulation. The player investigates e
   no repeated loading creates additional minerals or duplicate shipments.
   Spring exposes `GET /api/v1/industry`, the console has `industry`,
   and Godot offers a public industrial dashboard and Quarry/Factory districts.
-- Worker wages are not yet tied to production revenue. Player-owned mining,
-  logistics, recycling, factory accounts, actual truck transport, and
-  chemical or energy consumption remain future work.
+- Quarry miners, transport drivers and factory machinists now receive
+  salaries from finite company accounts; the factory pays for ore and
+  city maintenance pays for deliveries. Bankrupt businesses can lay
+  off employees, who then search for other local work.
+- The player can apply for quarry/factory jobs and produce real materials
+  during paid two-hour shifts. A two-hour geological survey may unlock
+  one hidden finite western deposit.
+- A limited three-unit freight truck takes 30 game minutes between
+  dispatch and arrival. Factory workers can recycle two finite scrap
+  units into one steel unit, with lossy recovery.
+- Fully modeled wages in other economic sectors, animated trucks,
+  enterprise ownership, external trade and energy consumption are
+  future work. See [Industry](INDUSTRY.md).
   See [Industry](INDUSTRY.md).
 
 ### New world calendar and Godot API bridge (v1.16 draft)
