@@ -120,6 +120,10 @@ final class CareerLife {
             throw new IllegalArgumentException("Two-hour shifts start between 08:00 and 16:00.");
         if(p.lastWorkDay==day)
             throw new IllegalArgumentException("Already completed a shift today.");
+        if((vacancy.id.equals("technician") || vacancy.id.equals("engineer")) &&
+                p.lastTechnicalDay!=day)
+            throw new IllegalArgumentException(
+                    "Inspect and complete an actual city work order before this technical shift.");
         int funds=town.employerFunds.getOrDefault(vacancy.id,0);
         if(funds<vacancy.wage)
             throw new IllegalArgumentException("Employer has insufficient payroll funds.");
