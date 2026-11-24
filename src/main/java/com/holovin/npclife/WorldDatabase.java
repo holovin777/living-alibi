@@ -23,42 +23,42 @@ final class WorldDatabase implements AutoCloseable {
             st.execute("CREATE TABLE IF NOT EXISTS character_facts (id INTEGER PRIMARY KEY AUTOINCREMENT, npc_id TEXT NOT NULL, text TEXT NOT NULL, day INTEGER NOT NULL, minute INTEGER NOT NULL)");
             st.execute("INSERT OR IGNORE INTO world_state(id,day,minute,friendship) VALUES(1,1,450,0)");
             st.execute("""
-                CREATE TABLE IF NOT EXISTS town_people (
-                    id TEXT PRIMARY KEY, place TEXT NOT NULL, destination TEXT NOT NULL,
-                    travel_remaining INTEGER NOT NULL, activity TEXT NOT NULL,
-                    hunger INTEGER NOT NULL, thirst INTEGER NOT NULL, fatigue INTEGER NOT NULL,
-                    health INTEGER NOT NULL, money INTEGER NOT NULL,
-                    food INTEGER NOT NULL, water INTEGER NOT NULL, age INTEGER NOT NULL,
-                    alive INTEGER NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS town_people (
+                        id TEXT PRIMARY KEY, place TEXT NOT NULL, destination TEXT NOT NULL,
+                        travel_remaining INTEGER NOT NULL, activity TEXT NOT NULL,
+                        hunger INTEGER NOT NULL, thirst INTEGER NOT NULL, fatigue INTEGER NOT NULL,
+                        health INTEGER NOT NULL, money INTEGER NOT NULL,
+                        food INTEGER NOT NULL, water INTEGER NOT NULL, age INTEGER NOT NULL,
+                        alive INTEGER NOT NULL)
+                    """);
             st.execute("CREATE TABLE IF NOT EXISTS town_meta (id INTEGER PRIMARY KEY CHECK(id=1), together INTEGER NOT NULL)");
             st.execute("""
-                CREATE TABLE IF NOT EXISTS town_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
-                    minute INTEGER NOT NULL, actor_id TEXT NOT NULL, place TEXT NOT NULL,
-                    text TEXT NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS town_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+                        minute INTEGER NOT NULL, actor_id TEXT NOT NULL, place TEXT NOT NULL,
+                        text TEXT NOT NULL)
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS town_observations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, witness_id TEXT NOT NULL,
-                    day INTEGER NOT NULL, minute INTEGER NOT NULL, place TEXT NOT NULL,
-                    text TEXT NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS town_observations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, witness_id TEXT NOT NULL,
+                        day INTEGER NOT NULL, minute INTEGER NOT NULL, place TEXT NOT NULL,
+                        text TEXT NOT NULL)
+                    """);
             st.execute("CREATE INDEX IF NOT EXISTS idx_town_observations_witness ON town_observations(witness_id,id)");
             st.execute("""
-                CREATE TABLE IF NOT EXISTS town_relationships (
-                    first_id TEXT NOT NULL, second_id TEXT NOT NULL,
-                    affinity INTEGER NOT NULL, trust INTEGER NOT NULL, tension INTEGER NOT NULL,
-                    encounters INTEGER NOT NULL, conversations INTEGER NOT NULL, arguments INTEGER NOT NULL,
-                    last_interaction_tick INTEGER NOT NULL, rng INTEGER NOT NULL,
-                    PRIMARY KEY(first_id,second_id))
-                """);
+                    CREATE TABLE IF NOT EXISTS town_relationships (
+                        first_id TEXT NOT NULL, second_id TEXT NOT NULL,
+                        affinity INTEGER NOT NULL, trust INTEGER NOT NULL, tension INTEGER NOT NULL,
+                        encounters INTEGER NOT NULL, conversations INTEGER NOT NULL, arguments INTEGER NOT NULL,
+                        last_interaction_tick INTEGER NOT NULL, rng INTEGER NOT NULL,
+                        PRIMARY KEY(first_id,second_id))
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS social_interactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL, minute INTEGER NOT NULL,
-                    first_id TEXT NOT NULL, second_id TEXT NOT NULL, place TEXT NOT NULL,
-                    kind TEXT NOT NULL, description TEXT NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS social_interactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL, minute INTEGER NOT NULL,
+                        first_id TEXT NOT NULL, second_id TEXT NOT NULL, place TEXT NOT NULL,
+                        kind TEXT NOT NULL, description TEXT NOT NULL)
+                    """);
 
 
         }
@@ -66,17 +66,40 @@ final class WorldDatabase implements AutoCloseable {
         // Neither table is included in world NPC identity or investigation evidence.
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS player_state (
-                    id INTEGER PRIMARY KEY CHECK(id=1), place TEXT NOT NULL,
-                    destination TEXT NOT NULL, travel_remaining INTEGER NOT NULL,
-                    private_name TEXT)
-                """);
+                    CREATE TABLE IF NOT EXISTS player_state (
+                        id INTEGER PRIMARY KEY CHECK(id=1), place TEXT NOT NULL,
+                        destination TEXT NOT NULL, travel_remaining INTEGER NOT NULL,
+                        private_name TEXT,
+                        hunger INTEGER NOT NULL DEFAULT 0,
+                        thirst INTEGER NOT NULL DEFAULT 0,
+                        fatigue INTEGER NOT NULL DEFAULT 0,
+                        health INTEGER NOT NULL DEFAULT 100)
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS player_contacts (
-                    resident_id TEXT PRIMARY KEY, known_name TEXT,
-                    conversations INTEGER NOT NULL, last_day INTEGER NOT NULL,
-                    last_minute INTEGER NOT NULL, last_heard TEXT)
-                """);
+                    CREATE TABLE IF NOT EXISTS player_contacts (
+                        resident_id TEXT PRIMARY KEY, known_name TEXT,
+                        conversations INTEGER NOT NULL, last_day INTEGER NOT NULL,
+                        last_minute INTEGER NOT NULL, last_heard TEXT)
+                    """);
+        }
+        // v1.16: player physical needs.
+        // Existing worlds receive healthy default values.
+        // Never reset an existing player's saved condition.
+        LinkedHashMap<String,String> playerColumns=new LinkedHashMap<>();
+        playerColumns.put("hunger","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("thirst","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("fatigue","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("health","INTEGER NOT NULL DEFAULT 100");
+
+        for(var col:playerColumns.entrySet()) {
+            if(!columnExists("player_state",col.getKey())) {
+                try(Statement st=db.createStatement()) {
+                    st.executeUpdate(
+                            "ALTER TABLE player_state ADD COLUMN "+
+                            col.getKey()+" "+col.getValue()
+                            );
+                }
+            }
         }
         // Additive migration for databases created by v1.1.
         if(!columnExists("town_meta","meeting_since")) {
@@ -133,60 +156,60 @@ final class WorldDatabase implements AutoCloseable {
         // v1.6: claims are separate from the authoritative event log and old observations.
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS resident_beliefs (
-                    resident_id TEXT NOT NULL, event_key TEXT NOT NULL,
-                    event_day INTEGER NOT NULL, event_minute INTEGER NOT NULL,
-                    actor_id TEXT NOT NULL, scene_id TEXT NOT NULL, statement TEXT NOT NULL,
-                    origin TEXT NOT NULL CHECK(origin IN ('DIRECT','HEARD')),
-                    learned_from TEXT NOT NULL, learned_day INTEGER NOT NULL,
-                    learned_minute INTEGER NOT NULL, hops INTEGER NOT NULL,
-                    confidence INTEGER NOT NULL,
-                    PRIMARY KEY(resident_id,event_key))
-                """);
+                    CREATE TABLE IF NOT EXISTS resident_beliefs (
+                        resident_id TEXT NOT NULL, event_key TEXT NOT NULL,
+                        event_day INTEGER NOT NULL, event_minute INTEGER NOT NULL,
+                        actor_id TEXT NOT NULL, scene_id TEXT NOT NULL, statement TEXT NOT NULL,
+                        origin TEXT NOT NULL CHECK(origin IN ('DIRECT','HEARD')),
+                        learned_from TEXT NOT NULL, learned_day INTEGER NOT NULL,
+                        learned_minute INTEGER NOT NULL, hops INTEGER NOT NULL,
+                        confidence INTEGER NOT NULL,
+                        PRIMARY KEY(resident_id,event_key))
+                    """);
             st.execute("CREATE INDEX IF NOT EXISTS idx_resident_beliefs_person ON resident_beliefs(resident_id,event_day,event_minute)");
             st.execute("""
-                CREATE TABLE IF NOT EXISTS information_transfers (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
-                    minute INTEGER NOT NULL, from_id TEXT NOT NULL, to_id TEXT NOT NULL,
-                    event_key TEXT NOT NULL, confidence INTEGER NOT NULL,
-                    hops INTEGER NOT NULL, statement TEXT NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS information_transfers (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+                        minute INTEGER NOT NULL, from_id TEXT NOT NULL, to_id TEXT NOT NULL,
+                        event_key TEXT NOT NULL, confidence INTEGER NOT NULL,
+                        hops INTEGER NOT NULL, statement TEXT NOT NULL)
+                    """);
         }
         // v1.7: confidential eyewitness experiences and deliberate misstatements.
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS resident_secrets (
-                    keeper_id TEXT NOT NULL, event_key TEXT NOT NULL,
-                    day INTEGER NOT NULL, minute INTEGER NOT NULL, reason TEXT NOT NULL,
-                    PRIMARY KEY(keeper_id,event_key))
-                """);
+                    CREATE TABLE IF NOT EXISTS resident_secrets (
+                        keeper_id TEXT NOT NULL, event_key TEXT NOT NULL,
+                        day INTEGER NOT NULL, minute INTEGER NOT NULL, reason TEXT NOT NULL,
+                        PRIMARY KEY(keeper_id,event_key))
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS deception_decisions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
-                    minute INTEGER NOT NULL, from_id TEXT NOT NULL, to_id TEXT NOT NULL,
-                    event_key TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('WITHHELD','LIE')),
-                    statement TEXT NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS deception_decisions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+                        minute INTEGER NOT NULL, from_id TEXT NOT NULL, to_id TEXT NOT NULL,
+                        event_key TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('WITHHELD','LIE')),
+                        statement TEXT NOT NULL)
+                    """);
         }
         // v1.8: separate authoritative incident details from player-visible investigation notes.
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS investigation_cases (
-                    id TEXT PRIMARY KEY, day INTEGER NOT NULL, minute INTEGER NOT NULL,
-                    place TEXT NOT NULL, victim_id TEXT NOT NULL, offender_id TEXT NOT NULL,
-                    item TEXT NOT NULL, amount INTEGER NOT NULL,
-                    inspected INTEGER NOT NULL, solved INTEGER NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS investigation_cases (
+                        id TEXT PRIMARY KEY, day INTEGER NOT NULL, minute INTEGER NOT NULL,
+                        place TEXT NOT NULL, victim_id TEXT NOT NULL, offender_id TEXT NOT NULL,
+                        item TEXT NOT NULL, amount INTEGER NOT NULL,
+                        inspected INTEGER NOT NULL, solved INTEGER NOT NULL)
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS investigation_witnesses (
-                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL,
-                    PRIMARY KEY(case_id,resident_id))
-                """);
+                    CREATE TABLE IF NOT EXISTS investigation_witnesses (
+                        case_id TEXT NOT NULL, resident_id TEXT NOT NULL,
+                        PRIMARY KEY(case_id,resident_id))
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS investigation_interviews (
-                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL, statement TEXT NOT NULL,
-                    PRIMARY KEY(case_id,resident_id))
-                """);
+                    CREATE TABLE IF NOT EXISTS investigation_interviews (
+                        case_id TEXT NOT NULL, resident_id TEXT NOT NULL, statement TEXT NOT NULL,
+                        PRIMARY KEY(case_id,resident_id))
+                    """);
         }
         // v1.9: incident-time scene records are immutable historical snapshots.
         // No legacy positions are inferred from current citizen locations.
@@ -197,15 +220,15 @@ final class WorldDatabase implements AutoCloseable {
         }
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS investigation_positions (
-                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL, space_id TEXT NOT NULL,
-                    PRIMARY KEY(case_id,resident_id))
-                """);
+                    CREATE TABLE IF NOT EXISTS investigation_positions (
+                        case_id TEXT NOT NULL, resident_id TEXT NOT NULL, space_id TEXT NOT NULL,
+                        PRIMARY KEY(case_id,resident_id))
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS investigation_alibis (
-                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL, result TEXT NOT NULL,
-                    PRIMARY KEY(case_id,resident_id))
-                """);
+                    CREATE TABLE IF NOT EXISTS investigation_alibis (
+                        case_id TEXT NOT NULL, resident_id TEXT NOT NULL, result TEXT NOT NULL,
+                        PRIMARY KEY(case_id,resident_id))
+                    """);
         }
         // v1.10: optional incident-time motive context, never reconstructed for old cases.
         if(!columnExists("investigation_cases","motive_code")) {
@@ -220,11 +243,11 @@ final class WorldDatabase implements AutoCloseable {
         }
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS investigation_backgrounds (
-                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL,
-                    financial INTEGER NOT NULL, conflict INTEGER NOT NULL,
-                    impulse INTEGER NOT NULL, PRIMARY KEY(case_id,resident_id))
-                """);
+                    CREATE TABLE IF NOT EXISTS investigation_backgrounds (
+                        case_id TEXT NOT NULL, resident_id TEXT NOT NULL,
+                        financial INTEGER NOT NULL, conflict INTEGER NOT NULL,
+                        impulse INTEGER NOT NULL, PRIMARY KEY(case_id,resident_id))
+                    """);
         }
         // v1.11: additive household arrears, bilateral loans and append-only ledger.
         // No historical debt is inferred from a resident's old cash balance.
@@ -235,21 +258,21 @@ final class WorldDatabase implements AutoCloseable {
         }
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS economy_loans (
-                    id TEXT PRIMARY KEY, lender_id TEXT NOT NULL, borrower_id TEXT NOT NULL,
-                    original INTEGER NOT NULL CHECK(original>0),
-                    outstanding INTEGER NOT NULL CHECK(outstanding>=0),
-                    start_day INTEGER NOT NULL, due_day INTEGER NOT NULL,
-                    status TEXT NOT NULL CHECK(status IN ('OPEN','OVERDUE','PAID')))
-                """);
+                    CREATE TABLE IF NOT EXISTS economy_loans (
+                        id TEXT PRIMARY KEY, lender_id TEXT NOT NULL, borrower_id TEXT NOT NULL,
+                        original INTEGER NOT NULL CHECK(original>0),
+                        outstanding INTEGER NOT NULL CHECK(outstanding>=0),
+                        start_day INTEGER NOT NULL, due_day INTEGER NOT NULL,
+                        status TEXT NOT NULL CHECK(status IN ('OPEN','OVERDUE','PAID')))
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS economy_ledger (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
-                    minute INTEGER NOT NULL, kind TEXT NOT NULL,
-                    from_id TEXT NOT NULL, to_id TEXT NOT NULL,
-                    loan_id TEXT, amount INTEGER NOT NULL CHECK(amount>0),
-                    detail TEXT NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS economy_ledger (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+                        minute INTEGER NOT NULL, kind TEXT NOT NULL,
+                        from_id TEXT NOT NULL, to_id TEXT NOT NULL,
+                        loan_id TEXT, amount INTEGER NOT NULL CHECK(amount>0),
+                        detail TEXT NOT NULL)
+                    """);
             st.execute("CREATE INDEX IF NOT EXISTS idx_economy_ledger_actor ON economy_ledger(from_id,to_id,id)");
         }
         // v1.12: existing residents keep their jobs; no retroactive illnesses or unemployment.
@@ -266,28 +289,28 @@ final class WorldDatabase implements AutoCloseable {
         }
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS resident_life_changes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,day INTEGER NOT NULL,
-                    minute INTEGER NOT NULL,resident_id TEXT NOT NULL,
-                    kind TEXT NOT NULL,detail TEXT NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS resident_life_changes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,day INTEGER NOT NULL,
+                        minute INTEGER NOT NULL,resident_id TEXT NOT NULL,
+                        kind TEXT NOT NULL,detail TEXT NOT NULL)
+                    """);
             st.execute("CREATE INDEX IF NOT EXISTS idx_life_changes_person ON resident_life_changes(resident_id,id)");
         }
         // v1.13: item custody is separate from legal title and from historic case reports.
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS property_items (
-                    id TEXT PRIMARY KEY, type TEXT NOT NULL, owner_id TEXT NOT NULL,
-                    holder_id TEXT, stored_space TEXT, stolen INTEGER NOT NULL,
-                    value INTEGER NOT NULL, created_day INTEGER NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS property_items (
+                        id TEXT PRIMARY KEY, type TEXT NOT NULL, owner_id TEXT NOT NULL,
+                        holder_id TEXT, stored_space TEXT, stolen INTEGER NOT NULL,
+                        value INTEGER NOT NULL, created_day INTEGER NOT NULL)
+                    """);
             st.execute("""
-                CREATE TABLE IF NOT EXISTS property_changes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,day INTEGER NOT NULL,
-                    minute INTEGER NOT NULL,action TEXT NOT NULL,
-                    item_id TEXT NOT NULL,from_id TEXT NOT NULL,to_id TEXT NOT NULL,
-                    details TEXT NOT NULL)
-                """);
+                    CREATE TABLE IF NOT EXISTS property_changes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,day INTEGER NOT NULL,
+                        minute INTEGER NOT NULL,action TEXT NOT NULL,
+                        item_id TEXT NOT NULL,from_id TEXT NOT NULL,to_id TEXT NOT NULL,
+                        details TEXT NOT NULL)
+                    """);
             st.execute("CREATE INDEX IF NOT EXISTS idx_property_changes_item ON property_changes(item_id,id)");
         }
         if(!columnExists("investigation_cases","physical_item_id")) {
@@ -305,10 +328,10 @@ final class WorldDatabase implements AutoCloseable {
         // Older saved cases start with zero searches; no retroactive search result exists.
         try(Statement st=db.createStatement()) {
             st.execute("""
-                CREATE TABLE IF NOT EXISTS investigation_searches (
-                    case_id TEXT NOT NULL, resident_id TEXT NOT NULL, result TEXT NOT NULL,
-                    PRIMARY KEY(case_id,resident_id))
-                """);
+                    CREATE TABLE IF NOT EXISTS investigation_searches (
+                        case_id TEXT NOT NULL, resident_id TEXT NOT NULL, result TEXT NOT NULL,
+                        PRIMARY KEY(case_id,resident_id))
+                    """);
         }
         LinkedHashMap<String,String> add = new LinkedHashMap<>();
         add.put("age", "INTEGER NOT NULL DEFAULT 36");
@@ -391,24 +414,24 @@ final class WorldDatabase implements AutoCloseable {
     }
 
     void save(WorldState s,List<LifeSimulation.LifeEvent> events,List<Memory> messages,
-              TownLife.Town town,List<TownLife.Event> townEvents,
-              List<TownLife.Observation> observations) throws SQLException {
+            TownLife.Town town,List<TownLife.Event> townEvents,
+            List<TownLife.Observation> observations) throws SQLException {
         save(s,events,messages,town,townEvents,observations,List.of());
     }
 
     void save(WorldState s,List<LifeSimulation.LifeEvent> events,List<Memory> messages,
-              TownLife.Town town,List<TownLife.Event> townEvents,
-              List<TownLife.Observation> observations,List<SocialLife.Interaction> socialEvents) throws SQLException {
+            TownLife.Town town,List<TownLife.Event> townEvents,
+            List<TownLife.Observation> observations,List<SocialLife.Interaction> socialEvents) throws SQLException {
         // Marco, the other residents, world events, and their knowledge commit atomically.
         s.lastSavedEpoch=Instant.now().getEpochSecond();
         db.setAutoCommit(false);
         try {
             String sql="""
-              UPDATE world_state SET day=?,minute=?,friendship=?,age=?,hunger=?,thirst=?,fatigue=?,health=?,money=?,food=?,water=?,
-              work_minutes=?,activity=?,stress=?,loneliness=?,mood=?,hygiene=?,illness=?,debt=?,fitness=?,personality_sociable=?,
-              personality_careful=?,personality_curious=?,days_worked=?,missed_rent=?,days_sick=?,alive=?,owns_bakery=?,goal=?,rng=?,
-              last_saved_epoch=?,offline_progress=?,ai_autonomy=?,speed=? WHERE id=1
-              """;
+                UPDATE world_state SET day=?,minute=?,friendship=?,age=?,hunger=?,thirst=?,fatigue=?,health=?,money=?,food=?,water=?,
+                       work_minutes=?,activity=?,stress=?,loneliness=?,mood=?,hygiene=?,illness=?,debt=?,fitness=?,personality_sociable=?,
+                       personality_careful=?,personality_curious=?,days_worked=?,missed_rent=?,days_sick=?,alive=?,owns_bakery=?,goal=?,rng=?,
+                       last_saved_epoch=?,offline_progress=?,ai_autonomy=?,speed=? WHERE id=1
+                           """;
             try (PreparedStatement p=db.prepareStatement(sql)) {
                 int i=1;
                 p.setInt(i++,s.day);p.setInt(i++,s.minute);p.setInt(i++,s.friendship);p.setInt(i++,s.age);
@@ -489,11 +512,11 @@ final class WorldDatabase implements AutoCloseable {
     List<LifeSimulation.LifeEvent> milestones(int limit) throws SQLException {
         List<LifeSimulation.LifeEvent> result=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("SELECT day,minute,text FROM life_events WHERE npc_id=? AND ("+
-                "text LIKE '%turned%' OR text LIKE '%opened his own bakery%' OR text LIKE '%died%' OR text LIKE '%recovered%'"+
-                ") ORDER BY id DESC LIMIT ?")) {
+                    "text LIKE '%turned%' OR text LIKE '%opened his own bakery%' OR text LIKE '%died%' OR text LIKE '%recovered%'"+
+                    ") ORDER BY id DESC LIMIT ?")) {
             p.setString(1,NPC);p.setInt(2,limit);
             try(ResultSet r=p.executeQuery()) {while(r.next())result.add(new LifeSimulation.LifeEvent(r.getInt(1),r.getInt(2),r.getString(3)));}
-        }
+                    }
         Collections.reverse(result);return result;
     }
     TownLife.Town loadTown(WorldState state) throws SQLException {
@@ -508,7 +531,7 @@ final class WorldDatabase implements AutoCloseable {
                     if(fullName==null||fullName.isBlank()||occupation==null||occupation.isBlank())
                         throw new SQLException("Generated resident has missing identity: "+id);
                     town.people.put(id,new TownLife.Citizen(id,fullName,occupation,
-                            TownLife.Place.valueOf(rs.getString("place"))));
+                                TownLife.Place.valueOf(rs.getString("place"))));
                 }
                 var p=town.get(id);
                 p.place=TownLife.Place.valueOf(rs.getString("place"));
@@ -526,7 +549,7 @@ final class WorldDatabase implements AutoCloseable {
                 String savedHomeUnit=rs.getString("home_unit");
                 // Upgrading v1.3 saves assigns each existing resident a distinct unit.
                 p.homeUnit=(savedHomeUnit==null||savedHomeUnit.isBlank())
-                        ? TownLife.privateUnit(p.id) : savedHomeUnit;
+                    ? TownLife.privateUnit(p.id) : savedHomeUnit;
                 if(p.id.startsWith("resident-")) {
                     p.home=TownLife.Place.valueOf(rs.getString("home_place"));
                     p.workplace=TownLife.Place.valueOf(rs.getString("work_place"));
@@ -550,7 +573,7 @@ final class WorldDatabase implements AutoCloseable {
             }
         }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT * FROM town_relationships")) {
+                ResultSet rs=st.executeQuery("SELECT * FROM town_relationships")) {
             while(rs.next()) {
                 String first=rs.getString("first_id"),second=rs.getString("second_id");
                 if(!town.people.containsKey(first)||!town.people.containsKey(second))continue;
@@ -564,9 +587,9 @@ final class WorldDatabase implements AutoCloseable {
                 r.lastAttemptDay=rs.getInt("last_attempt_day");
                 if(!legacy)town.peerRelationships.put(SocialNetwork.key(first,second),r);
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT * FROM resident_beliefs ORDER BY event_day,event_minute,event_key")) {
+                ResultSet rs=st.executeQuery("SELECT * FROM resident_beliefs ORDER BY event_day,event_minute,event_key")) {
             while(rs.next()) {
                 String resident=rs.getString("resident_id");
                 if(!town.people.containsKey(resident))continue;
@@ -576,25 +599,25 @@ final class WorldDatabase implements AutoCloseable {
                         rs.getString("learned_from"),rs.getInt("learned_day"),
                         rs.getInt("learned_minute"),rs.getInt("hops"),rs.getInt("confidence"));
                 town.beliefs.computeIfAbsent(resident,ignored->new LinkedHashMap<>())
-                        .put(belief.eventKey(),belief);
+                    .put(belief.eventKey(),belief);
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT * FROM resident_secrets ORDER BY day,minute,event_key")) {
+                ResultSet rs=st.executeQuery("SELECT * FROM resident_secrets ORDER BY day,minute,event_key")) {
             while(rs.next()) {
                 String keeper=rs.getString("keeper_id");
                 if(!town.people.containsKey(keeper))continue;
                 var secret=new DeceptionLife.Secret(keeper,rs.getString("event_key"),
                         rs.getInt("day"),rs.getInt("minute"),rs.getString("reason"));
                 town.secrets.computeIfAbsent(keeper,ignored->new LinkedHashMap<>())
-                        .put(secret.eventKey(),secret);
+                    .put(secret.eventKey(),secret);
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT * FROM investigation_cases ORDER BY id")) {
+                ResultSet rs=st.executeQuery("SELECT * FROM investigation_cases ORDER BY id")) {
             while(rs.next()) {
                 if(!town.people.containsKey(rs.getString("victim_id")) ||
-                   !town.people.containsKey(rs.getString("offender_id")))continue;
+                        !town.people.containsKey(rs.getString("offender_id")))continue;
                 var c=new InvestigationLife.CaseFile(rs.getString("id"),rs.getInt("day"),
                         rs.getInt("minute"),TownLife.Place.valueOf(rs.getString("place")),
                         rs.getString("victim_id"),rs.getString("offender_id"),
@@ -607,56 +630,56 @@ final class WorldDatabase implements AutoCloseable {
                 c.returned=rs.getInt("returned")!=0;
                 town.cases.put(c.id,c);
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT case_id,resident_id FROM investigation_witnesses")) {
+                ResultSet rs=st.executeQuery("SELECT case_id,resident_id FROM investigation_witnesses")) {
             while(rs.next()) {
                 var c=town.cases.get(rs.getString(1));
                 if(c!=null && town.people.containsKey(rs.getString(2)))c.witnesses.add(rs.getString(2));
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT case_id,resident_id,statement FROM investigation_interviews")) {
+                ResultSet rs=st.executeQuery("SELECT case_id,resident_id,statement FROM investigation_interviews")) {
             while(rs.next()) {
                 var c=town.cases.get(rs.getString(1));
                 if(c!=null && town.people.containsKey(rs.getString(2)))c.interviews.put(rs.getString(2),rs.getString(3));
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT case_id,resident_id,space_id FROM investigation_positions")) {
+                ResultSet rs=st.executeQuery("SELECT case_id,resident_id,space_id FROM investigation_positions")) {
             while(rs.next()) {
                 var c=town.cases.get(rs.getString(1));
                 if(c!=null && town.people.containsKey(rs.getString(2)))
                     c.incidentSpaces.put(rs.getString(2),rs.getString(3));
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT case_id,resident_id,result FROM investigation_alibis")) {
+                ResultSet rs=st.executeQuery("SELECT case_id,resident_id,result FROM investigation_alibis")) {
             while(rs.next()) {
                 var c=town.cases.get(rs.getString(1));
                 if(c!=null && town.people.containsKey(rs.getString(2)))
                     c.alibiChecks.put(rs.getString(2),rs.getString(3));
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT case_id,resident_id,result FROM investigation_searches")) {
+                ResultSet rs=st.executeQuery("SELECT case_id,resident_id,result FROM investigation_searches")) {
             while(rs.next()) {
                 var c=town.cases.get(rs.getString(1));
                 if(c!=null && town.people.containsKey(rs.getString(2)))
                     c.searches.put(rs.getString(2),rs.getString(3));
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT case_id,resident_id,financial,conflict,impulse FROM investigation_backgrounds")) {
+                ResultSet rs=st.executeQuery("SELECT case_id,resident_id,financial,conflict,impulse FROM investigation_backgrounds")) {
             while(rs.next()) {
                 var c=town.cases.get(rs.getString(1));
                 if(c!=null && town.people.containsKey(rs.getString(2)))
                     c.incidentProfiles.put(rs.getString(2),new MotiveLife.Indicators(
-                            rs.getInt(3),rs.getInt(4),rs.getInt(5)));
+                                rs.getInt(3),rs.getInt(4),rs.getInt(5)));
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT * FROM economy_loans ORDER BY id")) {
+                ResultSet rs=st.executeQuery("SELECT * FROM economy_loans ORDER BY id")) {
             while(rs.next()) {
                 String lender=rs.getString("lender_id"),borrower=rs.getString("borrower_id");
                 if(!town.people.containsKey(lender)||!town.people.containsKey(borrower))continue;
@@ -666,9 +689,9 @@ final class WorldDatabase implements AutoCloseable {
                 loan.status=EconomyLife.Status.valueOf(rs.getString("status"));
                 town.loans.put(loan.id,loan);
             }
-        }
+                }
         try(Statement st=db.createStatement();
-            ResultSet rs=st.executeQuery("SELECT * FROM property_items ORDER BY id")) {
+                ResultSet rs=st.executeQuery("SELECT * FROM property_items ORDER BY id")) {
             while(rs.next()) {
                 String owner=rs.getString("owner_id"),holder=rs.getString("holder_id");
                 if(!town.people.containsKey(owner) ||
@@ -679,7 +702,7 @@ final class WorldDatabase implements AutoCloseable {
                         rs.getInt("value"),rs.getInt("created_day"));
                 town.items.put(item.id,item);
             }
-        }
+                }
         // Anonymous by default on migration. No resident learns the player's identity.
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_state WHERE id=1")) {
             if(rs.next()) {
@@ -707,182 +730,182 @@ final class WorldDatabase implements AutoCloseable {
 
     private void persistPlayer(PlayerLife.Player player) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-                INSERT INTO player_state(id,place,destination,travel_remaining,private_name)
-                VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
-                place=excluded.place,destination=excluded.destination,
-                travel_remaining=excluded.travel_remaining,private_name=excluded.private_name
-                """)) {
-            p.setString(1,player.place.name());p.setString(2,player.destination.name());
-            p.setInt(3,player.travelRemaining);p.setString(4,player.privateName);
-            p.executeUpdate();
-        }
+                    INSERT INTO player_state(id,place,destination,travel_remaining,private_name)
+                    VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                    place=excluded.place,destination=excluded.destination,
+                    travel_remaining=excluded.travel_remaining,private_name=excluded.private_name
+                    """)) {
+                        p.setString(1,player.place.name());p.setString(2,player.destination.name());
+                        p.setInt(3,player.travelRemaining);p.setString(4,player.privateName);
+                        p.executeUpdate();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-                INSERT INTO player_contacts(resident_id,known_name,conversations,last_day,last_minute,last_heard)
-                VALUES(?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
-                known_name=excluded.known_name,conversations=excluded.conversations,
-                last_day=excluded.last_day,last_minute=excluded.last_minute,
-                last_heard=excluded.last_heard
-                """)) {
-            for(var c:player.contacts.values()) {
-                p.setString(1,c.residentId);p.setString(2,c.knownName);
-                p.setInt(3,c.conversations);p.setInt(4,c.lastDay);
-                p.setInt(5,c.lastMinute);p.setString(6,c.lastHeard);p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO player_contacts(resident_id,known_name,conversations,last_day,last_minute,last_heard)
+                    VALUES(?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
+                    known_name=excluded.known_name,conversations=excluded.conversations,
+                    last_day=excluded.last_day,last_minute=excluded.last_minute,
+                    last_heard=excluded.last_heard
+                    """)) {
+                        for(var c:player.contacts.values()) {
+                            p.setString(1,c.residentId);p.setString(2,c.knownName);
+                            p.setInt(3,c.conversations);p.setInt(4,c.lastDay);
+                            p.setInt(5,c.lastMinute);p.setString(6,c.lastHeard);p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
     }
 
     private void persistTown(TownLife.Town town,List<TownLife.Event> events,
-                             List<TownLife.Observation> observations) throws SQLException {
+            List<TownLife.Observation> observations) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO town_people(id,place,destination,travel_remaining,activity,hunger,thirst,fatigue,
-                                    health,money,food,water,age,alive,name,occupation,home_place,work_place,
-                                    sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed,home_unit,unpaid_bills,employed,unemployment_days,sick_until_day,last_hired_day,job_changes)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET
-                place=excluded.place,destination=excluded.destination,
-                travel_remaining=excluded.travel_remaining,activity=excluded.activity,
-                hunger=excluded.hunger,thirst=excluded.thirst,fatigue=excluded.fatigue,
-                health=excluded.health,money=excluded.money,food=excluded.food,
-                water=excluded.water,age=excluded.age,alive=excluded.alive,
-                name=excluded.name,occupation=excluded.occupation,
-                home_place=excluded.home_place,work_place=excluded.work_place,
-                sociability=excluded.sociability,carefulness=excluded.carefulness,
-                curiosity=excluded.curiosity,goal=excluded.goal,
-                schedule_offset=excluded.schedule_offset,generation_index=excluded.generation_index,
-                personal_seed=excluded.personal_seed,home_unit=excluded.home_unit,
-                unpaid_bills=excluded.unpaid_bills,
-                employed=excluded.employed,unemployment_days=excluded.unemployment_days,
-                sick_until_day=excluded.sick_until_day,last_hired_day=excluded.last_hired_day,
-                job_changes=excluded.job_changes
-            """)) {
-            for(var c:town.people.values()) {
-                p.setString(1,c.id);p.setString(2,c.place.name());p.setString(3,c.destination.name());
-                p.setInt(4,c.travelRemaining);p.setString(5,c.activity);
-                p.setInt(6,c.hunger);p.setInt(7,c.thirst);p.setInt(8,c.fatigue);
-                p.setInt(9,c.health);p.setInt(10,c.money);p.setInt(11,c.food);
-                p.setInt(12,c.water);p.setInt(13,c.age);p.setInt(14,c.alive?1:0);
-                p.setString(15,c.name);p.setString(16,c.occupation);
-                p.setString(17,c.home.name());p.setString(18,c.workplace.name());
-                p.setInt(19,c.sociability);p.setInt(20,c.carefulness);
-                p.setInt(21,c.curiosity);p.setString(22,c.goal);
-                p.setInt(23,c.scheduleOffset);p.setInt(24,c.generationIndex);
-                p.setLong(25,c.personalSeed);p.setString(26,c.homeUnit);p.setInt(27,c.unpaidBills);
-                p.setInt(28,c.employed?1:0);p.setInt(29,c.unemploymentDays);
-                p.setInt(30,c.sickUntilDay);p.setInt(31,c.lastHiredDay);p.setInt(32,c.jobChanges);
-                p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO town_people(id,place,destination,travel_remaining,activity,hunger,thirst,fatigue,
+                        health,money,food,water,age,alive,name,occupation,home_place,work_place,
+                        sociability,carefulness,curiosity,goal,schedule_offset,generation_index,personal_seed,home_unit,unpaid_bills,employed,unemployment_days,sick_until_day,last_hired_day,job_changes)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(id) DO UPDATE SET
+                    place=excluded.place,destination=excluded.destination,
+                    travel_remaining=excluded.travel_remaining,activity=excluded.activity,
+                    hunger=excluded.hunger,thirst=excluded.thirst,fatigue=excluded.fatigue,
+                    health=excluded.health,money=excluded.money,food=excluded.food,
+                    water=excluded.water,age=excluded.age,alive=excluded.alive,
+                    name=excluded.name,occupation=excluded.occupation,
+                    home_place=excluded.home_place,work_place=excluded.work_place,
+                    sociability=excluded.sociability,carefulness=excluded.carefulness,
+                    curiosity=excluded.curiosity,goal=excluded.goal,
+                    schedule_offset=excluded.schedule_offset,generation_index=excluded.generation_index,
+                    personal_seed=excluded.personal_seed,home_unit=excluded.home_unit,
+                    unpaid_bills=excluded.unpaid_bills,
+                    employed=excluded.employed,unemployment_days=excluded.unemployment_days,
+                    sick_until_day=excluded.sick_until_day,last_hired_day=excluded.last_hired_day,
+                    job_changes=excluded.job_changes
+                        """)) {
+                            for(var c:town.people.values()) {
+                                p.setString(1,c.id);p.setString(2,c.place.name());p.setString(3,c.destination.name());
+                                p.setInt(4,c.travelRemaining);p.setString(5,c.activity);
+                                p.setInt(6,c.hunger);p.setInt(7,c.thirst);p.setInt(8,c.fatigue);
+                                p.setInt(9,c.health);p.setInt(10,c.money);p.setInt(11,c.food);
+                                p.setInt(12,c.water);p.setInt(13,c.age);p.setInt(14,c.alive?1:0);
+                                p.setString(15,c.name);p.setString(16,c.occupation);
+                                p.setString(17,c.home.name());p.setString(18,c.workplace.name());
+                                p.setInt(19,c.sociability);p.setInt(20,c.carefulness);
+                                p.setInt(21,c.curiosity);p.setString(22,c.goal);
+                                p.setInt(23,c.scheduleOffset);p.setInt(24,c.generationIndex);
+                                p.setLong(25,c.personalSeed);p.setString(26,c.homeUnit);p.setInt(27,c.unpaidBills);
+                                p.setInt(28,c.employed?1:0);p.setInt(29,c.unemploymentDays);
+                                p.setInt(30,c.sickUntilDay);p.setInt(31,c.lastHiredDay);p.setInt(32,c.jobChanges);
+                                p.addBatch();
+                            }
+                            p.executeBatch();
+                        }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO town_meta(id,together,meeting_since) VALUES(1,?,?)
-            ON CONFLICT(id) DO UPDATE SET together=excluded.together,
-                                          meeting_since=excluded.meeting_since
-            """)) {
-            p.setInt(1,town.together?1:0);p.setLong(2,town.meetingSinceTick);p.executeUpdate();
-        }
+                    INSERT INTO town_meta(id,together,meeting_since) VALUES(1,?,?)
+                    ON CONFLICT(id) DO UPDATE SET together=excluded.together,
+                    meeting_since=excluded.meeting_since
+                    """)) {
+                        p.setInt(1,town.together?1:0);p.setLong(2,town.meetingSinceTick);p.executeUpdate();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO town_events(day,minute,actor_id,place,space_id,text) VALUES(?,?,?,?,?,?)
-            """)) {
-            for(var e:events) {
-                p.setInt(1,e.day());p.setInt(2,e.minute());p.setString(3,e.actorId());
-                p.setString(4,e.place().name());p.setString(5,e.spaceId());
-                p.setString(6,e.text());p.addBatch();
-            }
-            if(!events.isEmpty())p.executeBatch();
-        }
+                    INSERT INTO town_events(day,minute,actor_id,place,space_id,text) VALUES(?,?,?,?,?,?)
+                    """)) {
+                        for(var e:events) {
+                            p.setInt(1,e.day());p.setInt(2,e.minute());p.setString(3,e.actorId());
+                            p.setString(4,e.place().name());p.setString(5,e.spaceId());
+                            p.setString(6,e.text());p.addBatch();
+                        }
+                        if(!events.isEmpty())p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO town_observations(witness_id,day,minute,place,space_id,text) VALUES(?,?,?,?,?,?)
-            """)) {
-            for(var o:observations) {
-                p.setString(1,o.witnessId());p.setInt(2,o.day());p.setInt(3,o.minute());
-                p.setString(4,o.place().name());p.setString(5,o.spaceId());
-                p.setString(6,o.text());p.addBatch();
-            }
-            if(!observations.isEmpty())p.executeBatch();
-        }
+                    INSERT INTO town_observations(witness_id,day,minute,place,space_id,text) VALUES(?,?,?,?,?,?)
+                    """)) {
+                        for(var o:observations) {
+                            p.setString(1,o.witnessId());p.setInt(2,o.day());p.setInt(3,o.minute());
+                            p.setString(4,o.place().name());p.setString(5,o.spaceId());
+                            p.setString(6,o.text());p.addBatch();
+                        }
+                        if(!observations.isEmpty())p.executeBatch();
+                    }
     }
 
     List<TownLife.Event> townEvents(int limit) throws SQLException {
         List<TownLife.Event> entries=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-            SELECT day,minute,actor_id,place,space_id,text FROM town_events ORDER BY id DESC LIMIT ?
-            """)) {
-            p.setInt(1,limit);
-            try(ResultSet r=p.executeQuery()) {
-                while(r.next())entries.add(new TownLife.Event(r.getInt(1),r.getInt(2),
-                        r.getString(3),TownLife.Place.valueOf(r.getString(4)),r.getString(5),r.getString(6)));
-            }
-        }
+                    SELECT day,minute,actor_id,place,space_id,text FROM town_events ORDER BY id DESC LIMIT ?
+                    """)) {
+                        p.setInt(1,limit);
+                        try(ResultSet r=p.executeQuery()) {
+                            while(r.next())entries.add(new TownLife.Event(r.getInt(1),r.getInt(2),
+                                        r.getString(3),TownLife.Place.valueOf(r.getString(4)),r.getString(5),r.getString(6)));
+                        }
+                    }
         Collections.reverse(entries);return entries;
     }
     List<TownLife.Observation> observations(String witnessId,int limit) throws SQLException {
         List<TownLife.Observation> entries=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-            SELECT day,minute,place,space_id,text FROM town_observations
-            WHERE witness_id=? ORDER BY id DESC LIMIT ?
-            """)) {
-            p.setString(1,witnessId);p.setInt(2,limit);
-            try(ResultSet r=p.executeQuery()) {
-                while(r.next())entries.add(new TownLife.Observation(witnessId,r.getInt(1),
-                        r.getInt(2),TownLife.Place.valueOf(r.getString(3)),r.getString(4),r.getString(5)));
-            }
-        }
+                    SELECT day,minute,place,space_id,text FROM town_observations
+                    WHERE witness_id=? ORDER BY id DESC LIMIT ?
+                    """)) {
+                        p.setString(1,witnessId);p.setInt(2,limit);
+                        try(ResultSet r=p.executeQuery()) {
+                            while(r.next())entries.add(new TownLife.Observation(witnessId,r.getInt(1),
+                                        r.getInt(2),TownLife.Place.valueOf(r.getString(3)),r.getString(4),r.getString(5)));
+                        }
+                    }
         Collections.reverse(entries);return entries;
     }
 
 
     private void persistSocial(TownLife.Town town,List<SocialLife.Interaction> interactions) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO town_relationships(first_id,second_id,affinity,trust,tension,encounters,
-                                           conversations,arguments,last_interaction_tick,rng,last_seen_tick,meeting_since_tick,last_attempt_day)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(first_id,second_id) DO UPDATE SET
-                affinity=excluded.affinity,trust=excluded.trust,tension=excluded.tension,
-                encounters=excluded.encounters,conversations=excluded.conversations,
-                arguments=excluded.arguments,last_interaction_tick=excluded.last_interaction_tick,
-                rng=excluded.rng,last_seen_tick=excluded.last_seen_tick,
-                meeting_since_tick=excluded.meeting_since_tick,last_attempt_day=excluded.last_attempt_day
-            """)) {
-            List<SocialLife.Relationship> all=new ArrayList<>();
-            all.add(town.relationship);
-            all.addAll(town.peerRelationships.values());
-            for(var r:all) {
-                p.setString(1,r.firstId);p.setString(2,r.secondId);p.setInt(3,r.affinity);
-                p.setInt(4,r.trust);p.setInt(5,r.tension);p.setInt(6,r.encounters);
-                p.setInt(7,r.conversations);p.setInt(8,r.arguments);p.setLong(9,r.lastInteractionTick);
-                p.setLong(10,r.rng);p.setLong(11,r.lastSeenTick);p.setLong(12,r.meetingSinceTick);
-                p.setInt(13,r.lastAttemptDay);
-                p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO town_relationships(first_id,second_id,affinity,trust,tension,encounters,
+                        conversations,arguments,last_interaction_tick,rng,last_seen_tick,meeting_since_tick,last_attempt_day)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(first_id,second_id) DO UPDATE SET
+                    affinity=excluded.affinity,trust=excluded.trust,tension=excluded.tension,
+                    encounters=excluded.encounters,conversations=excluded.conversations,
+                    arguments=excluded.arguments,last_interaction_tick=excluded.last_interaction_tick,
+                    rng=excluded.rng,last_seen_tick=excluded.last_seen_tick,
+                    meeting_since_tick=excluded.meeting_since_tick,last_attempt_day=excluded.last_attempt_day
+                    """)) {
+                        List<SocialLife.Relationship> all=new ArrayList<>();
+                        all.add(town.relationship);
+                        all.addAll(town.peerRelationships.values());
+                        for(var r:all) {
+                            p.setString(1,r.firstId);p.setString(2,r.secondId);p.setInt(3,r.affinity);
+                            p.setInt(4,r.trust);p.setInt(5,r.tension);p.setInt(6,r.encounters);
+                            p.setInt(7,r.conversations);p.setInt(8,r.arguments);p.setLong(9,r.lastInteractionTick);
+                            p.setLong(10,r.rng);p.setLong(11,r.lastSeenTick);p.setLong(12,r.meetingSinceTick);
+                            p.setInt(13,r.lastAttemptDay);
+                            p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO social_interactions(day,minute,first_id,second_id,place,kind,description)
-            VALUES(?,?,?,?,?,?,?)
-            """)) {
-            for(var i:interactions) {
-                p.setInt(1,i.day());p.setInt(2,i.minute());p.setString(3,i.firstId());
-                p.setString(4,i.secondId());p.setString(5,i.place().name());
-                p.setString(6,i.kind().name());p.setString(7,i.description());p.addBatch();
-            }
-            if(!interactions.isEmpty())p.executeBatch();
-        }
+                    INSERT INTO social_interactions(day,minute,first_id,second_id,place,kind,description)
+                    VALUES(?,?,?,?,?,?,?)
+                    """)) {
+                        for(var i:interactions) {
+                            p.setInt(1,i.day());p.setInt(2,i.minute());p.setString(3,i.firstId());
+                            p.setString(4,i.secondId());p.setString(5,i.place().name());
+                            p.setString(6,i.kind().name());p.setString(7,i.description());p.addBatch();
+                        }
+                        if(!interactions.isEmpty())p.executeBatch();
+                    }
     }
 
     List<SocialLife.Interaction> socialEvents(int limit) throws SQLException {
         List<SocialLife.Interaction> entries=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-                SELECT day,minute,first_id,second_id,place,kind,description
-                FROM social_interactions ORDER BY id DESC LIMIT ?
-                """)) {
-            p.setInt(1,limit);
-            try(ResultSet rs=p.executeQuery()) {
-                while(rs.next())entries.add(new SocialLife.Interaction(rs.getInt(1),rs.getInt(2),
-                        rs.getString(3),rs.getString(4),TownLife.Place.valueOf(rs.getString(5)),
-                        SocialLife.Kind.valueOf(rs.getString(6)),rs.getString(7)));
-            }
-        }
+                    SELECT day,minute,first_id,second_id,place,kind,description
+                    FROM social_interactions ORDER BY id DESC LIMIT ?
+                    """)) {
+                        p.setInt(1,limit);
+                        try(ResultSet rs=p.executeQuery()) {
+                            while(rs.next())entries.add(new SocialLife.Interaction(rs.getInt(1),rs.getInt(2),
+                                        rs.getString(3),rs.getString(4),TownLife.Place.valueOf(rs.getString(5)),
+                                        SocialLife.Kind.valueOf(rs.getString(6)),rs.getString(7)));
+                        }
+                    }
         Collections.reverse(entries);return entries;
     }
 
@@ -890,252 +913,252 @@ final class WorldDatabase implements AutoCloseable {
         // UPSERT retains provenance on restart and lets a later direct witness
         // upgrade a second-hand report to direct observation of the same event.
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO resident_beliefs(resident_id,event_key,event_day,event_minute,
-                actor_id,scene_id,statement,origin,learned_from,learned_day,learned_minute,hops,confidence)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(resident_id,event_key) DO UPDATE SET
-                statement=excluded.statement,actor_id=excluded.actor_id,
-                scene_id=excluded.scene_id,origin=excluded.origin,
-                learned_from=excluded.learned_from,learned_day=excluded.learned_day,learned_minute=excluded.learned_minute,
-                hops=excluded.hops,confidence=excluded.confidence
-            """)) {
-            for(var entries:town.beliefs.values())for(var b:entries.values()) {
-                p.setString(1,b.residentId());p.setString(2,b.eventKey());
-                p.setInt(3,b.eventDay());p.setInt(4,b.eventMinute());
-                p.setString(5,b.actorId());p.setString(6,b.sceneId());
-                p.setString(7,b.statement());p.setString(8,b.origin());
-                p.setString(9,b.learnedFrom());p.setInt(10,b.learnedDay());
-                p.setInt(11,b.learnedMinute());p.setInt(12,b.hops());
-                p.setInt(13,b.confidence());p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO resident_beliefs(resident_id,event_key,event_day,event_minute,
+                        actor_id,scene_id,statement,origin,learned_from,learned_day,learned_minute,hops,confidence)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(resident_id,event_key) DO UPDATE SET
+                    statement=excluded.statement,actor_id=excluded.actor_id,
+                    scene_id=excluded.scene_id,origin=excluded.origin,
+                    learned_from=excluded.learned_from,learned_day=excluded.learned_day,learned_minute=excluded.learned_minute,
+                    hops=excluded.hops,confidence=excluded.confidence
+                    """)) {
+                        for(var entries:town.beliefs.values())for(var b:entries.values()) {
+                            p.setString(1,b.residentId());p.setString(2,b.eventKey());
+                            p.setInt(3,b.eventDay());p.setInt(4,b.eventMinute());
+                            p.setString(5,b.actorId());p.setString(6,b.sceneId());
+                            p.setString(7,b.statement());p.setString(8,b.origin());
+                            p.setString(9,b.learnedFrom());p.setInt(10,b.learnedDay());
+                            p.setInt(11,b.learnedMinute());p.setInt(12,b.hops());
+                            p.setInt(13,b.confidence());p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO information_transfers(day,minute,from_id,to_id,event_key,confidence,hops,statement)
-            VALUES(?,?,?,?,?,?,?,?)
-            """)) {
-            for(var t:town.pendingTransfers) {
-                p.setInt(1,t.day());p.setInt(2,t.minute());
-                p.setString(3,t.fromId());p.setString(4,t.toId());
-                p.setString(5,t.eventKey());p.setInt(6,t.confidence());
-                p.setInt(7,t.hops());p.setString(8,t.statement());p.addBatch();
-            }
-            if(!town.pendingTransfers.isEmpty())p.executeBatch();
-        }
+                    INSERT INTO information_transfers(day,minute,from_id,to_id,event_key,confidence,hops,statement)
+                    VALUES(?,?,?,?,?,?,?,?)
+                    """)) {
+                        for(var t:town.pendingTransfers) {
+                            p.setInt(1,t.day());p.setInt(2,t.minute());
+                            p.setString(3,t.fromId());p.setString(4,t.toId());
+                            p.setString(5,t.eventKey());p.setInt(6,t.confidence());
+                            p.setInt(7,t.hops());p.setString(8,t.statement());p.addBatch();
+                        }
+                        if(!town.pendingTransfers.isEmpty())p.executeBatch();
+                    }
     }
 
     private void persistDeception(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-                INSERT OR IGNORE INTO resident_secrets(keeper_id,event_key,day,minute,reason)
-                VALUES(?,?,?,?,?)
-                """)) {
-            for(var secrets:town.secrets.values())for(var s:secrets.values()) {
-                p.setString(1,s.keeperId());p.setString(2,s.eventKey());
-                p.setInt(3,s.day());p.setInt(4,s.minute());p.setString(5,s.reason());
-                p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT OR IGNORE INTO resident_secrets(keeper_id,event_key,day,minute,reason)
+                    VALUES(?,?,?,?,?)
+                    """)) {
+                        for(var secrets:town.secrets.values())for(var s:secrets.values()) {
+                            p.setString(1,s.keeperId());p.setString(2,s.eventKey());
+                            p.setInt(3,s.day());p.setInt(4,s.minute());p.setString(5,s.reason());
+                            p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-                INSERT INTO deception_decisions(day,minute,from_id,to_id,event_key,kind,statement)
-                VALUES(?,?,?,?,?,?,?)
-                """)) {
-            for(var d:town.pendingDecisions) {
-                p.setInt(1,d.day());p.setInt(2,d.minute());
-                p.setString(3,d.fromId());p.setString(4,d.toId());
-                p.setString(5,d.eventKey());p.setString(6,d.kind());
-                p.setString(7,d.statement());p.addBatch();
-            }
-            if(!town.pendingDecisions.isEmpty())p.executeBatch();
-        }
+                    INSERT INTO deception_decisions(day,minute,from_id,to_id,event_key,kind,statement)
+                    VALUES(?,?,?,?,?,?,?)
+                    """)) {
+                        for(var d:town.pendingDecisions) {
+                            p.setInt(1,d.day());p.setInt(2,d.minute());
+                            p.setString(3,d.fromId());p.setString(4,d.toId());
+                            p.setString(5,d.eventKey());p.setString(6,d.kind());
+                            p.setString(7,d.statement());p.addBatch();
+                        }
+                        if(!town.pendingDecisions.isEmpty())p.executeBatch();
+                    }
     }
 
     List<DeceptionLife.Secret> secrets(String keeperId,int limit) throws SQLException {
         List<DeceptionLife.Secret> result=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-                SELECT * FROM resident_secrets WHERE keeper_id=? ORDER BY day DESC,minute DESC LIMIT ?
-                """)) {
-            p.setString(1,keeperId);p.setInt(2,limit);
-            try(ResultSet rs=p.executeQuery()) { while(rs.next())result.add(new DeceptionLife.Secret(
-                rs.getString("keeper_id"),rs.getString("event_key"),rs.getInt("day"),
-                rs.getInt("minute"),rs.getString("reason"))); }
-        }
+                    SELECT * FROM resident_secrets WHERE keeper_id=? ORDER BY day DESC,minute DESC LIMIT ?
+                    """)) {
+                        p.setString(1,keeperId);p.setInt(2,limit);
+                        try(ResultSet rs=p.executeQuery()) { while(rs.next())result.add(new DeceptionLife.Secret(
+                                    rs.getString("keeper_id"),rs.getString("event_key"),rs.getInt("day"),
+                                    rs.getInt("minute"),rs.getString("reason"))); }
+                    }
         Collections.reverse(result);return result;
     }
 
     List<DeceptionLife.Decision> deceptions(int limit) throws SQLException {
         List<DeceptionLife.Decision> result=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-                SELECT * FROM deception_decisions ORDER BY id DESC LIMIT ?
-                """)) {
-            p.setInt(1,limit);
-            try(ResultSet rs=p.executeQuery()) { while(rs.next())result.add(new DeceptionLife.Decision(
-                rs.getInt("day"),rs.getInt("minute"),rs.getString("from_id"),
-                rs.getString("to_id"),rs.getString("event_key"),rs.getString("kind"),
-                rs.getString("statement"))); }
-        }
+                    SELECT * FROM deception_decisions ORDER BY id DESC LIMIT ?
+                    """)) {
+                        p.setInt(1,limit);
+                        try(ResultSet rs=p.executeQuery()) { while(rs.next())result.add(new DeceptionLife.Decision(
+                                    rs.getInt("day"),rs.getInt("minute"),rs.getString("from_id"),
+                                    rs.getString("to_id"),rs.getString("event_key"),rs.getString("kind"),
+                                    rs.getString("statement"))); }
+                    }
         Collections.reverse(result);return result;
     }
 
     List<KnowledgeLife.Belief> beliefs(String residentId,int limit) throws SQLException {
         List<KnowledgeLife.Belief> result=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-            SELECT * FROM resident_beliefs WHERE resident_id=?
-            ORDER BY learned_day DESC,learned_minute DESC,event_key DESC LIMIT ?
-            """)) {
-            p.setString(1,residentId);p.setInt(2,limit);
-            try(ResultSet rs=p.executeQuery()) {
-                while(rs.next())result.add(new KnowledgeLife.Belief(residentId,
-                        rs.getString("event_key"),rs.getInt("event_day"),
-                        rs.getInt("event_minute"),rs.getString("actor_id"),
-                        rs.getString("scene_id"),rs.getString("statement"),rs.getString("origin"),
-                        rs.getString("learned_from"),rs.getInt("learned_day"),
-                        rs.getInt("learned_minute"),rs.getInt("hops"),rs.getInt("confidence")));
-            }
-        }
+                    SELECT * FROM resident_beliefs WHERE resident_id=?
+                    ORDER BY learned_day DESC,learned_minute DESC,event_key DESC LIMIT ?
+                    """)) {
+                        p.setString(1,residentId);p.setInt(2,limit);
+                        try(ResultSet rs=p.executeQuery()) {
+                            while(rs.next())result.add(new KnowledgeLife.Belief(residentId,
+                                        rs.getString("event_key"),rs.getInt("event_day"),
+                                        rs.getInt("event_minute"),rs.getString("actor_id"),
+                                        rs.getString("scene_id"),rs.getString("statement"),rs.getString("origin"),
+                                        rs.getString("learned_from"),rs.getInt("learned_day"),
+                                        rs.getInt("learned_minute"),rs.getInt("hops"),rs.getInt("confidence")));
+                        }
+                    }
         Collections.reverse(result);return result;
     }
 
     List<KnowledgeLife.Transfer> informationTransfers(int limit) throws SQLException {
         List<KnowledgeLife.Transfer> result=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-            SELECT * FROM information_transfers ORDER BY id DESC LIMIT ?
-            """)) {
-            p.setInt(1,limit);
-            try(ResultSet rs=p.executeQuery()) {
-                while(rs.next())result.add(new KnowledgeLife.Transfer(rs.getInt("day"),
-                        rs.getInt("minute"),rs.getString("from_id"),rs.getString("to_id"),
-                        rs.getString("event_key"),rs.getInt("confidence"),rs.getInt("hops"),
-                        rs.getString("statement")));
-            }
-        }
+                    SELECT * FROM information_transfers ORDER BY id DESC LIMIT ?
+                    """)) {
+                        p.setInt(1,limit);
+                        try(ResultSet rs=p.executeQuery()) {
+                            while(rs.next())result.add(new KnowledgeLife.Transfer(rs.getInt("day"),
+                                        rs.getInt("minute"),rs.getString("from_id"),rs.getString("to_id"),
+                                        rs.getString("event_key"),rs.getInt("confidence"),rs.getInt("hops"),
+                                        rs.getString("statement")));
+                        }
+                    }
         Collections.reverse(result);return result;
     }
 
     private void persistInvestigations(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved,fabric_color,motive_code,motive_strength,physical_item_id,returned)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET inspected=excluded.inspected,solved=excluded.solved,
-                                         fabric_color=excluded.fabric_color,
-                                         motive_code=excluded.motive_code,motive_strength=excluded.motive_strength,
-                                         physical_item_id=excluded.physical_item_id,
-                                         returned=excluded.returned
-            """)) {
-            for(var c:town.cases.values()) {
-                p.setString(1,c.id);p.setInt(2,c.day);p.setInt(3,c.minute);
-                p.setString(4,c.place.name());p.setString(5,c.victimId);p.setString(6,c.offenderId);
-                p.setString(7,c.item);p.setInt(8,c.amount);
-                p.setInt(9,c.inspected?1:0);p.setInt(10,c.solved?1:0);
-                p.setString(11,c.fabricColor);p.setString(12,c.motiveCode);
-                if(c.motiveCode==null)p.setNull(13,java.sql.Types.INTEGER);
-                else p.setInt(13,c.motiveStrength);
-                p.setString(14,c.physicalItemId);p.setInt(15,c.returned?1:0);
-                p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO investigation_cases(id,day,minute,place,victim_id,offender_id,item,amount,inspected,solved,fabric_color,motive_code,motive_strength,physical_item_id,returned)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(id) DO UPDATE SET inspected=excluded.inspected,solved=excluded.solved,
+                    fabric_color=excluded.fabric_color,
+                    motive_code=excluded.motive_code,motive_strength=excluded.motive_strength,
+                    physical_item_id=excluded.physical_item_id,
+                    returned=excluded.returned
+                    """)) {
+                        for(var c:town.cases.values()) {
+                            p.setString(1,c.id);p.setInt(2,c.day);p.setInt(3,c.minute);
+                            p.setString(4,c.place.name());p.setString(5,c.victimId);p.setString(6,c.offenderId);
+                            p.setString(7,c.item);p.setInt(8,c.amount);
+                            p.setInt(9,c.inspected?1:0);p.setInt(10,c.solved?1:0);
+                            p.setString(11,c.fabricColor);p.setString(12,c.motiveCode);
+                            if(c.motiveCode==null)p.setNull(13,java.sql.Types.INTEGER);
+                            else p.setInt(13,c.motiveStrength);
+                            p.setString(14,c.physicalItemId);p.setInt(15,c.returned?1:0);
+                            p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT OR IGNORE INTO investigation_backgrounds(case_id,resident_id,financial,conflict,impulse)
-            VALUES(?,?,?,?,?)
-            """)) {
-            for(var c:town.cases.values())for(var entry:c.incidentProfiles.entrySet()) {
-                p.setString(1,c.id);p.setString(2,entry.getKey());
-                var v=entry.getValue();p.setInt(3,v.financial());p.setInt(4,v.conflict());
-                p.setInt(5,v.impulse());p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT OR IGNORE INTO investigation_backgrounds(case_id,resident_id,financial,conflict,impulse)
+                    VALUES(?,?,?,?,?)
+                    """)) {
+                        for(var c:town.cases.values())for(var entry:c.incidentProfiles.entrySet()) {
+                            p.setString(1,c.id);p.setString(2,entry.getKey());
+                            var v=entry.getValue();p.setInt(3,v.financial());p.setInt(4,v.conflict());
+                            p.setInt(5,v.impulse());p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT OR IGNORE INTO investigation_witnesses(case_id,resident_id) VALUES(?,?)
-            """)) {
-            for(var c:town.cases.values())for(var witness:c.witnesses) {
-                p.setString(1,c.id);p.setString(2,witness);p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT OR IGNORE INTO investigation_witnesses(case_id,resident_id) VALUES(?,?)
+                    """)) {
+                        for(var c:town.cases.values())for(var witness:c.witnesses) {
+                            p.setString(1,c.id);p.setString(2,witness);p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO investigation_interviews(case_id,resident_id,statement) VALUES(?,?,?)
-            ON CONFLICT(case_id,resident_id) DO UPDATE SET statement=excluded.statement
-            """)) {
-            for(var c:town.cases.values())for(var entry:c.interviews.entrySet()) {
-                p.setString(1,c.id);p.setString(2,entry.getKey());
-                p.setString(3,entry.getValue());p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO investigation_interviews(case_id,resident_id,statement) VALUES(?,?,?)
+                    ON CONFLICT(case_id,resident_id) DO UPDATE SET statement=excluded.statement
+                    """)) {
+                        for(var c:town.cases.values())for(var entry:c.interviews.entrySet()) {
+                            p.setString(1,c.id);p.setString(2,entry.getKey());
+                            p.setString(3,entry.getValue());p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT OR IGNORE INTO investigation_positions(case_id,resident_id,space_id) VALUES(?,?,?)
-            """)) {
-            for(var c:town.cases.values())for(var entry:c.incidentSpaces.entrySet()) {
-                p.setString(1,c.id);p.setString(2,entry.getKey());p.setString(3,entry.getValue());p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT OR IGNORE INTO investigation_positions(case_id,resident_id,space_id) VALUES(?,?,?)
+                    """)) {
+                        for(var c:town.cases.values())for(var entry:c.incidentSpaces.entrySet()) {
+                            p.setString(1,c.id);p.setString(2,entry.getKey());p.setString(3,entry.getValue());p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO investigation_alibis(case_id,resident_id,result) VALUES(?,?,?)
-            ON CONFLICT(case_id,resident_id) DO UPDATE SET result=excluded.result
-            """)) {
-            for(var c:town.cases.values())for(var entry:c.alibiChecks.entrySet()) {
-                p.setString(1,c.id);p.setString(2,entry.getKey());p.setString(3,entry.getValue());p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO investigation_alibis(case_id,resident_id,result) VALUES(?,?,?)
+                    ON CONFLICT(case_id,resident_id) DO UPDATE SET result=excluded.result
+                    """)) {
+                        for(var c:town.cases.values())for(var entry:c.alibiChecks.entrySet()) {
+                            p.setString(1,c.id);p.setString(2,entry.getKey());p.setString(3,entry.getValue());p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
     }
 
     private void persistSearches(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO investigation_searches(case_id,resident_id,result) VALUES(?,?,?)
-            ON CONFLICT(case_id,resident_id) DO UPDATE SET result=excluded.result
-            """)) {
-            for(var c:town.cases.values())for(var entry:c.searches.entrySet()) {
-                p.setString(1,c.id);p.setString(2,entry.getKey());
-                p.setString(3,entry.getValue());p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO investigation_searches(case_id,resident_id,result) VALUES(?,?,?)
+                    ON CONFLICT(case_id,resident_id) DO UPDATE SET result=excluded.result
+                    """)) {
+                        for(var c:town.cases.values())for(var entry:c.searches.entrySet()) {
+                            p.setString(1,c.id);p.setString(2,entry.getKey());
+                            p.setString(3,entry.getValue());p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
     }
 
     private void persistEconomy(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO economy_loans(id,lender_id,borrower_id,original,outstanding,start_day,due_day,status)
-            VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
-                outstanding=excluded.outstanding,status=excluded.status
-            """)) {
-            for(var loan:town.loans.values()) {
-                p.setString(1,loan.id);p.setString(2,loan.lenderId);p.setString(3,loan.borrowerId);
-                p.setInt(4,loan.original);p.setInt(5,loan.outstanding);
-                p.setInt(6,loan.day);p.setInt(7,loan.dueDay);p.setString(8,loan.status.name());p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO economy_loans(id,lender_id,borrower_id,original,outstanding,start_day,due_day,status)
+                    VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                    outstanding=excluded.outstanding,status=excluded.status
+                    """)) {
+                        for(var loan:town.loans.values()) {
+                            p.setString(1,loan.id);p.setString(2,loan.lenderId);p.setString(3,loan.borrowerId);
+                            p.setInt(4,loan.original);p.setInt(5,loan.outstanding);
+                            p.setInt(6,loan.day);p.setInt(7,loan.dueDay);p.setString(8,loan.status.name());p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO economy_ledger(day,minute,kind,from_id,to_id,loan_id,amount,detail)
-            VALUES(?,?,?,?,?,?,?,?)
-            """)) {
-            for(var entry:town.pendingEconomy) {
-                p.setInt(1,entry.day());p.setInt(2,entry.minute());p.setString(3,entry.kind().name());
-                p.setString(4,entry.fromId());p.setString(5,entry.toId());
-                p.setString(6,entry.loanId());p.setInt(7,entry.amount());
-                p.setString(8,entry.detail());p.addBatch();
-            }
-            if(!town.pendingEconomy.isEmpty())p.executeBatch();
-        }
+                    INSERT INTO economy_ledger(day,minute,kind,from_id,to_id,loan_id,amount,detail)
+                    VALUES(?,?,?,?,?,?,?,?)
+                    """)) {
+                        for(var entry:town.pendingEconomy) {
+                            p.setInt(1,entry.day());p.setInt(2,entry.minute());p.setString(3,entry.kind().name());
+                            p.setString(4,entry.fromId());p.setString(5,entry.toId());
+                            p.setString(6,entry.loanId());p.setInt(7,entry.amount());
+                            p.setString(8,entry.detail());p.addBatch();
+                        }
+                        if(!town.pendingEconomy.isEmpty())p.executeBatch();
+                    }
     }
 
     List<EconomyLife.Entry> economyLedger(String residentId,int limit) throws SQLException {
         List<EconomyLife.Entry> result=new ArrayList<>();
         String sql=residentId==null
-                ?"SELECT day,minute,kind,from_id,to_id,loan_id,amount,detail FROM economy_ledger ORDER BY id DESC LIMIT ?"
-                :"SELECT day,minute,kind,from_id,to_id,loan_id,amount,detail FROM economy_ledger WHERE from_id=? OR to_id=? ORDER BY id DESC LIMIT ?";
+            ?"SELECT day,minute,kind,from_id,to_id,loan_id,amount,detail FROM economy_ledger ORDER BY id DESC LIMIT ?"
+            :"SELECT day,minute,kind,from_id,to_id,loan_id,amount,detail FROM economy_ledger WHERE from_id=? OR to_id=? ORDER BY id DESC LIMIT ?";
         try(PreparedStatement p=db.prepareStatement(sql)) {
             int i=1;
             if(residentId!=null){p.setString(i++,residentId);p.setString(i++,residentId);}
             p.setInt(i,limit);
             try(ResultSet rs=p.executeQuery()){
                 while(rs.next())result.add(new EconomyLife.Entry(rs.getInt(1),rs.getInt(2),
-                        EconomyLife.Kind.valueOf(rs.getString(3)),rs.getString(4),rs.getString(5),
-                        rs.getString(6),rs.getInt(7),rs.getString(8)));
+                            EconomyLife.Kind.valueOf(rs.getString(3)),rs.getString(4),rs.getString(5),
+                            rs.getString(6),rs.getInt(7),rs.getString(8)));
             }
         }
         Collections.reverse(result);return result;
@@ -1144,28 +1167,28 @@ final class WorldDatabase implements AutoCloseable {
 
     private void persistLifeChanges(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO resident_life_changes(day,minute,resident_id,kind,detail) VALUES(?,?,?,?,?)
-            """)) {
-            for(var e:town.pendingLifeEvents) {
-                p.setInt(1,e.day());p.setInt(2,e.minute());p.setString(3,e.residentId());
-                p.setString(4,e.kind().name());p.setString(5,e.detail());p.addBatch();
-            }
-            if(!town.pendingLifeEvents.isEmpty())p.executeBatch();
-        }
+                    INSERT INTO resident_life_changes(day,minute,resident_id,kind,detail) VALUES(?,?,?,?,?)
+                    """)) {
+                        for(var e:town.pendingLifeEvents) {
+                            p.setInt(1,e.day());p.setInt(2,e.minute());p.setString(3,e.residentId());
+                            p.setString(4,e.kind().name());p.setString(5,e.detail());p.addBatch();
+                        }
+                        if(!town.pendingLifeEvents.isEmpty())p.executeBatch();
+                    }
     }
 
     List<EmploymentLife.Event> residentLifeEvents(String residentId,int limit) throws SQLException {
         List<EmploymentLife.Event> result=new ArrayList<>();
         String sql=residentId==null
-                ? "SELECT day,minute,resident_id,kind,detail FROM resident_life_changes ORDER BY id DESC LIMIT ?"
-                : "SELECT day,minute,resident_id,kind,detail FROM resident_life_changes WHERE resident_id=? ORDER BY id DESC LIMIT ?";
+            ? "SELECT day,minute,resident_id,kind,detail FROM resident_life_changes ORDER BY id DESC LIMIT ?"
+            : "SELECT day,minute,resident_id,kind,detail FROM resident_life_changes WHERE resident_id=? ORDER BY id DESC LIMIT ?";
         try(PreparedStatement p=db.prepareStatement(sql)) {
             int i=1;
             if(residentId!=null)p.setString(i++,residentId);
             p.setInt(i,limit);
             try(ResultSet rs=p.executeQuery()) {
                 while(rs.next())result.add(new EmploymentLife.Event(rs.getInt(1),rs.getInt(2),rs.getString(3),
-                        EmploymentLife.Kind.valueOf(rs.getString(4)),rs.getString(5)));
+                            EmploymentLife.Kind.valueOf(rs.getString(4)),rs.getString(5)));
             }
         }
         Collections.reverse(result);return result;
@@ -1173,49 +1196,49 @@ final class WorldDatabase implements AutoCloseable {
 
     private void persistProperty(TownLife.Town town) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO property_items(id,type,owner_id,holder_id,stored_space,stolen,value,created_day)
-            VALUES(?,?,?,?,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET
-                owner_id=excluded.owner_id,holder_id=excluded.holder_id,
-                stored_space=excluded.stored_space,stolen=excluded.stolen
-            """)) {
-            for(var item:town.items.values()) {
-                p.setString(1,item.id);p.setString(2,item.type.name());
-                p.setString(3,item.ownerId);p.setString(4,item.holderId);
-                p.setString(5,item.storedSpace);p.setInt(6,item.stolen?1:0);
-                p.setInt(7,item.value);p.setInt(8,item.createdDay);p.addBatch();
-            }
-            p.executeBatch();
-        }
+                    INSERT INTO property_items(id,type,owner_id,holder_id,stored_space,stolen,value,created_day)
+                    VALUES(?,?,?,?,?,?,?,?)
+                    ON CONFLICT(id) DO UPDATE SET
+                    owner_id=excluded.owner_id,holder_id=excluded.holder_id,
+                    stored_space=excluded.stored_space,stolen=excluded.stolen
+                    """)) {
+                        for(var item:town.items.values()) {
+                            p.setString(1,item.id);p.setString(2,item.type.name());
+                            p.setString(3,item.ownerId);p.setString(4,item.holderId);
+                            p.setString(5,item.storedSpace);p.setInt(6,item.stolen?1:0);
+                            p.setInt(7,item.value);p.setInt(8,item.createdDay);p.addBatch();
+                        }
+                        p.executeBatch();
+                    }
         try(PreparedStatement p=db.prepareStatement("""
-            INSERT INTO property_changes(day,minute,action,item_id,from_id,to_id,details)
-            VALUES(?,?,?,?,?,?,?)
-            """)) {
-            for(var change:town.pendingProperty) {
-                p.setInt(1,change.day());p.setInt(2,change.minute());
-                p.setString(3,change.action().name());p.setString(4,change.itemId());
-                p.setString(5,change.fromId());p.setString(6,change.toId());
-                p.setString(7,change.details());p.addBatch();
-            }
-            if(!town.pendingProperty.isEmpty())p.executeBatch();
-        }
+                    INSERT INTO property_changes(day,minute,action,item_id,from_id,to_id,details)
+                    VALUES(?,?,?,?,?,?,?)
+                    """)) {
+                        for(var change:town.pendingProperty) {
+                            p.setInt(1,change.day());p.setInt(2,change.minute());
+                            p.setString(3,change.action().name());p.setString(4,change.itemId());
+                            p.setString(5,change.fromId());p.setString(6,change.toId());
+                            p.setString(7,change.details());p.addBatch();
+                        }
+                        if(!town.pendingProperty.isEmpty())p.executeBatch();
+                    }
     }
 
     List<PropertyLife.Change> propertyChanges(int limit) throws SQLException {
         List<PropertyLife.Change> result=new ArrayList<>();
         try(PreparedStatement p=db.prepareStatement("""
-                SELECT day,minute,action,item_id,from_id,to_id,details
-                FROM property_changes ORDER BY id DESC LIMIT ?
-                """)) {
-            p.setInt(1,limit);
-            try(ResultSet rs=p.executeQuery()) {
-                while(rs.next())result.add(new PropertyLife.Change(
-                        rs.getInt(1),rs.getInt(2),PropertyLife.Action.valueOf(rs.getString(3)),
-                        rs.getString(4),rs.getString(5),rs.getString(6),rs.getString(7)));
-            }
-        }
+                    SELECT day,minute,action,item_id,from_id,to_id,details
+                    FROM property_changes ORDER BY id DESC LIMIT ?
+                    """)) {
+                        p.setInt(1,limit);
+                        try(ResultSet rs=p.executeQuery()) {
+                            while(rs.next())result.add(new PropertyLife.Change(
+                                        rs.getInt(1),rs.getInt(2),PropertyLife.Action.valueOf(rs.getString(3)),
+                                        rs.getString(4),rs.getString(5),rs.getString(6),rs.getString(7)));
+                        }
+                    }
         Collections.reverse(result);return result;
     }
 
     @Override public void close() throws SQLException {db.close();}
-}
+    }

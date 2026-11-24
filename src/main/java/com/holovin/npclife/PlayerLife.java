@@ -17,11 +17,19 @@ final class PlayerLife {
         TownLife.Place destination=TownLife.Place.PARK;
         int travelRemaining;
         String privateName; // Never passed to NPCs automatically.
+        int hunger = 0;
+        int thirst = 0;
+        int fatigue = 0;
+        int health = 100;
         final Map<String,Contact> contacts=new LinkedHashMap<>();
         Player copy() {
             Player p=new Player();
             p.place=place;p.destination=destination;p.travelRemaining=travelRemaining;
             p.privateName=privateName;
+            p.hunger=hunger;
+            p.thirst=thirst;
+            p.fatigue=fatigue;
+            p.health=health;
             for(var e:contacts.entrySet())p.contacts.put(e.getKey(),e.getValue().copy());
             return p;
         }
