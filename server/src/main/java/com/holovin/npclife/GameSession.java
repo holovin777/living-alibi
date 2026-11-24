@@ -57,6 +57,10 @@ public final class GameSession implements AutoCloseable {
     public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
     public record ServicesView(int pumpCondition,boolean fountainWorking,int cleanWater,
                                int cleanWaterCapacity,int lightingCondition,boolean lightsWorking) { }
+    public record IndustryView(int ironRemaining,int copperRemaining,int oreAtQuarry,
+                               int oreAtFactory,int factorySteel,int factoryCopper,
+                               int factoryParts,int workshopSteel,int workshopCopper,
+                               int workshopParts,int minersAtWork,int factoryWorkersAtWork) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources,ServicesView services) { }
@@ -84,6 +88,15 @@ public final class GameSession implements AutoCloseable {
         var u=UtilityLife.status(town);
         return new ServicesView(u.pumpCondition(),u.fountainWorking(),u.cleanWater(),
                 u.cleanWaterCapacity(),u.lightingCondition(),u.lightsWorking());
+    }
+
+    /** Public inventories of the local mining and manufacturing enterprises. */
+    public synchronized IndustryView industry() {
+        var r=IndustryLife.report(town);
+        return new IndustryView(r.ironRemaining(),r.copperRemaining(),r.oreAtQuarry(),
+                r.oreAtFactory(),r.factorySteel(),r.factoryCopper(),r.factoryParts(),
+                r.workshopSteel(),r.workshopCopper(),r.workshopParts(),
+                r.minersAtWork(),r.factoryWorkersAtWork());
     }
 
     /** Travel is visible to the client, but distance and time remain Java-owned. */
