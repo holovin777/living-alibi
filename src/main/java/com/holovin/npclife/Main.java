@@ -44,11 +44,26 @@ public final class Main {
                     if(lower.equals("me")||lower.equals("whereami")) {
                         System.out.println("You | "+PlayerLife.position(town.player)+
                                 " | private name: "+(town.player.privateName==null?"not set":town.player.privateName));
+                        System.out.println(PlayerLife.condition(town.player));
                         System.out.println("Your name is NOT automatically known by any resident. Investigations are optional.");
                         continue;
                     }
+                    if(lower.equals("needs")) {
+                        System.out.println(PlayerLife.condition(town.player));
+                        continue;
+                    }
+                    if(lower.equals("rest")||lower.startsWith("rest ")) {
+                        int minutes=lower.equals("rest")?60:Integer.parseInt(arg(input));
+                        var candidate=town.copy();
+                        int recovered=PlayerLife.rest(candidate.player,minutes);
+                        advanceAndSave(db,state,candidate,minutes);
+                        town.copyFrom(candidate);
+                        System.out.println("You rested for "+minutes+" game minutes (up to "+
+                                recovered+" fatigue recovered). "+PlayerLife.condition(town.player));
+                        continue;
+                    }
                     if(lower.equals("explore")) {
-                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias]");
+                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias] | needs | rest [minutes]");
                         System.out.println("You can simply wander, wait, and meet people. No cases or missions are required.");
                         continue;
                     }
@@ -682,9 +697,10 @@ public final class Main {
     private static void help() {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
-        System.out.println(" explore | me | locations | look | go <place> — move freely as an anonymous visitor");
+        System.out.println(" explore | me | needs | locations | look | go <place> — visitor presence and condition");
         System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
         System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
+        System.out.println(" rest [minutes]        — pause for 15–240 game minutes (default: 60)");
         System.out.println(" town | population [count] | population generate 12 | resident resident-0001");
         System.out.println(" home <id>             — inspect a resident's private home unit (developer view)");
         System.out.println(" where <id> | known <id> [count] | town-events [count]");
