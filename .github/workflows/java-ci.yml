@@ -194,6 +194,11 @@ jobs:
           grep -q '"season":"SPRING"' target/api-smoke/world.json
           grep -q '"weather":' target/api-smoke/world.json
           grep -q '"temperatureC":' target/api-smoke/world.json
+          grep -q '"placeId":"PARK"' target/api-smoke/world.json
+          curl -fsS http://127.0.0.1:18080/api/v1/locations \
+            -o target/api-smoke/locations.json
+          grep -q '"travelMinutes":10' target/api-smoke/locations.json
+          grep -q '"id":"MARKET"' target/api-smoke/locations.json
           curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/go \
             -H 'Content-Type: application/json' \
             -d '{"destination":"river"}' \
@@ -218,4 +223,15 @@ jobs:
             -H 'Content-Type: application/json' \
             -d '{}' > target/api-smoke/work.json
           grep -q '"money":74' target/api-smoke/work.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/go \
+            -H 'Content-Type: application/json' \
+            -d '{"destination":"school"}' \
+            -o target/api-smoke/school.json
+          grep -q '"placeId":"SCHOOL"' target/api-smoke/school.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/study \
+            -H 'Content-Type: application/json' \
+            -d '{"subject":"engineering"}' \
+            -o target/api-smoke/study.json
+          grep -q '"engineeringSkill":1' target/api-smoke/study.json
+          grep -q '"money":64' target/api-smoke/study.json
           test -f target/api-smoke/world.db
