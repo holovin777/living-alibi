@@ -347,6 +347,7 @@ func _render_destinations() -> void:
         var minutes := int(place.get("travelMinutes", 0))
         var caption := "%s (%sm)" % [str(place.get("label", id)), str(minutes)]
         var choice := _button(caption, _travel_to.bind(id))
+        choice.set_meta("destination", id)
         choice.disabled = id == _current_place or _api.is_busy()
         _travel_choices.add_child(choice)
 
