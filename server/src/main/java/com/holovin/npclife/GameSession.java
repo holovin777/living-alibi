@@ -48,6 +48,9 @@ public final class GameSession implements AutoCloseable {
                              int money,String jobId,int engineeringSkill,int investigationSkill) { }
     public record JobView(String id,String title,String workplace,String subject,
                           int requiredSkill,int wage,int remainingPayroll) { }
+    public record WorkOrderView(String id,String title,String jobId,String place,
+                                String phase,int condition,int completedDay,
+                                String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
     public record ResidentView(String id,String name,String activity) { }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
@@ -79,6 +82,25 @@ public final class GameSession implements AutoCloseable {
         return PlayerLife.publicPlaces().stream()
                 .map(place->new DestinationView(place.name(),place.label,
                         PlayerLife.travelMinutes(town.player,place))).toList();
+    }
+
+    public synchronized List<WorkOrderView> workOrders() {
+        return TechnicalWorkLife.orders(town).stream()
+                .map(o->new WorkOrderView(o.id,o.title,o.jobId,o.place.name(),
+                        o.phase.name(),o.condition,o.completedDay,
+                        o.materialA,o.requiredA,o.materialB,o.requiredB)).toList();
+    }
+
+    public synchronized ActionView diagnose(String id) throws SQLException {
+        var candidate=town.copy();
+        String message=TechnicalWorkLife.inspect(candidate,id,state.minute);
+        return apply(candidate,TechnicalWorkLife.INSPECTION_MINUTES,message);
+    }
+
+    public synchronized ActionView repair(String id) throws SQLException {
+        var candidate=town.copy();
+        String message=TechnicalWorkLife.complete(candidate,id,state.day,state.minute);
+        return apply(candidate,TechnicalWorkLife.COMPLETION_MINUTES,message);
     }
 
     public synchronized List<JobView> jobs() {
