@@ -148,15 +148,19 @@ final class IndustryLife {
                 .count();
     }
 
-    /** NPC hourly pay and visitor wages draw from the SAME enterprise purse. */
-    static boolean payHourly(TownLife.Town town,TownLife.Citizen worker,
-                             WorldState clock,List<TownLife.Event> events,
-                             List<TownLife.Observation> observations) {
-        String employer=switch(worker.occupation) {
+    static String companyFor(String occupation) {
+        return switch(occupation) {
             case "Miner", "Transport driver" -> "miner";
             case "Factory machinist" -> "machinist";
             default -> null;
         };
+    }
+
+    /** NPC hourly pay and visitor wages draw from the SAME enterprise purse. */
+    static boolean payHourly(TownLife.Town town,TownLife.Citizen worker,
+                             WorldState clock,List<TownLife.Event> events,
+                             List<TownLife.Observation> observations) {
+        String employer=companyFor(worker.occupation);
         if(employer==null)return false;
         int balance=town.employerFunds.getOrDefault(employer,0);
         if(balance<HOURLY_WAGE)return true; // Industrial wage unpaid; no magic cash.
