@@ -83,6 +83,11 @@ public class GameController {
         return session.study(request.subject());
     }
 
+    @PostMapping("/actions/prospect")
+    public GameSession.ActionView prospect() throws SQLException {
+        return session.prospect();
+    }
+
     @PostMapping("/actions/work")
     public GameSession.ActionView work() throws SQLException {
         return session.work();
