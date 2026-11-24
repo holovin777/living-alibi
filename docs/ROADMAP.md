@@ -120,7 +120,9 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Details: [Player Daily Life](PLAYER_DAILY_LIFE.md).
 - Early natural-resource slice: finite river/puddle water and wild berries, local
   harvesting and saved depletion ([Natural Resources](NATURAL_RESOURCES.md)).
-  Shared NPC extraction, wildlife, shelter and enterprises remain future work.
+  Industrial NPC extraction and basic factories now exist
+  ([Industry](INDUSTRY.md)); wildlife, shelter, and advanced enterprises
+  with real energy, contracts and supply pricing remain future work.
 
 ### Player freedom: jobs, education and careers (v1.16 draft)
 
@@ -138,7 +140,10 @@ The eventual game is an emergent detective simulation. The player investigates e
   paid technical shift. The park water pump and public street lighting have
   persistent condition, shared finite component stocks, daily wear and
   archived completion state. Repeated work will eventually need new
-  material supply chains. See [Technical Work](TECHNICAL_WORK.md).
+  material supply chains. A first staffed quarry → factory → repair
+  warehouse supply chain now delivers finite metal and spare parts, but
+  import/recycling after deposit exhaustion is future work. See
+  [Technical Work](TECHNICAL_WORK.md) and [Industry](INDUSTRY.md).
 - Shared city water and lighting now alter both NPC well-being and **NPC choices**:
   the park's finite public fountain gives thirsty residents a cheaper
   destination than the market, while poor street lights send some evening
@@ -147,6 +152,24 @@ The eventual game is an emergent detective simulation. The player investigates e
 - A successor visitor never inherits an old career, money or qualifications.
 - Spring API adds job listings and matching voluntary player actions.
 - See [Player Careers](PLAYER_CAREERS.md).
+
+### Finite industry and material supply (v1.16 draft)
+
+- A first-run town has miners and factory machinists among 12 procedural
+  residents. They commute, work, earn NPC wages and can stop producing due
+  to illness, unemployment, death, weekends or absent resources.
+- Quarry has finite underground iron and copper deposits. NPCs mine real
+  quantities, transport ore to a factory, refine steel and copper, produce
+  spare parts, and deliver bounded batches to the existing city maintenance
+  stock. Each stage requires a working NPC at its real workplace.
+- All industrial inventories and daily processing markers persist in SQLite;
+  no repeated loading creates additional minerals or duplicate shipments.
+  Spring exposes `GET /api/v1/industry`, the console has `industry`,
+  and Godot offers a public industrial dashboard and Quarry/Factory districts.
+- Worker wages are not yet tied to production revenue. Player-owned mining,
+  logistics, recycling, factory accounts, actual truck transport, and
+  chemical or energy consumption remain future work.
+  See [Industry](INDUSTRY.md).
 
 ### New world calendar and Godot API bridge (v1.16 draft)
 
