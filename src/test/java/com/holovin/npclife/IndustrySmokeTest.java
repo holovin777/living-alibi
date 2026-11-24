@@ -25,7 +25,9 @@ public final class IndustrySmokeTest {
         var miner=generated.stream().filter(c->c.occupation.equals("Miner")).findFirst().orElseThrow();
         var factory=generated.stream().filter(c->c.occupation.equals("Factory machinist"))
                 .findFirst().orElseThrow();
-        for(var worker:new TownLife.Citizen[]{miner,factory}) {
+        var driver=generated.stream().filter(c->c.occupation.equals("Transport driver"))
+                .findFirst().orElseThrow();
+        for(var worker:new TownLife.Citizen[]{miner,factory,driver}) {
             worker.place=worker.workplace;
             worker.destination=worker.workplace;
             worker.travelRemaining=0;
@@ -60,8 +62,17 @@ public final class IndustrySmokeTest {
         world.minute=IndustryLife.TRANSPORT_MINUTE;
         IndustryLife.tick(town,world,events,seen);
         check(IndustryLife.report(town).oreAtQuarry()==0 &&
+                        IndustryLife.report(town).oreOnTruck()==3 &&
+                        IndustryLife.report(town).oreAtFactory()==0,
+                "driver loads finite cargo into truck without instant arrival");
+        IndustryLife.tick(town,world,events,seen);
+        check(IndustryLife.report(town).oreOnTruck()==3,
+                "same departure minute does not load a second truck");
+        world.minute=IndustryLife.ARRIVE_MINUTE;
+        IndustryLife.tick(town,world,events,seen);
+        check(IndustryLife.report(town).oreOnTruck()==0 &&
                         IndustryLife.report(town).oreAtFactory()==3,
-                "transport moves actual cargo without duplication");
+                "freight needs a separate thirty-minute arrival event");
         world.minute=IndustryLife.REFINE_MINUTE;
         IndustryLife.tick(town,world,events,seen);
         check(IndustryLife.report(town).oreAtFactory()==0 &&
@@ -82,6 +93,10 @@ public final class IndustrySmokeTest {
         check(report.workshopParts()==8 && report.workshopSteel()==5 &&
                         report.workshopCopper()==4,
                 "existing technical repair materials receive actual deliveries");
+        check(town.employerFunds.get("miner")==369 &&
+                        town.employerFunds.get("machinist")==570 &&
+                        town.employerFunds.get("city-maintenance")==481,
+                "factory pays quarry for ore and city pays factory for delivered stock");
         IndustryLife.tick(town,world,events,seen);
         check(IndustryLife.report(town).workshopParts()==8,
                 "same-day transport or delivery cannot be repeated for free");
@@ -115,6 +130,48 @@ public final class IndustrySmokeTest {
         check(depleted.industryStocks.get("seam:iron-ore")==0 &&
                         depleted.industryStocks.get("seam:copper-ore")==0,
                 "finite mineral seams stay exhausted");
+
+        var noDriver=town.copy();
+        noDriver.get(driver.id).employed=false;
+        noDriver.industryStocks.put("quarry:iron-ore",2);
+        noDriver.lastIndustryTransportDay=2;
+        world.day=3;world.minute=IndustryLife.TRANSPORT_MINUTE;
+        IndustryLife.tick(noDriver,world,new ArrayList<>(),new ArrayList<>());
+        check(noDriver.industryStocks.get("quarry:iron-ore")==2 &&
+                        noDriver.industryStocks.get("truck:iron-ore")==0,
+                "a cargo truck will not depart without an employed driver");
+
+        var scrap=town.copy();
+        world.minute=IndustryLife.RECYCLE_MINUTE;
+        int steelBefore=scrap.industryStocks.get("factory:steel");
+        IndustryLife.tick(scrap,world,new ArrayList<>(),new ArrayList<>());
+        check(scrap.industryStocks.get("factory:scrap-metal")==8 &&
+                        scrap.industryStocks.get("factory:steel")==steelBefore+1,
+                "two historical waste units produce just one recyclable steel unit");
+        IndustryLife.tick(scrap,world,new ArrayList<>(),new ArrayList<>());
+        check(scrap.industryStocks.get("factory:scrap-metal")==8,
+                "recycling cannot be repeated on the same date");
+
+        var survey=town.copy();
+        survey.industryStocks.put("seam:iron-ore",0);
+        survey.industryStocks.put("seam:copper-ore",0);
+        survey.player.place=TownLife.Place.QUARRY;
+        survey.player.destination=TownLife.Place.QUARRY;
+        survey.player.jobId="miner";
+        int surveyBudget=survey.employerFunds.get("miner");
+        String discovered=IndustryLife.prospectPlayer(survey,600);
+        check(discovered.contains("Western") &&
+                        survey.industryStocks.get("survey:west-discovered")==1 &&
+                        survey.employerFunds.get("miner")==surveyBudget-30 &&
+                        survey.employerFunds.get("survey-office")==30,
+                "new finite mineral pocket needs an actual paid geological survey");
+        check(IndustryLife.report(survey).ironRemaining()==30 &&
+                        IndustryLife.report(survey).copperRemaining()==15,
+                "western reserve is a distinct bounded pre-existing seam");
+        boolean secondSurvey=false;
+        try {IndustryLife.prospectPlayer(survey,750);}
+        catch(IllegalArgumentException expected) {secondSurvey=true;}
+        check(secondSurvey,"one discovery cannot be purchased twice");
 
         System.out.println("IndustrySmokeTest: ALL CHECKS PASSED");
     }
