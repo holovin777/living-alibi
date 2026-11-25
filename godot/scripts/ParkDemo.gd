@@ -3795,6 +3795,16 @@ func _render_actions() -> void:
                 var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
                 for action in home_options.get("actions",[]):
                     _action_choices.add_child(_button(str(home_labels.get(action,action)),_garden_action.bind("rebirth-home-"+str(action))))
+                var furnishing_names := {"kitchen":"Kitchen furnishings","bedroom":"Bedroom furnishings","children":"Children’s furnishings"}
+                for offer in home_options.get("furnishings",[]):
+                    var item_id := str(offer.get("id",""))
+                    var item_name := tr(str(furnishing_names.get(item_id,item_id)))
+                    if offer.get("installed",false):
+                        var installed_label := Label.new()
+                        installed_label.text = tr("%s · installed") % item_name
+                        _action_choices.add_child(installed_label)
+                    elif offer.get("canBuy",false):
+                        _action_choices.add_child(_button(tr("%s · %s EUR") % [item_name,offer.get("price",0)],_garden_action.bind("rebirth-home-furnish-"+item_id)))
                 var properties = home_options.get("properties",[])
                 if not properties.is_empty():
                     var market_label := Label.new()
@@ -4698,6 +4708,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
         _apartment.set_furniture_level(int(home.get("furnitureLevel",0)))
+        _apartment.set_home_style(str(home.get("interiorStyle","standard")))
+        _apartment.set_room_packages(home.get("furnishings",[]))
     _sync_family_entrance(home)
     if walking_transition and is_instance_valid(_home_entrance) and not road_arrival:
         _avatar.position=_home_entrance.position
