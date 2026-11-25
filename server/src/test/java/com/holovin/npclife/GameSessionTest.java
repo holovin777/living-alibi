@@ -2073,7 +2073,7 @@ class GameSessionTest {
     void ordinaryVisitorCanBecomeMinerOrMachinistAndSurveyNewOre() throws Exception {
         Path mine=directory.resolve("visitor-miner.db");
         try(var game=new GameSession(mine)) {
-            assertEquals(9,game.jobs().size());
+            assertEquals(10,game.jobs().size());
             game.move("quarry");
             game.applyJob("miner");
             game.waitMinutes(30);
@@ -2154,7 +2154,7 @@ class GameSessionTest {
             assertEquals(50,visitor.money());
             assertNull(visitor.jobId());
             assertEquals(0,visitor.engineeringSkill());
-            assertEquals(9,game.jobs().size());
+            assertEquals(10,game.jobs().size());
 
             assertThrows(IllegalArgumentException.class,
                     ()->game.applyJob("shop-assistant"));
@@ -2182,7 +2182,7 @@ class GameSessionTest {
             assertEquals("SCHOOL",restarted.snapshot().player().placeId());
             assertEquals("shop-assistant",restarted.snapshot().player().jobId());
             assertEquals(1,restarted.snapshot().player().engineeringSkill());
-            assertEquals(9,restarted.jobs().size(),"job board remains stable");
+            assertEquals(10,restarted.jobs().size(),"job board remains stable");
         }
     }
 
