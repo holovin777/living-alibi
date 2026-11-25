@@ -45,7 +45,7 @@ func _ready() -> void:
     title.add_theme_font_size_override("font_size",22)
     col.add_child(title)
     var apps := GridContainer.new()
-    apps.columns = 3
+    apps.columns = 2
     col.add_child(apps)
     for entry in [["home","Phone home"],["jobs","Phone jobs"],["map","Phone map"],["contacts","Phone contacts"],["bank","Phone bank"],["messages","Phone notifications"],["calendar","Phone calendar"],["weather","Phone weather"],["alarm","Phone alarm"]]:
         var button := Button.new()
@@ -54,7 +54,7 @@ func _ready() -> void:
         button.pressed.connect(open_app.bind(entry[0]))
         apps.add_child(button)
     var scroll := ScrollContainer.new()
-    scroll.custom_minimum_size = Vector2(290,215)
+    scroll.custom_minimum_size = Vector2(290,165)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     col.add_child(scroll)
