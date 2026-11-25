@@ -38,7 +38,7 @@ final class GardenLife {
     }
     static String act(TownLife.Town t,String action,int day,int minute) {
         if("sell-vegetables".equals(action))return RetailLife.buyProduce(t,minute);
-        if(action!=null&&action.startsWith("stall-"))return MarketStallLife.act(t,action,minute);
+        if(action!=null&&action.startsWith("stall-"))return MarketStallLife.act(t,action,day,minute);
         if(OrchardLife.handles(action))return OrchardLife.act(t,action,day,minute);
         if(java.util.Set.of("build-coop","buy-hen","feed-hens","water-hens","collect-eggs","sell-eggs").contains(action==null?"":action))
             return HenLife.act(t,action,day,minute);

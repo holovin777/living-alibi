@@ -2750,7 +2750,18 @@ func _render_actions() -> void:
                     var stall_info := Label.new()
                     stall_info.text = "Bottega · Stock %s/12 | Sold %s | Revenue %s EUR" % [stall.get("stocked",0),stall.get("sales",0),stall.get("revenue",0)]
                     stall_info.text += "\nCustomers %s | Regulars %s | Referred %s" % [stall.get("customers",0),stall.get("regularCustomers",0),stall.get("recommendedCustomers",0)]
+                    stall_info.text += "\nPayroll %s EUR | Wages paid %s EUR" % [stall.get("reserve",0),stall.get("wages",0)]
+                    var seller = stall.get("sellerName")
+                    if seller!=null:
+                        stall_info.text += "\nSeller: %s | %s" % [str(seller),"Paid shift" if bool(stall.get("staffed",false)) else "Off duty"]
                     _action_choices.add_child(stall_info)
+                    _action_choices.add_child(_button("Fund payroll · 10 EUR",_garden_action.bind("stall-fund")))
+                    _action_choices.add_child(_button("Withdraw payroll · 10 EUR",_garden_action.bind("stall-withdraw")))
+                    if seller!=null:
+                        _action_choices.add_child(_button("Dismiss seller",_garden_action.bind("stall-dismiss")))
+                    else:
+                        for candidate in stall.get("candidates",[]):
+                            _action_choices.add_child(_button("Hire "+str(candidate.get("name",""))+" · 4 EUR/hour",_garden_action.bind("stall-hire-"+str(candidate.get("id","")))))
                     if bool(stall.get("open",false)):
                         _action_choices.add_child(_button("Close stall",_garden_action.bind("stall-close")))
                     else:

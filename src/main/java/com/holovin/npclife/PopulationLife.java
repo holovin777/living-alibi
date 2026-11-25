@@ -31,14 +31,15 @@ final class PopulationLife {
         // Independent workshops use short real two-hour shifts, not fictitious
         // wages for eight hours to fabricate one small batch of parts.
         boolean shopEmployee=BusinessLife.isEmployee(town,c);
+        boolean stallEmployee=MarketStallLife.isEmployee(town,c);
         boolean carrier=LogisticsLife.isDriver(town,c);
         TownLife.Place freightDestination=LogisticsLife.activeDriverDestination(town,c);
         boolean freightRun=carrier && freightDestination!=null && !sick;
         boolean working=c.employed && !sick && workday &&
-                (carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):
+                (carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
-        boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,minute)!=null);
+        boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,clock.day,minute)!=null);
         boolean needWater=c.water<2;
         // A repaired public fountain provides an affordable alternative to
         // market purchases, but only while finite filtered water is available.
@@ -50,6 +51,7 @@ final class PopulationLife {
         else if(sleeping)desired=c.home;
         else if(carrier && working)desired=c.workplace;
         else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
+        else if(stallEmployee && working)desired=TownLife.Place.MARKET;
         else if(marketOpen && needFood)desired=TownLife.Place.MARKET;
         else if(marketOpen && publicWater)desired=TownLife.Place.PARK;
         else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;
@@ -81,6 +83,7 @@ final class PopulationLife {
             }
         }
         if(c.place==TownLife.Place.MARKET && marketOpen) {
+            if(stallEmployee && working)MarketStallLife.pay(town,c,clock,events,observations);
             String stallSale=MarketStallLife.purchase(town,c,clock.day,minute);
             if(stallSale!=null)TownLife.publish(town,clock,c.id,c.place,stallSale,events,observations);
             else if(c.food<2 && c.money>=9) {
@@ -107,7 +110,7 @@ final class PopulationLife {
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){
-                if(!LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
+                if(!stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
                         !IndustryLife.payHourly(town,c,clock,events,observations)) {
                     // Existing unrelated occupations retain their original
                     // placeholder wage model until their companies are modeled.
