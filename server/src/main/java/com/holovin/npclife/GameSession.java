@@ -21,24 +21,42 @@ public final class GameSession implements AutoCloseable {
     private TownLife.Town town;
     private int archiveYear,archivePage=1;
 
+    static final String POPULATION_SEED_TARGET="population:seed-target";
+
     @Autowired
-    public GameSession(@Value("${living-alibi.database:data/world.db}") String databasePath)
+    public GameSession(@Value("${living-alibi.database:data/world.db}") String databasePath,
+                       @Value("${living-alibi.population:28}") int population)
             throws Exception {
-        this(Path.of(databasePath));
+        this(Path.of(databasePath),population);
     }
 
+    // Small deterministic fixtures remain available to existing regression tests.
     GameSession(Path databasePath) throws Exception {
+        this(databasePath,12);
+    }
+
+    GameSession(Path databasePath,int population) throws Exception {
+        if(population<12||population>PopulationGenerator.MAX_GENERATED)
+            throw new IllegalArgumentException("Initial generated population must be between 12 and "+PopulationGenerator.MAX_GENERATED);
         boolean firstLaunch=Files.notExists(databasePath);
         db=new WorldDatabase(databasePath);
         state=db.load();
         town=db.loadTown(state);
-        if(firstLaunch) {
-            // A fresh city should already contain a small, active population.
-            PopulationGenerator.add(town,12);
-            db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+        int previousTarget=town.industryStocks.getOrDefault(POPULATION_SEED_TARGET,12);
+        boolean changed=false;
+        if(firstLaunch||population>previousTarget) {
+            // One-time immigration, not an automatic respawn after deaths.
+            int missing=Math.max(0,population-(int)DemographyLife.living(town));
+            while(missing>0){
+                int batch=Math.min(20,missing);
+                PopulationGenerator.add(town,batch);
+                missing-=batch;
+            }
+            town.industryStocks.put(POPULATION_SEED_TARGET,population);
+            changed=true;
         }
         // Old save files might contain a deceased visitor.
-        boolean changed=RebirthLife.restoreIdentity(town);
+        changed=RebirthLife.restoreIdentity(town)||changed;
         if(!town.player.alive&&!RebirthLife.active(town)) {
             RebirthLife.prepare(town,state.day,state.minute);
             changed=true;

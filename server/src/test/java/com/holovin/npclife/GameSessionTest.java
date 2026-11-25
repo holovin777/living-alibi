@@ -3796,6 +3796,35 @@ class GameSessionTest {
     }
 
     @Test
+    void expandedPopulationPreservesOldWorldAndDoesNotReplaceDeaths() throws Exception {
+        Path file=directory.resolve("population-upgrade.db");
+        try(var game=new GameSession(file)){
+            assertEquals(12,game.snapshot().demography().alive());
+            game.move("river");
+        }
+        try(var game=new GameSession(file,28)){
+            assertEquals(28,game.snapshot().demography().alive());
+            assertEquals("River",game.snapshot().player().place());
+            assertEquals(50,game.snapshot().player().money());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(30,town.people.size());
+            assertEquals(28,town.industryStocks.get(GameSession.POPULATION_SEED_TARGET));
+            town.people.values().stream().filter(c->c.generationIndex==28).findFirst().orElseThrow().alive=false;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file,28)){
+            assertEquals(27,game.snapshot().demography().alive());
+        }
+        Path fresh=directory.resolve("expanded-fresh.db");
+        try(var game=new GameSession(fresh,28)){
+            assertEquals(28,game.snapshot().demography().alive());
+            assertEquals("Park",game.snapshot().player().place());
+        }
+    }
+
+    @Test
     void newWorldActionsAndRestart() throws Exception {
         Path file=directory.resolve("fresh-world.db");
         try(var game=new GameSession(file)) {
