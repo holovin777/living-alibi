@@ -2490,6 +2490,7 @@ func _build_cafe() -> void:
         _room_furniture(tables,Vector3(x,0,9.0),Vector3(0.94,0.76,0.94),wood)
         for z in [7.95,10.05]:
             _room_furniture(tables,Vector3(x,0,z),Vector3(0.48,0.45,0.48),Color("#698379"))
+            _register_resident_seat(Vector3(x,0.48,z),0.0 if z>9.0 else PI,"cafe")
             _box(tables,Vector3(0.48,0.43,0.07),wood,Vector3(x,0.66,z+0.20*signf(z-9.0)))
     _sign(tables,"Take a break · E",Vector3(-7,2.1,9))
     for at in [Vector3(-7,2.6,5.4),Vector3(-8.3,2.6,9)]:
@@ -2918,6 +2919,8 @@ func _park_flowers(parent: Node3D, at: Vector3) -> void:
 
 func _bench(parent: Node3D, at: Vector3) -> void:
     _add_obstacle(at, Vector2(2.0, 0.66))
+    for x in [-0.50,0.50]:
+        _register_resident_seat(at+Vector3(x,0.58,0),0.0,"bench")
     var wood := Color(0.43,0.27,0.14)
     for z in [-0.20,0.0,0.20]:
         _box(parent,Vector3(2.0,0.09,0.17),wood,at+Vector3(0,0.52,z),"wood")
@@ -3008,6 +3011,7 @@ func _render_residents() -> void:
             _residents_root.remove_child(child)
             child.queue_free()
 
+    _assign_resident_seats()
     _sync_office_joker()
 
 func _sync_office_joker() -> void:
@@ -3171,10 +3175,15 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         leg.name = "LegLeft" if side < 0 else "LegRight"
         leg.position = Vector3(side*0.13,0.84,0)
         person.add_child(leg)
-        var trouser := _cylinder(leg,0.105,0.70,pants,Vector3(0,-0.35,0))
+        var trouser := _cylinder(leg,0.105,0.36,pants,Vector3(0,-0.18,0))
         trouser.scale.z = 1.08
-        _box(leg,Vector3(0.22,0.13,0.34),Color("#303032"),Vector3(0,-0.77,-0.06))
-        _box(leg,Vector3(0.23,0.035,0.35),Color("#665f55"),Vector3(0,-0.825,-0.06))
+        var knee := Node3D.new()
+        knee.name = "Knee"
+        knee.position = Vector3(0,-0.35,0)
+        leg.add_child(knee)
+        _cylinder(knee,0.10,0.35,pants,Vector3(0,-0.175,0))
+        _box(knee,Vector3(0.22,0.13,0.34),Color("#303032"),Vector3(0,-0.42,-0.06))
+        _box(knee,Vector3(0.23,0.035,0.35),Color("#665f55"),Vector3(0,-0.475,-0.06))
         var arm := Node3D.new()
         arm.name = "ArmLeft" if side < 0 else "ArmRight"
         arm.position = Vector3(side*0.29,1.37,0)
@@ -3182,6 +3191,17 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         _cylinder(arm,0.083,0.43,jacket,Vector3(0,-0.22,0))
         _cylinder(arm,0.085,0.065,jacket.darkened(0.18),Vector3(0,-0.425,0))
         _sphere(arm,0.075,skin,Vector3(0,-0.48,0))
+    var hand := person.get_node("ArmRight") as Node3D
+    var phone := Node3D.new()
+    phone.name = "Phone"
+    hand.add_child(phone)
+    phone.position = Vector3(0,-0.49,-0.065)
+    _box(phone,Vector3(0.075,0.13,0.025),Color("#303638"),Vector3.ZERO)
+    _box(phone,Vector3(0.062,0.108,0.008),Color("#8aaeb6"),Vector3(0,0,-0.017))
+    phone.hide()
+    var cup := _cylinder(hand,0.055,0.095,Color("#eee6d5"),Vector3(0,-0.49,-0.07))
+    cup.name = "CoffeeCup"
+    cup.hide()
     _sign(person,display_name,Vector3(0,2.1,0))
     var activity_label := Label3D.new()
     activity_label.name="ActivityLabel"
@@ -3192,6 +3212,44 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     activity_label.modulate=Color("#f4db9e")
     person.add_child(activity_label)
     return person
+
+func _register_resident_seat(at: Vector3, yaw: float, kind: String) -> void:
+    var seats: Array = _scenery.get_meta("resident_seats",[])
+    seats.append({"at":at,"yaw":yaw,"kind":kind})
+    _scenery.set_meta("resident_seats",seats)
+
+func _assign_resident_seats() -> void:
+    # Only residents present in the authoritative snapshot may sit.
+    var seats: Array = [] if _apartment_active else _scenery.get_meta("resident_seats",[])
+    var used: Dictionary = {}
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b): return str(a.get_meta("resident_id","")) < str(b.get_meta("resident_id","")))
+    for child in people:
+        var person := child as Node3D
+        var activity := str(person.get_meta("activity",""))
+        var eligible := activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"]
+        var old_index := int(person.get_meta("seat_index",-1))
+        var chosen := -1
+        if eligible:
+            if old_index>=0 and old_index<seats.size() and not used.has(old_index):
+                chosen = old_index
+            else:
+                for i in range(seats.size()):
+                    if not used.has(i):
+                        chosen = i
+                        break
+        person.set_meta("seat_index",chosen)
+        if chosen>=0:
+            used[chosen] = true
+            var seat: Dictionary = seats[chosen]
+            var at: Vector3 = seat["at"]
+            person.position = at-Vector3(0,0.84*person.scale.y,0)
+            person.rotation.y = float(seat["yaw"])
+            person.set_meta("seat_kind",seat["kind"])
+        elif old_index>=0:
+            var anchor: Vector3 = person.get_meta("anchor")
+            person.position = _open_anchor(anchor)
+            person.set_meta("seat_kind","")
 
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
@@ -3204,8 +3262,14 @@ func _animate_residents(delta: float) -> void:
         var appearance: Dictionary = person.get_meta("appearance",{})
         var pace := float(appearance.get("pace",1.0))
         var stride := float(appearance.get("stride",0.42))
-        if _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target:
+        var seated := int(person.get_meta("seat_index",-1)) >= 0
+        var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
+        if talking or seated:
             walking = false
+        if talking and not seated:
+            var toward := _avatar.position-person.position
+            if toward.length_squared()>0.001:
+                person.rotation.y = lerp_angle(person.rotation.y,atan2(-toward.x,-toward.z),minf(delta*6.0,1.0))
         if walking:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
@@ -3219,10 +3283,26 @@ func _animate_residents(delta: float) -> void:
             person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
             walking = person.position.distance_squared_to(old) > 0.000001
         var swing := sin(phase*12.0)*stride if walking else 0.0
+        var gesture_time := float(Time.get_ticks_msec())*0.001+phase
+        var coffee := seated and str(person.get_meta("seat_kind",""))=="cafe" and not talking
+        var phone := not seated and not talking and not walking and activity in ["RELAXING","RESTING","FREE_TIME"] and sin(gesture_time*0.45)>0.45
+        person.get_node("ArmRight/Phone").visible = phone
+        person.get_node("ArmRight/CoffeeCup").visible = coffee
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
-            if activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
+            if limb in ["LegLeft","LegRight"]:
+                var knee := part.get_node("Knee") as Node3D
+                knee.rotation.x = lerpf(knee.rotation.x,-PI/2.0 if seated else 0.0,minf(delta*10.0,1.0))
+                if seated:
+                    angle = PI/2.0
+            if talking and limb=="ArmRight":
+                angle=0.30+sin(gesture_time*3.3)*0.28
+            elif coffee and limb=="ArmRight":
+                angle=0.85+0.50*maxf(0.0,sin(gesture_time*1.4))
+            elif phone and limb=="ArmRight":
+                angle=1.02
+            elif activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
                 angle=-0.7
             elif not walking and activity in ["WORKING","STUDYING"] and limb in ["ArmRight","ArmLeft"]:
                 angle=-0.22+sin(float(Time.get_ticks_msec())*0.003+phase)*0.12
