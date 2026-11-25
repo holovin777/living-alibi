@@ -43,8 +43,25 @@ public final class BusinessMachineDatabaseSmokeTest {
             // rather than requiring a user's old save as a test fixture.
             try(var connection=DriverManager.getConnection("jdbc:sqlite:"+file);
                     var st=connection.createStatement()) {
+                // Re-create the real old DDL including the PRIMARY KEY.
+                // CREATE TABLE AS SELECT would incorrectly drop constraints,
+                // invalidating the production ON CONFLICT save path.
                 st.executeUpdate("""
-                        CREATE TABLE previous_business AS
+                        CREATE TABLE previous_business (
+                            id INTEGER PRIMARY KEY CHECK(id=1),
+                            registered INTEGER NOT NULL DEFAULT 0,
+                            owner_incarnation INTEGER NOT NULL DEFAULT 0,
+                            cash INTEGER NOT NULL DEFAULT 0 CHECK(cash>=0),
+                            machine INTEGER NOT NULL DEFAULT 0,
+                            employee_id TEXT,
+                            spare_parts INTEGER NOT NULL DEFAULT 0 CHECK(spare_parts>=0),
+                            last_pay_day INTEGER NOT NULL DEFAULT 0,
+                            paid_hours INTEGER NOT NULL DEFAULT 0,
+                            last_production_day INTEGER NOT NULL DEFAULT 0,
+                            last_sale_day INTEGER NOT NULL DEFAULT 0)
+                        """);
+                st.executeUpdate("""
+                        INSERT INTO previous_business
                         SELECT id,registered,owner_incarnation,cash,machine,
                                employee_id,spare_parts,last_pay_day,paid_hours,
                                last_production_day,last_sale_day
