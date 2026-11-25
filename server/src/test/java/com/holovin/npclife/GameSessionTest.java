@@ -165,6 +165,56 @@ class GameSessionTest {
     }
 
     @Test
+    void municipalBudgetTransfersTaxesAndFundsServicesWithoutMintingCash() throws Exception {
+        Path file=directory.resolve("comune.db");
+        String residentId;
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            var resident=PopulationGenerator.add(town,1).getFirst();residentId=resident.id;
+            p.money=200;resident.money=140;
+            int city=town.employerFunds.get("city-maintenance");
+            int school=town.employerFunds.get("school"),library=town.employerFunds.get("library");
+            var pump=town.technicalOrders.get("water-pump");
+            pump.condition=75;pump.phase=TechnicalWorkLife.Phase.COMPLETED;
+            var lights=town.technicalOrders.get("street-lights");
+            lights.condition=80;lights.phase=TechnicalWorkLife.Phase.COMPLETED;
+            int parts=town.technicalMaterials.get("spare-parts"),steel=town.technicalMaterials.get("steel");
+            MunicipalLife.tick(town,1,360);
+            assertEquals(200,p.money);
+            MunicipalLife.tick(town,8,360);MunicipalLife.tick(town,8,360);
+            var report=MunicipalLife.report(town);
+            assertEquals(195,p.money);assertEquals(138,resident.money);
+            assertEquals(7,report.taxes());assertEquals(city+7-26,report.budget());
+            assertEquals(school+6,report.schoolFunds());assertEquals(library+4,report.libraryFunds());
+            assertEquals(8,report.clinicFunds());assertEquals(8,report.maintenance());
+            assertEquals(83,pump.condition);assertEquals(85,lights.condition);
+            assertEquals(parts-1,town.technicalMaterials.get("spare-parts"));
+            assertEquals(steel-1,town.technicalMaterials.get("steel"));
+            resident.money=70;
+            assertEquals(8,MunicipalLife.medicalAid(town,resident,75));
+            assertEquals(0,MunicipalLife.medicalAid(town,resident,75));
+            assertEquals(8,town.employerFunds.get(MunicipalLife.CARE));
+            state.day=8;state.minute=360;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            assertEquals(7,MunicipalLife.report(town).taxes());
+            assertEquals(8,MunicipalLife.report(town).medicalAid());
+            assertEquals(8,town.employerFunds.get(MunicipalLife.CARE));
+            assertEquals(83,town.technicalOrders.get("water-pump").condition);
+            MunicipalLife.tick(town,8,360);
+            assertEquals(195,p.money);assertEquals(7,MunicipalLife.report(town).taxes());
+            town.employerFunds.put(MunicipalLife.CITY,40);
+            p.money=100;town.get(residentId).money=70;
+            MunicipalLife.tick(town,15,360);
+            assertEquals(40,MunicipalLife.report(town).budget());
+            assertEquals(8,MunicipalLife.report(town).maintenance());
+            assertEquals(83,town.technicalOrders.get("water-pump").condition);
+        }
+    }
+
+    @Test
     void constructionConsumesRealMaterialsAndPaidLaborAndPersistsCompletedHouse() throws Exception {
         Path file=directory.resolve("construction.db");
         try(var db=new WorldDatabase(file)) {

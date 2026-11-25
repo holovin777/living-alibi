@@ -2907,6 +2907,12 @@ func _render_actions() -> void:
                                 _business_hire.bind(id)))
                 _action_choices.add_child(_button("Withdraw 10 EUR", _business_withdraw.bind(10)))
         "OFFICE":
+            var comune: Dictionary = _last_snapshot.get("comune",{})
+            var budget_info := Label.new()
+            budget_info.text = "Comune · Budget %s EUR | Taxes %s EUR" % [comune.get("budget",0),comune.get("taxes",0)]
+            budget_info.text += "\nEducation %s | Healthcare %s | Maintenance %s EUR" % [comune.get("education",0),comune.get("healthcare",0),comune.get("maintenance",0)]
+            budget_info.text += "\nClinic reserve %s EUR | Medical aid %s EUR" % [comune.get("clinicFunds",0),comune.get("medicalAid",0)]
+            _action_choices.add_child(budget_info)
             var construction: Dictionary = _last_snapshot.get("construction",{})
             var stage := int(construction.get("stage",0))
             var construction_info := Label.new()
