@@ -6,7 +6,7 @@ final class EducationLife {
     private EducationLife(){}
     static final String LESSONS="education:lessons", GRADUATES="education:graduates", EXPERIENCE="education:experience", SCHOOL_SERVICE="school-services";
     static final List<String> SUBJECTS=List.of("technical","social","academic","commerce");
-    static final List<String> FIELDS=List.of("technical","social","academic","commerce","school-days","last-school","last-work","graduate","fitness","hobby-days","last-hobby","allowance-week","allowance-total");
+    static final List<String> FIELDS=List.of("technical","social","academic","commerce","school-days","last-school","last-work","graduate","fitness","hobby-days","last-hobby","allowance-week","allowance-total","last-family-time");
     static String key(TownLife.Citizen c,String f){return "education:"+c.id+":"+f;}
     static int get(TownLife.Town t,String k){return t.industryStocks.getOrDefault(k,0);}
     static void set(TownLife.Town t,String k,int n){t.industryStocks.put(k,n);}

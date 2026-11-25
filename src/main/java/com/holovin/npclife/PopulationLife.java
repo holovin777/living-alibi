@@ -79,15 +79,15 @@ final class PopulationLife {
             if(c.travelRemaining>0){c.activity="TRAVELING";return;}
         }
         // During a short illness, essential supplies may be delivered to the private unit.
-        if((sick||child) && c.place==c.home && marketOpen) {
+        if((sick||child||RebirthLife.stayingHome(town,c)) && c.place==c.home && marketOpen) {
             if(c.food<2 && c.money>=12) {
                 c.money-=12;c.food+=3;
-                if(child)town.employerFunds.merge("shop-assistant",12,Math::addExact);
+                if(child||RebirthLife.stayingHome(town,c))town.employerFunds.merge("shop-assistant",12,Math::addExact);
                 TownLife.publish(town,clock,c.id,c.place,c.name+" received groceries at home.",events,observations);
             }
             if(c.water<2 && c.money>=6) {
                 c.money-=6;c.water+=3;
-                if(child)town.employerFunds.merge("shop-assistant",6,Math::addExact);
+                if(child||RebirthLife.stayingHome(town,c))town.employerFunds.merge("shop-assistant",6,Math::addExact);
                 TownLife.publish(town,clock,c.id,c.place,c.name+" received drinking water at home.",events,observations);
             }
         }
@@ -115,6 +115,7 @@ final class PopulationLife {
         if(sleeping)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
         else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":c.place==c.home?"AT_HOME":"FREE_TIME";
+        else if(RebirthLife.stayingHome(town,c)&&c.place==c.home)c.activity="AT_HOME";
         else if(retired)c.activity="RETIRED";
         else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
         else if(freightRun)c.activity="WORKING";

@@ -76,6 +76,57 @@ class GameSessionTest {
         }
     }
     @Test
+    void linkedAdultHomeUsesRealSuppliesAndPrivateSpace() throws Exception {
+        Path file=directory.resolve("linked-home.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var a=people.get(0);var b=people.get(1);
+            id=a.id;a.age=30;b.age=30;
+            a.place=TownLife.Place.PARK;a.destination=a.place;a.travelRemaining=0;
+            a.home=TownLife.Place.NORTH_RESIDENCES;a.activity="FREE_TIME";
+            a.hunger=70;a.thirst=70;a.fatigue=60;a.food=5;a.water=5;a.money=200;
+            b.home=a.home;b.homeUnit=a.homeUnit;b.place=b.home;b.destination=b.home;b.travelRemaining=0;b.activity="AT_HOME";
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,a.generationIndex);
+            DemographyLife.set(town,a,"played-incarnation",town.player.incarnation);
+            DemographyLife.set(town,a,"partner",b.generationIndex);DemographyLife.set(town,b,"partner",a.generationIndex);
+            state.day=2;state.minute=1210;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-home-meal"));
+            var home=game.gardenAction("rebirth-home-go").world();
+            assertTrue(home.rebirth().homeOptions().atHome());
+            assertTrue(home.rebirth().homeOptions().stayingHome());
+            assertEquals("NORTH_RESIDENCES",home.player().placeId());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var a=town.get(id);a.hunger=60;a.thirst=60;a.fatigue=60;a.food=5;a.water=5;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var before=game.snapshot();
+            var meal=game.gardenAction("rebirth-home-meal").world();
+            assertEquals(before.rebirth().homeOptions().food()-1,meal.rebirth().homeOptions().food());
+            assertEquals(before.minute()+15,meal.minute());
+            var drink=game.gardenAction("rebirth-home-drink").world();
+            assertEquals(meal.rebirth().homeOptions().water()-1,drink.rebirth().homeOptions().water());
+            var rest=game.gardenAction("rebirth-home-rest").world();
+            assertEquals(drink.minute()+60,rest.minute());
+            assertTrue(rest.rebirth().homeOptions().stayingHome());
+            if(rest.rebirth().homeOptions().actions().contains("family")){
+                var family=game.gardenAction("rebirth-home-family").world();
+                assertFalse(family.rebirth().homeOptions().actions().contains("family"));
+            }
+            var routine=game.gardenAction("rebirth-routine").world();
+            assertFalse(routine.rebirth().homeOptions().stayingHome());
+        }
+    }
+    @Test
     void orchardIsPerennialSeasonalAndConservesFruitOnSale() throws Exception {
         Path file=directory.resolve("orchard.db");
         try(var game=new GameSession(file)) {

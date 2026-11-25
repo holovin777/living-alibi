@@ -2715,6 +2715,17 @@ func _render_actions() -> void:
                 for destination in options.get("destinations",[]):
                     if str(destination) != _current_place:
                         _action_choices.add_child(_button("Walk to "+str(destination).capitalize(),_garden_action.bind("rebirth-travel-"+str(destination))))
+            var home_options = rebirth.get("homeOptions")
+            if home_options is Dictionary:
+                var home_label := Label.new()
+                home_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                home_label.text = "Home · %s · %s\nFood portions %s · Water portions %s" % [home_options.get("district",""),"at home" if home_options.get("atHome",false) else "away",home_options.get("food",0),home_options.get("water",0)]
+                for relative in home_options.get("family",[]):
+                    home_label.text += "\nAt home: "+str(relative)
+                _action_choices.add_child(home_label)
+                var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min"}
+                for action in home_options.get("actions",[]):
+                    _action_choices.add_child(_button(str(home_labels.get(action,action)),_garden_action.bind("rebirth-home-"+str(action))))
             var family_options = rebirth.get("familyOptions")
             if family_options is Dictionary:
                 var household := Label.new()

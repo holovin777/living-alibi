@@ -337,6 +337,14 @@ public final class GameSession implements AutoCloseable {
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
             }
+            if(action.equals("rebirth-home-go")){
+                int duration=RebirthLife.goHome(copy);
+                return applyInternal(copy,duration,"Returned to your own home.",true);
+            }
+            if(action.startsWith("rebirth-home-")){
+                var home=RebirthLife.homeAction(copy,state.day,action.substring("rebirth-home-".length()));
+                return applyInternal(copy,home.minutes(),home.message(),true);
+            }
             if(action.equals("rebirth-child-hour")){
                 var child=RebirthLife.child(copy);
                 if(!RebirthLife.linkedChild(copy,child)||child.age<6)throw new IllegalArgumentException("Available from age six.");

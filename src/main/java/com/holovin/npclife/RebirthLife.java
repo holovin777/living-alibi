@@ -121,6 +121,7 @@ final class RebirthLife {
     static TownLife.Place manualDestination(TownLife.Town t,TownLife.Citizen c){
         if(!linkedAdult(t,c))return null;
         int n=t.industryStocks.getOrDefault(TRAVEL,0);
+        if(n==HOME_DESTINATION)return c.home;
         var places=PlayerLife.publicPlaces();
         return n>=1&&n<=places.size()?places.get(n-1):null;
     }
@@ -134,6 +135,69 @@ final class RebirthLife {
         c.destination=destination;c.travelRemaining=TownLife.travelTime(c.place,destination);
         c.activity="TRAVELING";
         return c.travelRemaining;
+    }
+    private static final int HOME_DESTINATION=1000;
+    static boolean stayingHome(TownLife.Town t,TownLife.Citizen c){
+        return linkedAdult(t,c)&&t.industryStocks.getOrDefault(TRAVEL,0)==HOME_DESTINATION;
+    }
+    static int goHome(TownLife.Town t){
+        var c=requireAdult(t);
+        if(c.travelRemaining>0)throw new IllegalArgumentException("Finish traveling first.");
+        t.industryStocks.put(TRAVEL,HOME_DESTINATION);
+        int duration=TownLife.travelTime(c.place,c.home);
+        if(duration>0){c.destination=c.home;c.travelRemaining=duration;c.activity="TRAVELING";}
+        else c.activity="AT_HOME";
+        return duration;
+    }
+    static boolean atHome(TownLife.Citizen c){
+        return awakePresent(c)&&c.place==c.home;
+    }
+    static List<TownLife.Citizen> homeFamily(TownLife.Town t,TownLife.Citizen c){
+        if(!atHome(c))return List.of();
+        int a=DemographyLife.get(t,c,"parent-a"),b=DemographyLife.get(t,c,"parent-b"),p=DemographyLife.get(t,c,"partner");
+        return t.people.values().stream().filter(x->x!=c&&x.generationIndex>0&&atHome(x)&&together(c,x)
+                &&(x.generationIndex==a||x.generationIndex==b||x.generationIndex==p
+                ||DemographyLife.get(t,x,"parent-a")==c.generationIndex||DemographyLife.get(t,x,"parent-b")==c.generationIndex)).toList();
+    }
+    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions){}
+    static HomeOptions homeOptions(TownLife.Town t,int day){
+        var c=child(t);
+        if(!linkedAdult(t,c))return null;
+        var family=homeFamily(t,c);
+        var actions=new ArrayList<String>();
+        if(c.travelRemaining==0)actions.add("go");
+        if(atHome(c)){
+            if(c.food>0&&c.hunger>0)actions.add("meal");
+            if(c.water>0&&c.thirst>0)actions.add("drink");
+            if(c.fatigue>0)actions.add("rest");
+            if(!family.isEmpty()&&EducationLife.get(t,c,"last-family-time")<day)actions.add("family");
+        }
+        return new HomeOptions(c.home.label,atHome(c),stayingHome(t,c),c.food,c.water,
+                family.stream().map(p->p.name).toList(),List.copyOf(actions));
+    }
+    record HomeAction(int minutes,String message){}
+    static HomeAction homeAction(TownLife.Town t,int day,String action){
+        var c=requireAdult(t);
+        if(!homeOptions(t,day).actions().contains(action)||"go".equals(action))
+            throw new IllegalArgumentException("This home activity is not available.");
+        t.industryStocks.put(TRAVEL,HOME_DESTINATION);
+        return switch(action){
+            case "meal" -> {c.food--;c.hunger=Math.max(0,c.hunger-50);yield new HomeAction(15,"Prepared a meal from your food supplies.");}
+            case "drink" -> {c.water--;c.thirst=Math.max(0,c.thirst-52);yield new HomeAction(5,"Drank water from your supplies.");}
+            case "rest" -> {c.fatigue=Math.max(0,c.fatigue-20);yield new HomeAction(60,"Rested at home.");}
+            case "family" -> {
+                for(var relative:homeFamily(t,c)){
+                    var relation=t.peerRelationships.computeIfAbsent(SocialNetwork.key(c.id,relative.id),
+                            k->new SocialLife.Relationship(c.id.compareTo(relative.id)<=0?c.id:relative.id,c.id.compareTo(relative.id)<=0?relative.id:c.id));
+                    relation.affinity=Math.min(100,relation.affinity+2);
+                    relation.trust=Math.min(100,relation.trust+1);
+                    relation.conversations++;relation.encounters++;
+                }
+                EducationLife.set(t,c,"last-family-time",day);
+                yield new HomeAction(30,"Spent time with family at home.");
+            }
+            default -> throw new IllegalArgumentException("Unknown home activity.");
+        };
     }
     static String resumeRoutine(TownLife.Town t){
         requireAdult(t);
@@ -456,7 +520,7 @@ final class RebirthLife {
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
                 EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known));
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions){}
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
     static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
@@ -466,6 +530,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day));
     }
 }
