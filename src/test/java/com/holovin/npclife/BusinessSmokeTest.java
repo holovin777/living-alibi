@@ -49,6 +49,9 @@ public final class BusinessSmokeTest {
         BusinessLife.payHourly(town,candidate,clock,new ArrayList<>(),new ArrayList<>());
         clock.minute=780;
         BusinessLife.payHourly(town,candidate,clock,new ArrayList<>(),new ArrayList<>());
+        BusinessLife.payHourly(town,candidate,clock,new ArrayList<>(),new ArrayList<>());
+        check(town.business.paidHours==2 && town.business.cash==43,
+                "replaying the same minute cannot pay a third industrial wage");
         check(town.business.paidHours==2 && town.business.cash==43 &&
                 candidate.money==personalMoney+32,
                 "one small shift has two honest hourly wages, not eight imaginary hours");
@@ -57,7 +60,7 @@ public final class BusinessSmokeTest {
         clock.minute=BusinessLife.FABRICATE_MINUTE;
         BusinessLife.tick(town,clock,new ArrayList<>(),new ArrayList<>());
         check(town.business.parts==2 && town.technicalMaterials.get("steel")==steel-1 &&
-                town.business.cash==39,
+                town.business.cash==39 && town.business.machineCondition==85,
                 "the business buys and consumes a real city steel unit before fabrication");
 
         clock.minute=BusinessLife.SELL_MINUTE;
@@ -68,6 +71,17 @@ public final class BusinessSmokeTest {
                 "city buys real delivered parts using finite budget");
         check(allCash(town)==totalBefore,
                 "full payroll, steel and equipment trades conserve all participant cash");
+        var serviced=town.copy();
+        String maintenance=BusinessLife.service(serviced);
+        check(maintenance.contains("100/100") &&
+                serviced.business.cash==59 &&
+                serviced.business.machineCondition==100 &&
+                serviced.technicalMaterials.get("spare-parts")==6 &&
+                serviced.employerFunds.get("city-maintenance")==499,
+                "maintenance consumes real city components and business cash");
+        check(allCash(serviced)==totalBefore &&
+                town.business.cash==69 && town.business.machineCondition==85,
+                "servicing is a balanced transfer and speculative copy changes nothing");
         BusinessLife.tick(town,clock,new ArrayList<>(),new ArrayList<>());
         check(town.business.cash==69 && town.technicalMaterials.get("spare-parts")==8,
                 "same-minute replay cannot duplicate a sale");
