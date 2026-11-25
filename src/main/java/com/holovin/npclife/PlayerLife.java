@@ -346,17 +346,16 @@ final class PlayerLife {
         } else if(support){
             var mood=EmotionLife.mood(town,resident,day,minute);
             boolean difficult=switch(mood){case TIRED,STRESSED,IRRITATED,SAD,LONELY -> true;default -> false;};
-            if(difficult && contact.lastPositiveDay!=day){
+            if(difficult && SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT)!=day){
                 adjust(contact,4,6);
-                contact.lastPositiveDay=day;
                 SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.SUPPORT,day);
             }
         } else if(positive && contact.lastPositiveDay!=day) {
             adjust(contact,apology?5:3,apology?5:(resident.sociability>=60?5:3));
             contact.lastPositiveDay=day;
-            if(apology && SocialMemoryLife.unresolved(town,id))
-                SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.APOLOGY,day);
         }
+        if(apology && SocialMemoryLife.unresolved(town,id))
+            SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.APOLOGY,day);
         contact.conversations++;
         contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=spoken;
         String greeting=contact.knownName==null?"stranger":contact.knownName;
