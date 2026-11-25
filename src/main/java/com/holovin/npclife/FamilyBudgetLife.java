@@ -17,7 +17,7 @@ final class FamilyBudgetLife {
         int children=(int)t.people.values().stream().filter(x->x.alive&&DemographyLife.child(x)&&
                 (DemographyLife.get(t,x,"parent-a")==c.generationIndex||DemographyLife.get(t,x,"parent-b")==c.generationIndex||
                  DemographyLife.get(t,x,"parent-a")==p.generationIndex||DemographyLife.get(t,x,"parent-b")==p.generationIndex)).count();
-        boolean meeting=RebirthLife.meeting(c,p)&&RebirthLife.together(c,p);
+        boolean meeting=RebirthLife.meeting(c,p)&&RebirthLife.together(c,p)&&RebirthLife.atHome(c)&&RebirthLife.atHome(p);
         return new View(own,other,Math.addExact(own,other),Math.addExact(c.unpaidBills,p.unpaidBills),children,
                 meeting&&c.money>=RESERVE+STEP,meeting&&own>=STEP,meeting&&own>0&&c.unpaidBills>0);
     }
