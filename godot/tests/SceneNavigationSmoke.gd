@@ -158,6 +158,23 @@ func _exercise() -> void:
             "town sound can be muted independently"):
         return
     sound.set_enabled(true)
+    if not _check(world._hands.get_parent()==world._camera and world._hands.held_item=="",
+            "first-person hands are attached to the camera, not the hidden avatar"):
+        return
+    world._set_hands_enabled(false)
+    if not _check(not world._hands.visible,"hands can be disabled"):
+        return
+    world._set_hands_enabled(true)
+    var old_bag_snapshot: Dictionary = world._last_snapshot
+    world._last_snapshot = {"player":{"bag":{"bread":1,"water":1}}}
+    world._cycle_held_item()
+    if not _check(world._hands.held_item=="bread","holding selects an item actually in inventory"):
+        return
+    world._last_snapshot = {"player":{"bag":{}}}
+    world._refresh_held_item()
+    if not _check(world._hands.held_item=="","removed inventory item no longer appears in hand"):
+        return
+    world._last_snapshot = old_bag_snapshot
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
     var park_root: Node3D = world._chunks["PARK"]["root"]
     if not _check(school_root.position == Vector3(0,0,-48)
@@ -1026,6 +1043,14 @@ func _exercise() -> void:
     if not _check(not world._can_stand(Vector3(0,0,4.5),world.WALKER_RADIUS), "closed entrance blocks walking"):
         return
     world._apartment.toggle_entrance(Vector3(0,0,3.5))
+    if not _check(world._apartment.entrance_open and not world._can_stand(Vector3(0,0,4.5),world.WALKER_RADIUS),
+            "door stays solid during opening"):
+        return
+    world._apartment.advance_door(0.6)
+    if not _check(world._apartment.get_node("EntranceDoor").visible
+            and is_equal_approx(world._apartment.get_node("EntranceDoor").rotation.y,-PI/2.0),
+            "open door rotates on hinge instead of disappearing"):
+        return
     var lobby_pos: Vector3 = world._move_on_ground(Vector3(0,0,3.5),Vector3(0,0,4.5),world.WALKER_RADIUS)
     if not _check(lobby_pos.z>7.9 and not world._can_stand(Vector3(2.1,0,6.5),world.WALKER_RADIUS), "open entrance allows continuous walk into lobby; lobby walls solid"):
         return
