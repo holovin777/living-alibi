@@ -14,9 +14,13 @@ final class RetailLife {
             new Product("pasta","Pasta",2,20,8),
             new Product("vegetables","Vegetables",3,18,8),
             new Product("milk","Milk",2,16,6),
-            new Product("rice","Rice",2,20,0));
+            new Product("rice","Rice",2,20,0),
+            new Product("apples","Apples",3,12,0),
+            new Product("pears","Pears",3,12,0),
+            new Product("plums","Plums",3,12,0),
+            new Product("grapes","Grapes",3,12,0));
     static void ensure(TownLife.Town t) {
-        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),p.capacity());
+        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),OrchardLife.isFruit(p.id())?0:p.capacity());
     }
     static void tick(TownLife.Town t,int minute) {
         if(minute!=360)return;
@@ -85,6 +89,21 @@ final class RetailLife {
         t.employerFunds.merge("shop-assistant",-EGG_PRICE,Integer::sum);
         p.money=Math.addExact(p.money,EGG_PRICE);
         return "Sold one egg unit for 2 EUR.";
+    }
+    static int fruitSpace(TownLife.Town t,String id){
+        if(!OrchardLife.isFruit(id))throw new IllegalArgumentException("Unknown fruit.");
+        return Math.max(0,product(id).capacity()-t.retailStock.getOrDefault(id,0));
+    }
+    static String buyFruit(TownLife.Town t,String id,int minute){
+        var p=t.player;TransportLife.ready(p);
+        if(p.place!=TownLife.Place.MARKET||minute<480||minute>=1200)throw new IllegalArgumentException("Sell fruit at Market 08:00–20:00.");
+        if(fruitSpace(t,id)<1||t.employerFunds.getOrDefault("shop-assistant",0)<OrchardLife.SELL_PRICE)
+            throw new IllegalArgumentException("Market cannot accept more fruit.");
+        FoodLife.change(p,id,false,-1);
+        t.retailStock.merge(id,1,Math::addExact);
+        t.employerFunds.merge("shop-assistant",-OrchardLife.SELL_PRICE,Integer::sum);
+        p.money=Math.addExact(p.money,OrchardLife.SELL_PRICE);
+        return "Sold one "+id+" unit for 2 EUR.";
     }
     static String consume(PlayerLife.Player p,String id) {
         PlayerLife.requireAlive(p);

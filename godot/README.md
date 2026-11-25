@@ -652,6 +652,24 @@ The 3D hens are static models reflecting the current flock, not
 autonomous animals. No rainwater drinking, breeding, spoilage or
 independent feed inventory yet.
 
+## Private orchard
+
+The north-east yard of Casa del Glicine has four perennial plots:
+apple and pear trees (12 EUR each), plum tree and grapevine (10 EUR
+each). Establishment needs five watered or rainy game days outside
+winter; mature plants need three such days in their fruiting season
+(plums in summer, others in autumn). One harvest of three units per
+plant per game year is allowed. Unpicked fruit resets outside its
+season, while mature plants survive winter. One daily orchard watering
+uses a bottled-water or rain-barrel unit for all planted crops.
+Harvest goes into the existing 24-unit cupboard. Fruit plates use
+one unit, and Market buys fruit for 2 EUR per unit when shelf space
+and money permit. New fruit shelves start empty with no automatic
+external delivery. All crop markers persist and reset on visitor death.
+The maturity timing is deliberately accelerated; models are static
+procedural scenery with size and ripe-fruit states. Jam, greenhouse
+and compost remain future work.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

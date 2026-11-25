@@ -13,6 +13,59 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void orchardIsPerennialSeasonalAndConservesFruitOnSale() throws Exception {
+        Path file=directory.resolve("orchard.db");
+        try(var game=new GameSession(file)) {
+            game.move("south");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("orchard-plant-apples"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var p=town.player;p.ownsHouse=true;p.money=50;
+            var apple=OrchardLife.CROPS.getFirst();
+            OrchardLife.act(town,"orchard-plant-apples",1,720);
+            assertEquals(38,p.money);
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"orchard-plant-apples",1,720));
+            for(int day=1;day<=5;day++){
+                OrchardLife.set(town,OrchardLife.WATER,day);
+                OrchardLife.tick(town,day,1080);OrchardLife.tick(town,day,1080);
+            }
+            assertEquals(5,OrchardLife.get(town,OrchardLife.key(apple,"age")));
+            OrchardLife.set(town,OrchardLife.WATER,100);OrchardLife.tick(town,100,1080);
+            assertEquals(0,OrchardLife.get(town,OrchardLife.key(apple,"fruit")));
+            for(int day=186;day<=188;day++){
+                OrchardLife.set(town,OrchardLife.WATER,day);OrchardLife.tick(town,day,1080);
+            }
+            OrchardLife.act(town,"orchard-harvest-apples",188,1100);
+            assertEquals(3,FoodLife.quantity(p,"apples",true));
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"orchard-harvest-apples",188,1100));
+            for(int day=189;day<=192;day++){
+                OrchardLife.set(town,OrchardLife.WATER,day);OrchardLife.tick(town,day,1080);
+            }
+            assertEquals(0,OrchardLife.get(town,OrchardLife.key(apple,"fruit")));
+            OrchardLife.tick(town,276,1080);
+            assertEquals(5,OrchardLife.get(town,OrchardLife.key(apple,"age")));
+            for(int day=551;day<=553;day++){
+                OrchardLife.set(town,OrchardLife.WATER,day);OrchardLife.tick(town,day,1080);
+            }
+            OrchardLife.act(town,"orchard-harvest-apples",553,1100);
+            assertEquals(6,FoodLife.quantity(p,"apples",true));
+            FoodLife.change(p,"apples",true,-1);FoodLife.change(p,"apples",false,1);
+            p.place=TownLife.Place.MARKET;p.destination=p.place;
+            town.employerFunds.put("shop-assistant",20);
+            RetailLife.buyFruit(town,"apples",720);
+            assertEquals(40,p.money);assertEquals(18,town.employerFunds.get("shop-assistant"));
+            assertEquals(1,town.retailStock.get("apples"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(5,game.snapshot().player().pantry().get("apples"));
+            assertEquals(5,game.snapshot().orchard().plants().getFirst().age());
+            assertTrue(game.snapshot().orchard().plants().getFirst().planted());
+        }
+    }
+
+    @Test
     void homeHensRequireCareAndPersistEggsAndMarketPayments() throws Exception {
         Path file=directory.resolve("hens.db");
         try(var game=new GameSession(file)) {

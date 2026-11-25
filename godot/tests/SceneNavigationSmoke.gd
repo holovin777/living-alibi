@@ -504,14 +504,27 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    home = home.duplicate(true)
+    home["orchard"] = {"plants":[{"id":"apples","label":"Apple tree","planted":true,"age":5,"fruit":3,"ready":true,"season":"AUTUMN","marketFree":12}]}
+    world._on_world_updated(home)
+    world._avatar.position = world.ORCHARD_CENTER
+    world._render_actions()
+    if not _check(world._near_orchard() and _has_button(world._action_choices,"Harvest apples")
+            and world._scenery.get_node("FruttetoPrivato/Plant0/Tree/Fruit").visible
+            and not world._can_stand(world.ORCHARD_PLOTS[0],world.WALKER_RADIUS),
+            "orchard shows mature fruit and local harvest"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
     var trade := _world("MARKET","Market")
-    trade["player"]["bag"] = {"vegetables":2,"eggs":1}
+    trade["player"]["bag"] = {"vegetables":2,"eggs":1,"apples":1}
+    trade["orchard"] = {"plants":[{"id":"apples","marketFree":12}],"marketBudget":20}
     trade["hens"] = {"marketFree":1,"marketBudget":20}
     trade["garden"] = {"marketFree":1,"marketBudget":20}
     world._on_world_updated(trade)
     world._avatar.position = world.KIOSK_POSITION+Vector3(0,0,1.5)
     world._render_actions()
-    if not _check(_has_button(world._action_choices,"Sell vegetables") and _has_button(world._action_choices,"Sell eggs"),"market accepts carried vegetables and eggs"):
+    if not _check(_has_button(world._action_choices,"Sell vegetables") and _has_button(world._action_choices,"Sell eggs") and _has_button(world._action_choices,"Sell apples"),"market accepts carried produce"):
         return
     world._on_world_updated(_world("PARK","Park"))
 

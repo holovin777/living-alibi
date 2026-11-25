@@ -28,6 +28,8 @@ const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
 const GARDEN_CENTER := Vector3(11,0,11)
 const COOP_CENTER := Vector3(-10,0,-10)
+const ORCHARD_CENTER := Vector3(7.5,0,-9.5)
+const ORCHARD_PLOTS := [Vector3(5.5,0,-12),Vector3(9.5,0,-12),Vector3(5.5,0,-7),Vector3(9.5,0,-7)]
 const ROOM_BOUNDS := Rect2(-13.0,4.0,9.0,10.0)
 const ROOM_EXIT := Vector3(-3.0,0,8.5)
 const BED_POSITION := Vector3(-11.3,0,6.1)
@@ -186,6 +188,8 @@ func _process(delta: float) -> void:
         _hint.text = "F: choose a driving route."
     elif _near_rack() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
         _hint.text = "P: park or retrieve your bicycle · B: ride/walk."
+    elif _near_orchard():
+        _hint.text = "F: care for the fruit orchard."
     elif _near_coop():
         _hint.text = "F: care for chickens or collect eggs."
     elif _near_garden():
@@ -292,8 +296,11 @@ func _near_garden() -> bool:
 func _near_coop() -> bool:
     return _current_place=="SOUTH_RESIDENCES" and _owns_house() and _avatar.position.distance_to(COOP_CENTER)<4.5
 
+func _near_orchard() -> bool:
+    return _current_place=="SOUTH_RESIDENCES" and _owns_house() and _avatar.position.distance_to(ORCHARD_CENTER)<4.5
+
 func _near_home_station() -> bool:
-    return _near_room_bed() or _near_kitchen() or _near_bath() or _near_garden() or _near_coop()
+    return _near_room_bed() or _near_kitchen() or _near_bath() or _near_garden() or _near_coop() or _near_orchard()
 
 func _sync_guest_room() -> void:
     for district in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"]:
@@ -747,6 +754,7 @@ func _generate_chunk(place_id: String) -> void:
             _build_guesthouse(true)
             _build_home_garden()
             _build_home_coop()
+            _build_orchard()
         "PORTICI":
             _build_portici()
         "CENTRO":
@@ -1062,6 +1070,12 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
+    if _current_place=="SOUTH_RESIDENCES" and _owns_house():
+        var plants: Array = _last_snapshot.get("orchard",{}).get("plants",[])
+        for n in range(mini(plants.size(),4)):
+            var plot: Vector3 = ORCHARD_PLOTS[n]
+            if bool(plants[n].get("planted",false)) and p.distance_to(Vector2(plot.x,plot.z))<radius+0.30:
+                return false
     if _current_place=="SOUTH_RESIDENCES" and _owns_house() and bool(_last_snapshot.get("hens",{}).get("coop",false)):
         if Rect2(Vector2(COOP_CENTER.x-2.6,COOP_CENTER.z-2.4),Vector2(5.2,4.8)).grow(radius).has_point(p):
             return false
@@ -1600,6 +1614,53 @@ func _sync_coop() -> void:
     for n in range(6):
         var egg := coop.get_node("Egg"+str(n+1)) as Node3D
         egg.visible = n<int(report.get("eggs",0))
+
+func _build_orchard() -> void:
+    var orchard := Node3D.new()
+    orchard.name = "FruttetoPrivato"
+    _scenery.add_child(orchard)
+    _sign(orchard,"Frutteto · F",ORCHARD_CENTER+Vector3(0,2.4,3.5))
+    for n in range(4):
+        var plot: Vector3 = ORCHARD_PLOTS[n]
+        _box(orchard,Vector3(1.8,0.05,1.8),Color("#866449"),plot+Vector3(0,0.02,0))
+        var plant := Node3D.new()
+        plant.name = "Plant"+str(n)
+        plant.position = plot
+        orchard.add_child(plant)
+        var trunk := Node3D.new()
+        trunk.name = "Tree"
+        plant.add_child(trunk)
+        _cylinder(trunk,0.15,1.7,Color("#73523b"),Vector3(0,0.85,0))
+        _sphere(trunk,0.8,Color("#4c783d"),Vector3(0,1.9,0))
+        if n==3:
+            _box(trunk,Vector3(1.7,0.12,0.12),Color("#997b59"),Vector3(0,1.25,0))
+            _box(trunk,Vector3(0.12,1.5,0.12),Color("#997b59"),Vector3(-0.8,0.75,0))
+            _box(trunk,Vector3(0.12,1.5,0.12),Color("#997b59"),Vector3(0.8,0.75,0))
+        var fruit := Node3D.new()
+        fruit.name = "Fruit"
+        trunk.add_child(fruit)
+        var colors := [Color("#c64b40"),Color("#c5ac49"),Color("#69518b"),Color("#60537e")]
+        for x in [-0.55,0.0,0.55]:
+            _sphere(fruit,0.13,colors[n],Vector3(x,1.7,0.48))
+        fruit.visible = false
+        plant.visible = false
+
+func _sync_orchard() -> void:
+    if not _chunks.has("SOUTH_RESIDENCES"):
+        return
+    var root: Node3D = _chunks["SOUTH_RESIDENCES"]["root"]
+    var plants: Array = _last_snapshot.get("orchard",{}).get("plants",[])
+    for n in range(4):
+        var model := root.get_node_or_null("FruttetoPrivato/Plant"+str(n)) as Node3D
+        if model==null:
+            continue
+        var data: Dictionary = plants[n] if n<plants.size() else {}
+        model.visible = _owns_house() and bool(data.get("planted",false))
+        var tree := model.get_node("Tree") as Node3D
+        var size := 0.30+0.14*float(data.get("age",0))
+        tree.scale = Vector3.ONE*size
+        var fruit := tree.get_node("Fruit") as Node3D
+        fruit.visible = bool(data.get("ready",false))
 
 func _build_portici() -> void:
     var street := Node3D.new()
@@ -2478,7 +2539,22 @@ func _render_actions() -> void:
         "CENTRO":
             _action_choices.add_child(_button("Job noticeboard",_find_jobs))
         "NORTH_RESIDENCES", "SOUTH_RESIDENCES":
-            if _near_coop():
+            if _near_orchard():
+                var orchard: Dictionary = _last_snapshot.get("orchard",{})
+                for plant in orchard.get("plants",[]):
+                    var id := str(plant.get("id",""))
+                    var label := Label.new()
+                    label.text = "%s · %s | Growth %s/5 | Fruit %s/3" % [plant.get("label",id),plant.get("season",""),plant.get("age",0),plant.get("fruit",0)]
+                    _action_choices.add_child(label)
+                    if not bool(plant.get("planted",false)) and not bool(orchard.get("winter",false)) and not bool(orchard.get("wateredToday",false)):
+                        _action_choices.add_child(_button("Plant %s · %s EUR" % [plant.get("label",id),plant.get("price",0)],_garden_action.bind("orchard-plant-"+id)))
+                    elif bool(plant.get("ready",false)):
+                        _action_choices.add_child(_button("Harvest "+id,_garden_action.bind("orchard-harvest-"+id)))
+                if not bool(orchard.get("winter",false)) and not bool(orchard.get("rainy",false)) and not bool(orchard.get("wateredToday",false)) and int(_last_snapshot.get("minute",0))<1080:
+                    _action_choices.add_child(_button("Water orchard · 1 water",_garden_action.bind("orchard-water")))
+                    if int(_last_snapshot.get("garden",{}).get("rainwater",0))>0:
+                        _action_choices.add_child(_button("Water orchard from barrel",_garden_action.bind("orchard-water-rain")))
+            elif _near_coop():
                 var hens: Dictionary = _last_snapshot.get("hens",{})
                 if not bool(hens.get("coop",false)):
                     _action_choices.add_child(_button("Build chicken coop · 20 EUR",_garden_action.bind("build-coop")))
@@ -2524,7 +2600,7 @@ func _render_actions() -> void:
                 var stock := Label.new()
                 stock.text = "Cupboard %s/24" % _inventory_count(pantry)
                 _action_choices.add_child(stock)
-                for item in ["bread","water","flour","eggs","pasta","vegetables","milk","rice"]:
+                for item in ["bread","water","flour","eggs","pasta","vegetables","milk","rice","apples","pears","plums","grapes"]:
                     if item not in ["bread","water"] and int(bag.get(item,0))+int(pantry.get(item,0)) == 0:
                         continue
                     var line := HBoxContainer.new()
@@ -2536,6 +2612,9 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Frittata · 20m (eggs + veg)",_room_cook.bind("frittata")))
                 _action_choices.add_child(_button("Pancakes · 25m (flour + eggs + milk)",_room_cook.bind("pancakes")))
                 _action_choices.add_child(_button("Rice verdure · 25m (rice + veg + water)",_room_cook.bind("rice-verdure")))
+                for fruit in ["apple","pear","plum","grape"]:
+                    if int(pantry.get(fruit+"s",0))>0:
+                        _action_choices.add_child(_button("Prepare "+fruit+" plate · 5m",_room_cook.bind(fruit+"-plate")))
             elif _near_bath():
                 _action_choices.add_child(_button("Wash · 10m",_room_wash))
             elif _near_kiosk():
@@ -2562,6 +2641,13 @@ func _render_actions() -> void:
                     var sale := _button("Sell vegetables · 2 EUR / unit",_garden_action.bind("sell-vegetables"))
                     sale.disabled = int(trade.get("marketFree",0))<=0 or int(trade.get("marketBudget",0))<2
                     _action_choices.add_child(sale)
+                var orchard: Dictionary = _last_snapshot.get("orchard",{})
+                for fruit in orchard.get("plants",[]):
+                    var fruit_id := str(fruit.get("id",""))
+                    if int(player.get("bag",{}).get(fruit_id,0))>0:
+                        var fruit_sale := _button("Sell "+fruit_id+" · 2 EUR / unit",_garden_action.bind("sell-fruit-"+fruit_id))
+                        fruit_sale.disabled = int(fruit.get("marketFree",0))<=0 or int(orchard.get("marketBudget",0))<2
+                        _action_choices.add_child(fruit_sale)
                 var eggs: Dictionary = _last_snapshot.get("hens",{})
                 if int(player.get("bag",{}).get("eggs",0))>0:
                     var egg_sale := _button("Sell eggs · 2 EUR / unit",_garden_action.bind("sell-eggs"))
@@ -2752,7 +2838,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (_near_garden() or _near_coop() or (action in ["sell-vegetables","sell-eggs"] and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if (_near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs"] or action.begins_with("sell-fruit-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:
@@ -2793,7 +2879,7 @@ func _update_bag() -> void:
     _bag_label.text = "Bag %s/12 | %s" % [_inventory_count(bag),", ".join(lines)]
     _bag_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     var remaining := maxi(0,int(player.get("roomUntil",0)) - ((int(_last_snapshot.get("day",1))-1)*1440+int(_last_snapshot.get("minute",0))))
-    _housing_label.text = "Housing: North guesthouse · %s h left" % ceili(remaining/60.0) if bool(player.get("roomActive",false)) else "Housing: no room"
+    _housing_label.text = "Housing: Casa del Glicine (owned)" if _owns_house() else ("Housing: North guesthouse · %s h left" % ceili(remaining/60.0) if bool(player.get("roomActive",false)) else "Housing: no room")
     _eat_button.disabled = bread == 0 or int(player.get("hunger",0)) == 0
     _water_button.disabled = water == 0 or int(player.get("thirst",0)) == 0
 
@@ -2903,6 +2989,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _sync_guest_room()
     _sync_garden()
     _sync_coop()
+    _sync_orchard()
     _sync_owned_car()
     _car_label.text = "Car: none" if _car_place().is_empty() else "Car: %s | Fuel %s/12 | Condition %s%%" % [_car_place().capitalize(),player.get("carFuel",0),player.get("carCondition",0)]
     _refresh_transport_buttons(false)
