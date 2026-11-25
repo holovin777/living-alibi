@@ -22,6 +22,7 @@ const WALKER_RADIUS := 0.32
 const COLLISION_STEP := 0.12
 const ROAD_EDGE := 24.0
 const ROAD_HALF_WIDTH := 2.0
+const MOTOR_WALK_HALF_WIDTH := 4.5
 const ROAD_TRIGGER := 23.8
 const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
@@ -262,7 +263,8 @@ func _process(delta: float) -> void:
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
-        _hint.text = "District crossing · walk forward to travel"
+        var next_district := _road_destination(_avatar.position, ROAD_TRIGGER)
+        _hint.text = tr("Walk forward to %s") % str(TownLayout.LABELS.get(next_district,next_district.capitalize()))
     elif _near_truck():
         _hint.text = "F: assigned freight truck."
     elif _near_car():
@@ -1069,7 +1071,32 @@ func _build_road_links(place_id: String) -> void:
                 direction * 16.5 + Vector3(0,0.025,0),"asphalt" if motor else "paving")
         if motor:
             _mark_motor_road(roads,direction)
+        _build_street_approach(roads,place_id,direction,motor)
         _sign(roads, str(TownLayout.LABELS.get(id,str(id).capitalize())), direction * 19.0 + Vector3(0,2.8,0))
+
+func _build_street_approach(parent: Node3D,place_id: String,direction: Vector3,motor: bool) -> void:
+    # Align paving with the existing 48 m district seam. Keep authored
+    # interiors and obstacles unchanged; this is a surface connection.
+    var approach := Node3D.new()
+    approach.name="StreetApproach"
+    approach.rotation.y=atan2(direction.x,direction.z)
+    parent.add_child(approach)
+    var paving := Color("#b4a58d") if place_id in ["CENTRO","PORTICI"] else Color("#aca595")
+    if motor:
+        _box(approach,Vector3(6.4,0.05,3.0),Color("#42484b"),Vector3(0,0.025,7.5),"asphalt")
+        for x in [-4.0,4.0]:
+            _box(approach,Vector3(1.0,0.08,3.0),paving,Vector3(x,0.04,7.5),"paving")
+        # A short paved shoulder at each inner end rather than an abrupt
+        # asphalt-to-grass edge. Does not imply continuous vehicle routing.
+        _box(approach,Vector3(9.0,0.055,1.2),paving,Vector3(0,0.028,5.4),"paving")
+    else:
+        _box(approach,Vector3(4.0,0.055,5.0),paving,Vector3(0,0.028,6.5),"paving")
+        for x in [-2.10,2.10]:
+            _box(approach,Vector3(0.18,0.08,15),Color("#c5bbaa"),Vector3(x,0.04,16.5))
+    # Street name sign is outside the usable corridor, not a collision trap.
+    var side := 4.9 if motor else 2.65
+    _box(approach,Vector3(0.10,2.0,0.10),Color("#606868"),Vector3(side,1.0,21))
+    _box(approach,Vector3(0.95,0.36,0.11),Color("#426c82"),Vector3(side,2.05,21))
 
 func _mark_motor_road(parent: Node3D,direction: Vector3) -> void:
     var lane := Node3D.new()
@@ -1256,7 +1283,8 @@ func _road_destination(at: Vector3, minimum: float) -> String:
         var direction: Vector3 = key
         var along := at.dot(direction)
         var lateral := (at - direction * along).length()
-        if along >= minimum and along <= ROAD_EDGE + 0.001 and lateral <= ROAD_HALF_WIDTH:
+        var walk_width := MOTOR_WALK_HALF_WIDTH if TownLayout.motor_road(_current_place,str(_road_links[key])) else ROAD_HALF_WIDTH
+        if along >= minimum and along <= ROAD_EDGE + 0.001 and lateral <= walk_width:
             return str(_road_links[key])
     return ""
 
