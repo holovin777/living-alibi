@@ -38,9 +38,24 @@ server leaves a visual preview only and shows a connection error.
 The launcher saves logs in `data/server.log`. Don't run another world
 writer (such as the console) against the same SQLite file at the same time.
 
+## Camera and viewpoint
+
+The 3D preview now **starts in first person**: you look out from the ordinary
+visitor's eye level rather than watching a fixed camera behind a model.
+Press **V** to switch between first person and third person at any time;
+the camera setting is only visual and never changes the Java/SQLite world.
+
+Click the empty 3D scene to capture the mouse and look around.
+Press **Esc** to release the cursor. Pressing **E** at the travel gate
+or **F** at a local kiosk also releases the cursor whenever the
+clickable action menu opens. In third person the visitor's temporary
+simple avatar is visible; in first person the avatar mesh is hidden
+to prevent it from blocking the view. Both modes use the same local
+WASD movement and interaction ranges.
+
 ## Controls
 
-- **WASD / arrow keys:** move the placeholder person inside the visible
+- **WASD / arrow keys:** walk relative to the camera inside the visible
   *local public district* (this is a visual preview, not per-meter
   networked gameplay).
 - **Walk to the yellow gate, press E:** select a public district. The
