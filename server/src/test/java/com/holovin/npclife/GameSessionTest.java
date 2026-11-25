@@ -2966,6 +2966,46 @@ class GameSessionTest {
     }
 
     @Test
+    void sharedMemoriesPersistAcrossYearsAndReloadWithoutInheritingReputation() throws Exception {
+        Path file=directory.resolve("social-memory.db");
+        String id;
+        try(var game=new GameSession(file)) { }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=town.people.values().iterator().next();
+            id=resident.id;resident.place=TownLife.Place.PARK;
+            resident.travelRemaining=0;resident.activity="FREE_TIME";resident.fatigue=90;
+            PlayerLife.speak(town,id,"How are you?",1,450);
+            PlayerLife.speak(town,id,"I'm here for you.",1,451);
+            var contact=town.player.contacts.get(id);
+            int affinity=contact.affinity;
+            PlayerLife.speak(town,id,"I'm here for you.",1,452);
+            assertEquals(affinity,contact.affinity);
+            assertEquals(1,SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT));
+            PlayerLife.speak(town,id,"Leave me alone!",2,450);
+            assertTrue(SocialMemoryLife.unresolved(town,id));
+            assertTrue(PlayerLife.speak(town,id,"What do you remember about me?",2,451).contains("Trust takes time"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            var resident=town.get(id);
+            resident.place=TownLife.Place.PARK;resident.travelRemaining=0;resident.activity="FREE_TIME";
+            assertEquals(1,SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT));
+            assertEquals(2,SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.HURT));
+            assertTrue(PlayerLife.speak(town,id,"Cosa ricordi di me?",1097,450).contains("Trust takes time"));
+            PlayerLife.speak(town,id,"I'm sorry.",1097,451);
+            assertFalse(SocialMemoryLife.unresolved(town,id));
+            assertTrue(PlayerLife.speak(town,id,"What do you remember about me?",1097,452).contains("apology"));
+            var next=town.copy();next.player.incarnation++;
+            assertEquals(0,SocialMemoryLife.last(next,id,SocialMemoryLife.Kind.SUPPORT));
+            assertFalse(SocialMemoryLife.unresolved(next,id));
+            assertEquals(1,SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT));
+        }
+    }
+
+    @Test
     void businessMachineServiceConsumesRealCityPartsAndSurvivesServerRestart() throws Exception {
         Path file=directory.resolve("worn-machine.db");
         try(var game=new GameSession(file)) {

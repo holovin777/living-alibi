@@ -2960,6 +2960,8 @@ func _create_interface() -> void:
     dialog_col.add_child(_dialog_reply)
     dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
     dialog_col.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
+    dialog_col.add_child(_button("Offer support",_send_dialog.bind("I'm here for you.")))
+    dialog_col.add_child(_button("Ask about shared memories",_send_dialog.bind("What do you remember about me?")))
     dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
     dialog_col.add_child(_button("Allow sharing my name",_send_dialog.bind("You can tell people my name.")))
     dialog_col.add_child(_button("Ask for visitor news",_send_dialog.bind("Any news about visitors?")))
