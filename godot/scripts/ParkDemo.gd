@@ -750,6 +750,7 @@ func _generate_chunk(place_id: String) -> void:
             _build_farm()
         "NORTH_RESIDENCES":
             _build_guesthouse()
+            _build_construction_site()
         "SOUTH_RESIDENCES":
             _build_guesthouse(true)
             _build_home_garden()
@@ -1440,6 +1441,45 @@ func _build_farm() -> void:
             wheel.rotation_degrees.z = 90
     _sign(farm,"Farm office · F",KIOSK_POSITION+Vector3(0,2.2,0))
     _lamp(farm,Vector3(-3,0,8))
+
+func _build_construction_site() -> void:
+    var site := Node3D.new()
+    site.name = "CantiereVerdi"
+    _scenery.add_child(site)
+    site.position = Vector3(12,0,12)
+    _box(site,Vector3(6,0.06,6),Color("#aa9475"),Vector3.ZERO)
+    _sign(site,"Cantiere Verdi",Vector3(0,1.5,-3.5))
+    _add_obstacle(Vector3(12,0,12),Vector2(6,6))
+    var foundation := Node3D.new()
+    foundation.name = "Foundation"
+    site.add_child(foundation)
+    _box(foundation,Vector3(5.4,0.35,5.4),Color("#a4a29a"),Vector3(0,0.18,0))
+    var walls := Node3D.new()
+    walls.name = "Walls"
+    site.add_child(walls)
+    _box(walls,Vector3(5.0,2.8,5.0),Color("#d4b997"),Vector3(0,1.75,0))
+    var roof := Node3D.new()
+    roof.name = "Roof"
+    site.add_child(roof)
+    _box(roof,Vector3(5.5,0.35,5.5),Color("#92563d"),Vector3(0,3.3,0))
+    _box(roof,Vector3(1.0,2.0,0.08),Color("#72523e"),Vector3(0,1.2,-2.53))
+    for x in [-1.5,1.5]:
+        _box(roof,Vector3(0.85,0.9,0.08),Color("#7199aa"),Vector3(x,1.9,-2.53))
+    foundation.visible = false
+    walls.visible = false
+    roof.visible = false
+
+func _sync_construction_site() -> void:
+    if not _chunks.has("NORTH_RESIDENCES"):
+        return
+    var root: Node3D = _chunks["NORTH_RESIDENCES"]["root"]
+    var site := root.get_node_or_null("CantiereVerdi") as Node3D
+    if site==null:
+        return
+    var stage := int(_last_snapshot.get("construction",{}).get("stage",0))
+    site.get_node("Foundation").visible = stage>=1
+    site.get_node("Walls").visible = stage>=2
+    site.get_node("Roof").visible = stage>=3
 
 func _build_guesthouse(owned: bool = false) -> void:
     var house := Node3D.new()
@@ -2867,6 +2907,25 @@ func _render_actions() -> void:
                                 _business_hire.bind(id)))
                 _action_choices.add_child(_button("Withdraw 10 EUR", _business_withdraw.bind(10)))
         "OFFICE":
+            var construction: Dictionary = _last_snapshot.get("construction",{})
+            var stage := int(construction.get("stage",0))
+            var construction_info := Label.new()
+            construction_info.text = "Cantiere Verdi · %s/3 | Steel %s | Parts %s | Crew EUR %s" % [stage,construction.get("steel",0),construction.get("parts",0),construction.get("reserve",0)]
+            _action_choices.add_child(construction_info)
+            if not bool(construction.get("owned",false)) and stage<3:
+                _action_choices.add_child(_button("Buy plot · 60 EUR",_garden_action.bind("construction-buy")))
+            elif bool(construction.get("owned",false)):
+                if stage<3:
+                    _action_choices.add_child(_button("Buy steel · 4 EUR (factory %s)" % construction.get("factorySteel",0),_garden_action.bind("construction-steel")))
+                    _action_choices.add_child(_button("Buy parts · 5 EUR (factory %s)" % construction.get("factoryParts",0),_garden_action.bind("construction-parts")))
+                    _action_choices.add_child(_button("Fund crew · 10 EUR",_garden_action.bind("construction-fund")))
+                    if bool(construction.get("enabled",false)):
+                        _action_choices.add_child(_button("Pause construction",_garden_action.bind("construction-pause")))
+                    else:
+                        _action_choices.add_child(_button("Authorize crew",_garden_action.bind("construction-start")))
+                else:
+                    _action_choices.add_child(_button("Sell finished house · 150 EUR",_garden_action.bind("construction-sell")))
+                _action_choices.add_child(_button("Withdraw unused crew funds",_garden_action.bind("construction-withdraw")))
             var rental: Dictionary = _last_snapshot.get("rental",{})
             var property_info := Label.new()
             property_info.text = "Appartamento Verdi · North residences | %s" % ["Occupied" if bool(rental.get("occupied",false)) else "Vacant"]
@@ -3032,7 +3091,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (((action.begins_with("bank-") or action.begins_with("rental-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if (((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:
@@ -3184,6 +3243,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _sync_garden()
     _sync_coop()
     _sync_orchard()
+    _sync_construction_site()
     _sync_owned_car()
     _car_label.text = "Car: none" if _car_place().is_empty() else "Car: %s | Fuel %s/12 | Condition %s%%" % [_car_place().capitalize(),player.get("carFuel",0),player.get("carCondition",0)]
     _refresh_transport_buttons(false)

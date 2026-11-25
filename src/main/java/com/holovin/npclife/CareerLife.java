@@ -52,6 +52,7 @@ final class CareerLife {
         town.employerFunds.putIfAbsent(FuelLife.SUPPLIER,0);
         town.employerFunds.putIfAbsent(StallSupplyLife.CARRIER,0);
         town.employerFunds.putIfAbsent(BankLife.ACCOUNT,500);
+        town.employerFunds.putIfAbsent(ConstructionLife.CONTRACTOR,0);
     }
 
     private static Offer offer(String id) {
