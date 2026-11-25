@@ -47,7 +47,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
                              int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
-                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations) { }
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -84,7 +84,7 @@ public final class GameSession implements AutoCloseable {
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,p.hygiene,
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
-                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of());
+                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
         var residents=PlayerLife.visible(town).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
@@ -323,6 +323,10 @@ public final class GameSession implements AutoCloseable {
         return apply(copy,10,HousingLife.wash(copy.player,state.day,state.minute));
     }
 
+    public synchronized ActionView buyHouse() throws SQLException {
+        var copy=town.copy();
+        return apply(copy,5,HousingLife.buyHouse(copy,state.day,state.minute));
+    }
     public synchronized ActionView rentRoom() throws SQLException {
         var copy=town.copy();
         return apply(copy,5,HousingLife.rent(copy,state.day,state.minute));
@@ -330,7 +334,7 @@ public final class GameSession implements AutoCloseable {
     public synchronized ActionView sleepInRoom(int hours) throws SQLException {
         var copy=town.copy();
         var result=HousingLife.sleep(copy.player,hours,state.day,state.minute);
-        return apply(copy,result.minutes(),"Slept in your guest room for "+hours+" hours.");
+        return apply(copy,result.minutes(),"Slept in your home for "+hours+" hours.");
     }
 
     public synchronized ActionView sleep(int hours) throws SQLException {

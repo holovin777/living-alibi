@@ -461,6 +461,22 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    var home := _world("SOUTH_RESIDENCES","South residences")
+    world._on_world_updated(home)
+    var house_door := world._scenery.get_node("CasaDelGlicine/LeaseDoor") as Node3D
+    if not _check(house_door.visible and not world._can_stand(Vector3(-5,0,8.5),world.WALKER_RADIUS)
+            and _has_button(world._action_choices,"Buy Casa del Glicine"),"unowned house is locked and offered for sale"):
+        return
+    home = home.duplicate(true)
+    home["player"]["ownsHouse"] = true
+    world._on_world_updated(home)
+    world._avatar.position = Vector3(-9.8,0,7.7)
+    world._render_actions()
+    if not _check(not house_door.visible and world._near_room_bed()
+            and _has_button(world._action_choices,"Sleep in your house"),"owned house offers permanent sheltered sleep"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)

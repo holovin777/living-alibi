@@ -261,11 +261,14 @@ func _near_kiosk() -> bool:
     var target := DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION
     return _avatar.position.distance_to(target) < INTERACTION_RADIUS
 
+func _owns_house() -> bool:
+    return bool(_last_snapshot.get("player",{}).get("ownsHouse",false))
+
 func _has_room_lease() -> bool:
-    return bool(_last_snapshot.get("player",{}).get("roomActive",false))
+    return _owns_house() if _current_place=="SOUTH_RESIDENCES" else bool(_last_snapshot.get("player",{}).get("roomActive",false))
 
 func _inside_guest_room() -> bool:
-    return _current_place == "NORTH_RESIDENCES" and ROOM_BOUNDS.has_point(
+    return _current_place in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"] and ROOM_BOUNDS.has_point(
             Vector2(_avatar.position.x,_avatar.position.z))
 
 func _near_room_bed() -> bool:
@@ -281,16 +284,18 @@ func _near_home_station() -> bool:
     return _near_room_bed() or _near_kitchen() or _near_bath()
 
 func _sync_guest_room() -> void:
-    if _chunks.has("NORTH_RESIDENCES"):
-        var root: Node3D = _chunks["NORTH_RESIDENCES"]["root"]
-        var door := root.get_node_or_null("CasaOspiti/LeaseDoor") as Node3D
+    for district in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"]:
+        if not _chunks.has(district):
+            continue
+        var root: Node3D = _chunks[district]["root"]
+        var door := root.get_node_or_null("CasaOspiti/LeaseDoor" if district=="NORTH_RESIDENCES" else "CasaDelGlicine/LeaseDoor") as Node3D
         if door != null:
-            door.visible = not _has_room_lease()
+            door.visible = not (_owns_house() if district=="SOUTH_RESIDENCES" else bool(_last_snapshot.get("player",{}).get("roomActive",false)))
     if _inside_guest_room() and not _has_room_lease():
         _avatar.position = ROOM_EXIT
         _action_panel.visible = false
         _follow_player()
-        _message.text = "Your lease ended. Renew at reception to enter again."
+        _message.text = "This home is locked. Visit the local property office or reception."
 
 func _cycling() -> bool:
     var p: Dictionary = _last_snapshot.get("player",{})
@@ -726,6 +731,8 @@ func _generate_chunk(place_id: String) -> void:
             _build_farm()
         "NORTH_RESIDENCES":
             _build_guesthouse()
+        "SOUTH_RESIDENCES":
+            _build_guesthouse(true)
         "PORTICI":
             _build_portici()
         "CENTRO":
@@ -1041,7 +1048,7 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
-    if _current_place == "NORTH_RESIDENCES" and not _has_room_lease() and ROOM_BOUNDS.grow(radius).has_point(p):
+    if _current_place in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"] and not _has_room_lease() and ROOM_BOUNDS.grow(radius).has_point(p):
         return false
     for obstacle in _obstacles:
         var nearest := p.clamp(obstacle.position, obstacle.end)
@@ -1399,11 +1406,11 @@ func _build_farm() -> void:
     _sign(farm,"Farm office · F",KIOSK_POSITION+Vector3(0,2.2,0))
     _lamp(farm,Vector3(-3,0,8))
 
-func _build_guesthouse() -> void:
+func _build_guesthouse(owned: bool = false) -> void:
     var house := Node3D.new()
-    house.name = "CasaOspiti"
+    house.name = "CasaDelGlicine" if owned else "CasaOspiti"
     _scenery.add_child(house)
-    var plaster := Color("#d6c4a3")
+    var plaster := Color("#c6b5a6") if owned else Color("#d6c4a3")
     var interior := Color("#e7d9bd")
     _box(house,Vector3(9,0.08,10),Color("#bd9c79"),Vector3(-8.5,0.025,9))
     _room_wall(house,Vector3(-13,0,9),Vector2(0.24,10),plaster)
@@ -1417,7 +1424,7 @@ func _build_guesthouse() -> void:
     house.add_child(door)
     _box(door,Vector3(0.16,2.55,2.95),Color("#715039"),Vector3(-4,1.275,8.5))
     _sphere(door,0.08,Color("#d5b16e"),Vector3(-3.88,1.1,7.5))
-    door.visible = not _has_room_lease()
+    door.visible = not (_owns_house() if owned else bool(_last_snapshot.get("player",{}).get("roomActive",false)))
     _box(house,Vector3(9.25,0.22,10.3),Color("#ccb99c"),Vector3(-8.5,3.1,9))
     # Decorative upper storey; the actual rented studio is on ground level.
     _box(house,Vector3(9,3.2,10),Color("#c4a382"),Vector3(-8.5,4.8,9))
@@ -1426,8 +1433,13 @@ func _build_guesthouse() -> void:
         _box(house,Vector3(0.08,1.3,1.0),Color("#3b5051"),Vector3(-3.96,4.7,z))
         for offset in [-0.72,0.72]:
             _box(house,Vector3(0.14,1.4,0.35),Color("#486045"),Vector3(-3.86,4.7,z+offset))
-    _sign(house,"Casa Ospiti · Camera 1",Vector3(-3.7,3.35,8.5))
-    _sign(house,"Reception · F",KIOSK_POSITION+Vector3(0,2.2,0))
+    _sign(house,"Casa del Glicine" if owned else "Casa Ospiti · Camera 1",Vector3(-3.7,3.35,8.5))
+    _sign(house,"Property office · F" if owned else "Reception · F",KIOSK_POSITION+Vector3(0,2.2,0))
+    if owned:
+        _box(house,Vector3(2.8,0.10,1.2),Color("#a58d71"),Vector3(-2.5,0.04,8.5))
+        for z in [5.0,12.0]:
+            _room_furniture(house,Vector3(-2.7,0,z),Vector3(0.5,0.45,0.55),Color("#8d6853"))
+            _sphere(house,0.35,Color("#7664a3"),Vector3(-2.7,0.8,z))
     # Bedroom opening from z=7 to z=10.
     _room_wall(house,Vector3(-8,0,5.5),Vector2(0.17,3),interior)
     _room_wall(house,Vector3(-8,0,12),Vector2(0.17,4),interior)
@@ -2337,10 +2349,10 @@ func _render_actions() -> void:
                     _apply_job.bind("machinist")))
         "CENTRO":
             _action_choices.add_child(_button("Job noticeboard",_find_jobs))
-        "NORTH_RESIDENCES":
+        "NORTH_RESIDENCES", "SOUTH_RESIDENCES":
             if _near_room_bed():
-                _action_choices.add_child(_button("Sleep in guest room · 2h",_sleep_room.bind(2)))
-                _action_choices.add_child(_button("Sleep in guest room · 8h",_sleep_room.bind(8)))
+                _action_choices.add_child(_button("Sleep in your house · 2h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 2h",_sleep_room.bind(2)))
+                _action_choices.add_child(_button("Sleep in your house · 8h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 8h",_sleep_room.bind(8)))
             elif _near_kitchen():
                 var bag: Dictionary = player.get("bag",{"bread":player.get("bread",0),"water":player.get("bottledWater",0)})
                 var pantry: Dictionary = player.get("pantry",{"bread":player.get("storedBread",0),"water":player.get("storedWater",0)})
@@ -2362,7 +2374,10 @@ func _render_actions() -> void:
             elif _near_bath():
                 _action_choices.add_child(_button("Wash · 10m",_room_wash))
             elif _near_kiosk():
-                _action_choices.add_child(_button("Rent / renew guest room · 35 EUR / 7 days",_rent_room))
+                if _current_place=="SOUTH_RESIDENCES" and not _owns_house():
+                    _action_choices.add_child(_button("Buy Casa del Glicine · 320 EUR",_buy_house))
+                elif _current_place=="NORTH_RESIDENCES" and not _owns_house():
+                    _action_choices.add_child(_button("Rent / renew guest room · 35 EUR / 7 days",_rent_room))
                 if _has_room_lease():
                     var instruction := Label.new()
                     instruction.text = "Your room is across the street. Walk to the bed."
@@ -2560,6 +2575,10 @@ func _room_cook(recipe_id: String) -> void:
 func _room_wash() -> void:
     if _near_bath() and _connected and not _api.is_busy():
         _api.room_wash()
+
+func _buy_house() -> void:
+    if _current_place=="SOUTH_RESIDENCES" and _near_kiosk() and _connected and not _api.is_busy():
+        _api.buy_house()
 
 func _rent_room() -> void:
     if _near_kiosk() and _connected and not _api.is_busy():

@@ -13,6 +13,44 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void housePurchaseEndsRentalAndKeepsPantryAcrossRestart() throws Exception {
+        Path file=directory.resolve("owned-home.db");
+        try(var game=new GameSession(file)) {
+            game.move("south");
+            assertThrows(IllegalArgumentException.class,game::buyHouse);
+            assertThrows(IllegalArgumentException.class,()->game.sleepInRoom(2));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            town.player.money=400;
+            town.player.roomUntil=HousingLife.now(state.day,state.minute)+10080;
+            town.player.storedBread=2;town.player.storedWater=1;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            game.buyHouse();
+            assertEquals(80,game.snapshot().player().money());
+            assertTrue(game.snapshot().player().ownsHouse());
+            assertFalse(game.snapshot().player().roomActive());
+            assertEquals(2,game.snapshot().player().storedBread());
+            assertThrows(IllegalArgumentException.class,game::buyHouse);
+            game.sleepInRoom(2);
+            game.transferRoomItem("bread",false);
+            game.move("north");
+            assertThrows(IllegalArgumentException.class,game::rentRoom);
+            assertThrows(IllegalArgumentException.class,()->game.sleepInRoom(2));
+        }
+        try(var game=new GameSession(file)) {
+            assertTrue(game.snapshot().player().ownsHouse());
+            assertEquals(1,game.snapshot().player().storedBread());
+            game.move("south");
+            game.cookRoomMeal();
+            assertEquals(0,game.snapshot().player().storedBread());
+            assertEquals(0,game.snapshot().player().storedWater());
+        }
+    }
+
+    @Test
     void logisticsDepotIsPublicAndSupportsCompanyManagement() throws Exception {
         Path file=directory.resolve("depot.db");
         try(var game=new GameSession(file)) {

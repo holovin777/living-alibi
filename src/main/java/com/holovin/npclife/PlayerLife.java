@@ -26,6 +26,7 @@ final class PlayerLife {
         int bread;
         int bottledWater;
         long roomUntil;
+        boolean ownsHouse;
         boolean ownsBicycle;
         boolean cycling;
         TownLife.Place bicycleParked;
@@ -53,7 +54,7 @@ final class PlayerLife {
             p.alive=alive;
             p.incarnation=incarnation;
             p.money=money;
-            p.bread=bread;p.bottledWater=bottledWater;p.roomUntil=roomUntil;
+            p.bread=bread;p.bottledWater=bottledWater;p.roomUntil=roomUntil;p.ownsHouse=ownsHouse;
             p.ownsBicycle=ownsBicycle;p.cycling=cycling;p.bicycleParked=bicycleParked;
             p.carPlace=carPlace;p.carFuel=carFuel;p.carCondition=carCondition;
             p.storedBread=storedBread;p.storedWater=storedWater;p.hygiene=hygiene;

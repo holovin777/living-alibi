@@ -586,6 +586,21 @@ not yet a separately purchased property, and garage repairs still
 use the existing shared technical spare-parts ledger. All views
 remain first person.
 
+## Casa del Glicine
+
+The south residences now contain a furnished buyable home with
+bedroom, kitchen, cupboard and bathroom, sharing the tested guest
+studio floor plan. Buy at the local blue kiosk for 320 EUR; payment
+goes to the finite city-maintenance account. The door stays locked
+until purchase. Purchase ends any existing lease without refund and
+moves its remaining pantry supplies, rather than cloning inventory.
+The existing sleep, storage, cooking and wash actions validate access
+to the correct district. No rent renewal is required for owners.
+Ownership persists in the visitor record; on visitor death the house
+returns to the public sale inventory for the new life. No sale by
+the living owner, rental income, customization, utility bills or
+separate real-estate market yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

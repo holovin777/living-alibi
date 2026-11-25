@@ -205,6 +205,10 @@ public class GameController {
         return session.transportMode(request.mode());
     }
 
+    @PostMapping("/actions/buy-house")
+    public GameSession.ActionView buyHouse() throws SQLException {
+        return session.buyHouse();
+    }
     @PostMapping("/actions/rent-room")
     public GameSession.ActionView rentRoom() throws SQLException {
         return session.rentRoom();
