@@ -165,6 +165,54 @@ class GameSessionTest {
     }
 
     @Test
+    void marketStallUsesRealStockPricesAndCustomerMoneyAcrossRestart() throws Exception {
+        Path file=directory.resolve("stall.db");
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            p.place=TownLife.Place.PARK;p.destination=p.place;p.travelRemaining=0;p.money=100;
+            assertThrows(IllegalArgumentException.class,()->MarketStallLife.act(town,"stall-register",720));
+            p.place=TownLife.Place.MARKET;p.destination=p.place;
+            MarketStallLife.act(town,"stall-register",720);
+            assertEquals(80,p.money);
+            FoodLife.change(p,"vegetables",false,2);
+            MarketStallLife.act(town,"stall-stock-vegetables",720);
+            MarketStallLife.act(town,"stall-stock-vegetables",720);
+            assertEquals(0,FoodLife.quantity(p,"vegetables",false));
+            MarketStallLife.act(town,"stall-price-up-vegetables",720);
+            MarketStallLife.act(town,"stall-open",720);
+            var buyer=new TownLife.Citizen("test-buyer","Test buyer","Worker",TownLife.Place.MARKET);
+            buyer.generationIndex=99;buyer.money=10;buyer.food=0;
+            assertNull(MarketStallLife.purchase(town,buyer,720));
+            MarketStallLife.act(town,"stall-price-down-vegetables",720);
+            MarketStallLife.act(town,"stall-price-down-vegetables",720);
+            p.place=TownLife.Place.PARK;
+            assertNull(MarketStallLife.purchase(town,buyer,720));
+            p.place=TownLife.Place.MARKET;
+            assertNotNull(MarketStallLife.purchase(town,buyer,720));
+            assertEquals(8,buyer.money);assertEquals(1,buyer.food);
+            assertEquals(82,p.money);
+            assertEquals(1,MarketStallLife.total(town));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            var report=MarketStallLife.report(town,720);
+            assertTrue(report.registered());assertTrue(report.open());assertEquals(1,report.stocked());
+            assertEquals(1,report.sales());assertEquals(2,report.revenue());assertEquals(82,p.money);
+            var buyer=new TownLife.Citizen("test-buyer","Test buyer","Worker",TownLife.Place.MARKET);
+            buyer.generationIndex=99;buyer.money=10;buyer.food=0;buyer.home=TownLife.Place.NORTH_RESIDENCES;
+            buyer.employed=false;
+            for(var resident:town.people.values())resident.food=3;
+            town.people.put(buyer.id,buyer);
+            state.minute=720;
+            PopulationLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(0,MarketStallLife.total(town));assertEquals(84,p.money);
+            assertEquals(8,buyer.money);
+            assertNull(MarketStallLife.purchase(town,buyer,720));
+        }
+    }
+
+    @Test
     void cellarConservesGrapesAndMaturesOneBatchAcrossRestart() throws Exception {
         Path file=directory.resolve("cellar.db");
         try(var db=new WorldDatabase(file)) {

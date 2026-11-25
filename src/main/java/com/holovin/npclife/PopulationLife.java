@@ -38,7 +38,7 @@ final class PopulationLife {
                 (carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
-        boolean needFood=c.food<2 && c.money>=9;
+        boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,minute)!=null);
         boolean needWater=c.water<2;
         // A repaired public fountain provides an affordable alternative to
         // market purchases, but only while finite filtered water is available.
@@ -81,7 +81,9 @@ final class PopulationLife {
             }
         }
         if(c.place==TownLife.Place.MARKET && marketOpen) {
-            if(c.food<2 && c.money>=9) {
+            String stallSale=MarketStallLife.purchase(town,c,minute);
+            if(stallSale!=null)TownLife.publish(town,clock,c.id,c.place,stallSale,events,observations);
+            else if(c.food<2 && c.money>=9) {
                 c.money-=9;c.food+=3;
                 TownLife.publish(town,clock,c.id,c.place,c.name+" purchased groceries.",events,observations);
             }
