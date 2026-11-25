@@ -410,7 +410,7 @@ func _animate_residents(delta: float) -> void:
     for child in _residents_root.get_children():
         var person := child as Node3D
         var activity := str(person.get_meta("activity", ""))
-        var walking := activity in ["WALKING", "WANDERING", "STROLLING"]
+        var walking := activity in ["WALKING", "WANDERING", "STROLLING", "FREE_TIME", "SHOPPING", "JOB_SEARCH"]
         var phase := float(person.get_meta("phase", 0.0))
         if walking:
             phase += delta * 0.65
