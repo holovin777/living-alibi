@@ -111,6 +111,14 @@ func _exercise() -> void:
             and world._chunks.has("CENTRO") and not world._chunks.has("QUARRY"),
             "park streams its eight nearest neighbours only"):
         return
+    if not _check(world._environment.background_mode==Environment.BG_SKY
+            and world._environment.sky.sky_material is ProceduralSkyMaterial
+            and world._surface_textures.size()==3
+            and world._ground_material.albedo_texture==world._surface_textures["grass"]
+            and world._chunks["SCHOOL"]["ground"].albedo_texture==world._surface_textures["grass"]
+            and world._scenery.has_node("TreeCrown"),
+            "procedural sky, textured shared ground and clustered trees are available"):
+        return
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
     var park_root: Node3D = world._chunks["PARK"]["root"]
     if not _check(school_root.position == Vector3(0,0,-48)
