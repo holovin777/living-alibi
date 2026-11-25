@@ -187,7 +187,26 @@ const IT := {
     "Inbox · Generated work notices": "Posta in arrivo · Avvisi di lavoro",
     "Handbook · Java / Spring / SQL": "Manuale · Java / Spring / SQL",
     "Catalog not deployed. Finish BD-103 to publish this service.": "Catalogo non pubblicato. Completa BD-103 per pubblicare il servizio.",
-    "503 Service Unavailable · Visit the server room.": "503 Servizio non disponibile · Vai in sala server."
+    "503 Service Unavailable · Visit the server room.": "503 Servizio non disponibile · Vai in sala server.",
+    "How are you?": "Come stai?",
+    "Seems: %s": "Sembra: %s",
+    "Calm": "Tranquillo",
+    "Happy": "Felice",
+    "Enthusiastic": "Entusiasta",
+    "Tired": "Stanco",
+    "Stressed": "Stressato",
+    "Irritated": "Irritato",
+    "Sad": "Triste",
+    "Lonely": "Solo",
+    "I'd rather not talk about it right now.": "Preferirei non parlarne adesso.",
+    "I'm exhausted. I need some rest.": "Sono esausto. Ho bisogno di riposo.",
+    "I'm a little irritated today.": "Oggi sono un po' irritato.",
+    "It's been a stressful day.": "È stata una giornata stressante.",
+    "I'm not feeling very well today.": "Oggi non mi sento molto bene.",
+    "I haven't had much company lately.": "Ultimamente ho avuto poca compagnia.",
+    "I'm having a good day, thanks!": "È una bella giornata, grazie!",
+    "I'm really enjoying my work today!": "Oggi mi piace davvero il mio lavoro!",
+    "I'm doing all right, thanks for asking.": "Sto bene, grazie per avermelo chiesto."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
