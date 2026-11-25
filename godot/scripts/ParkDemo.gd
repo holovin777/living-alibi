@@ -45,6 +45,7 @@ const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 const TownAudio = preload("res://scripts/TownAudio.gd")
 const FirstPersonHands = preload("res://scripts/FirstPersonHands.gd")
+const TownPhone = preload("res://scripts/TownPhone.gd")
 const TownVisuals = preload("res://scripts/TownVisuals.gd")
 var _sky_material: ProceduralSkyMaterial
 var _surface_textures: Dictionary = {}
@@ -125,6 +126,7 @@ var _weather_fx: Node3D
 var _town_audio: Node3D
 var _hands: Node3D
 var _held_label: Label
+var _phone: PanelContainer
 var _api
 var _current_place := ""
 var _road_links: Dictionary = {}
@@ -227,7 +229,7 @@ func _process(delta: float) -> void:
     var direction := Vector3.ZERO
     var moved := 0.0
     # Do not move away from an open clickable interaction menu.
-    if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
+    if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
             direction.z -= 1.0
         if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -335,10 +337,20 @@ func _unhandled_input(event: InputEvent) -> void:
         _follow_player()
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # UI consumes its own clicks before they reach this handler.
-        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
+        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode==KEY_H:
+            _toggle_phone()
+            get_viewport().set_input_as_handled()
+            return
+        if _phone.visible:
+            if event.keycode==KEY_ESCAPE:
+                _close_phone()
+            get_viewport().set_input_as_handled()
+            return
     if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
         if _can_jump():
             _jump_elapsed = 0.0
@@ -849,7 +861,7 @@ func _foot_controls_available() -> bool:
         and (not _rebirth_active() or _child_can_walk()) \
         and _road_pending.is_empty() and not _home_transition \
         and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
-        and not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible)
+        and not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible)
 
 func _crouch_requested() -> bool:
     return Input.is_key_pressed(KEY_CTRL) and _jump_elapsed < 0.0
@@ -3580,6 +3592,7 @@ func _create_interface() -> void:
     column.add_child(hands_toggle)
     _held_label = Label.new()
     column.add_child(_held_label)
+    column.add_child(_button("Open phone (H)",_toggle_phone))
     _refresh_held_item()
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3679,11 +3692,23 @@ func _create_interface() -> void:
     action_scroll.add_child(_action_choices)
     _action_title = Label.new()
     _action_choices.add_child(_action_title)
+    _phone = TownPhone.new()
+    _phone.hide()
+    canvas.add_child(_phone)
+    _phone.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
+    _phone.offset_left = -355.0
+    _phone.offset_right = -15.0
+    _phone.offset_top = -235.0
+    _phone.offset_bottom = 235.0
+    _phone.close_requested.connect(_close_phone)
+    _phone.jobs_requested.connect(_phone_request_jobs)
+    _phone.map_requested.connect(_phone_open_map)
 
 func _on_language_selected(index: int) -> void:
     GameLanguage.select_locale("it" if index==1 else "en")
     _refresh_localized_hud()
     _refresh_held_item()
+    _phone.refresh()
     if _software_menu:
         _render_actions()
 
@@ -5336,6 +5361,43 @@ func _refresh() -> void:
     if not _api.is_busy():
         _api.refresh_world()
 
+func _phone_allowed() -> bool:
+    if _drive_active() or _cycling() or _jump_elapsed>=0.0 or not _road_pending.is_empty() or _home_transition:
+        return false
+    var rebirth = _last_snapshot.get("rebirth")
+    if rebirth is Dictionary:
+        if str(rebirth.get("phase",""))=="CHOICE":return false
+        if str(rebirth.get("phase",""))=="CHILDHOOD" and int(rebirth.get("age",0))<12:return false
+    return bool(_last_snapshot.get("player",{}).get("alive",true))
+
+func _toggle_phone() -> void:
+    if _phone.visible:
+        _close_phone()
+        return
+    if not _phone_allowed():return
+    _close_dialog()
+    _travel_panel.hide()
+    _map_panel.hide()
+    _action_panel.hide()
+    _phone.update_data(_last_snapshot,_job_offers,_locations)
+    _phone.show()
+    _phone.open_app("home")
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _close_phone() -> void:
+    if _phone.visible:
+        _phone.hide()
+        Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _phone_request_jobs() -> void:
+    if _connected and not _api.is_busy():
+        _find_jobs()
+
+func _phone_open_map() -> void:
+    _close_phone()
+    if not _map_panel.visible:
+        _toggle_map()
+
 func _find_jobs() -> void:
     if not _api.is_busy():
         _api.list_jobs()
@@ -5553,12 +5615,15 @@ func _on_world_updated(snapshot: Dictionary) -> void:
             _render_dialog_mood(person)
     _apply_weather()
     _render_actions()
+    _phone.update_data(snapshot,_job_offers,_locations)
+    if _phone.visible and not _phone_allowed():
+        _close_phone()
     if _rebirth_active():
         _travel_panel.visible = false
         _map_panel.visible = false
         _close_dialog()
-        _action_panel.visible = not walking_transition
-        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
+        _action_panel.visible = not walking_transition and not _phone.visible
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible or _phone.visible else Input.MOUSE_MODE_CAPTURED)
     if _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 
@@ -5702,12 +5767,14 @@ func _apply_weather() -> void:
 
 func _on_locations_updated(locations: Array) -> void:
     _locations = locations
+    _phone.update_data(_last_snapshot,_job_offers,_locations)
     _town_map.update_world(_current_place, _locations)
     if _travel_panel.visible:
         _render_destinations()
 
 func _on_job_offers_updated(jobs: Array) -> void:
     _job_offers = jobs
+    _phone.update_data(_last_snapshot,_job_offers,_locations)
     var lines := PackedStringArray(["Available careers (travel to workplace to apply):"])
     for offer in jobs:
         lines.append("%s | %s EUR/shift | %s level %s" % [
@@ -5779,6 +5846,7 @@ func _on_action_feedback(message: String) -> void:
             _dialog_input.clear()
     if not _clock_pending:
         _message.text = tr(message)
+        _phone.add_notification(message)
 
 func _on_request_started(route: String) -> void:
     if route.begins_with("/actions/") and not _clock_pending:
