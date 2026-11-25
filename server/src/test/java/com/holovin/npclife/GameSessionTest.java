@@ -165,6 +165,58 @@ class GameSessionTest {
     }
 
     @Test
+    void educationRequiresAttendanceAndBudgetAndPersistsCareerSkills() throws Exception {
+        Path file=directory.resolve("education.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var pupil=PopulationGenerator.add(town,1).getFirst();id=pupil.id;
+            pupil.age=10;pupil.employed=false;pupil.occupation="Child";
+            for(String subject:EducationLife.SUBJECTS)EducationLife.set(town,pupil,subject,0);
+            pupil.place=TownLife.Place.SCHOOL;pupil.destination=pupil.place;pupil.travelRemaining=0;
+            state.day=1;state.minute=600;
+            town.employerFunds.put("school",2);
+            pupil.activity="FREE_TIME";EducationLife.attendance(town,pupil,state);
+            assertEquals(0,EducationLife.report(town).lessons());
+            pupil.activity="STUDYING";EducationLife.attendance(town,pupil,state);
+            EducationLife.attendance(town,pupil,state);
+            assertEquals(1,EducationLife.report(town).lessons());
+            assertEquals(1,town.employerFunds.get("school"));
+            state.day=2;EducationLife.attendance(town,pupil,state);
+            state.day=3;EducationLife.attendance(town,pupil,state);
+            assertEquals(2,EducationLife.report(town).lessons());
+            assertEquals(2,town.employerFunds.get(EducationLife.SCHOOL_SERVICE));
+            assertEquals(0,town.employerFunds.get("school"));
+            pupil.age=18;pupil.occupation="Job seeker";
+            EducationLife.graduate(town,pupil);EducationLife.graduate(town,pupil);
+            assertEquals(1,EducationLife.report(town).graduates());
+            for(String subject:EducationLife.SUBJECTS)EducationLife.set(town,pupil,subject,0);
+            EducationLife.set(town,pupil,"technical",80);
+            String[] jobs={"Teacher","Mechanic","Nurse","Baker"};
+            assertEquals(1,EducationLife.preferredRole(town,pupil,jobs));
+            EducationLife.set(town,pupil,"technical",0);
+            assertEquals(3,EducationLife.preferredRole(town,pupil,jobs));
+            EducationLife.set(town,pupil,"technical",80);
+            EmploymentLife.hire(town,state,pupil,1);
+            pupil.place=pupil.workplace;pupil.destination=pupil.place;pupil.activity="WORKING";
+            state.minute=720;EducationLife.attendance(town,pupil,state);
+            EducationLife.attendance(town,pupil,state);
+            assertEquals(81,EducationLife.get(town,pupil,"technical"));
+            assertEquals(1,EducationLife.report(town).workDays());
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var pupil=town.get(id);
+            assertEquals(81,EducationLife.get(town,pupil,"technical"));
+            assertEquals(2,EducationLife.report(town).lessons());
+            assertEquals(1,EducationLife.report(town).graduates());
+            EducationLife.attendance(town,pupil,state);
+            assertEquals(81,EducationLife.get(town,pupil,"technical"));
+            assertEquals(2,town.employerFunds.get(EducationLife.SCHOOL_SERVICE));
+        }
+    }
+
+    @Test
     void familyBirthSchoolRetirementAndInheritancePersistAcrossRestart() throws Exception {
         Path file=directory.resolve("demography.db");
         String firstId,secondId,childId;
