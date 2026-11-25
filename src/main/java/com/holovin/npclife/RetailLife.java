@@ -8,7 +8,12 @@ final class RetailLife {
     record Product(String id,String label,int price,int capacity,int dailyDelivery) { }
     static final List<Product> PRODUCTS=List.of(
             new Product("bread","Bread",3,20,8),
-            new Product("water","Bottled water",1,30,12));
+            new Product("water","Bottled water",1,30,12),
+            new Product("flour","Flour",2,18,6),
+            new Product("eggs","Eggs",3,16,6),
+            new Product("pasta","Pasta",2,20,8),
+            new Product("vegetables","Vegetables",3,18,8),
+            new Product("milk","Milk",2,16,6));
     static void ensure(TownLife.Town t) {
         for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),p.capacity());
     }
@@ -35,12 +40,12 @@ final class RetailLife {
         if(t.retailStock.getOrDefault(id,0)<1)
             throw new IllegalArgumentException("This product is sold out.");
         if(player.money<product.price())throw new IllegalArgumentException("Not enough money.");
-        if(player.bread+player.bottledWater>=12)
+        if(FoodLife.total(player,false)>=12)
             throw new IllegalArgumentException("Your bag is full (12 units).");
         player.money-=product.price();
         t.employerFunds.merge("shop-assistant",product.price(),Math::addExact);
         t.retailStock.merge(id,-1,Integer::sum);
-        if(id.equals("bread"))player.bread++;else player.bottledWater++;
+        FoodLife.change(player,id,false,1);
         return "Bought "+product.label()+" for "+product.price()+" EUR.";
     }
     static String consume(PlayerLife.Player p,String id) {
@@ -53,6 +58,7 @@ final class RetailLife {
             p.bread--;p.hunger=Math.max(0,p.hunger-35);
             return "Ate bread.";
         }
+        if(!id.equals("water"))throw new IllegalArgumentException("Use this ingredient in your rented kitchen.");
         if(p.bottledWater<1)throw new IllegalArgumentException("No bottled water in your bag.");
         if(p.thirst==0)throw new IllegalArgumentException("You are not thirsty.");
         p.bottledWater--;p.thirst=Math.max(0,p.thirst-40);

@@ -168,9 +168,10 @@ public class GameController {
     public GameSession.ActionView roomStorage(@RequestBody StorageRequest request) throws SQLException {
         return session.transferRoomItem(request.item(),request.deposit());
     }
+    public record RecipeRequest(String recipeId) { }
     @PostMapping("/actions/room-cook")
-    public GameSession.ActionView roomCook() throws SQLException {
-        return session.cookRoomMeal();
+    public GameSession.ActionView roomCook(@RequestBody(required=false) RecipeRequest request) throws SQLException {
+        return session.cookRoomMeal(request==null || request.recipeId()==null?"bread-soup":request.recipeId());
     }
     @PostMapping("/actions/room-wash")
     public GameSession.ActionView roomWash() throws SQLException {

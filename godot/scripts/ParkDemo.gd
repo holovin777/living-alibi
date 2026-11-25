@@ -1199,8 +1199,13 @@ func _create_interface() -> void:
     _action_panel.custom_minimum_size = Vector2(430.0, 0.0)
     _action_panel.visible = false
     canvas.add_child(_action_panel)
+    var action_scroll := ScrollContainer.new()
+    action_scroll.custom_minimum_size = Vector2(420,420)
+    action_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _action_panel.add_child(action_scroll)
     _action_choices = VBoxContainer.new()
-    _action_panel.add_child(_action_choices)
+    _action_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    action_scroll.add_child(_action_choices)
     _action_title = Label.new()
     _action_choices.add_child(_action_title)
 
@@ -1354,16 +1359,22 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in guest room · 8h",_sleep_room.bind(8)))
             elif _near_kitchen():
+                var bag: Dictionary = player.get("bag",{"bread":player.get("bread",0),"water":player.get("bottledWater",0)})
+                var pantry: Dictionary = player.get("pantry",{"bread":player.get("storedBread",0),"water":player.get("storedWater",0)})
                 var stock := Label.new()
-                stock.text = "Cupboard %s/24 | Bread %s | Water %s" % [
-                    int(player.get("storedBread",0))+int(player.get("storedWater",0)),
-                    player.get("storedBread",0),player.get("storedWater",0)]
+                stock.text = "Cupboard %s/24" % _inventory_count(pantry)
                 _action_choices.add_child(stock)
-                _action_choices.add_child(_button("Store bread",_room_storage.bind("bread",true)))
-                _action_choices.add_child(_button("Store water",_room_storage.bind("water",true)))
-                _action_choices.add_child(_button("Take bread",_room_storage.bind("bread",false)))
-                _action_choices.add_child(_button("Take water",_room_storage.bind("water",false)))
-                _action_choices.add_child(_button("Cook bread soup · 15m (1 bread + 1 water)",_room_cook))
+                for item in ["bread","water","flour","eggs","pasta","vegetables","milk"]:
+                    if item not in ["bread","water"] and int(bag.get(item,0))+int(pantry.get(item,0)) == 0:
+                        continue
+                    var line := HBoxContainer.new()
+                    _action_choices.add_child(line)
+                    line.add_child(_button("Store %s (%s)" % [item,bag.get(item,0)],_room_storage.bind(item,true)))
+                    line.add_child(_button("Take %s (%s)" % [item,pantry.get(item,0)],_room_storage.bind(item,false)))
+                _action_choices.add_child(_button("Cook bread soup · 15m (bread + water)",_room_cook.bind("bread-soup")))
+                _action_choices.add_child(_button("Pasta verdure · 25m (pasta + veg + water)",_room_cook.bind("pasta-verdure")))
+                _action_choices.add_child(_button("Frittata · 20m (eggs + veg)",_room_cook.bind("frittata")))
+                _action_choices.add_child(_button("Pancakes · 25m (flour + eggs + milk)",_room_cook.bind("pancakes")))
             elif _near_bath():
                 _action_choices.add_child(_button("Wash · 10m",_room_wash))
             elif _near_kiosk():
@@ -1536,9 +1547,9 @@ func _room_storage(item: String,deposit: bool) -> void:
     if _near_kitchen() and _connected and not _api.is_busy():
         _api.room_storage(item,deposit)
 
-func _room_cook() -> void:
+func _room_cook(recipe_id: String) -> void:
     if _near_kitchen() and _connected and not _api.is_busy():
-        _api.room_cook()
+        _api.room_cook(recipe_id)
 
 func _room_wash() -> void:
     if _near_bath() and _connected and not _api.is_busy():
@@ -1560,11 +1571,23 @@ func _consume_product(id: String) -> void:
     if _connected and not _api.is_busy():
         _api.consume_product(id)
 
+func _inventory_count(items: Dictionary) -> int:
+    var total := 0
+    for amount in items.values():
+        total += int(amount)
+    return total
+
 func _update_bag() -> void:
     var player: Dictionary = _last_snapshot.get("player",{})
     var bread := int(player.get("bread",0))
     var water := int(player.get("bottledWater",0))
-    _bag_label.text = "Bag %s/12 | Bread %s | Water %s" % [bread+water,bread,water]
+    var bag: Dictionary = player.get("bag",{"bread":bread,"water":water})
+    var lines := PackedStringArray()
+    for id in bag:
+        if int(bag[id])>0:
+            lines.append("%s %s" % [str(id).capitalize(),bag[id]])
+    _bag_label.text = "Bag %s/12 | %s" % [_inventory_count(bag),", ".join(lines)]
+    _bag_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     var remaining := maxi(0,int(player.get("roomUntil",0)) - ((int(_last_snapshot.get("day",1))-1)*1440+int(_last_snapshot.get("minute",0))))
     _housing_label.text = "Housing: North guesthouse · %s h left" % ceili(remaining/60.0) if bool(player.get("roomActive",false)) else "Housing: no room"
     _eat_button.disabled = bread == 0 or int(player.get("hunger",0)) == 0

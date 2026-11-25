@@ -555,6 +555,8 @@ func _has_button(parent: Node, prefix: String) -> bool:
     for node in parent.get_children():
         if node is Button and node.text.begins_with(prefix):
             return true
+        if _has_button(node,prefix):
+            return true
     return false
 
 func _check(ok: bool, label: String) -> bool:

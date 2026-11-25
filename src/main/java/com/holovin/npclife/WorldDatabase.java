@@ -103,6 +103,7 @@ final class WorldDatabase implements AutoCloseable {
                         died_minute INTEGER NOT NULL, died_place TEXT NOT NULL,
                         private_name TEXT)
                     """);
+            st.execute("CREATE TABLE IF NOT EXISTS visitor_ingredients (location TEXT NOT NULL, product_id TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>0), PRIMARY KEY(location,product_id))");
             st.execute("CREATE TABLE IF NOT EXISTS retail_stock (product_id TEXT PRIMARY KEY, quantity INTEGER NOT NULL CHECK(quantity>=0))");
             st.execute("""
                     CREATE TABLE IF NOT EXISTS career_accounts (
@@ -609,6 +610,16 @@ final class WorldDatabase implements AutoCloseable {
                 persistLifeChanges(town);
                 persistProperty(town);
                 persistPlayer(town.player);
+                try(Statement st=db.createStatement()) {st.executeUpdate("DELETE FROM visitor_ingredients");}
+                try(PreparedStatement p=db.prepareStatement("INSERT INTO visitor_ingredients(location,product_id,quantity) VALUES(?,?,?)")) {
+                    for(String location:List.of("bag","pantry")) {
+                        var items=location.equals("bag")?town.player.bagItems:town.player.pantryItems;
+                        for(var item:items.entrySet()) {
+                            p.setString(1,location);p.setString(2,item.getKey());p.setInt(3,item.getValue());p.addBatch();
+                        }
+                    }
+                    p.executeBatch();
+                }
                 persistLives(town);
                 persistNature(town);
                 persistCareerAccounts(town);
@@ -958,6 +969,15 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.investigationSkill=rs.getInt("investigation_skill");
                 town.player.lastWorkDay=rs.getInt("last_work_day");
                 town.player.lastTechnicalDay=rs.getInt("last_technical_day");
+            }
+        }
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM visitor_ingredients")) {
+            while(rs.next()) {
+                String id=rs.getString("product_id"),location=rs.getString("location");
+                if(id.equals("bread") || id.equals("water") ||
+                        RetailLife.PRODUCTS.stream().noneMatch(item->item.id().equals(id)))continue;
+                if(location.equals("bag"))town.player.bagItems.put(id,rs.getInt("quantity"));
+                else if(location.equals("pantry"))town.player.pantryItems.put(id,rs.getInt("quantity"));
             }
         }
         // v1.15 contacts belong to the first visitor; later visitors have

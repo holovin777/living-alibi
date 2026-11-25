@@ -108,8 +108,8 @@ func wait_for(minutes: int) -> void:
 func room_storage(item: String, deposit: bool) -> void:
     _send("/actions/room-storage",HTTPClient.METHOD_POST,{"item":item,"deposit":deposit})
 
-func room_cook() -> void:
-    _send("/actions/room-cook",HTTPClient.METHOD_POST,{})
+func room_cook(recipe_id: String = "bread-soup") -> void:
+    _send("/actions/room-cook",HTTPClient.METHOD_POST,{"recipeId":recipe_id})
 
 func room_wash() -> void:
     _send("/actions/room-wash",HTTPClient.METHOD_POST,{})

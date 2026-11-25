@@ -27,6 +27,8 @@ final class PlayerLife {
         int bottledWater;
         long roomUntil;
         int storedBread,storedWater;
+        final Map<String,Integer> bagItems=new LinkedHashMap<>();
+        final Map<String,Integer> pantryItems=new LinkedHashMap<>();
         int hygiene=100;
         int money=50; // Modest personal cash on first entry; no preset profession.
         String jobId; // Null until the player voluntarily applies.
@@ -48,6 +50,7 @@ final class PlayerLife {
             p.money=money;
             p.bread=bread;p.bottledWater=bottledWater;p.roomUntil=roomUntil;
             p.storedBread=storedBread;p.storedWater=storedWater;p.hygiene=hygiene;
+            p.bagItems.putAll(bagItems);p.pantryItems.putAll(pantryItems);
             p.jobId=jobId;
             p.engineeringSkill=engineeringSkill;
             p.investigationSkill=investigationSkill;

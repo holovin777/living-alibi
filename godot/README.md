@@ -330,6 +330,20 @@ district, while Godot checks proximity to the kitchen or bathroom.
 Water utilities, electricity, ingredients and cooking equipment are
 still abstracted for this first household version.
 
+## Groceries and recipes
+
+Market and Alimentari share seven products: bread, bottled water,
+flour, eggs, pasta, vegetables and milk. All use the same bag and
+cupboard capacity limits. Ingredient rows are saved atomically with
+the existing bread/water columns and cleared on a new visitor;
+expired leases clear the cupboard only. Four recipes consume exact
+stored ingredients: bread soup, pasta with vegetables, vegetable
+frittata and pancakes. The server validates the entire recipe before
+consuming anything. Raw new ingredients cannot be eaten directly.
+Deliveries still use capped scheduled replenishment; no spoilage,
+refrigeration, supplier contracts or NPC shared purchases yet.
+The kitchen and shop action panel is scrollable.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

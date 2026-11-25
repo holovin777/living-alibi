@@ -13,6 +13,39 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void newIngredientsPersistAndRecipesConsumeExactStock() throws Exception {
+        Path file=directory.resolve("recipes.db");
+        try(var game=new GameSession(file)) {
+            game.move("market");game.waitMinutes(60);
+            game.buy("pasta");game.buy("vegetables");game.buy("water");
+            assertEquals(44,game.snapshot().player().money());
+            assertEquals(1,game.snapshot().player().bag().get("pasta"));
+            assertThrows(IllegalArgumentException.class,()->game.consume("pasta"));
+            game.move("north");game.rentRoom();
+            for(String id:java.util.List.of("pasta","vegetables","water"))
+                game.transferRoomItem(id,true);
+            game.waitMinutes(120);
+            assertThrows(IllegalArgumentException.class,()->game.cookRoomMeal("frittata"));
+            assertEquals(1,game.snapshot().player().pantry().get("vegetables"));
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(1,game.snapshot().player().pantry().get("pasta"));
+            int hunger=game.snapshot().player().hunger();
+            game.cookRoomMeal("pasta-verdure");
+            assertTrue(game.snapshot().player().hunger()<hunger);
+            for(String id:java.util.List.of("pasta","vegetables","water"))
+                assertEquals(0,game.snapshot().player().pantry().get(id));
+        }
+        var p=new PlayerLife.Player();
+        FoodLife.change(p,"milk",false,12);
+        assertEquals(12,FoodLife.total(p,false));
+        p.roomUntil=600;FoodLife.change(p,"eggs",true,1);
+        HousingLife.expire(p,1,600);
+        assertEquals(0,FoodLife.total(p,true));
+        assertEquals(12,FoodLife.total(p,false));
+    }
+
+    @Test
     void rentedKitchenConservesFoodAndPersistsHygiene() throws Exception {
         Path file=directory.resolve("kitchen.db");
         try(var game=new GameSession(file)) {

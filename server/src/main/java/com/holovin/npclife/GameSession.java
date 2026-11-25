@@ -46,7 +46,8 @@ public final class GameSession implements AutoCloseable {
     public record PlayerView(int incarnation,String place,String placeId,String privateName,
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
-                             int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene) { }
+                             int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -80,7 +81,8 @@ public final class GameSession implements AutoCloseable {
         var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.place.name(),p.privateName,
                 p.hunger,p.thirst,p.fatigue,p.health,p.alive,
                 p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
-                HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,p.hygiene);
+                HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,p.hygiene,
+                FoodLife.inventory(p,false),FoodLife.inventory(p,true));
         var residents=PlayerLife.visible(town).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
@@ -261,8 +263,12 @@ public final class GameSession implements AutoCloseable {
         return apply(copy,1,HousingLife.transfer(copy.player,item,deposit,state.day,state.minute));
     }
     public synchronized ActionView cookRoomMeal() throws SQLException {
+        return cookRoomMeal("bread-soup");
+    }
+    public synchronized ActionView cookRoomMeal(String recipeId) throws SQLException {
+        var recipe=FoodLife.recipe(recipeId);
         var copy=town.copy();
-        return apply(copy,15,HousingLife.cook(copy.player,state.day,state.minute));
+        return apply(copy,recipe.minutes(),FoodLife.cook(copy.player,recipe,state.day,state.minute));
     }
     public synchronized ActionView washInRoom() throws SQLException {
         var copy=town.copy();
