@@ -108,7 +108,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute));
     }
 
     public synchronized BusinessView business() {
@@ -336,6 +336,20 @@ public final class GameSession implements AutoCloseable {
             if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
+            }
+            if(action.equals("rebirth-child-hour")){
+                var child=RebirthLife.child(copy);
+                if(!RebirthLife.linkedChild(copy,child)||child.age<6)throw new IllegalArgumentException("Available from age six.");
+                return applyInternal(copy,60,"Advanced childhood by one hour.",true);
+            }
+            if(action.equals("rebirth-child-home")){
+                int duration=RebirthLife.childReturn(copy);
+                return applyInternal(copy,duration,"Return home.",true);
+            }
+            if(action.startsWith("rebirth-child-travel-")){
+                var destination=PlayerLife.destination(action.substring("rebirth-child-travel-".length()));
+                int duration=RebirthLife.childTravel(copy,destination,state.day,state.minute);
+                return applyInternal(copy,duration,"Outing to "+destination.label+".",true);
             }
             if(action.startsWith("rebirth-travel-")){
                 var destination=PlayerLife.destination(action.substring("rebirth-travel-".length()));

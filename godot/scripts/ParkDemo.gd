@@ -2642,7 +2642,7 @@ func _render_actions() -> void:
             _action_choices.add_child(_button("Start adult life instead",_garden_action.bind("rebirth-adult")))
         else:
             _action_title.text = "Childhood · family life"
-            info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nF: choices / local first-person exploration from age 3. District travel follows the daily schedule." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
+            info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nF: choices / local first-person exploration from age 3. School and home routines continue; afternoon outings unlock at age 6." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
             _action_choices.add_child(info)
             var age := int(rebirth.get("age",0))
             var identity = rebirth.get("identity")
@@ -2673,6 +2673,18 @@ func _render_actions() -> void:
                 if age < 18:
                     for subject in ["balanced","technical","social","academic","commerce"]:
                         _action_choices.add_child(_button("Focus: "+subject.capitalize(),_garden_action.bind("rebirth-focus-"+subject)))
+            var child_options = rebirth.get("childOptions")
+            if child_options is Dictionary:
+                var outing := Label.new()
+                outing.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                var return_minute := int(child_options.get("returnMinute",1080))
+                outing.text = "Afternoon outings · return starts at %02d:%02d" % [return_minute/60,return_minute%60]
+                _action_choices.add_child(outing)
+                _action_choices.add_child(_button("Advance one hour",_garden_action.bind("rebirth-child-hour")))
+                for destination in child_options.get("destinations",[]):
+                    _action_choices.add_child(_button("Visit "+str(destination).capitalize(),_garden_action.bind("rebirth-child-travel-"+str(destination))))
+                if child_options.get("outing",false):
+                    _action_choices.add_child(_button("Return home",_garden_action.bind("rebirth-child-home")))
             var options = rebirth.get("adultOptions")
             if options is Dictionary:
                 var career := Label.new()

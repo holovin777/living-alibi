@@ -115,7 +115,7 @@ final class RebirthLife {
         var c=child(t);
         if(phase(t)!=CHILDHOOD||c==null||!c.alive||c.age<18||EducationLife.get(t,c,"graduate")==0)
             throw new IllegalArgumentException("Adulthood requires the existing graduate.");
-        t.industryStocks.put(PHASE,LINKED_ADULT);
+        t.industryStocks.put(PHASE,LINKED_ADULT);t.industryStocks.put(TRAVEL,0);
         return "Continue as "+c.name+". Your savings, education and relationships remain yours.";
     }
     static TownLife.Place manualDestination(TownLife.Town t,TownLife.Citizen c){
@@ -153,6 +153,55 @@ final class RebirthLife {
     }
     static boolean linkedChild(TownLife.Town t,TownLife.Citizen c){
         return c!=null&&phase(t)==CHILDHOOD&&c==child(t)&&c.alive&&c.age<18;
+    }
+    // A voluntary afternoon outing never replaces school, sleep or care at home.
+    static int outingEnd(TownLife.Citizen c){return c.age<13?1080:1200;}
+    static boolean outingHours(TownLife.Citizen c,int minute){return minute>=780&&minute<outingEnd(c);}
+    static List<TownLife.Place> childDestinations(TownLife.Citizen c){
+        if(c.age<6)return List.of();
+        if(c.age<13)return List.of(TownLife.Place.PARK,TownLife.Place.LIBRARY);
+        return List.of(TownLife.Place.PARK,TownLife.Place.LIBRARY,TownLife.Place.CENTRO,TownLife.Place.PORTICI,TownLife.Place.MARKET);
+    }
+    static TownLife.Place childOuting(TownLife.Town t,TownLife.Citizen c,int day,int minute){
+        if(!linkedChild(t,c))return null;
+        int n=t.industryStocks.getOrDefault(TRAVEL,0);
+        var places=PlayerLife.publicPlaces();
+        if(n<=0||n>places.size())return null;
+        var destination=places.get(n-1);
+        if(!outingHours(c,minute)||EmploymentLife.sick(c,day)||!childDestinations(c).contains(destination)){
+            t.industryStocks.put(TRAVEL,0);
+            return null;
+        }
+        return destination;
+    }
+    static int childTravel(TownLife.Town t,TownLife.Place destination,int day,int minute){
+        var c=child(t);
+        if(!linkedChild(t,c)||!awakePresent(c)||EmploymentLife.sick(c,day)||!outingHours(c,minute)
+                ||!childDestinations(c).contains(destination))
+            throw new IllegalArgumentException("This outing is not available at your age, time or condition.");
+        int duration=TownLife.travelTime(c.place,destination);
+        if(minute+duration>=outingEnd(c))throw new IllegalArgumentException("It is time to return home.");
+        t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(destination)+1);
+        if(duration>0){c.destination=destination;c.travelRemaining=duration;c.activity="TRAVELING";}
+        return duration;
+    }
+    static int childReturn(TownLife.Town t){
+        var c=child(t);
+        if(!linkedChild(t,c)||c.age<6||c.travelRemaining>0||t.industryStocks.getOrDefault(TRAVEL,0)==0)
+            throw new IllegalArgumentException("No active outing to end.");
+        t.industryStocks.put(TRAVEL,0);
+        int duration=TownLife.travelTime(c.place,c.home);
+        if(duration>0){c.destination=c.home;c.travelRemaining=duration;c.activity="TRAVELING";}
+        return duration;
+    }
+    record ChildOptions(List<String> destinations,boolean outing,int returnMinute,String activity){}
+    static ChildOptions childOptions(TownLife.Town t,int day,int minute){
+        var c=child(t);
+        if(!linkedChild(t,c)||c.age<6)return null;
+        var destinations=awakePresent(c)&&!EmploymentLife.sick(c,day)&&outingHours(c,minute)
+                ?childDestinations(c).stream().filter(p->minute+TownLife.travelTime(c.place,p)<outingEnd(c)).map(Enum::name).toList():List.<String>of();
+        boolean outing=t.industryStocks.getOrDefault(TRAVEL,0)>0&&outingHours(c,minute)&&!EmploymentLife.sick(c,day);
+        return new ChildOptions(destinations,outing,outingEnd(c),c.activity);
     }
     static String focus(TownLife.Town t,TownLife.Citizen c){
         if(!linkedChild(t,c)||c.age<6)return null;
@@ -237,8 +286,9 @@ final class RebirthLife {
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
                 EducationLife.get(t,c,"graduate")>0,List.copyOf(known));
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives){}
-    static Report report(TownLife.Town t,int day){
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions){}
+    static Report report(TownLife.Town t,int day){return report(t,day,0);}
+    static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
         var a=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-a"));
         var b=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-b"));
@@ -246,6 +296,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute));
     }
 }
