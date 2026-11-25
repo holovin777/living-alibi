@@ -121,6 +121,58 @@ final class TechnicalWorkLife {
                     " Better street lighting reduces night fatigue for people outdoors.");
     }
 
+    // Linked citizens operate on the very same physical orders as the visitor.
+    record LinkedOrder(String id,String title,String district,String phase,int condition,String materials,int wage,boolean canInspect,boolean canComplete){}
+    static boolean linkedEngineer(TownLife.Town t,TownLife.Citizen c){
+        return RebirthLife.linkedAdult(t,c)&&c.employed&&"Engineer".equals(c.occupation)
+                &&EducationLife.get(t,c,"diploma-engineering")>0&&EducationLife.get(t,c,"technical")>=45;
+    }
+    static int linkedWage(Order o){return o.id.equals("water-pump")?38:62;}
+    static boolean linkedPresent(TownLife.Town t,TownLife.Citizen c,Order o,int day,int minute,int duration){
+        return linkedEngineer(t,c)&&RebirthLife.awakePresent(c)&&!RebirthLife.atHome(c)&&c.place==o.place
+                &&!EmploymentLife.sick(c,day)&&minute>=480&&minute+duration<=1080&&c.fatigue<85;
+    }
+    static boolean materialsReady(TownLife.Town t,Order o){
+        return t.technicalMaterials.getOrDefault(o.materialA,0)>=o.requiredA
+                &&(o.materialB==null||t.technicalMaterials.getOrDefault(o.materialB,0)>=o.requiredB);
+    }
+    static List<LinkedOrder> linkedOrders(TownLife.Town t,int day,int minute){
+        var c=RebirthLife.child(t);
+        if(!linkedEngineer(t,c))return List.of();
+        return orders(t).stream().map(o->new LinkedOrder(o.id,o.title,o.place.name(),o.phase.name(),o.condition,
+                o.requiredA+" "+o.materialA+" ("+t.technicalMaterials.getOrDefault(o.materialA,0)+" available)"
+                +(o.materialB==null?"":" + "+o.requiredB+" "+o.materialB+" ("+t.technicalMaterials.getOrDefault(o.materialB,0)+" available)"),
+                linkedWage(o),linkedPresent(t,c,o,day,minute,INSPECTION_MINUTES)&&o.phase==Phase.OPEN,
+                linkedPresent(t,c,o,day,minute,COMPLETION_MINUTES)&&o.phase==Phase.INSPECTED&&materialsReady(t,o)
+                &&EducationLife.get(t,c,"last-engineering-order")<day&&t.employerFunds.getOrDefault(o.jobId,0)>=linkedWage(o))).toList();
+    }
+    static String linkedInspect(TownLife.Town t,String id,int day,int minute){
+        var c=RebirthLife.requireAdult(t);var o=order(t,id);
+        if(linkedOrders(t,day,minute).stream().noneMatch(v->v.id().equals(o.id)&&v.canInspect()))
+            throw new IllegalArgumentException("Inspection unavailable: qualification, location, hours or order state.");
+        RebirthLife.travel(t,o.place,day);
+        o.phase=Phase.INSPECTED;c.fatigue=Math.min(100,c.fatigue+3);
+        return "Inspected "+o.title+"; condition "+o.condition+"/100.";
+    }
+    static String linkedComplete(TownLife.Town t,String id,int day,int minute){
+        var c=RebirthLife.requireAdult(t);var o=order(t,id);
+        if(linkedOrders(t,day,minute).stream().noneMatch(v->v.id().equals(o.id)&&v.canComplete()))
+            throw new IllegalArgumentException("Repair unavailable: inspect first, check stock, hours and payroll.");
+        int wage=linkedWage(o),wallet=Math.addExact(c.money,wage);
+        RebirthLife.travel(t,o.place,day);
+        t.technicalMaterials.merge(o.materialA,-o.requiredA,Integer::sum);
+        if(o.materialB!=null)t.technicalMaterials.merge(o.materialB,-o.requiredB,Integer::sum);
+        int previous=o.condition;
+        o.condition=Math.min(100,o.condition+(o.jobId.equals("engineer")?40:55));
+        o.phase=Phase.COMPLETED;o.completedDay=day;
+        if(o.id.equals("water-pump"))UtilityLife.pumpRepaired(t);
+        t.employerFunds.merge(o.jobId,-wage,Integer::sum);c.money=wallet;
+        EducationLife.set(t,c,"last-engineering-order",day);
+        EducationLife.learn(t,c,"technical",2);
+        c.fatigue=Math.min(100,c.fatigue+7);
+        return "Completed "+o.title+": "+previous+" -> "+o.condition+"/100; earned EUR "+wage+".";
+    }
+
     /** Slow wear makes failures reappear; consumable supplies never regenerate for free. */
     static void tick(TownLife.Town town,int day,int minute) {
         if(minute!=0 || day<=1)return;

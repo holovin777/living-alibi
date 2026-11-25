@@ -1020,6 +1020,15 @@ func _exercise() -> void:
     if not _check(world._near_college() and _has_button(world._action_choices,"Enroll: Engineering"),"college registration menu"):
         return
     world._close_college()
+    var workshop := _world("WORKSHOP","Workshop")
+    workshop["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","engineeringOrders":[{"id":"water-pump","title":"Park pump","district":"WORKSHOP","phase":"OPEN","condition":45,"materials":"2 spare-parts","wage":38,"canInspect":true,"canComplete":false}]}
+    world._on_world_updated(workshop)
+    world._avatar.position=world.KIOSK_POSITION
+    world._engineering_menu=true
+    world._render_actions()
+    if not _check(world._near_engineering() and _has_button(world._action_choices,"Inspect · 30 min") and _has_button(world._action_choices,"Repair · 90 min"),"linked engineering work orders"):
+        return
+    world._close_engineering()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

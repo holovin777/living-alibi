@@ -130,7 +130,7 @@ final class PopulationLife {
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){
-                if(!journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
+                if(!TechnicalWorkLife.linkedEngineer(town,c) && !journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
                         !IndustryLife.payHourly(town,c,clock,events,observations)) {
                     // Existing unrelated occupations retain their original
                     // placeholder wage model until their companies are modeled.

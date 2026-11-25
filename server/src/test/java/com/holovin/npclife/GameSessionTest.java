@@ -269,6 +269,44 @@ class GameSessionTest {
         }
     }
     @Test
+    void linkedEngineerRepairsSharedPumpAndEarnsFundedWage() throws Exception {
+        Path file=directory.resolve("linked-engineer.db");
+        String id;int payroll;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=30;c.hunger=10;c.thirst=10;c.fatigue=20;c.food=5;c.water=5;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.WORKSHOP;c.destination=c.place;c.activity="FREE_TIME";
+            c.workplace=TownLife.Place.WORKSHOP;c.occupation="Engineer";c.employed=true;
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            EducationLife.set(town,c,"technical",70);EducationLife.set(town,c,"diploma-engineering",1);
+            town.technicalMaterials.put("spare-parts",6);
+            payroll=town.employerFunds.getOrDefault("technician",0);
+            state.day=2;state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-engineer-repair-water-pump"));
+            var inspection=game.gardenAction("rebirth-engineer-inspect-water-pump").world();
+            assertEquals(830,inspection.minute());
+            var repair=game.gardenAction("rebirth-engineer-repair-water-pump").world();
+            assertEquals(920,repair.minute());
+            assertEquals(68,repair.player().money());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-engineer-repair-water-pump"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(4,town.technicalMaterials.get("spare-parts").intValue());
+            assertEquals(100,town.technicalOrders.get("water-pump").condition);
+            assertTrue(UtilityLife.status(town).fountainWorking());
+            assertEquals(payroll-38,town.employerFunds.get("technician").intValue());
+            assertEquals(2,EducationLife.get(town,town.get(id),"last-engineering-order"));
+        }
+    }
+    @Test
     void linkedAdultHomeUsesRealSuppliesAndPrivateSpace() throws Exception {
         Path file=directory.resolve("linked-home.db");
         String id;

@@ -52,6 +52,7 @@ const CAFE_TABLE := Vector3(-7.0,0,9.0)
 var _cafe_menu := false
 var _medical_menu := false
 var _college_menu := false
+var _engineering_menu := false
 const COLLEGE_DESK := Vector3(-6.3,0,7)
 const CLINIC_COUNTER := Vector3(-6.3,0,7)
 const PHARMACY_COUNTER := Vector3(6.3,0,-7)
@@ -198,7 +199,9 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
-        if _near_college():
+        if _near_engineering():
+            _hint.text="E: engineering work orders · F: life choices"
+        elif _near_college():
             _hint.text="E: Istituto Leonardo · F: life choices"
         elif not _medical_station().is_empty():
             _hint.text="E: "+("Farmacia" if _medical_station()=="first-aid" else "Ambulatorio")+" · F: life choices"
@@ -273,6 +276,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_engineering() and not _action_panel.visible:
+                _engineering_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
             elif event.keycode == KEY_E and _near_college() and not _action_panel.visible:
                 _college_menu=true
                 _render_actions()
@@ -305,6 +314,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 _cafe_menu=false
                 _medical_menu=false
                 _college_menu=false
+                _engineering_menu=false
                 _render_actions()
                 _action_panel.visible = not _action_panel.visible
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
@@ -2970,6 +2980,34 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _near_engineering() -> bool:
+    if _apartment_active or not _near_kiosk():return false
+    for order in _last_snapshot.get("rebirth",{}).get("engineeringOrders",[]):
+        if str(order.get("district",""))==_current_place:return true
+    return false
+
+func _close_engineering() -> void:
+    _engineering_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_engineering() -> void:
+    _action_title.text="Engineering work orders"
+    for order in _last_snapshot.get("rebirth",{}).get("engineeringOrders",[]):
+        if str(order.get("district",""))!=_current_place:continue
+        var info := Label.new()
+        info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        info.text="%s · %s · Condition %s/100\n%s · Wage %s EUR" % [order.get("title",""),order.get("phase",""),order.get("condition",0),order.get("materials",""),order.get("wage",0)]
+        _action_choices.add_child(info)
+        var inspect := _button("Inspect · 30 min",_garden_action.bind("rebirth-engineer-inspect-"+str(order.get("id",""))))
+        inspect.disabled=not bool(order.get("canInspect",false))
+        _action_choices.add_child(inspect)
+        var repair := _button("Repair · 90 min",_garden_action.bind("rebirth-engineer-repair-"+str(order.get("id",""))))
+        repair.disabled=not bool(order.get("canComplete",false))
+        _action_choices.add_child(repair)
+    _action_choices.add_child(_button("Leave",_close_engineering))
+
 func _near_college() -> bool:
     var college = _last_snapshot.get("rebirth",{}).get("college")
     return not _apartment_active and _current_place=="SCHOOL" and college is Dictionary and college.get("atCampus",false) and _avatar.position.distance_to(COLLEGE_DESK)<1.5
@@ -3068,6 +3106,10 @@ func _close_grocery() -> void:
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _engineering_menu and _near_engineering():
+        _render_engineering()
+        return
+    _engineering_menu=false
     if _college_menu and _near_college():
         _render_college()
         return
@@ -3193,6 +3235,11 @@ func _render_actions() -> void:
                 for destination in options.get("destinations",[]):
                     if str(destination) != _current_place:
                         _action_choices.add_child(_button("Walk to "+str(destination).capitalize(),_garden_action.bind("rebirth-travel-"+str(destination))))
+            for order in rebirth.get("engineeringOrders",[]):
+                var task := Label.new()
+                task.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                task.text="Engineering · %s · %s · %s/100" % [order.get("title",""),order.get("district",""),order.get("condition",0)]
+                _action_choices.add_child(task)
             var college = rebirth.get("college")
             if college is Dictionary and college.get("enrolled")!=null:
                 var study_info := Label.new()
@@ -3830,6 +3877,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
     if action.begins_with("rebirth-cafe-"):
@@ -4018,6 +4066,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _engineering_menu=false
         _college_menu=false
         _medical_menu=false
         _cafe_menu=false
