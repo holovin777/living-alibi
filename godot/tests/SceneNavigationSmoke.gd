@@ -1122,6 +1122,30 @@ func _exercise() -> void:
     var assistant := world._residents_root.get_node_or_null("Resident_resident-0002") as Node3D
     if not _check(assistant!=null and assistant.position.distance_to(world.OFFICE_STAFF_ANCHOR)<0.1,"actual working assistant appears inside office"):
         return
+    world._avatar.position=world.JAVA_DESK
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Code editor") and _has_button(world._action_choices,"Issue tracker") and _has_button(world._action_choices,"Inbox") and _has_button(world._action_choices,"Intranet"),"BorgoOS app dock"):
+        return
+    var draft = world._action_choices.get_node_or_null("Java_retail-sql")
+    if not _check(draft is LineEdit,"code editor available"):
+        return
+    draft.text="SELECT id FROM products WHERE stock < 3 ORDER BY id"
+    draft.text_changed.emit(draft.text)
+    world._switch_office_app("tasks")
+    if not _check(world._office_app=="tasks" and not world._action_choices.has_node("Java_retail-sql"),"issue tracker separate from editor"):
+        return
+    world._switch_office_app("mail")
+    if not _check(world._office_app=="mail" and _has_button(world._action_choices,"Leave workstation"),"mail application"):
+        return
+    world._switch_office_app("browser")
+    if not _check(world._office_app=="browser" and _has_button(world._action_choices,"Leave workstation"),"intranet application"):
+        return
+    world._switch_office_app("work")
+    var restored = world._action_choices.get_node_or_null("Java_retail-sql")
+    if not _check(restored is LineEdit and restored.text=="SELECT id FROM products WHERE stock < 3 ORDER BY id","draft survives app switching"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

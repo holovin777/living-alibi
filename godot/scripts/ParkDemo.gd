@@ -54,6 +54,8 @@ var _medical_menu := false
 var _college_menu := false
 var _engineering_menu := false
 var _software_menu := false
+var _office_app := "work"
+var _office_drafts: Dictionary = {}
 const JAVA_DESK := Vector3(-10,0,4)
 const DEVOPS_DESK := Vector3(-10,0,8)
 const COMPANY_DESK := Vector3(-10,0,12)
@@ -3100,15 +3102,101 @@ func _office_action_allowed(action: String) -> bool:
     return true
 
 func _close_software() -> void:
+    _office_app="work"
     _software_menu=false
     _action_panel.visible=false
     _render_actions()
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
+func _office_label(value: String) -> void:
+    var label := Label.new()
+    label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    label.text=value
+    _action_choices.add_child(label)
+
+func _switch_office_app(app: String) -> void:
+    if not _near_software():return
+    _office_app=app
+    _render_actions()
+
+func _office_draft_key(id: String) -> String:
+    return str(_last_snapshot.get("player",{}).get("incarnation",0))+":"+str(_last_snapshot.get("rebirth",{}).get("childName",""))+":"+id
+
+func _remember_office_draft(value: String,id: String) -> void:
+    _office_drafts[_office_draft_key(id)]=value.left(180)
+
+func _render_office_apps(station: String) -> void:
+    _office_label("BorgoOS · "+station.capitalize()+" workstation · Day "+str(_last_snapshot.get("day",1)))
+    var dock := HFlowContainer.new()
+    _action_choices.add_child(dock)
+    var work_title := "Code editor" if station=="java" else ("Terminal" if station=="devops" else "Company ledger")
+    for entry in [["work",work_title],["tasks","Issue tracker"],["mail","Inbox"],["browser","Intranet"],["help","Handbook"]]:
+        var app := _button(str(entry[1]),_switch_office_app.bind(str(entry[0])))
+        app.disabled=_office_app==str(entry[0])
+        dock.add_child(app)
+
+func _render_office_app(workspace: Dictionary) -> void:
+    var projects: Array = _last_snapshot.get("rebirth",{}).get("softwareProjects",[])
+    var ops = workspace.get("devops")
+    match _office_app:
+        "tasks":
+            _office_label("Issue tracker · Team backlog")
+            for project in projects:
+                _office_label("%s | %s | Next: %s | %s EUR" % [project.get("title",""),project.get("phase",""),project.get("nextAction",""),project.get("wage",0)])
+                if project.get("branch","")!="":
+                    _office_label(str(project.get("branch","")))
+            if projects.is_empty():_office_label("No assigned projects.")
+            _office_label("Use the Java code editor to advance a ticket.")
+        "mail":
+            _office_label("Inbox · Generated work notices")
+            _office_label("From: Team lead\nSubject: Welcome to Borgo Digital\nRead acceptance criteria, run tests and open a pull request before releasing your work.")
+            for project in projects:
+                if project.get("deployed",false):
+                    _office_label("From: Release automation\nSubject: %s deployed\nThe client service is released." % project.get("title",""))
+                elif str(project.get("phase",""))=="TESTED":
+                    _office_label("From: Code review\nSubject: %s reviewed\nNext step: %s" % [project.get("title",""),project.get("nextAction","")])
+            if ops is Dictionary and ops.get("active",false):
+                _office_label("From: Monitoring\nSubject: Retail incident\n"+str(ops.get("status",""))+" · Visit the operations workstation.")
+            var firm = workspace.get("companyStatus")
+            if firm is Dictionary and firm.get("registered",false):
+                _office_label("From: Company accounts\nBalance: %s EUR · Lease through day %s" % [firm.get("cash",0),firm.get("rentUntil",0)])
+        "browser":
+            _office_label("Intranet · /api/v1/retail/catalog")
+            var catalog := false
+            var low_stock := false
+            for project in projects:
+                if project.get("id","")=="retail-api":catalog=bool(project.get("deployed",false))
+                if project.get("id","")=="retail-sql":low_stock=bool(project.get("deployed",false))
+            if not catalog:
+                _office_label("Catalog not deployed. Finish BD-103 to publish this service.")
+            elif ops is Dictionary and str(ops.get("status",""))=="OUTAGE":
+                _office_label("503 Service Unavailable · Visit the server room.")
+            else:
+                _office_label("200 OK · Live inventory from world snapshot (read-only preview)")
+                var rows: Array = _last_snapshot.get("shop",[]).duplicate()
+                rows.sort_custom(func(a,b):return str(a.get("id",""))<str(b.get("id","")))
+                for item in rows:
+                    _office_label("%s · %s EUR · %s units" % [item.get("label",item.get("id","")),item.get("price",0),item.get("stock",0)])
+                if low_stock:
+                    _office_label("/api/v1/retail/low-stock · Stock below 3")
+                    for item in rows:
+                        if int(item.get("stock",0))<3:_office_label(str(item.get("id",""))+": "+str(item.get("stock",0)))
+        "help":
+            _office_label("Handbook · Java / Spring / SQL")
+            _office_label("Java: return an integer expression using variables, arithmetic, Math.min and Math.max. Test boundary cases such as zero stock.")
+            _office_label("REST: @GetMapping defines a read-only method route below the class-level @RequestMapping. SQL: SELECT columns FROM table WHERE condition ORDER BY column.")
+            _office_label("Git: feature branch → implementation → commit → pull request → CI/review → merge → deployment.")
+            _office_label("Operations: check health, inspect evidence, apply the guided recovery and verify. Terminal commands are simulated, never executed on a host.")
+    _action_choices.add_child(_button("Leave workstation",_close_software))
+
 func _render_software() -> void:
     var station := _office_station()
     _action_title.text="Borgo Digital · "+("Java team" if station=="java" else ("Server room" if station=="devops" else "Meeting room"))
     var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
+    _render_office_apps(station)
+    if _office_app!="work":
+        _render_office_app(workspace if workspace is Dictionary else {})
+        return
     if workspace is Dictionary:
         var intro := Label.new()
         intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3245,8 +3333,10 @@ func _render_software() -> void:
                 var editor := LineEdit.new()
                 editor.name="Java_"+str(ticket.get("id",""))
                 editor.placeholder_text=str(ticket.get("language","Java"))+" solution"
-                editor.text=str(ticket.get("starter","return 0;"))
+                var ticket_id := str(ticket.get("id",""))
+                editor.text=str(_office_drafts.get(_office_draft_key(ticket_id),ticket.get("starter","return 0;")))
                 editor.max_length=180
+                editor.text_changed.connect(_remember_office_draft.bind(ticket_id))
                 editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL
                 _action_choices.add_child(editor)
                 var submit := _button("Run tests and submit · 60 min",_submit_java.bind(str(ticket.get("id","")),editor))
@@ -4366,6 +4456,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _office_app="work"
         _software_menu=false
         _engineering_menu=false
         _college_menu=false
