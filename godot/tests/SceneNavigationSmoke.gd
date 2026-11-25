@@ -69,6 +69,26 @@ func _exercise() -> void:
     world._view_pitch = 0.0
     world._follow_player()
 
+    world._on_world_updated(_world("PARK","Park"))
+    world._avatar.position=Vector3.ZERO
+    world._view_yaw=0.0
+    world._update_first_steps()
+    if not _check(world._guide_direction(Vector3(0,0,-12))=="↑ 12 m"
+            and world._guide_direction(Vector3(12,0,0))=="→ 12 m"
+            and world._guide_label.text.contains("Market"),
+            "new visitor has a visible optional job goal and directional guidance"):
+        return
+    world._view_yaw=PI/2.0
+    if not _check(world._guide_direction(Vector3(0,0,-12))=="→ 12 m",
+            "guide follows the first-person camera heading"):
+        return
+    world._view_yaw=0.0
+    world._set_guide_enabled(false)
+    if not _check(not world._guide_label.visible,"optional guidance can be hidden"):
+        return
+    world._set_guide_enabled(true)
+    world._follow_player()
+
     var layout = world._town_map
     if not _check(layout.DISTRICTS.size() == 20
             and layout.world_center("PARK") == Vector3.ZERO
