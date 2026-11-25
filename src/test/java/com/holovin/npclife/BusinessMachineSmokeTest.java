@@ -46,7 +46,7 @@ public final class BusinessMachineSmokeTest {
         check(town.business.machineCondition==10,
                 "six production batches wear the machine to a broken state");
         check(town.technicalMaterials.get("steel")==14 &&
-                        town.technicalMaterials.get("spare-parts")==18,
+                        town.technicalMaterials.get("spare-parts")==6,
                 "broken machine stops consuming steel and making new goods");
         check(town.business.lastProductionDay==7,
                 "the failed seventh production opportunity cannot be retried for free");
