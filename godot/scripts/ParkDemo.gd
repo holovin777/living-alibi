@@ -1,11 +1,20 @@
 extends Node3D
 ## Living Alibi vertical slice: move around a local public scene; travel and
 ## careers are validated by the real Java/Spring server, never by a fake client wallet.
-## WASD/arrow keys: walk. E: town travel gate. F: local interaction kiosk.
+## WASD/arrow keys: walk relative to the camera. Click the world for mouse look.
+## V: first/third person. Escape: release mouse. E: gate. F: local kiosk.
 
 const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
 const INTERACTION_RADIUS := 3.5
+const WALK_SPEED := 4.5
+const MOUSE_SENSITIVITY := 0.0025
+const EYE_HEIGHT := 1.65
+
+# Local presentation only: true movement between districts is Java-authorized.
+var _first_person := true
+var _view_yaw := 0.0
+var _view_pitch := 0.0
 
 var _avatar: Node3D
 var _camera: Camera3D
@@ -28,6 +37,7 @@ var _weather: Label
 var _needs: Label
 var _message: Label
 var _hint: Label
+var _view_button: Button
 var _jobs: Label
 var _travel_panel: PanelContainer
 var _travel_choices: GridContainer
@@ -55,16 +65,20 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
     var direction := Vector3.ZERO
-    if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-        direction.z -= 1.0
-    if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
-        direction.z += 1.0
-    if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
-        direction.x -= 1.0
-    if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
-        direction.x += 1.0
+    # Do not move away from an open clickable interaction menu.
+    if not _travel_panel.visible and not _action_panel.visible:
+        if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+            direction.z -= 1.0
+        if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+            direction.z += 1.0
+        if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+            direction.x -= 1.0
+        if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+            direction.x += 1.0
     if direction.length_squared() > 0.0:
-        _avatar.position += direction.normalized() * delta * 4.5
+        # The Java world controls district transitions; this is local preview walking.
+        var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
+        _avatar.position += relative_motion * delta * WALK_SPEED
         _avatar.position.x = clampf(_avatar.position.x, -17.0, 17.0)
         _avatar.position.z = clampf(_avatar.position.z, -17.0, 17.0)
         _follow_player()
@@ -74,15 +88,33 @@ func _process(delta: float) -> void:
     if not _near_kiosk():
         _action_panel.visible = false
     if _near_gate():
-        _hint.text = "E: town travel gate — journeys consume real game time."
+        _hint.text = "E: travel gate (game time). V: camera. Esc: cursor."
     elif _near_kiosk():
-        _hint.text = "F: interact here — employment, study, or local resources."
+        _hint.text = "F: local interactions. V: camera. Esc: cursor."
     else:
-        _hint.text = "WASD/arrows: walk. Yellow gate: travel. Blue kiosk: interact."
+        _hint.text = "WASD: walk · click scene: mouse look · V: camera · Esc: cursor."
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+        _view_yaw -= event.relative.x * MOUSE_SENSITIVITY
+        _view_pitch = clampf(_view_pitch - event.relative.y * MOUSE_SENSITIVITY, -1.15, 1.15)
+        _follow_player()
+    elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+        # UI consumes its own clicks before they reach this handler.
+        if not _travel_panel.visible and not _action_panel.visible:
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        if event.keycode == KEY_E and _near_gate():
+        if event.keycode == KEY_ESCAPE:
+            Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+            _travel_panel.visible = false
+            _action_panel.visible = false
+            get_viewport().set_input_as_handled()
+        elif event.keycode == KEY_V:
+            _toggle_view_mode()
+            get_viewport().set_input_as_handled()
+        elif event.keycode == KEY_E and _near_gate():
             _toggle_travel()
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_F and _near_kiosk():
@@ -95,9 +127,22 @@ func _near_gate() -> bool:
 func _near_kiosk() -> bool:
     return _avatar.position.distance_to(KIOSK_POSITION) < INTERACTION_RADIUS
 
+func _toggle_view_mode() -> void:
+    _first_person = not _first_person
+    _view_button.text = "View: first person (V)" if _first_person else "View: third person (V)"
+    _follow_player()
+
 func _follow_player() -> void:
-    _camera.position = _avatar.position + Vector3(0.0, 7.0, 12.0)
-    _camera.look_at(_avatar.position + Vector3(0.0, 1.0, 0.0))
+    # Hide the mesh at eye height to prevent looking through your own head.
+    _avatar.visible = not _first_person
+    if _first_person:
+        _camera.position = _avatar.position + Vector3(0.0, EYE_HEIGHT, 0.0)
+        _camera.rotation = Vector3(_view_pitch, _view_yaw, 0.0)
+    else:
+        var orbit := Basis(Vector3.UP, _view_yaw) * Vector3(
+                0.0, 3.8 - _view_pitch * 2.5, 6.0)
+        _camera.position = _avatar.position + orbit
+        _camera.look_at(_avatar.position + Vector3(0.0, 1.4, 0.0))
 
 func _build_world() -> void:
     _environment = Environment.new()
@@ -307,8 +352,10 @@ func _create_interface() -> void:
     buttons.add_child(_button("Industry", _view_industry))
     buttons.add_child(_button("Business", _view_business))
     buttons.add_child(_button("Wait 60m", _wait_one_hour))
+    _view_button = _button("View: first person (V)", _toggle_view_mode)
+    column.add_child(_view_button)
     _hint = Label.new()
-    _hint.text = "WASD/arrow keys to walk; E at gate; F at kiosk."
+    _hint.text = "WASD: walk · click scene: mouse look · V: camera · Esc: cursor."
     column.add_child(_hint)
     _jobs = Label.new()
     _jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -361,6 +408,7 @@ func _toggle_travel() -> void:
     _action_panel.visible = false
     _travel_panel.visible = not _travel_panel.visible
     if _travel_panel.visible:
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
         _render_destinations()
         if not _api.is_busy():
             _api.list_locations()
@@ -389,6 +437,7 @@ func _toggle_actions() -> void:
     _travel_panel.visible = false
     _action_panel.visible = not _action_panel.visible
     if _action_panel.visible:
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
         _render_actions()
         if _current_place == "WORKSHOP" and not _api.is_busy():
             _api.view_business()
