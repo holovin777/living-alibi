@@ -256,6 +256,7 @@ final class TownLife {
         DemographyLife.ensure(t);
         EducationLife.ensure(t);
         NewspaperLife.ensure(t);
+        OpinionLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;

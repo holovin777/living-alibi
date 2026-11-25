@@ -2918,6 +2918,11 @@ func _render_actions() -> void:
             school_info.text = "Scuola · Pupils %s | Lessons %s | Graduates %s" % [education.get("pupils",0),education.get("lessons",0),education.get("graduates",0)]
             school_info.text += "\nSchool reserve %s EUR | Work experience days %s" % [education.get("schoolFunds",0),education.get("workDays",0)]
             _action_choices.add_child(school_info)
+            var opinion: Dictionary = _last_snapshot.get("opinion",{})
+            var poll := Label.new()
+            poll.text = "Opinione pubblica · Comune trust %s/100 | Stall %s/100" % [opinion.get("cityTrust",50),opinion.get("stallTrust",50)]
+            poll.text += "\nAdult residents %s | Newspaper readers %s" % [opinion.get("respondents",0),opinion.get("readers",0)]
+            _action_choices.add_child(poll)
             var comune: Dictionary = _last_snapshot.get("comune",{})
             var budget_info := Label.new()
             budget_info.text = "Comune · Budget %s EUR | Taxes %s EUR" % [comune.get("budget",0),comune.get("taxes",0)]

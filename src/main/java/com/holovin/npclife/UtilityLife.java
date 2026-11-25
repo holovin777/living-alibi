@@ -70,10 +70,11 @@ final class UtilityLife {
                 continue;
             if(takeFountainUnit(town)) {
                 c.water++;
+                OpinionLife.fountain(town,c,clock.day,true);
                 TownLife.publish(town,clock,c.id,c.place,
                         c.name+" refilled a bottle from the working park fountain.",
                         events,observations);
-            }
+            } else if(clock.minute%60==0)OpinionLife.fountain(town,c,clock.day,false);
         }
     }
 
