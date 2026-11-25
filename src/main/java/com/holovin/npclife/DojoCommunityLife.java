@@ -44,6 +44,19 @@ final class DojoCommunityLife {
             .map(c->new Member(c.id,c.name,c==teacher?"instructor":"student")).toList();
         return new View(founded(t),present,present.stream().anyMatch(m->m.role().equals("instructor")));
     }
+    static RebirthLife.HomeAction greet(TownLife.Town t,int day,int minute){
+        var c=RebirthLife.requireAdult(t);
+        var teacher=instructor(t,day);
+        if(c.place!=TownLife.Place.SCHOOL||!RebirthLife.awakePresent(c)||!view(t,day,minute).instructorPresent()||
+                DojoLife.get(t,c,"last-rei")>=day)throw new IllegalArgumentException("Greet the attending instructor once per day.");
+        String key=SocialNetwork.key(c.id,teacher.id);
+        var relation=t.peerRelationships.computeIfAbsent(key,k->new SocialLife.Relationship(
+                c.id.compareTo(teacher.id)<=0?c.id:teacher.id,c.id.compareTo(teacher.id)<=0?teacher.id:c.id));
+        relation.affinity=Math.min(100,relation.affinity+1);
+        relation.trust=Math.min(100,relation.trust+1);
+        DojoLife.set(t,c,"last-rei",day);
+        return new RebirthLife.HomeAction(1,"Exchanged a respectful dojo greeting.");
+    }
     static void tick(TownLife.Town t,WorldState clock){
         if(clock.minute!=1110||!founded(t)||!DojoLife.open(clock.day,1080))return;
         var teacher=instructor(t,clock.day);
