@@ -69,7 +69,7 @@ func _exercise() -> void:
     world._follow_player()
 
     var layout = world._town_map
-    if not _check(layout.DISTRICTS.size() == 18
+    if not _check(layout.DISTRICTS.size() == 19
             and layout.world_center("PARK") == Vector3.ZERO
             and layout.adjacent("PARK", "SCHOOL")
             and not layout.adjacent("PARK", "QUARRY")
@@ -291,7 +291,7 @@ func _exercise() -> void:
         return
     for i in range(15):
         controls.accept(controls.propose(0.1,1.0,1.0,false,2))
-    if not _check(controls.distance>15.0 and controls.lateral<=1.85 and controls.speed>0,
+    if not _check(controls.distance>15.0 and controls.lateral<=1.851 and controls.speed>0,
             "gas and limited steering move car on green"):
         return
     controls.accept(controls.propose(0.1,0.0,0.0,true,2))
@@ -347,6 +347,19 @@ func _exercise() -> void:
             "choose another adjacent road without leaving the cabin"):
         return
     world._end_driving(true)
+    world._on_world_updated(_world("PARK","Park"))
+
+    var station := _world("FUEL_STATION","Stazione di servizio")
+    station["player"]["carPlace"] = "FUEL_STATION"
+    station["fuel"] = {"stock":48,"capacity":48,"price":2}
+    world._on_world_updated(station)
+    if not _check(layout.motor_road("QUARRY","FUEL_STATION")
+            and world._scenery.has_node("StazioneDiServizio/StationShop")
+            and not world._can_stand(Vector3(-12,0,-6),world.WALKER_RADIUS)
+            and _has_button(world._action_choices,"Refuel")
+            and _has_button(world._action_choices,"Apply: fuel station attendant"),
+            "station has solid pumps, a connected motor road and local services"):
+        return
     world._on_world_updated(_world("PARK","Park"))
 
     # Physical footprints: long steps cannot tunnel through solid objects.

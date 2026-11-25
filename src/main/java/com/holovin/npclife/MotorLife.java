@@ -13,7 +13,8 @@ final class MotorLife {
             case LIBRARY -> List.of(OFFICE,WORKSHOP);
             case WORKSHOP -> List.of(LIBRARY,FACTORY,QUARRY);
             case FACTORY -> List.of(OFFICE,WORKSHOP);
-            case QUARRY -> List.of(WORKSHOP);
+            case QUARRY -> List.of(WORKSHOP,FUEL_STATION);
+            case FUEL_STATION -> List.of(QUARRY);
             default -> List.of();
         };
     }
@@ -39,11 +40,7 @@ final class MotorLife {
         return "Bought a used compact car for 180 EUR.";
     }
     static String refuel(TownLife.Town t,int minute) {
-        var p=t.player;workshop(p,minute);present(p);
-        int units=Math.min(3,CAPACITY-p.carFuel);
-        if(units<=0)throw new IllegalArgumentException("Fuel tank is full.");
-        pay(t,units*2);p.carFuel+=units;
-        return "Bought "+units+" fuel units.";
+        return FuelLife.refuel(t,minute);
     }
     static String repair(TownLife.Town t,int minute) {
         var p=t.player;workshop(p,minute);present(p);

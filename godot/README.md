@@ -445,6 +445,22 @@ manual parking, physical mirror reflections, or server-side vehicle
 position persistence yet. An uncertain response requires refresh
 before another trip.
 
+## Stazione di servizio
+
+A new public fuel station south of Quarry connects to the motor
+network. It has two pump models, a canopy, a walkable mini-market
+shell, a public parking space and a local action kiosk. Refuelling
+at the station (06:00–22:00) or garage (08:00–18:00) draws from the
+same 48-unit fuel stock. The station account receives 2 EUR per
+unit; a paid external supplier replenishes up to 12 units at 07:00
+for 1 EUR each, limited by cash and capacity. Stock and delivery
+markers persist in the industry ledger. A fuel attendant earns
+25 EUR per two-hour shift from finite station funds. The shop sells
+bread and water from shared market supplies (08:00–20:00). Local
+actions are still at the kiosk, not physical pump controls; supplier
+transport is abstract, and the new car's included fuel remains part
+of its purchase package.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

@@ -32,7 +32,8 @@ final class CareerLife {
                     "none",0,30,360),
             new Offer("machinist","Factory machinist",TownLife.Place.FACTORY,
                     "none",0,34,560),
-            new Offer("farm-worker","Farm worker",TownLife.Place.FARM,"none",0,26,300)
+            new Offer("farm-worker","Farm worker",TownLife.Place.FARM,"none",0,26,300),
+            new Offer("fuel-attendant","Fuel station attendant",TownLife.Place.FUEL_STATION,"none",0,25,300)
     );
 
     static List<Offer> offers() {return OFFERS;}
@@ -47,6 +48,7 @@ final class CareerLife {
         town.employerFunds.putIfAbsent("survey-office",0);
         town.employerFunds.putIfAbsent("guesthouse",0);
         town.employerFunds.putIfAbsent("farm-contractors",0);
+        town.employerFunds.putIfAbsent(FuelLife.SUPPLIER,0);
     }
 
     private static Offer offer(String id) {

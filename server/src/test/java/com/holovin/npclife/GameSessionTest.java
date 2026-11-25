@@ -13,6 +13,50 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void stationFuelConservesStockAndMoneyAndRestarts() throws Exception {
+        Path file=directory.resolve("fuel.db");
+        try(var game=new GameSession(file)) {
+            game.move("fuel_station");game.waitMinutes(60);
+            assertEquals(2,game.snapshot().shop().size());
+            assertThrows(IllegalArgumentException.class,()->game.buy("milk"));
+            game.buy("water");game.applyJob("fuel-attendant");game.work();
+            assertEquals(74,game.snapshot().player().money());
+            assertThrows(IllegalArgumentException.class,()->game.carAction("refuel"));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            town.player.carPlace=TownLife.Place.FUEL_STATION;
+            town.player.carFuel=4;town.player.carCondition=80;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            int stock=game.snapshot().fuel().stock();
+            int cash=game.snapshot().fuel().payroll();
+            game.carAction("refuel");
+            assertEquals(7,game.snapshot().player().carFuel());
+            assertEquals(stock-3,game.snapshot().fuel().stock());
+            assertEquals(cash+6,game.snapshot().fuel().payroll());
+            assertEquals(68,game.snapshot().player().money());
+            game.drive("quarry");
+            assertEquals(6,game.snapshot().player().carFuel());
+            assertThrows(IllegalArgumentException.class,()->game.carAction("refuel"));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(45,FuelLife.stock(town));
+            int funds=town.employerFunds.get(FuelLife.ACCOUNT);
+            int supplier=town.employerFunds.get(FuelLife.SUPPLIER);
+            FuelLife.tick(town,state.day+1,420);
+            assertEquals(48,FuelLife.stock(town));
+            assertEquals(funds-3,town.employerFunds.get(FuelLife.ACCOUNT));
+            assertEquals(supplier+3,town.employerFunds.get(FuelLife.SUPPLIER));
+            FuelLife.tick(town,state.day+1,420);
+            assertEquals(funds-3,town.employerFunds.get(FuelLife.ACCOUNT));
+        }
+    }
+
+    @Test
     void carTripsConserveMoneyFuelAndLocationAcrossRestart() throws Exception {
         Path file=directory.resolve("car.db");
         try(var game=new GameSession(file)) {
@@ -506,7 +550,7 @@ class GameSessionTest {
     void ordinaryVisitorCanBecomeMinerOrMachinistAndSurveyNewOre() throws Exception {
         Path mine=directory.resolve("visitor-miner.db");
         try(var game=new GameSession(mine)) {
-            assertEquals(7,game.jobs().size());
+            assertEquals(8,game.jobs().size());
             game.move("quarry");
             game.applyJob("miner");
             game.waitMinutes(30);
@@ -587,7 +631,7 @@ class GameSessionTest {
             assertEquals(50,visitor.money());
             assertNull(visitor.jobId());
             assertEquals(0,visitor.engineeringSkill());
-            assertEquals(7,game.jobs().size());
+            assertEquals(8,game.jobs().size());
 
             assertThrows(IllegalArgumentException.class,
                     ()->game.applyJob("shop-assistant"));
@@ -615,7 +659,7 @@ class GameSessionTest {
             assertEquals("SCHOOL",restarted.snapshot().player().placeId());
             assertEquals("shop-assistant",restarted.snapshot().player().jobId());
             assertEquals(1,restarted.snapshot().player().engineeringSkill());
-            assertEquals(7,restarted.jobs().size(),"job board remains stable");
+            assertEquals(8,restarted.jobs().size(),"job board remains stable");
         }
     }
 

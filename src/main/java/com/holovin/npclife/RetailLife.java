@@ -28,14 +28,17 @@ final class RetailLife {
                 .orElseThrow(()->new IllegalArgumentException("Unknown retail product."));
     }
     static boolean hasCounter(TownLife.Place place) {
-        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI;
+        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI || place==TownLife.Place.FUEL_STATION;
+    }
+    static boolean availableAt(TownLife.Place place,Product product) {
+        return hasCounter(place) && (place!=TownLife.Place.FUEL_STATION || product.id().equals("bread") || product.id().equals("water"));
     }
     static String buy(TownLife.Town t,String id,int minute) {
         var player=t.player;
         PlayerLife.requireAlive(player);
         var product=product(id);
-        if(!hasCounter(player.place) || player.travelRemaining>0)
-            throw new IllegalArgumentException("Visit the market or Via dei Portici grocery to buy supplies.");
+        if(!availableAt(player.place,product) || player.travelRemaining>0)
+            throw new IllegalArgumentException("This product is not available at your local counter.");
         if(minute<480 || minute>=1200)
             throw new IllegalArgumentException("Market opens 08:00–20:00.");
         if(t.retailStock.getOrDefault(id,0)<1)

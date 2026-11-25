@@ -302,7 +302,7 @@ func _near_car() -> bool:
     return _car_place()==_current_place and _current_place in TownLayout.MOTOR_DISTRICTS and _avatar.position.distance_to(CAR_PARK)<3.3
 
 func _car_action(action: String) -> void:
-    if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():
+    if (_current_place=="WORKSHOP" or (_current_place=="FUEL_STATION" and action=="refuel")) and _near_kiosk() and _connected and not _api.is_busy():
         _api.car_action(action)
 
 func _drive_active() -> bool:
@@ -640,6 +640,8 @@ func _generate_chunk(place_id: String) -> void:
     _scenery.add_child(_residents_root)
 
     match place_id:
+        "FUEL_STATION":
+            _build_fuel_station()
         "FARM":
             _build_farm()
         "NORTH_RESIDENCES":
@@ -1086,6 +1088,47 @@ func _build_public_car_park() -> void:
     var car := _make_city_car(lot,Color("#496e50"))
     car.name = "OwnedCar"
     car.visible = false
+
+func _build_fuel_station() -> void:
+    var station := Node3D.new()
+    station.name = "StazioneDiServizio"
+    _scenery.add_child(station)
+    var white := Color("#e2dfd3")
+    var red := Color("#a34a39")
+    _box(station,Vector3(12,0.055,14),Color("#52595b"),Vector3(-9,0.02,-6))
+    _box(station,Vector3(11.6,0.32,9.5),white,Vector3(-9,4.0,-6))
+    _box(station,Vector3(11.7,0.27,0.2),red,Vector3(-9,4.02,-1.2))
+    for x in [-14.2,-3.8]:
+        _room_wall(station,Vector3(x,0,-6),Vector2(0.32,0.32),white)
+        _box(station,Vector3(0.32,1.0,0.32),white,Vector3(x,3.5,-6))
+    for x in [-12.0,-6.0]:
+        var pump := Node3D.new()
+        pump.name = "FuelPump"
+        pump.position = Vector3(x,0,-6)
+        station.add_child(pump)
+        _add_obstacle(pump.position,Vector2(0.85,0.7))
+        _box(pump,Vector3(0.85,1.65,0.7),white,Vector3(0,0.825,0))
+        _box(pump,Vector3(0.65,0.35,0.07),Color("#394b4c"),Vector3(0,1.25,0.39))
+        _box(pump,Vector3(0.85,0.20,0.72),red,Vector3(0,1.55,0))
+        _bike_tube(pump,Vector3(0.48,1.25,0),Vector3(0.63,0.25,0),Color("#303434"),0.035)
+        _bike_tube(pump,Vector3(0.63,0.25,0),Vector3(0.51,0.9,0.23),Color("#303434"),0.035)
+    _sign(station,"Stazione · carburante",Vector3(-9,4.5,-1.1))
+    # Walk-in shop with a doorway toward the central path.
+    var shop := Node3D.new()
+    shop.name = "StationShop"
+    station.add_child(shop)
+    _box(shop,Vector3(9,0.06,7),Color("#c3baaa"),Vector3(-9,0.02,10))
+    for side in [-1.0,1.0]:
+        _room_wall(shop,Vector3(-9+side*4.5,0,10),Vector2(0.25,7),white)
+    _room_wall(shop,Vector3(-9,0,13.5),Vector2(9,0.25),white)
+    for x in [-12.2,-5.8]:
+        _room_wall(shop,Vector3(x,0,6.5),Vector2(2.6,0.25),white)
+    _box(shop,Vector3(9.3,0.3,7.3),red,Vector3(-9,3.15,10))
+    _sign(shop,"Mini market",Vector3(-9,3.6,6.3))
+    _room_furniture(shop,Vector3(-12.1,0,11.8),Vector3(1.1,1.6,2),Color("#856a4d"))
+    _room_furniture(shop,Vector3(-6,0,11.8),Vector3(1.1,1.0,2),Color("#a8b7b8"))
+    _sign(station,"Fuel / shop / jobs · F",KIOSK_POSITION+Vector3(0,2.2,0))
+    _lamp(station,Vector3(-3,0,8))
 
 func _build_motor_court() -> void:
     var court := Node3D.new()
@@ -2078,7 +2121,7 @@ func _render_actions() -> void:
                     var instruction := Label.new()
                     instruction.text = "Your room is across the street. Walk to the bed."
                     _action_choices.add_child(instruction)
-        "MARKET", "PORTICI":
+        "MARKET", "PORTICI", "FUEL_STATION":
             for item in _last_snapshot.get("shop",[]):
                 var id := str(item.get("id",""))
                 var stock := int(item.get("stock",0))
@@ -2090,6 +2133,14 @@ func _render_actions() -> void:
             if _current_place == "MARKET":
                 _action_choices.add_child(_button("Apply: market assistant",
                         _apply_job.bind("shop-assistant")))
+            elif _current_place=="FUEL_STATION":
+                var fuel: Dictionary = _last_snapshot.get("fuel",{})
+                var supply := Label.new()
+                supply.text = "Fuel: %s/%s · %s EUR/unit" % [fuel.get("stock",0),fuel.get("capacity",48),fuel.get("price",2)]
+                _action_choices.add_child(supply)
+                if _car_place()==_current_place:
+                    _action_choices.add_child(_button("Refuel · up to 3 units",_car_action.bind("refuel")))
+                _action_choices.add_child(_button("Apply: fuel station attendant",_apply_job.bind("fuel-attendant")))
         "WORKSHOP":
             if _car_place().is_empty():
                 _action_choices.add_child(_button("Buy used car · 180 EUR",_car_action.bind("buy")))
@@ -2156,6 +2207,8 @@ func _render_actions() -> void:
 
     var work_site := ""
     match employed:
+        "fuel-attendant":
+            work_site = "FUEL_STATION"
         "farm-worker":
             work_site = "FARM"
         "shop-assistant":

@@ -73,7 +73,7 @@ public final class GameSession implements AutoCloseable {
     public record RetailView(String id,String label,int price,int stock) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm) { }
+                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -100,8 +100,8 @@ public final class GameSession implements AutoCloseable {
                 new WeatherView(weather.sky().name(),weather.temperatureC(),
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services(),RetailLife.hasCounter(p.place)
-                        ? RetailLife.PRODUCTS.stream().map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town));
+                        ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town));
     }
 
     public synchronized BusinessView business() {
