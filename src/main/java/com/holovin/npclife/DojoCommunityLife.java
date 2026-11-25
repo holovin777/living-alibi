@@ -8,12 +8,23 @@ import java.util.Comparator;
 final class DojoCommunityLife {
     private DojoCommunityLife(){}
     static final String FOUNDED="dojo-community:founded";
+    static final String INSTRUCTOR="dojo-community:instructor";
+    static void found(TownLife.Town t,int day){
+        if(founded(t))return;
+        var coach=instructor(t,day);
+        if(coach!=null)t.industryStocks.put(INSTRUCTOR,coach.generationIndex);
+        t.industryStocks.put(FOUNDED,1);
+    }
     static boolean founded(TownLife.Town t){return t.industryStocks.getOrDefault(FOUNDED,0)>0;}
     static boolean eligible(TownLife.Town t,TownLife.Citizen c,int day){
         return c.alive&&c.generationIndex>0&&c.age>=18&&c.age<=65&&!RebirthLife.linkedAdult(t,c)
                 &&!EmploymentLife.sick(c,day)&&c.health>=65;
     }
     static TownLife.Citizen instructor(TownLife.Town t,int day){
+        if(founded(t)){
+            var chosen=DemographyLife.byIndex(t,t.industryStocks.getOrDefault(INSTRUCTOR,0));
+            return chosen!=null&&eligible(t,chosen,day)?chosen:null;
+        }
         return t.people.values().stream().filter(c->eligible(t,c,day))
                 .filter(c->c.age>=25&&c.carefulness>=50)
                 .sorted(Comparator.comparingInt((TownLife.Citizen c)->DojoLife.get(t,c,"rank")).reversed()
@@ -21,7 +32,7 @@ final class DojoCommunityLife {
                     .thenComparingInt(c->c.generationIndex)).findFirst().orElse(null);
     }
     static boolean scheduled(TownLife.Town t,TownLife.Citizen c,int day,int minute){
-        if(!founded(t)||!eligible(t,c,day)||!DojoLife.open(day,1080)||minute<1050||minute>=1140)return false;
+        if(!founded(t)||!eligible(t,c,day)||!DojoLife.open(day,1080)||minute<1050||minute>=1260)return false;
         if(c==instructor(t,day))return true;
         return "STAY_HEALTHY".equals(c.goal)||Math.floorMod(c.personalSeed,5)==0;
     }
@@ -49,7 +60,7 @@ final class DojoCommunityLife {
             DojoLife.set(t,c,"sessions",Math.addExact(DojoLife.get(t,c,"sessions"),1));
             String mode=DojoLife.MODES.get(Math.floorMod(DojoLife.get(t,c,"sessions")-1,3));
             DojoLife.set(t,c,mode,Math.min(100,DojoLife.get(t,c,mode)+1));
-            var relation=t.peerRelationships.computeIfAbsent(SocialNetwork.key(c.id,teacher.id),k->new SocialLife.Relationship(c.id,teacher.id));
+            var relation=t.peerRelationships.computeIfAbsent(SocialNetwork.key(c.id,teacher.id),k->new SocialLife.Relationship(c.id.compareTo(teacher.id)<=0?c.id:teacher.id,c.id.compareTo(teacher.id)<=0?teacher.id:c.id));
             relation.affinity=Math.min(100,relation.affinity+1);
             relation.trust=Math.min(100,relation.trust+1);
         }
