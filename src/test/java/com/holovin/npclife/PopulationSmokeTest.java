@@ -23,6 +23,7 @@ public final class PopulationSmokeTest {
                     c.personalSeed==twin.personalSeed,"stable generation across fresh worlds");
         }
         personalityPreferences();
+        emotionalChanges();
         var first=town.get("resident-0001");
         check(first.home!=null && first.workplace!=null,"home and workplace assigned");
         var events=new ArrayList<TownLife.Event>();
@@ -50,6 +51,26 @@ public final class PopulationSmokeTest {
         try { PopulationGenerator.add(copy,20); throw new AssertionError("limit not enforced"); }
         catch(IllegalArgumentException expected) { /* max is 40 */ }
         System.out.println("PopulationSmokeTest: ALL CHECKS PASSED (20 residents; 30 days)");
+    }
+    private static void emotionalChanges() {
+        var town=TownLife.create(new WorldState());
+        var c=PopulationGenerator.add(town,1).getFirst();
+        c.health=100;c.hunger=20;c.thirst=20;c.fatigue=10;c.curiosity=80;c.sociability=80;c.activity="WORKING";
+        check(EmotionLife.mood(town,c,1,600)==EmotionLife.Mood.ENTHUSIASTIC,"rested curious worker enjoys work");
+        c.fatigue=90;
+        check(EmotionLife.mood(town,c,1,600)==EmotionLife.Mood.TIRED,"fatigue changes mood");
+        c.fatigue=10;c.hunger=90;
+        check(EmotionLife.mood(town,c,1,600)==EmotionLife.Mood.IRRITATED,"hunger changes mood");
+        c.hunger=20;c.activity="FREE_TIME";
+        check(EmotionLife.mood(town,c,4,600)==EmotionLife.Mood.LONELY,"isolated social resident misses company");
+        var relation=new SocialLife.Relationship(c.id,"marco");
+        relation.lastInteractionTick=3L*1440+590;relation.affinity=80;relation.trust=75;relation.tension=8;
+        town.peerRelationships.put(SocialNetwork.key(c.id,"marco"),relation);
+        check(EmotionLife.mood(town,c,4,600)==EmotionLife.Mood.HAPPY,"recent friendly encounter improves mood");
+        relation.tension=65;
+        check(EmotionLife.mood(town,c,4,600)==EmotionLife.Mood.IRRITATED,"recent conflict affects mood");
+        check(EmotionLife.mood(town,c,4,1000)==EmotionLife.Mood.CALM,"conflict effect fades");
+        check(!EmotionLife.reply(EmotionLife.Mood.SAD,false).equals(EmotionLife.reply(EmotionLife.Mood.SAD,true)),"private feelings require trust");
     }
     private static void personalityPreferences() {
         var social=new TownLife.Citizen("social-test","Social","Barista",TownLife.Place.CAFE);
