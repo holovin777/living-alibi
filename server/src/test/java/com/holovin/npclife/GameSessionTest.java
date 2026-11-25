@@ -38,10 +38,45 @@ class GameSessionTest {
             var town=db.loadTown(db.load());
             assertEquals("Alex",town.player.contacts.get(id).knownName);
             assertEquals(1,town.player.contacts.get(id).conversations);
+            assertEquals(53,town.player.contacts.get(id).trust);
+            assertTrue(town.player.contacts.get(id).affinity>0);
         }
         try(var game=new GameSession(file)) {
             game.move("quarry");
             assertThrows(IllegalArgumentException.class,()->game.speak(id,"Hello"));
+        }
+    }
+
+    @Test
+    void socialAttitudeIsPersonalAndCannotBeFarmedInOneDay() throws Exception {
+        Path file=directory.resolve("attitude.db");
+        try(var game=new GameSession(file)) { }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            var resident=town.people.values().iterator().next();
+            resident.place=TownLife.Place.PARK;
+            resident.travelRemaining=0;
+            resident.activity="FREE_TIME";
+            PlayerLife.speak(town,resident.id,"Hello",1,450);
+            var contact=town.player.contacts.get(resident.id);
+            int initialAffinity=contact.affinity;
+            for(int i=0;i<20;i++)PlayerLife.speak(town,resident.id,"Hello",1,450+i);
+            assertEquals(initialAffinity,contact.affinity);
+            for(int day=2;day<=12;day++)PlayerLife.speak(town,resident.id,"Hello",day,450);
+            assertEquals("FRIENDLY",PlayerLife.relationship(contact));
+            assertEquals("STRANGER",PlayerLife.relationship(null));
+            for(int i=0;i<8;i++)PlayerLife.speak(town,resident.id,"Leave me alone!",12,460+i);
+            assertEquals("WARY",PlayerLife.relationship(contact));
+            assertEquals(1,town.player.contacts.size());
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var town=db.loadTown(db.load());
+            var contact=town.player.contacts.values().iterator().next();
+            assertEquals("WARY",PlayerLife.relationship(contact));
+            assertEquals(12,contact.lastPositiveDay);
         }
     }
 

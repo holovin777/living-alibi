@@ -69,6 +69,7 @@ var _action_panel: PanelContainer
 var _dialog_panel: PanelContainer
 var _dialog_title: Label
 var _dialog_reply: Label
+var _dialog_attitude: Label
 var _dialog_input: LineEdit
 var _dialog_target := ""
 var _dialog_pending := false
@@ -563,6 +564,7 @@ func _render_residents() -> void:
         person.set_meta("display_name",str(resident.get("name","Resident")))
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
         person.set_meta("conversations",int(resident.get("conversations",0)))
+        person.set_meta("relationship",str(resident.get("relationship","STRANGER")))
     for child in _residents_root.get_children():
         if not present.has(str(child.get_meta("resident_id", ""))):
             _residents_root.remove_child(child)
@@ -800,12 +802,16 @@ func _create_interface() -> void:
     _dialog_panel.add_child(dialog_col)
     _dialog_title = Label.new()
     dialog_col.add_child(_dialog_title)
+    _dialog_attitude = Label.new()
+    dialog_col.add_child(_dialog_attitude)
     _dialog_reply = Label.new()
     _dialog_reply.custom_minimum_size = Vector2(400,0)
     _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_reply)
     dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
     dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
+    dialog_col.add_child(_button("Apologize",_send_dialog.bind("I'm sorry.")))
+    dialog_col.add_child(_button("Leave me alone!",_send_dialog.bind("Leave me alone!")))
     _dialog_input = LineEdit.new()
     _dialog_input.placeholder_text = "My name is ... / Say something"
     _dialog_input.max_length = 1000
@@ -870,6 +876,7 @@ func _open_dialog() -> void:
     _action_panel.visible = false
     _map_panel.visible = false
     _dialog_title.text = str(person.get_meta("display_name","Resident"))
+    _dialog_attitude.text = "Attitude: "+str(person.get_meta("relationship","STRANGER")).capitalize()
     var known := str(person.get_meta("known_name",""))
     _dialog_reply.text = "They know you as "+known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
@@ -1215,8 +1222,12 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     ]
     _town_map.update_world(_current_place, _locations)
     _render_residents()
-    if _dialog_panel.visible and not _residents_root.has_node("Resident_"+_dialog_target):
-        _close_dialog()
+    if _dialog_panel.visible:
+        var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+        if person == null:
+            _close_dialog()
+        else:
+            _dialog_attitude.text = "Attitude: "+str(person.get_meta("relationship","STRANGER")).capitalize()
     _apply_weather()
     _render_actions()
     if _api != null and not _api.is_busy() and not clock_update:

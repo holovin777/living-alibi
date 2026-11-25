@@ -217,6 +217,17 @@ proximity check is client-side; exact server-owned coordinates are
 not implemented. There is no language model, arbitrary natural-language
 understanding, or promise of a job. Ambient clock pauses in conversation.
 
+## Personal social attitudes
+
+Each resident's contact has independent trust (0–100) and affinity
+(-100–100), saved for the current visitor in the existing contact tables.
+Old databases are migrated with neutral defaults. The dialogue shows
+a coarse attitude: stranger, acquaintance, familiar, friendly or wary.
+Greetings, introductions and apologies can improve attitude once per
+game day; explicitly dismissing a resident or changing a previously
+disclosed alias can reduce it. Responses use deterministic Java rules.
+There is no global reputation, gossip propagation or romance yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

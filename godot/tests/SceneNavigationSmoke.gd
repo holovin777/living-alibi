@@ -242,12 +242,13 @@ func _exercise() -> void:
 
     var social := _world("PARK", "Park")
     social["residents"] = [{"id":"marco","name":"Marco","activity":"FREE_TIME",
-            "knownName":"Alex","conversations":2}]
+            "knownName":"Alex","conversations":2,"relationship":"FAMILIAR"}]
     world._on_world_updated(social)
     var social_person = world._residents_root.get_node("Resident_marco")
     world._avatar.position = social_person.position
     if not _check(world._nearest_resident() == "marco"
-            and social_person.get_meta("known_name") == "Alex",
+            and social_person.get_meta("known_name") == "Alex"
+            and social_person.get_meta("relationship") == "FAMILIAR",
             "nearby resident carries server-owned conversation memory"):
         return
     world._avatar.position = Vector3(16,0,16)

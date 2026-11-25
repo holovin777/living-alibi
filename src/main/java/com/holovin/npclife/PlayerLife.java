@@ -78,6 +78,9 @@ final class PlayerLife {
         final String residentId;
         String knownName; // Null means the visitor has not introduced themselves to this resident.
         int conversations;
+        int trust=50;
+        int affinity=0;
+        int lastPositiveDay;
         int lastDay;
         int lastMinute;
         String lastHeard;
@@ -85,6 +88,7 @@ final class PlayerLife {
         Contact copy() {
             Contact c=new Contact(residentId);
             c.knownName=knownName;c.conversations=conversations;
+            c.trust=trust;c.affinity=affinity;c.lastPositiveDay=lastPositiveDay;
             c.lastDay=lastDay;c.lastMinute=lastMinute;c.lastHeard=lastHeard;
             return c;
         }
@@ -258,6 +262,19 @@ final class PlayerLife {
         contact.lastHeard="My name is "+disclosed+".";
         return contact;
     }
+    static String relationship(Contact c) {
+        if(c==null)return "STRANGER";
+        if(c.affinity<=-20 || c.trust<30)return "WARY";
+        if(c.affinity>=30 && c.trust>=70)return "FRIENDLY";
+        if(c.affinity>=12 && c.trust>=55)return "FAMILIAR";
+        return "ACQUAINTANCE";
+    }
+
+    private static void adjust(Contact c,int trust,int affinity) {
+        c.trust=Math.max(0,Math.min(100,c.trust+trust));
+        c.affinity=Math.max(-100,Math.min(100,c.affinity+affinity));
+    }
+
     static String speak(TownLife.Town town,String id,String message,int day,int minute) {
         TownLife.Citizen resident=nearby(town,id);
         String spoken=message.strip();
@@ -266,17 +283,35 @@ final class PlayerLife {
         if(resident.activity.equals("SLEEPING")||resident.activity.equals("TRAVELING"))
             throw new IllegalArgumentException(resident.name+" is not available for a conversation.");
         Contact contact=town.player.contacts.computeIfAbsent(resident.id,Contact::new);
-        // A deliberate natural-language introduction counts; normal conversation does NOT.
-        if(spoken.regionMatches(true,0,"My name is ",0,11)) {
+        boolean introduction=spoken.regionMatches(true,0,"My name is ",0,11);
+        boolean changedAlias=false;
+        if(introduction) {
             String alias=spoken.substring(11).strip();
             if(alias.endsWith("."))alias=alias.substring(0,alias.length()-1);
-            contact.knownName=validateName(alias);
+            String disclosed=validateName(alias);
+            changedAlias=contact.knownName!=null && !contact.knownName.equalsIgnoreCase(disclosed);
+            contact.knownName=disclosed;
+        }
+        boolean rude=spoken.equalsIgnoreCase("Leave me alone!");
+        boolean apology=spoken.equalsIgnoreCase("I'm sorry.");
+        boolean positive=introduction || spoken.equalsIgnoreCase("Hello") || apology
+                || spoken.equalsIgnoreCase("What do you do?");
+        if(changedAlias)adjust(contact,-12,-4);
+        else if(rude)adjust(contact,-8,-12);
+        else if(positive && contact.lastPositiveDay!=day) {
+            adjust(contact,apology?5:3,apology?5:(resident.sociability>=60?5:3));
+            contact.lastPositiveDay=day;
         }
         contact.conversations++;
         contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=spoken;
         String greeting=contact.knownName==null?"stranger":contact.knownName;
-        if(spoken.regionMatches(true,0,"My name is ",0,11))
-            return "Nice to meet you, "+greeting+".";
+        if(changedAlias)return "I remember a different name. I'll remember "+greeting+" for now.";
+        if(rude)return "All right. I'll give you some space.";
+        if(apology)return contact.trust<30?"I need a little time.":"Thank you for saying that.";
+        if(introduction)return "Nice to meet you, "+greeting+".";
+        if(relationship(contact).equals("WARY"))return "I'd rather keep this brief, "+greeting+".";
+        if(spoken.equalsIgnoreCase("Hello") && relationship(contact).equals("FRIENDLY"))
+            return "It's good to see you, "+greeting+"! How have you been?";
         if(spoken.equalsIgnoreCase("What do you do?"))
             return resident.employed?"I work as "+resident.occupation+".":"I'm currently looking for work.";
         if(resident.sociability<40)return "Hello. I'm having a quiet day.";
