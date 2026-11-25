@@ -4910,6 +4910,9 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
     _needs.text += tr("\nResidents present in this district: %s") % [
         str(snapshot.get("residents", []).size())
     ]
+    var demography = snapshot.get("demography")
+    if demography is Dictionary:
+        _needs.text += tr(" · Town population: %s") % (int(demography.get("alive",0))+2)
 
 func _on_world_updated(snapshot: Dictionary) -> void:
     var clock_update := _clock_pending
