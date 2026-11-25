@@ -39,6 +39,9 @@ const LiveClock = preload("res://scripts/LiveClock.gd")
 const DriveControls = preload("res://scripts/DriveControls.gd")
 const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
+const TownVisuals = preload("res://scripts/TownVisuals.gd")
+var _sky_material: ProceduralSkyMaterial
+var _surface_textures: Dictionary = {}
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
 const GameLanguage = preload("res://scripts/GameLanguage.gd")
 const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
@@ -799,7 +802,12 @@ func _follow_player() -> void:
 
 func _build_world() -> void:
     _environment = Environment.new()
-    _environment.background_mode = Environment.BG_COLOR
+    _surface_textures={"grass":TownVisuals.texture("grass"),"paving":TownVisuals.texture("paving"),"asphalt":TownVisuals.texture("asphalt")}
+    _sky_material=ProceduralSkyMaterial.new()
+    var sky := Sky.new()
+    sky.sky_material=_sky_material
+    _environment.sky=sky
+    _environment.background_mode = Environment.BG_SKY
     _environment.background_color = Color(0.63, 0.80, 0.96)
     _environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
     _environment.ambient_light_color = Color(0.80, 0.86, 0.93)
@@ -811,6 +819,8 @@ func _build_world() -> void:
     _sun.rotation_degrees = Vector3(-55.0, -25.0, 0.0)
     _sun.light_energy = 1.1
     _sun.shadow_enabled = true
+    _sun.directional_shadow_max_distance=65.0
+    _sun.shadow_blur=1.2
     add_child(_sun)
 
     _avatar = Node3D.new()
@@ -921,7 +931,8 @@ func _generate_chunk(place_id: String) -> void:
     add_child(_scenery)
 
     _ground_material = StandardMaterial3D.new()
-    _ground_material.albedo_color = Color(0.27, 0.49, 0.26)
+    _ground_material.albedo_color = Color(0.37, 0.50, 0.29)
+    TownVisuals.surface(_ground_material,_surface_textures["grass"],0.32)
     var ground := BoxMesh.new()
     ground.size = Vector3(48.0, 0.3, 48.0)
     var floor := MeshInstance3D.new()
@@ -931,7 +942,7 @@ func _generate_chunk(place_id: String) -> void:
     _scenery.add_child(floor)
 
     _box(_scenery, Vector3(3.0, 0.05, 35.0), Color(0.63, 0.57, 0.45),
-            Vector3(0.0, -0.015, 0.0))
+            Vector3(0.0, -0.015, 0.0),"paving")
     _create_gate_and_kiosk()
     _residents_root = Node3D.new()
     _residents_root.name = "VisibleResidents"
@@ -1055,7 +1066,7 @@ func _build_road_links(place_id: String) -> void:
         var width := 6.4 if motor else 4.0
         var dimensions := Vector3(width,0.05,15.0) if vertical else Vector3(15.0,0.05,width)
         _box(roads, dimensions, Color("#42484b") if motor else Color(0.49,0.47,0.42),
-                direction * 16.5 + Vector3(0,0.025,0))
+                direction * 16.5 + Vector3(0,0.025,0),"asphalt" if motor else "paving")
         if motor:
             _mark_motor_road(roads,direction)
         _sign(roads, str(TownLayout.LABELS.get(id,str(id).capitalize())), direction * 19.0 + Vector3(0,2.8,0))
@@ -1077,6 +1088,10 @@ func _mark_motor_road(parent: Node3D,direction: Vector3) -> void:
     # Small roadside crossing markers, outside the road corridor.
     _box(lane,Vector3(2.9,0.022,0.15),white,Vector3(-1.5,0.065,16.7))
     _box(lane,Vector3(2.9,0.022,0.15),white,Vector3(1.5,0.065,19.3))
+    for x in [-3.35,3.35]:
+        _box(lane,Vector3(0.28,0.10,15),Color("#b5b0a3"),Vector3(x,0.05,16.5))
+    for x in [-4.0,4.0]:
+        _box(lane,Vector3(1.0,0.08,15),Color("#aaa294"),Vector3(x,0.04,16.5),"paving")
     _build_traffic_signal(lane)
     for x in [-3.7,3.7]:
         _box(lane,Vector3(0.12,1.8,0.12),Color("#686c70"),Vector3(x,0.9,18.0))
@@ -2576,8 +2591,8 @@ func _build_park() -> void:
     park.name = "ParkDetails"
     _scenery.add_child(park)
     var paving := Color(0.65, 0.61, 0.54)
-    _box(park, Vector3(32.0, 0.06, 2.6), paving, Vector3(0, 0.01, 5))
-    _box(park, Vector3(3.2, 0.06, 16.0), paving, Vector3(-11, 0.01, -3))
+    _box(park, Vector3(32.0, 0.06, 2.6), paving, Vector3(0, 0.01, 5),"paving")
+    _box(park, Vector3(3.2, 0.06, 16.0), paving, Vector3(-11, 0.01, -3),"paving")
     for p in [Vector2(-15,-13), Vector2(-8,-14), Vector2(8,-13),
             Vector2(14,-8), Vector2(-15,9), Vector2(-7,11),
             Vector2(10,11), Vector2(15,14), Vector2(-8,-5)]:
@@ -2597,10 +2612,9 @@ func _build_park() -> void:
     _fountain_water = _cylinder(fountain, 1.78, 0.04, Color(0.24,0.63,0.76), Vector3(0,0.45,0))
     _cylinder(fountain, 0.25, 1.1, Color(0.60,0.61,0.62), Vector3(0,0.85,0))
     _sign(fountain, "Public fountain", Vector3(0,1.8,0))
-    _sign(park, "Town centre · E", GATE_POSITION + Vector3(0,3.7,0))
-    _sign(park, "Public services · F", KIOSK_POSITION + Vector3(0,2.2,0))
+    # Shared gate and kiosk already have labelled signs.
     # A street along the edge provides visual context, not a new travel route.
-    _box(park, Vector3(38,0.08,3.2), Color(0.23,0.25,0.27), Vector3(0,0.02,-16))
+    _box(park, Vector3(38,0.08,3.2), Color(0.23,0.25,0.27), Vector3(0,0.02,-16),"asphalt")
     for x in range(-16,17,4):
         _box(park, Vector3(1.5,0.02,0.11), Color(0.92,0.85,0.61), Vector3(x,0.07,-16))
     for x in [-14.0,-8.0,8.0,14.0]:
@@ -2881,6 +2895,16 @@ func _building(_title: String, wall_color: Color) -> void:
             Vector3(-7.0, 4.85, 7.5))
     _box(_scenery, Vector3(2.1, 3.0, 0.1), Color(0.20, 0.28, 0.32),
             Vector3(-7.0, 1.5, 3.95))
+    _sign(_scenery,_title,Vector3(-7,3.9,3.82))
+    var trim := wall_color.lightened(0.25)
+    for x in [-10.7,-3.3]:
+        for y in [1.5,3.25]:
+            _box(_scenery,Vector3(1.55,1.3,0.12),trim,Vector3(x,y,3.91))
+            _box(_scenery,Vector3(1.28,1.03,0.14),Color("#4a6068"),Vector3(x,y,3.83))
+            _box(_scenery,Vector3(0.065,1.02,0.16),trim,Vector3(x,y,3.74))
+            _box(_scenery,Vector3(1.28,0.065,0.16),trim,Vector3(x,y,3.74))
+            _box(_scenery,Vector3(1.65,0.13,0.24),trim,Vector3(x,y-0.68,3.82))
+    _box(_scenery,Vector3(11.0,0.18,0.14),trim,Vector3(-7,2.42,3.9))
 
 func _create_gate_and_kiosk() -> void:
     # A yellow gate is a map transition — actual travel is authorized by Java.
@@ -2907,17 +2931,36 @@ func _tree(at: Vector3) -> void:
     _add_obstacle(at, Vector2(0.45, 0.45))
     _box(_scenery, Vector3(0.45, 1.8, 0.45), Color(0.33, 0.19, 0.11),
             at + Vector3(0.0, 0.9, 0.0))
-    _sphere(_scenery, 1.15, Color(0.16, 0.37, 0.16),
-            at + Vector3(0.0, 2.4, 0.0))
+    var crown := Node3D.new()
+    crown.name="TreeCrown"
+    crown.position=at
+    _scenery.add_child(crown)
+    var leaves := Color("#476f39")
+    for offset in [Vector3(-0.55,2.5,0),Vector3(0.55,2.6,0.2),Vector3(0,3.25,-0.1),Vector3(0,2.55,-0.65)]:
+        var mesh := SphereMesh.new()
+        mesh.radius=0.88
+        mesh.height=1.65
+        mesh.radial_segments=10
+        mesh.rings=5
+        var foliage := MeshInstance3D.new()
+        foliage.mesh=mesh
+        var mat := StandardMaterial3D.new()
+        mat.albedo_color=leaves.lightened(0.06*float(crown.get_child_count()))
+        mat.roughness=1.0
+        foliage.material_override=mat
+        foliage.position=offset
+        crown.add_child(foliage)
 
 func _box(parent: Node3D, size: Vector3, color: Color,
-        where: Vector3) -> void:
+        where: Vector3, surface: String = "") -> void:
     var mesh := BoxMesh.new()
     mesh.size = size
     var node := MeshInstance3D.new()
     node.mesh = mesh
     var mat := StandardMaterial3D.new()
     mat.albedo_color = color
+    if _surface_textures.has(surface):
+        TownVisuals.surface(mat,_surface_textures[surface],0.65 if surface=="paving" else 0.32)
     node.material_override = mat
     node.position = where
     parent.add_child(node)
@@ -5033,12 +5076,22 @@ func _apply_weather() -> void:
     var daylight := sin(day_progress * PI)
     _sun.rotation_degrees = Vector3(-8.0-65.0*daylight,
             -90.0+180.0*day_progress,0.0)
-    _sun.light_energy = lerpf(0.12,1.1,daylight)
-    _environment.ambient_light_energy = lerpf(0.25,1.0,daylight)
+    _sun.light_energy = lerpf(0.08,1.18,daylight)
+    _sun.light_color=Color("#f1bd83").lerp(Color("#fff5df"),smoothstep(0.0,0.65,daylight))
+    _environment.ambient_light_energy = lerpf(0.28,0.72,daylight)
     _environment.background_color = Color(0.07,0.10,0.18).lerp(
             _environment.background_color, smoothstep(0.0,0.35,daylight))
     if climate.get("sky","CLEAR") != "CLEAR":
         _sun.light_energy *= 0.65
+    var horizon := Color("#e9cba8").lerp(Color("#d9e7ef"),smoothstep(0.0,0.7,daylight))
+    var top := Color("#456fa5").lerp(Color("#548fc9"),daylight)
+    if climate.get("sky","CLEAR")!="CLEAR":
+        horizon=Color("#b7bdc2")
+        top=Color("#75818d")
+    _sky_material.sky_top_color=Color("#101a31").lerp(top,smoothstep(0.0,0.35,daylight))
+    _sky_material.sky_horizon_color=Color("#253044").lerp(horizon,smoothstep(0.0,0.35,daylight))
+    _sky_material.ground_horizon_color=_sky_material.sky_horizon_color
+    _sky_material.ground_bottom_color=Color("#272e28").lerp(Color("#777f68"),daylight)
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     _weather_fx.apply(climate,_environment)
