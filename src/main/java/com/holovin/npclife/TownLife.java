@@ -325,6 +325,7 @@ final class TownLife {
         SocialLife.tick(town,marco,truth,observations,interactions);
         SocialNetwork.tick(town,marco,truth,observations,interactions);
         MutualAidLife.tick(town,marco);
+        PeerAidLife.tick(town,marco,truth,observations);
         for(int i=before;i<interactions.size();i++) {
             var conversation=interactions.get(i);
             KnowledgeLife.exchange(town,marco,conversation.firstId(),conversation.secondId());
