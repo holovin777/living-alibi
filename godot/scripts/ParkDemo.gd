@@ -2682,6 +2682,9 @@ func _render_residents() -> void:
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
         person.set_meta("conversations",int(resident.get("conversations",0)))
         person.set_meta("relationship",str(resident.get("relationship","STRANGER")))
+        var activity_label := person.get_node_or_null("ActivityLabel") as Label3D
+        if activity_label!=null:
+            activity_label.text=tr(str(person.get_meta("activity","")).replace("_"," ").capitalize())
     for child in _residents_root.get_children():
         if not present.has(str(child.get_meta("resident_id", ""))):
             _residents_root.remove_child(child)
@@ -2822,6 +2825,14 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         _box(arm,Vector3(0.16,0.44,0.17),jacket,Vector3(0,-0.22,0))
         _sphere(arm,0.085,skin,Vector3(0,-0.48,0))
     _sign(person,display_name,Vector3(0,2.1,0))
+    var activity_label := Label3D.new()
+    activity_label.name="ActivityLabel"
+    activity_label.position=Vector3(0,1.94,0)
+    activity_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+    activity_label.font_size=24
+    activity_label.pixel_size=0.006
+    activity_label.modulate=Color("#f4db9e")
+    person.add_child(activity_label)
     return person
 
 func _animate_residents(delta: float) -> void:
@@ -2852,6 +2863,8 @@ func _animate_residents(delta: float) -> void:
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
             if activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
                 angle=-0.7
+            elif not walking and activity in ["WORKING","STUDYING"] and limb in ["ArmRight","ArmLeft"]:
+                angle=-0.22+sin(float(Time.get_ticks_msec())*0.003+phase)*0.12
             elif not walking and activity!="SLEEPING" and limb=="ArmRight":
                 var style := str(person.get_meta("personality","quiet"))
                 if style in ["talkative","joker"] and str(person.get_meta("mood","CALM")) in ["CALM","HAPPY","ENTHUSIASTIC"]:
