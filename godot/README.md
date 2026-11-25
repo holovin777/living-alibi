@@ -715,3 +715,9 @@ The HUD Graphics quality selector applies immediately for this session: Low disa
 ### Water and evening streets
 
 The public fountain and river share a lightweight animated opaque water shader, without screen-space reflections or refraction. The fountain has a stone rim and a small local particle spray, only while Java confirms a working fountain and available clean water. Low graphics quality disables spray. Municipal lantern glass emits warm light only when the committed time is night and the street-light service works. Historic shopfronts show decorative warm windows in the evening; this does not imply shops are open or change business schedules. No new game state or collision geometry is introduced.
+
+## Individual residents and vehicle styling
+
+Resident ID seeds an original, stable visual profile: height and build, skin and hair palettes, hairstyles, clothing, optional glasses, backpack or cap, walking speed and stride. These are client-side cosmetic traits, not authoritative age, demographic or health data. Existing residents remain the only figures displayed; their identity, activities, collision radius and save state are unchanged. Faces and articulated bodies are still stylized procedural meshes, not photorealistic humans.
+
+Compact traffic cars use a stable color palette per road and lane, two roof heights, slanted windscreens, hub spokes, mirrors, door handles and grille details. Their existing traffic and collision rules are unchanged; cars still recycle at the ends of modeled road segments.
