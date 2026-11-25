@@ -48,6 +48,29 @@ func _exercise() -> void:
             and world._residents_root.get_child(0).name == "Resident_marco",
             "only actually co-present residents appear in the park"):
         return
+    var marco = world._residents_root.get_node("Resident_marco")
+    var start_position: Vector3 = marco.position
+    world._animate_residents(0.5)
+    if not _check(marco.position.distance_to(start_position) > 0.01,
+            "walking residents move within the local visual scene"):
+        return
+    world._on_world_updated(populated_park)
+    if not _check(world._residents_root.get_node("Resident_marco") == marco,
+            "refresh retains the same resident model and animation state"):
+        return
+    var night := _world("PARK", "Park")
+    night["minute"] = 1260
+    night["services"] = {"lightsWorking": true, "fountainWorking": true, "cleanWater": 5}
+    world._on_world_updated(night)
+    if not _check(world._park_lamps.size() == 4 and world._park_lamps[0].visible
+            and world._fountain_water.visible,
+            "night park lights and water reflect working municipal services"):
+        return
+    night["services"] = {"lightsWorking": false, "fountainWorking": false, "cleanWater": 0}
+    world._on_world_updated(night)
+    if not _check(not world._park_lamps[0].visible and not world._fountain_water.visible,
+            "broken services turn off real visual indicators"):
+        return
     world._on_world_updated(_world("PARK", "Park"))
     if not _check(world._residents_root.get_child_count() == 0,
             "residents disappear when the authoritative snapshot reports nobody"):
