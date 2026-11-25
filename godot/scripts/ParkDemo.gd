@@ -2867,6 +2867,19 @@ func _render_actions() -> void:
                                 _business_hire.bind(id)))
                 _action_choices.add_child(_button("Withdraw 10 EUR", _business_withdraw.bind(10)))
         "OFFICE":
+            var bank: Dictionary = _last_snapshot.get("bank",{})
+            var bank_info := Label.new()
+            bank_info.text = "Banca · Personal %s EUR | Business %s EUR | Debt %s EUR" % [bank.get("personal",0),bank.get("business",0),bank.get("debt",0)]
+            _action_choices.add_child(bank_info)
+            _action_choices.add_child(_button("Deposit personal · 10 EUR",_garden_action.bind("bank-deposit-personal")))
+            _action_choices.add_child(_button("Withdraw personal · up to 10 EUR",_garden_action.bind("bank-withdraw-personal")))
+            if bool(bank.get("businessAvailable",false)):
+                _action_choices.add_child(_button("Deposit business · 10 EUR",_garden_action.bind("bank-deposit-business")))
+                _action_choices.add_child(_button("Withdraw business · up to 10 EUR",_garden_action.bind("bank-withdraw-business")))
+            if int(bank.get("debt",0))>0:
+                _action_choices.add_child(_button("Repay loan · up to 10 EUR",_garden_action.bind("bank-repay")))
+            elif bool(bank.get("eligible",false)):
+                _action_choices.add_child(_button("Borrow 50 EUR · weekly interest",_garden_action.bind("bank-borrow")))
             _action_choices.add_child(_button("Apply: engineer",
                     _apply_job.bind("engineer")))
             _action_choices.add_child(_button("Apply: investigator",
@@ -3002,7 +3015,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (_near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if ((action.begins_with("bank-") and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:

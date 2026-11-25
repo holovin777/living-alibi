@@ -165,6 +165,56 @@ class GameSessionTest {
     }
 
     @Test
+    void bankConservesCashProtectsDepositsAndPersistsWeeklyInterest() throws Exception {
+        Path file=directory.resolve("bank.db");
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            p.money=200;p.place=TownLife.Place.PARK;p.destination=p.place;p.travelRemaining=0;
+            assertThrows(IllegalArgumentException.class,()->BankLife.act(town,"bank-deposit-personal",1,600));
+            p.place=TownLife.Place.OFFICE;p.destination=p.place;
+            int bank=BankLife.cash(town);
+            assertThrows(IllegalArgumentException.class,()->BankLife.act(town,"bank-borrow",1,600));
+            assertThrows(IllegalArgumentException.class,()->BankLife.act(town,"bank-deposit-business",1,600));
+            for(int i=0;i<10;i++)BankLife.act(town,"bank-deposit-personal",1,600);
+            assertEquals(100,p.money);assertEquals(bank+100,BankLife.cash(town));
+            assertEquals(bank,BankLife.free(town));
+            p.jobId="engineer";
+            BankLife.act(town,"bank-borrow",1,600);
+            assertEquals(150,p.money);assertEquals(bank+50,BankLife.cash(town));
+            assertThrows(IllegalArgumentException.class,()->BankLife.act(town,"bank-borrow",1,600));
+            BankLife.tick(town,8,360);BankLife.tick(town,8,360);
+            assertEquals(52,BankLife.report(town).debt());
+            assertEquals(101,BankLife.report(town).personal());
+            assertEquals(1,BankLife.report(town).interestEarned());
+            assertEquals(bank+50,BankLife.cash(town));
+            state.day=8;state.minute=360;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            assertEquals(52,BankLife.report(town).debt());
+            assertEquals(101,BankLife.report(town).personal());
+            BankLife.tick(town,8,360);
+            assertEquals(52,BankLife.report(town).debt());
+            int before=p.money+BankLife.cash(town);
+            BankLife.act(town,"bank-repay",8,600);
+            BankLife.act(town,"bank-withdraw-personal",8,600);
+            assertEquals(42,BankLife.report(town).debt());
+            assertEquals(91,BankLife.report(town).personal());
+            assertEquals(before,p.money+BankLife.cash(town));
+            MarketStallLife.set(town,MarketStallLife.LICENSE,1);
+            BankLife.act(town,"bank-deposit-business",8,600);
+            assertEquals(10,BankLife.report(town).business());
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            BankLife.clear(town);
+            assertEquals(city+101,town.employerFunds.get("city-maintenance"));
+            assertEquals(0,BankLife.report(town).debt());
+            assertEquals(0,BankLife.report(town).personal());
+            assertEquals(0,BankLife.report(town).business());
+        }
+    }
+
+    @Test
     void standingFarmOrderReservesCargoAndMoneyAcrossRestart() throws Exception {
         Path file=directory.resolve("stall-supply.db");
         try(var db=new WorldDatabase(file)) {

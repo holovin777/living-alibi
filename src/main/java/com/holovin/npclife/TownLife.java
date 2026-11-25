@@ -245,6 +245,7 @@ final class TownLife {
         HenLife.ensure(t);
         OrchardLife.ensure(t);
         MarketStallLife.ensure(t);
+        BankLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -265,6 +266,7 @@ final class TownLife {
         FarmLife.tick(town,marco.day,marco.minute);
         FuelLife.tick(town,marco.day,marco.minute);
         StallSupplyLife.tick(town,marco.day,marco.minute);
+        BankLife.tick(town,marco.day,marco.minute);
         TechnicalWorkLife.tick(town,marco.day,marco.minute);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
