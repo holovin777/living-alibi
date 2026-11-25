@@ -1146,6 +1146,36 @@ func _exercise() -> void:
     if not _check(restored is LineEdit and restored.text=="SELECT id FROM products WHERE stock < 3 ORDER BY id","draft survives app switching"):
         return
     world._close_software()
+    # A real present worker makes jokes; the player cannot hear them outside.
+    world._avatar.position=Vector3.ZERO
+    world._tick_office_joker(60.0)
+    var joker = world._residents_root.get_node_or_null("Resident_resident-0002")
+    if not _check(joker!=null and world._office_joker_id=="resident-0002" and not joker.has_node("OfficeJoke"),"no ambient jokes outside the office"):
+        return
+    world._avatar.position=world.JAVA_DESK
+    world._tick_office_joker(9.0)
+    var speech = joker.get_node_or_null("OfficeJoke")
+    if not _check(speech is Label3D and speech.visible and speech.text==world.OFFICE_JOKE_LINES[0],"working colleague calls out in the office"):
+        return
+    world._tick_office_joker(5.0)
+    if not _check(not speech.visible,"joke expires"):
+        return
+    world._tick_office_joker(1.0)
+    if not _check(not speech.visible,"cooldown prevents repeated jokes"):
+        return
+    world._tick_office_joker(45.0)
+    if not _check(speech.visible and speech.text==world.OFFICE_JOKE_LINES[1],"jokes rotate"):
+        return
+    world._avatar.position=Vector3.ZERO
+    world._tick_office_joker(1.0)
+    if not _check(not speech.visible,"walking away hides speech"):
+        return
+    office["residents"]=[]
+    world._on_world_updated(office)
+    world._avatar.position=world.JAVA_DESK
+    world._tick_office_joker(60.0)
+    if not _check(world._residents_root.get_child_count()==0 and world._office_joker_id=="resident-0002","absent worker is not fabricated or replaced"):
+        return
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 
