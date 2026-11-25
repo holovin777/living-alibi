@@ -13,6 +13,57 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void hiredDriverDeliversWhileOwnerIsElsewhereAndReceivesRealPay() throws Exception {
+        Path file=directory.resolve("auto-carrier.db");
+        try(var game=new GameSession(file)) {
+            game.move("workshop");game.waitMinutes(90);
+            game.freightAction("register",null);
+        }
+        String id;
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            LogisticsLife.set(town,LogisticsLife.CASH,100);
+            LogisticsLife.park(town,TownLife.Place.FACTORY);
+            town.industryStocks.put(IndustryLife.FACTORY_PARTS,2);
+            town.industryStocks.put(IndustryLife.FACTORY_STEEL,1);
+            var worker=town.people.values().stream().filter(c->c.generationIndex>0&&c.alive).findFirst().orElseThrow();
+            worker.place=TownLife.Place.WORKSHOP;worker.destination=worker.place;worker.travelRemaining=0;
+            worker.sickUntilDay=0;worker.money=100;worker.food=8;worker.water=8;
+            id=worker.id;
+            LogisticsLife.hire(town,id,state.day);
+            assertEquals(90,LogisticsLife.get(town,LogisticsLife.CASH));
+            assertEquals(110,worker.money);
+            LogisticsLife.set(town,LogisticsLife.AUTO,1);
+            // Explicitly model the scheduled dispatch at 09:15, independent of incidental NPC actions.
+            FreightLife.dispatch(town,FreightLife.ROUTES.get(1),true,true);
+            LogisticsLife.set(town,LogisticsLife.LAST_DAY,state.day);
+            assertEquals(70,LogisticsLife.get(town,LogisticsLife.CASH));
+            town.player.place=TownLife.Place.PARK;town.player.destination=town.player.place;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(FreightLife.automated(town));
+            var worker=LogisticsLife.driver(town);
+            assertEquals(id,worker.id);
+            worker.place=TownLife.Place.FACTORY;worker.destination=worker.place;worker.travelRemaining=0;
+            state.minute=555;
+            LogisticsLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(TownLife.Place.WORKSHOP,FreightLife.truckPlace(town));
+            worker.place=TownLife.Place.WORKSHOP;worker.destination=worker.place;worker.travelRemaining=0;
+            state.minute=570;
+            LogisticsLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertFalse(FreightLife.active(town));
+            assertEquals(110,LogisticsLife.get(town,LogisticsLife.CASH));
+            assertEquals(128,worker.money);
+            assertEquals(30,town.player.money);
+            assertEquals(1,LogisticsLife.get(town,LogisticsLife.COMPLETED));
+            LogisticsLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(128,worker.money);
+        }
+    }
+
+    @Test
     void logisticsCompanyOwnsTruckAndReceivesContractRevenueNotPersonalWages() throws Exception {
         Path file=directory.resolve("logistics.db");
         try(var game=new GameSession(file)) {

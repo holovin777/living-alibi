@@ -311,12 +311,16 @@ func _truck_exit(id: String) -> Vector3:
     return _truck_parking(id)+Vector3(0,0,3.0)
 
 func _near_truck() -> bool:
-    return _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS and _avatar.position.distance_to(_truck_parking(_current_place))<3.5
+    return not bool(_last_snapshot.get("freight",{}).get("automated",false)) and _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS and _avatar.position.distance_to(_truck_parking(_current_place))<3.5
+
+func _hire_driver(id: String) -> void:
+    if _connected and not _api.is_busy() and _current_place=="WORKSHOP" and _near_kiosk():
+        _api.freight_action("hire-driver",id)
 
 func _freight_action(action: String) -> void:
     if not _connected or _api.is_busy():
         return
-    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck"] and _current_place=="WORKSHOP" and _near_kiosk()):
+    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off"] and _current_place=="WORKSHOP" and _near_kiosk()):
         _api.freight_action(action)
 
 func _drive_truck(destination: String) -> void:
@@ -2258,6 +2262,17 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Logistics: withdraw 25 EUR",_freight_action.bind("withdraw-25")))
                 if not bool(logistics.get("truck",false)):
                     _action_choices.add_child(_button("Buy company truck · 220 EUR",_freight_action.bind("buy-truck")))
+                else:
+                    var driver_name = logistics.get("driverName")
+                    var details := Label.new()
+                    details.text = "Driver: %s | Automated deliveries: %s" % ["none" if driver_name==null else str(driver_name),logistics.get("completed",0)]
+                    _action_choices.add_child(details)
+                    if driver_name==null:
+                        for candidate in logistics.get("candidates",[]):
+                            _action_choices.add_child(_button("Hire driver: "+str(candidate.get("name",""))+" · 10 EUR",_hire_driver.bind(str(candidate.get("id","")))))
+                    else:
+                        var enabled := bool(logistics.get("automatic",false))
+                        _action_choices.add_child(_button("Disable automatic freight" if enabled else "Enable automatic freight",_freight_action.bind("auto-off" if enabled else "auto-on")))
             if _car_place().is_empty():
                 _action_choices.add_child(_button("Buy used car · 180 EUR",_car_action.bind("buy")))
             elif _car_place()=="WORKSHOP":

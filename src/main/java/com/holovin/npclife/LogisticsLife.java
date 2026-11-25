@@ -5,8 +5,11 @@ final class LogisticsLife {
     private LogisticsLife() {}
     static final int REGISTRATION=20, TRUCK_PRICE=220, RELOCATION=8;
     static final String OWNER="logistics:owner", CASH="logistics:cash", TRUCK="logistics:truck-place";
+    static final String DRIVER="logistics:driver", AUTO="logistics:auto", LAST_DAY="logistics:last-dispatch-day", COMPLETED="logistics:completed";
+    static final String OCCUPATION="Company freight driver";
+    static final int SIGNING=10, DRIVER_WAGE=18;
     static void ensure(TownLife.Town t) {
-        for(String key:new String[]{OWNER,CASH,TRUCK})t.industryStocks.putIfAbsent(key,0);
+        for(String key:new String[]{OWNER,CASH,TRUCK,DRIVER,AUTO,LAST_DAY,COMPLETED})t.industryStocks.putIfAbsent(key,0);
     }
     static int get(TownLife.Town t,String key){return t.industryStocks.getOrDefault(key,0);}
     static void set(TownLife.Town t,String key,int value){t.industryStocks.put(key,value);}
@@ -28,6 +31,65 @@ final class LogisticsLife {
         set(t,CASH,get(t,CASH)-amount);
     }
     static void receive(TownLife.Town t,int amount){set(t,CASH,Math.addExact(get(t,CASH),amount));}
+    static TownLife.Citizen driver(TownLife.Town t) {
+        int index=get(t,DRIVER);
+        if(index<=0)return null;
+        return t.people.values().stream().filter(c->c.generationIndex==index && c.alive && c.employed && OCCUPATION.equals(c.occupation)).findFirst().orElse(null);
+    }
+    static boolean isDriver(TownLife.Town t,TownLife.Citizen c){return c==driver(t);}
+    static java.util.List<TownLife.Citizen> candidates(TownLife.Town t,int day) {
+        if(!yours(t)||t.player.place!=TownLife.Place.WORKSHOP||t.player.travelRemaining>0)return java.util.List.of();
+        return t.people.values().stream().filter(c->c.generationIndex>0 && c.presentAt(TownLife.Place.WORKSHOP)
+                && !EmploymentLife.sick(c,day) && !BusinessLife.isEmployee(t,c) && !isDriver(t,c)).toList();
+    }
+    static String hire(TownLife.Town t,String residentId,int day) {
+        office(t);requireOwner(t);
+        if(!hasTruck(t)||driver(t)!=null)throw new IllegalArgumentException("Buy a truck and ensure its driver position is vacant.");
+        var c=candidates(t,day).stream().filter(x->x.id.equals(residentId)).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("Choose an available resident at the workshop."));
+        if(get(t,CASH)<SIGNING+DRIVER_WAGE+12)throw new IllegalArgumentException("Reserve at least 40 EUR for hiring and dispatch.");
+        spend(t,SIGNING);c.money=Math.addExact(c.money,SIGNING);
+        c.occupation=OCCUPATION;c.workplace=TownLife.Place.WORKSHOP;c.employed=true;
+        c.unemploymentDays=0;c.lastHiredDay=day;c.jobChanges++;
+        set(t,DRIVER,c.generationIndex);set(t,AUTO,0);
+        return c.name+" hired for freight deliveries with a 10 EUR signing payment.";
+    }
+    static void tick(TownLife.Town t,WorldState clock,java.util.List<TownLife.Event> events,
+                     java.util.List<TownLife.Observation> observations) {
+        var c=driver(t);
+        if(FreightLife.automated(t)) {
+            if(c==null||EmploymentLife.sick(c,clock.day)) {
+                FreightLife.recover(t);
+                return;
+            }
+            if(!c.presentAt(FreightLife.truckPlace(t)) || clock.minute%15!=0)return;
+            if(FreightLife.next(t)!=null) {
+                FreightLife.advanceTruck(t,FreightLife.next(t));
+            } else {
+                String message=FreightLife.finish(t,clock.day,c);
+                set(t,COMPLETED,Math.addExact(get(t,COMPLETED),1));
+                TownLife.publish(t,clock,c.id,c.place,message,events,observations);
+            }
+            return;
+        }
+        if(c==null||!yours(t)||!t.player.alive||get(t,AUTO)==0||FreightLife.active(t)
+                ||clock.minute<540||clock.minute>=780||(clock.day-1)%7>=5||clock.minute%15!=0
+                ||get(t,LAST_DAY)>=clock.day||!c.presentAt(TownLife.Place.WORKSHOP)
+                ||EmploymentLife.sick(c,clock.day)||!"WORKING".equals(c.activity))return;
+        // Prefer a route at the current truck position, then other funded routes.
+        var choices=new java.util.ArrayList<>(FreightLife.ROUTES);
+        choices.sort(java.util.Comparator.comparingInt(r->r.places().getFirst()==truckPlace(t)?0:1));
+        for(var route:choices) {
+            try {
+                String message=FreightLife.dispatch(t,route,true,true);
+                set(t,LAST_DAY,clock.day);
+                TownLife.publish(t,clock,c.id,c.place,message,events,observations);
+                break;
+            } catch(IllegalArgumentException unavailable) {
+                // All dispatch validation precedes stock/cash mutation.
+            }
+        }
+    }
     static String manage(TownLife.Town t,String action) {
         office(t);
         var p=t.player;
@@ -53,6 +115,11 @@ final class LogisticsLife {
                 spend(t,25);p.money=Math.addExact(p.money,25);
                 yield "Withdrew 25 EUR from company reserves.";
             }
+            case "auto-on","auto-off" -> {
+                if(driver(t)==null)throw new IllegalArgumentException("Hire a driver first.");
+                set(t,AUTO,action.equals("auto-on")?1:0);
+                yield "Automatic contracts "+(get(t,AUTO)>0?"enabled.":"disabled.");
+            }
             case "buy-truck" -> {
                 if(hasTruck(t))throw new IllegalArgumentException("The company already has a truck.");
                 spend(t,TRUCK_PRICE);
@@ -63,9 +130,11 @@ final class LogisticsLife {
             default -> throw new IllegalArgumentException("Unknown company action.");
         };
     }
-    record Report(boolean registered,boolean yours,int cash,boolean truck,String truckPlace,int contractFee,int relocationFee) {}
-    static Report report(TownLife.Town t) {
+    record Candidate(String id,String name) {}
+    record Report(boolean registered,boolean yours,int cash,boolean truck,String truckPlace,int contractFee,int relocationFee,String driverName,boolean automatic,int completed,java.util.List<Candidate> candidates) {}
+    static Report report(TownLife.Town t,int day) {
         var place=truckPlace(t);
-        return new Report(get(t,OWNER)>0,yours(t),get(t,CASH),hasTruck(t),place==null?null:place.name(),FreightLife.CONTRACT_FEE,RELOCATION);
+        var worker=driver(t);
+        return new Report(get(t,OWNER)>0,yours(t),get(t,CASH),hasTruck(t),place==null?null:place.name(),FreightLife.CONTRACT_FEE,RELOCATION,worker==null?null:worker.name,get(t,AUTO)>0,get(t,COMPLETED),candidates(t,day).stream().map(c->new Candidate(c.id,c.name)).toList());
     }
 }

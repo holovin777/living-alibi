@@ -516,6 +516,27 @@ truck relocation is abstract, not manual driving; the physical
 truck is shown during an active manifest. Hiring drivers, fleet
 expansion and maintenance are not implemented.
 
+## Hired freight driver
+
+An owner with a truck and at least 40 EUR in the company can hire
+one eligible resident currently at Workshop. A 10 EUR signing
+payment transfers to the resident. Automatic freight is opt-in.
+On working days the driver reports to Workshop; the company can
+dispatch one funded available contract per day from 09:00–13:00.
+The 18 EUR driver wage is reserved with the fuel and relocation
+expenses, then paid when the driver reaches the final delivery
+district. The employee uses the existing resident travel system
+and needs; the manifest advances at quarter-hour ticks once
+the driver reaches each district. Cargo, wages and the completed
+counter persist. If the driver is sick, dies or leaves the job,
+cargo and escrow are recovered, excluding fuel and relocation
+already paid. The owner cannot drive the assigned truck during
+automatic work, but can walk, study or work independently.
+One shared freight manifest and one company truck remain the
+current limits. This is simulation-time logistics, not continuous
+background processing while the server is stopped or full NPC
+vehicle pathfinding.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

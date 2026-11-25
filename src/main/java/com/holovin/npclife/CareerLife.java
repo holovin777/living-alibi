@@ -84,7 +84,7 @@ final class CareerLife {
     static String apply(TownLife.Town town,String job) {
         var p=town.player;
         var vacancy=offer(job);
-        if(FreightLife.active(town))throw new IllegalArgumentException("Finish the freight delivery before changing jobs.");
+        if(FreightLife.active(town)&&!FreightLife.automated(town))throw new IllegalArgumentException("Finish the freight delivery before changing jobs.");
         requirePresent(p,vacancy.workplace);
         if(vacancy.id.equals(p.jobId))
             throw new IllegalArgumentException("You already hold this job.");

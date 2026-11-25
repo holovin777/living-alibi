@@ -101,7 +101,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day));
     }
 
     public synchronized BusinessView business() {
@@ -274,8 +274,9 @@ public final class GameSession implements AutoCloseable {
         var copy=town.copy();
         return switch(action==null?"":action) {
             case "load" -> apply(copy,5,FreightLife.load(copy,state.day,state.minute));
+            case "hire-driver" -> apply(copy,5,LogisticsLife.hire(copy,destination,state.day));
             case "load-company" -> apply(copy,5,FreightLife.load(copy,state.day,state.minute,true));
-            case "register","invest-25","invest-100","withdraw-25","buy-truck" -> apply(copy,5,LogisticsLife.manage(copy,action));
+            case "register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off" -> apply(copy,5,LogisticsLife.manage(copy,action));
             case "drive" -> {
                 var place=PlayerLife.destination(destination);
                 int minutes=FreightLife.drive(copy,place);

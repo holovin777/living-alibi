@@ -89,7 +89,7 @@ final class BusinessLife {
                 town.player.travelRemaining>0)return List.of();
         return town.people.values().stream().filter(c->
                 c.generationIndex>0 && c.alive && c.presentAt(TownLife.Place.WORKSHOP) &&
-                !EmploymentLife.sick(c,day) &&
+                !EmploymentLife.sick(c,day) && !LogisticsLife.isDriver(town,c) &&
                 !(c.id.equals(town.business.employeeId) && c.employed &&
                         "Independent fabricator".equals(c.occupation))).toList();
     }

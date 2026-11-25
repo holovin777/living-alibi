@@ -31,8 +31,10 @@ final class PopulationLife {
         // Independent workshops use short real two-hour shifts, not fictitious
         // wages for eight hours to fabricate one small batch of parts.
         boolean shopEmployee=BusinessLife.isEmployee(town,c);
+        boolean carrier=LogisticsLife.isDriver(town,c);
+        boolean freightRun=carrier && FreightLife.automated(town) && !sick;
         boolean working=c.employed && !sick && workday &&
-                (shopEmployee?(minute>=660 && minute<840):
+                (carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && c.money>=9;
@@ -42,8 +44,10 @@ final class PopulationLife {
         boolean publicWater=needWater && UtilityLife.status(town).fountainWorking()
                 && town.cleanWater>0;
         TownLife.Place desired;
-        if(sleeping || sick)desired=c.home;
-        else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
+        if(sick)desired=c.home;
+        else if(freightRun)desired=FreightLife.truckPlace(town);
+        else if(sleeping)desired=c.home;
+        else if((shopEmployee||carrier) && working)desired=TownLife.Place.WORKSHOP;
         else if(marketOpen && needFood)desired=TownLife.Place.MARKET;
         else if(marketOpen && publicWater)desired=TownLife.Place.PARK;
         else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;
@@ -95,10 +99,11 @@ final class PopulationLife {
         if(sleeping)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
         else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
+        else if(freightRun)c.activity="WORKING";
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){
-                if(!BusinessLife.payHourly(town,c,clock,events,observations) &&
+                if(!LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
                         !IndustryLife.payHourly(town,c,clock,events,observations)) {
                     // Existing unrelated occupations retain their original
                     // placeholder wage model until their companies are modeled.
