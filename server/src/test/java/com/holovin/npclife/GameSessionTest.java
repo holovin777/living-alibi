@@ -2966,6 +2966,28 @@ class GameSessionTest {
     }
 
     @Test
+    void mutualAidConservesSuppliesAndRespectsNeedsAndTrust() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("mutual-aid.db"))){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=town.people.values().iterator().next();
+            resident.place=TownLife.Place.PARK;resident.travelRemaining=0;resident.activity="FREE_TIME";
+            resident.food=0;resident.water=3;resident.hunger=80;resident.thirst=10;
+            town.player.bread=1;town.player.bottledWater=0;town.player.thirst=80;
+            assertTrue(PlayerLife.speak(town,resident.id,"Offer bread",1,450).contains("Thank you"));
+            assertEquals(0,town.player.bread);assertEquals(1,resident.food);
+            assertEquals(1,SocialMemoryLife.last(town,resident.id,SocialMemoryLife.Kind.SUPPORT));
+            assertFalse(MutualAidLife.give(town,resident,"bread",1));
+            assertFalse(MutualAidLife.receive(town,resident,"water",1));
+            var contact=town.player.contacts.get(resident.id);
+            contact.trust=75;contact.affinity=25;
+            assertTrue(PlayerLife.speak(town,resident.id,"Ask for water",1,451).contains("Here, take this"));
+            assertEquals(1,town.player.bottledWater);assertEquals(2,resident.water);
+            assertFalse(MutualAidLife.receive(town,resident,"water",1));
+            assertFalse(MutualAidLife.receive(town,resident,"water",2));
+        }
+    }
+
+    @Test
     void sharedMemoriesPersistAcrossYearsAndReloadWithoutInheritingReputation() throws Exception {
         Path file=directory.resolve("social-memory.db");
         String id;
