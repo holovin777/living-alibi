@@ -399,6 +399,10 @@ public final class GameSession implements AutoCloseable {
                 RebirthLife.travel(copy,TownLife.Place.SCHOOL,state.day);
                 return applyInternal(copy,60,result,true);
             }
+            if(action.equals("rebirth-dojo-rei")){
+                var greeting=DojoCommunityLife.greet(copy,state.day,state.minute);
+                return applyInternal(copy,greeting.minutes(),greeting.message(),true);
+            }
             if(action.startsWith("rebirth-dojo-")){
                 var session=DojoLife.act(copy,state.day,state.minute,action.substring("rebirth-dojo-".length()));
                 return applyInternal(copy,session.minutes(),session.message(),true);
