@@ -537,6 +537,24 @@ current limits. This is simulation-time logistics, not continuous
 background processing while the server is stopped or full NPC
 vehicle pathfinding.
 
+## Carrier maintenance and accounts
+
+Company truck condition starts at 100 (including migrated saves).
+Each loaded road leg and paid empty relocation costs three condition
+points; dispatch reserves sufficient condition for the whole route.
+At Workshop, service costs 15 EUR and consumes one existing technical
+spare part, restoring up to 30 points in 30 game minutes. A truck
+elsewhere can be transported back for 8 EUR and one fuel unit;
+the recovery transport does not wear the truck. The company records
+actual revenue, fuel, relocation, paid wages, hiring, repairs,
+capital purchases, owner investments and withdrawals separately.
+Operating net excludes capital purchases and owner transfers.
+Escrowed wages are recorded as expenses only when paid. Historic
+transactions before this update are not reconstructed; existing
+cash is retained and new counters begin at zero. Both manual and
+automatic contracts use these same constraints. One truck remains
+the fleet limit.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

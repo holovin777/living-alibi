@@ -276,6 +276,7 @@ public final class GameSession implements AutoCloseable {
             case "load" -> apply(copy,5,FreightLife.load(copy,state.day,state.minute));
             case "hire-driver" -> apply(copy,5,LogisticsLife.hire(copy,destination,state.day));
             case "load-company" -> apply(copy,5,FreightLife.load(copy,state.day,state.minute,true));
+            case "service-truck" -> apply(copy,30,LogisticsLife.manage(copy,action));
             case "register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off" -> apply(copy,5,LogisticsLife.manage(copy,action));
             case "drive" -> {
                 var place=PlayerLife.destination(destination);

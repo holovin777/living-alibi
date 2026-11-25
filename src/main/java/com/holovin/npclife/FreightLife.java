@@ -76,7 +76,12 @@ final class FreightLife {
             throw new IllegalArgumentException("Insufficient buyer funds or truck fuel.");
         if(company) {
             if(!LogisticsLife.hasTruck(t))throw new IllegalArgumentException("Buy a company truck first.");
+            if(LogisticsLife.get(t,LogisticsLife.CONDITION)<fuel*LogisticsLife.WEAR)
+                throw new IllegalArgumentException("Truck needs service before this route.");
             LogisticsLife.spend(t,fuelCost+relocation+(automated?LogisticsLife.DRIVER_WAGE:0));
+            LogisticsLife.record(t,LogisticsLife.FUEL_COST,fuelCost);
+            LogisticsLife.record(t,LogisticsLife.RELOCATION_COST,relocation);
+            if(relocation>0)LogisticsLife.wear(t);
             if(relocation>0)t.employerFunds.merge(JOB,relocation,Math::addExact);
             LogisticsLife.park(t,r.places.getFirst());
         } else {
@@ -105,7 +110,9 @@ final class FreightLife {
     }
     static void advanceTruck(TownLife.Town t,TownLife.Place destination) {
         set(t,STAGE,stock(t,STAGE)+1);
-        if(stock(t,COMPANY_RUN)>0)LogisticsLife.park(t,destination);
+        if(stock(t,COMPANY_RUN)>0) {
+            LogisticsLife.park(t,destination);LogisticsLife.wear(t);
+        }
     }
     static String unload(TownLife.Town t,int day) {
         requireDriver(t);
@@ -134,9 +141,13 @@ final class FreightLife {
         }
         t.employerFunds.merge(r.source,stock(t,PAYMENT),Math::addExact);
         boolean company=stock(t,COMPANY_RUN)>0;
-        if(company)LogisticsLife.receive(t,wage);else p.money=Math.addExact(p.money,wage);
+        if(company) {
+            LogisticsLife.receive(t,wage);LogisticsLife.record(t,LogisticsLife.REVENUE,wage);
+            LogisticsLife.record(t,LogisticsLife.DELIVERIES,1);
+        } else p.money=Math.addExact(p.money,wage);
         if(employee!=null) {
             employee.money=Math.addExact(employee.money,stock(t,DRIVER_ESCROW));
+            LogisticsLife.record(t,LogisticsLife.WAGE_COST,stock(t,DRIVER_ESCROW));
             employee.fatigue=Math.min(100,employee.fatigue+8);
         } else {
             p.lastWorkDay=day;

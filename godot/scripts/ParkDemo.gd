@@ -320,7 +320,7 @@ func _hire_driver(id: String) -> void:
 func _freight_action(action: String) -> void:
     if not _connected or _api.is_busy():
         return
-    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off"] and _current_place=="WORKSHOP" and _near_kiosk()):
+    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off","service-truck"] and _current_place=="WORKSHOP" and _near_kiosk()):
         _api.freight_action(action)
 
 func _drive_truck(destination: String) -> void:
@@ -2263,6 +2263,18 @@ func _render_actions() -> void:
                 if not bool(logistics.get("truck",false)):
                     _action_choices.add_child(_button("Buy company truck · 220 EUR",_freight_action.bind("buy-truck")))
                 else:
+                    var condition := int(logistics.get("condition",100))
+                    var finances: Dictionary = logistics.get("financials",{})
+                    var accounts := Label.new()
+                    accounts.text = "Truck condition: %s/100\nRevenue %s | Fuel %s | Relocation %s EUR\nWages %s | Hiring %s | Repairs %s EUR\nOperating net %s EUR | Deliveries %s\nTruck purchases %s | Invested %s | Withdrawn %s EUR" % [
+                        condition,finances.get("revenue",0),finances.get("fuel",0),finances.get("relocation",0),
+                        finances.get("wages",0),finances.get("hiring",0),finances.get("maintenance",0),
+                        finances.get("operatingNet",0),finances.get("deliveries",0),finances.get("truckPurchases",0),
+                        finances.get("invested",0),finances.get("withdrawn",0)]
+                    _action_choices.add_child(accounts)
+                    if condition<100:
+                        var service_note := " + transport" if str(logistics.get("truckPlace",""))!="WORKSHOP" else ""
+                        _action_choices.add_child(_button("Service company truck · 15 EUR + 1 part"+service_note,_freight_action.bind("service-truck")))
                     var driver_name = logistics.get("driverName")
                     var details := Label.new()
                     details.text = "Driver: %s | Automated deliveries: %s" % ["none" if driver_name==null else str(driver_name),logistics.get("completed",0)]

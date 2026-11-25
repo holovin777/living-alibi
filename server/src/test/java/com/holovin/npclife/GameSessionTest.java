@@ -13,6 +13,52 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void logisticsMaintenanceAndLedgerPersistAndChargeRealResources() throws Exception {
+        Path file=directory.resolve("carrier-service.db");
+        try(var game=new GameSession(file)) {
+            game.move("workshop");game.waitMinutes(90);game.freightAction("register",null);
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            LogisticsLife.set(town,LogisticsLife.CASH,100);
+            LogisticsLife.park(town,TownLife.Place.WORKSHOP);
+            LogisticsLife.set(town,LogisticsLife.CONDITION,2);
+            town.technicalMaterials.put("spare-parts",1);
+            town.industryStocks.put(IndustryLife.FACTORY_PARTS,2);
+            town.industryStocks.put(IndustryLife.FACTORY_STEEL,1);
+            assertThrows(IllegalArgumentException.class,()->FreightLife.dispatch(town,FreightLife.ROUTES.get(1),true,false));
+            assertEquals(100,LogisticsLife.get(town,LogisticsLife.CASH));
+            assertEquals(2,IndustryLife.stock(town,IndustryLife.FACTORY_PARTS));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            game.freightAction("service-truck",null);
+            assertEquals(32,game.snapshot().logistics().condition());
+            assertEquals(85,game.snapshot().logistics().cash());
+            assertEquals(15,game.snapshot().logistics().financials().maintenance());
+            assertThrows(IllegalArgumentException.class,()->game.freightAction("service-truck",null));
+            game.move("factory");game.freightAction("load-company",null);
+            assertEquals(29,game.snapshot().logistics().condition());
+            game.freightAction("drive","workshop");game.freightAction("unload",null);
+            assertEquals(26,game.snapshot().logistics().condition());
+            assertEquals(113,game.snapshot().logistics().cash());
+        }
+        try(var game=new GameSession(file)) {
+            var report=game.snapshot().logistics();
+            assertEquals(26,report.condition());
+            assertEquals(40,report.financials().revenue());
+            assertEquals(4,report.financials().fuel());
+            assertEquals(8,report.financials().relocation());
+            assertEquals(13,report.financials().operatingNet());
+            assertEquals(1,report.financials().deliveries());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var town=db.loadTown(db.load());
+            assertEquals(2,town.technicalMaterials.get("spare-parts"));
+        }
+    }
+
+    @Test
     void hiredDriverDeliversWhileOwnerIsElsewhereAndReceivesRealPay() throws Exception {
         Path file=directory.resolve("auto-carrier.db");
         try(var game=new GameSession(file)) {

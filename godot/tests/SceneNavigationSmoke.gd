@@ -420,8 +420,12 @@ func _exercise() -> void:
     carrier = carrier.duplicate(true)
     carrier["logistics"]["driverName"] = "Test Driver"
     carrier["logistics"]["automatic"] = false
+    carrier["logistics"]["condition"] = 65
+    carrier["logistics"]["truckPlace"] = "WORKSHOP"
+    carrier["logistics"]["financials"] = {"revenue":40,"operatingNet":20}
     world._on_world_updated(carrier)
-    if not _check(_has_button(world._action_choices,"Enable automatic freight"),"owner can enable autonomous contracts"):
+    if not _check(_has_button(world._action_choices,"Enable automatic freight")
+            and _has_button(world._action_choices,"Service company truck"),"owner can enable contracts and repair a worn truck"):
         return
     world._on_world_updated(_world("PARK","Park"))
 
