@@ -2377,6 +2377,7 @@ func _create_interface() -> void:
     dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
     dialog_col.add_child(_button("Allow sharing my name",_send_dialog.bind("You can tell people my name.")))
     dialog_col.add_child(_button("Ask for visitor news",_send_dialog.bind("Any news about visitors?")))
+    dialog_col.add_child(_button("Press interview",_send_dialog.bind("Any public news for the newspaper?")))
     dialog_col.add_child(_button("Apologize",_send_dialog.bind("I'm sorry.")))
     dialog_col.add_child(_button("Leave me alone!",_send_dialog.bind("Leave me alone!")))
     _dialog_input = LineEdit.new()
@@ -2980,6 +2981,24 @@ func _render_actions() -> void:
             _action_choices.add_child(_button("Study engineering · 10 EUR",
                     _study.bind("engineering")))
         "LIBRARY":
+            var newspaper = _last_snapshot.get("newspaper")
+            if newspaper is Dictionary:
+                var press := Label.new()
+                press.text = "Il Giornale · Editorial funds %s EUR" % newspaper.get("funds",0)
+                press.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                _action_choices.add_child(press)
+                _action_choices.add_child(_button("Apply: journalist · Investigation 2",_apply_job.bind("journalist")))
+                if employed=="journalist":
+                    var hint := Label.new()
+                    hint.text = "Dispatch filed today." if bool(newspaper.get("filedToday",false)) else "Interview a resident in town, then return to the library for your shift."
+                    hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    _action_choices.add_child(hint)
+                var editions: Array = newspaper.get("editions",[])
+                if not editions.is_empty():
+                    var latest := Label.new()
+                    latest.text = str(editions[0].get("text",""))
+                    latest.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    _action_choices.add_child(latest)
             var archive = _last_snapshot.get("archive")
             if archive is Dictionary:
                 var year := int(archive.get("year",1))

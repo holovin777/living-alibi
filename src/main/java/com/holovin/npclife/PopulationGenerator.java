@@ -60,6 +60,7 @@ final class PopulationGenerator {
                 // candidate rather than relying on a random lucky job draw.
                 c.occupation="Mechanic";c.workplace=TownLife.Place.WORKSHOP;
             }
+            if(index%12==10){c.occupation=NewspaperLife.OCCUPATION;c.workplace=TownLife.Place.LIBRARY;}
             c.age=rng.nextInt(19,71);
             c.sociability=rng.nextInt(15,91);
             c.carefulness=rng.nextInt(15,91);
