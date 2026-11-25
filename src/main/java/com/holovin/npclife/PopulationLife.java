@@ -43,6 +43,7 @@ final class PopulationLife {
                 && town.cleanWater>0;
         TownLife.Place desired;
         if(sleeping || sick)desired=c.home;
+        else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
         else if(marketOpen && needFood)desired=TownLife.Place.MARKET;
         else if(marketOpen && publicWater)desired=TownLife.Place.PARK;
         else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;
