@@ -27,9 +27,10 @@ final class LogisticsLife {
         TransportLife.ready(t.player);
         if(!yours(t))throw new IllegalArgumentException("Register or acquire the logistics company first.");
     }
+    static boolean isOffice(TownLife.Place place){return place==TownLife.Place.WORKSHOP||place==TownLife.Place.LOGISTICS_DEPOT;}
     static void office(TownLife.Town t) {
         TransportLife.ready(t.player);
-        if(t.player.place!=TownLife.Place.WORKSHOP)throw new IllegalArgumentException("Visit the workshop office.");
+        if(!isOffice(t.player.place))throw new IllegalArgumentException("Visit the logistics depot or workshop office.");
         if(FreightLife.active(t))throw new IllegalArgumentException("Complete the active freight delivery first.");
     }
     static void spend(TownLife.Town t,int amount) {
@@ -49,8 +50,8 @@ final class LogisticsLife {
         return null;
     }
     static java.util.List<TownLife.Citizen> candidates(TownLife.Town t,int day) {
-        if(!yours(t)||t.player.place!=TownLife.Place.WORKSHOP||t.player.travelRemaining>0)return java.util.List.of();
-        return t.people.values().stream().filter(c->c.generationIndex>0 && c.presentAt(TownLife.Place.WORKSHOP)
+        if(!yours(t)||!isOffice(t.player.place)||t.player.travelRemaining>0)return java.util.List.of();
+        return t.people.values().stream().filter(c->c.generationIndex>0 && c.presentAt(t.player.place)
                 && !EmploymentLife.sick(c,day) && !BusinessLife.isEmployee(t,c) && !isDriver(t,c)).toList();
     }
     static String hire(TownLife.Town t,String residentId,int day) {
@@ -60,7 +61,7 @@ final class LogisticsLife {
                 .orElseThrow(()->new IllegalArgumentException("Choose an available resident at the workshop."));
         if(get(t,CASH)<SIGNING+DRIVER_WAGE+12)throw new IllegalArgumentException("Reserve at least 40 EUR for hiring and dispatch.");
         spend(t,SIGNING);c.money=Math.addExact(c.money,SIGNING);record(t,HIRING_COST,SIGNING);
-        c.occupation=OCCUPATION;c.workplace=TownLife.Place.WORKSHOP;c.employed=true;
+        c.occupation=OCCUPATION;c.workplace=t.player.place;c.employed=true;
         c.unemploymentDays=0;c.lastHiredDay=day;c.jobChanges++;
         set(t,DRIVER,c.generationIndex);set(t,AUTO,0);
         return c.name+" hired for freight deliveries with a 10 EUR signing payment.";
@@ -85,7 +86,7 @@ final class LogisticsLife {
         }
         if(c==null||!yours(t)||!t.player.alive||get(t,AUTO)==0||FreightLife.active(t)
                 ||clock.minute<540||clock.minute>=780||(clock.day-1)%7>=5||clock.minute%15!=0
-                ||get(t,LAST_DAY)>=clock.day||!c.presentAt(TownLife.Place.WORKSHOP)
+                ||get(t,LAST_DAY)>=clock.day||!c.presentAt(c.workplace)
                 ||EmploymentLife.sick(c,clock.day)||!"WORKING".equals(c.activity))return;
         // Prefer a route at the current truck position, then other funded routes.
         var choices=new java.util.ArrayList<>(FreightLife.ROUTES);
@@ -133,7 +134,7 @@ final class LogisticsLife {
             }
             case "service-truck" -> {
                 if(!hasTruck(t)||get(t,CONDITION)>=100)throw new IllegalArgumentException("No truck needing service.");
-                int relocation=truckPlace(t)==TownLife.Place.WORKSHOP?0:RELOCATION;
+                int relocation=truckPlace(t)==t.player.place?0:RELOCATION;
                 int fuel=relocation==0?0:1;
                 if(FuelLife.stock(t)<fuel || t.technicalMaterials.getOrDefault("spare-parts",0)<1)
                     throw new IllegalArgumentException("Service needs one spare part and fuel for transport if required.");
@@ -146,7 +147,7 @@ final class LogisticsLife {
                     t.employerFunds.merge(FuelLife.ACCOUNT,fuel*FuelLife.PRICE,Math::addExact);
                     t.industryStocks.merge(FuelLife.STOCK,-fuel,Integer::sum);
                     record(t,RELOCATION_COST,relocation);record(t,FUEL_COST,fuel*FuelLife.PRICE);
-                    park(t,TownLife.Place.WORKSHOP);
+                    park(t,t.player.place);
                 }
                 set(t,CONDITION,Math.min(100,get(t,CONDITION)+RESTORE));
                 yield "Serviced company truck: one spare part, 15 EUR plus any transport costs.";
@@ -155,7 +156,7 @@ final class LogisticsLife {
                 if(hasTruck(t))throw new IllegalArgumentException("The company already has a truck.");
                 spend(t,TRUCK_PRICE);
                 t.employerFunds.merge("technician",TRUCK_PRICE,Math::addExact);
-                park(t,TownLife.Place.WORKSHOP);set(t,CONDITION,100);record(t,CAPITAL_COST,TRUCK_PRICE);
+                park(t,t.player.place);set(t,CONDITION,100);record(t,CAPITAL_COST,TRUCK_PRICE);
                 yield "Bought the company truck for 220 EUR.";
             }
             default -> throw new IllegalArgumentException("Unknown company action.");

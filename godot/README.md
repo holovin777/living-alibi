@@ -570,6 +570,22 @@ The second truck is automated only, represented in the office report,
 not yet a separate physical vehicle in the 3D scene. Fleet capacity
 is two; the depot remains the Workshop office.
 
+## Deposito Logistico
+
+The twentieth public district fills the grid gap between Farm and
+Fuel station. Private cars can reach it via Fuel station, and
+pedestrians via all adjacent paths. The walk-in office desk (F)
+offers the same registration, accounts, hiring, dispatch and service
+controls as Workshop. Trucks purchased or serviced at the depot
+park there; drivers hired there report to its office instead of
+Workshop. Existing hires and workshop controls remain compatible.
+Two garage models reflect authoritative parked truck locations,
+with solid footprints when present. Warehouse shelves are scenery,
+not a separate inventory. The depot site is public infrastructure,
+not yet a separately purchased property, and garage repairs still
+use the existing shared technical spare-parts ledger. All views
+remain first person.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

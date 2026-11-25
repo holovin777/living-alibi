@@ -6,6 +6,8 @@ extends Node3D
 
 const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
+const DEPOT_DESK := Vector3(-9.0,0.0,10.0)
+const DEPOT_BAYS := [Vector3(6.5,0,12.0),Vector3(12.5,0,12.0)]
 const INTERACTION_RADIUS := 3.5
 const WALK_SPEED := 4.5
 const CYCLE_SPEED := 8.0
@@ -256,7 +258,8 @@ func _near_gate() -> bool:
     return _avatar.position.distance_to(GATE_POSITION) < INTERACTION_RADIUS
 
 func _near_kiosk() -> bool:
-    return _avatar.position.distance_to(KIOSK_POSITION) < INTERACTION_RADIUS
+    var target := DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION
+    return _avatar.position.distance_to(target) < INTERACTION_RADIUS
 
 func _has_room_lease() -> bool:
     return bool(_last_snapshot.get("player",{}).get("roomActive",false))
@@ -314,17 +317,17 @@ func _near_truck() -> bool:
     return not bool(_last_snapshot.get("freight",{}).get("automated",false)) and _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS and _avatar.position.distance_to(_truck_parking(_current_place))<3.5
 
 func _hire_driver(id: String) -> void:
-    if _connected and not _api.is_busy() and _current_place=="WORKSHOP" and _near_kiosk():
+    if _connected and not _api.is_busy() and _current_place in ["WORKSHOP","LOGISTICS_DEPOT"] and _near_kiosk():
         _api.freight_action("hire-driver",id)
 
 func _hire_second_driver(id: String) -> void:
-    if _connected and not _api.is_busy() and _current_place=="WORKSHOP" and _near_kiosk():
+    if _connected and not _api.is_busy() and _current_place in ["WORKSHOP","LOGISTICS_DEPOT"] and _near_kiosk():
         _api.freight_action("hire-driver-2",id)
 
 func _freight_action(action: String) -> void:
     if not _connected or _api.is_busy():
         return
-    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off","service-truck","buy-truck-2","auto-on-2","auto-off-2","service-truck-2"] and _current_place=="WORKSHOP" and _near_kiosk()):
+    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off","service-truck","buy-truck-2","auto-on-2","auto-off-2","service-truck-2"] and _current_place in ["WORKSHOP","LOGISTICS_DEPOT"] and _near_kiosk()):
         _api.freight_action(action)
 
 func _drive_truck(destination: String) -> void:
@@ -486,7 +489,20 @@ func _park_in_cabin() -> void:
     _follow_player()
     _update_drive_hud()
 
+func _depot_truck_present(number: int) -> bool:
+    var logistics: Dictionary = _last_snapshot.get("logistics",{})
+    if number==0:
+        return bool(logistics.get("truck",false)) and str(logistics.get("truckPlace",""))=="LOGISTICS_DEPOT"
+    var second: Dictionary = logistics.get("secondTruck",{})
+    return bool(second.get("purchased",false)) and str(second.get("place",""))=="LOGISTICS_DEPOT"
+
 func _sync_owned_car() -> void:
+    if _chunks.has("LOGISTICS_DEPOT"):
+        var depot: Node3D = _chunks["LOGISTICS_DEPOT"]["root"]
+        for n in range(2):
+            var model := depot.get_node_or_null("DepositoLogistico/Garage/Truck"+str(n+1)) as Node3D
+            if model!=null:
+                model.visible = _depot_truck_present(n)
     for id in TownLayout.MOTOR_DISTRICTS:
         if not _chunks.has(id):
             continue
@@ -702,6 +718,8 @@ func _generate_chunk(place_id: String) -> void:
     _scenery.add_child(_residents_root)
 
     match place_id:
+        "LOGISTICS_DEPOT":
+            _build_logistics_depot()
         "FUEL_STATION":
             _build_fuel_station()
         "FARM":
@@ -1029,6 +1047,11 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         var nearest := p.clamp(obstacle.position, obstacle.end)
         if p.distance_squared_to(nearest) < radius * radius:
             return false
+    if _current_place=="LOGISTICS_DEPOT":
+        for n in range(2):
+            var bay: Vector3 = DEPOT_BAYS[n]
+            if _depot_truck_present(n) and Rect2(Vector2(bay.x-1.1,bay.z-2.4),Vector2(2.2,4.8)).grow(radius).has_point(p):
+                return false
     if _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS:
         var truck_at := _truck_parking(_current_place)
         if Rect2(Vector2(truck_at.x-1.1,truck_at.z-2.4),Vector2(2.2,4.8)).grow(radius).has_point(p):
@@ -1150,10 +1173,13 @@ func _build_freight_parking(place_id: String) -> void:
     _scenery.add_child(lot)
     _box(lot,Vector3(3,0.045,5.8),Color("#505659"),Vector3.ZERO)
     _sign(lot,"Merci · F",Vector3(0,2.7,-2.8))
+    var truck := _make_freight_truck(lot,"AssignedTruck",Color("#b29b69"))
+    truck.visible = false
+
+func _make_freight_truck(parent: Node3D,caption: String,paint: Color) -> Node3D:
     var truck := Node3D.new()
-    truck.name = "AssignedTruck"
-    lot.add_child(truck)
-    var paint := Color("#b29b69")
+    truck.name = caption
+    parent.add_child(truck)
     _box(truck,Vector3(2.1,0.55,4.7),Color("#48494a"),Vector3(0,0.67,0))
     _box(truck,Vector3(2.1,1.65,1.65),paint,Vector3(0,1.51,-1.43))
     _box(truck,Vector3(1.78,0.65,0.06),Color("#577782"),Vector3(0,1.85,-2.27))
@@ -1165,7 +1191,58 @@ func _build_freight_parking(place_id: String) -> void:
             wheel.rotation_degrees.z = 90
     for z in [0.1,0.8,1.5]:
         _box(truck,Vector3(1.65,0.46,0.62),Color("#846d58"),Vector3(0,1.5,z))
-    truck.visible = false
+    return truck
+
+func _build_logistics_depot() -> void:
+    var depot := Node3D.new()
+    depot.name = "DepositoLogistico"
+    _scenery.add_child(depot)
+    var plaster := Color("#d5d5ca")
+    var steel := Color("#64777e")
+    # Administrative office: doorway facing the central yard, not a solid shell.
+    var office := Node3D.new()
+    office.name = "Office"
+    depot.add_child(office)
+    _box(office,Vector3(10,0.08,8),Color("#b0ada0"),Vector3(-9,0.02,10))
+    _room_wall(office,Vector3(-14,0,10),Vector2(0.25,8),plaster)
+    _room_wall(office,Vector3(-9,0,14),Vector2(10,0.25),plaster)
+    _room_wall(office,Vector3(-4,0,10),Vector2(0.25,8),plaster)
+    for x in [-12.25,-5.75]:
+        _room_wall(office,Vector3(x,0,6),Vector2(3.5,0.25),plaster)
+    _box(office,Vector3(10.3,0.25,8.3),steel,Vector3(-9,3.13,10))
+    _sign(office,"Deposito Logistico · Ufficio",Vector3(-9,3.6,5.8))
+    _room_furniture(office,DEPOT_DESK,Vector3(2.5,0.85,0.85),Color("#8b7158"))
+    _box(office,Vector3(0.66,0.4,0.09),Color("#323c40"),DEPOT_DESK+Vector3(-0.5,1.1,0))
+    _room_furniture(office,Vector3(-12.4,0,12.1),Vector3(1.0,2.0,1.2),steel)
+    _sign(office,"Fleet management · F",DEPOT_DESK+Vector3(0,2.1,0))
+    # Two walk-in garage bays, shared maintenance floor and marked parking.
+    var garage := Node3D.new()
+    garage.name = "Garage"
+    depot.add_child(garage)
+    _box(garage,Vector3(12,0.07,8),Color("#555b5b"),Vector3(9.5,0.03,12))
+    for x in [3.5,9.5,15.5]:
+        _room_wall(garage,Vector3(x,0,12),Vector2(0.24,8),steel)
+        _box(garage,Vector3(0.24,1.0,8),steel,Vector3(x,3.5,12))
+    _room_wall(garage,Vector3(9.5,0,16),Vector2(12,0.25),steel)
+    _box(garage,Vector3(12.3,0.3,8.3),Color("#526369"),Vector3(9.5,4.15,12))
+    for n in range(2):
+        var bay: Vector3 = DEPOT_BAYS[n]
+        for x in [-1.45,1.45]:
+            _box(garage,Vector3(0.08,0.02,6),Color("#e7d9ac"),bay+Vector3(x,0.08,0))
+        _sign(garage,"Bay %s" % (n+1),Vector3(bay.x,3.65,7.8))
+        var truck := _make_freight_truck(garage,"Truck"+str(n+1),Color("#b29b69") if n==0 else Color("#668696"))
+        truck.position = bay
+        truck.visible = false
+    # Storage racks are scenery until a separate depot inventory is implemented.
+    var store := Node3D.new()
+    store.name = "Warehouse"
+    depot.add_child(store)
+    _box(store,Vector3(10,0.05,5),Color("#7c807d"),Vector3(-9,0.02,-11))
+    for x in [-13.0,-9.0,-5.0]:
+        _room_furniture(store,Vector3(x,0,-12),Vector3(2.4,1.7,1.4),Color("#967956"))
+    _sign(store,"Magazzino · storage",Vector3(-9,2.65,-9))
+    _lamp(depot,Vector3(-3,0,5))
+    _lamp(depot,Vector3(3,0,-8))
 
 func _build_public_car_park() -> void:
     var lot := Node3D.new()
@@ -1799,18 +1876,20 @@ func _create_gate_and_kiosk() -> void:
     # A yellow gate is a map transition — actual travel is authorized by Java.
     for offset in [-1.6, 1.6]:
         _add_obstacle(GATE_POSITION + Vector3(offset, 0.0, 0.0), Vector2(0.4, 0.4))
-    _add_obstacle(KIOSK_POSITION, Vector2(2.4, 1.6))
+    if _scenery.name != "PublicScene_LOGISTICS_DEPOT":
+        _add_obstacle(KIOSK_POSITION, Vector2(2.4, 1.6))
     _box(_scenery, Vector3(0.4, 3.1, 0.4), Color(0.94, 0.69, 0.12),
             GATE_POSITION + Vector3(-1.6, 1.55, 0.0))
     _box(_scenery, Vector3(0.4, 3.1, 0.4), Color(0.94, 0.69, 0.12),
             GATE_POSITION + Vector3(1.6, 1.55, 0.0))
     _box(_scenery, Vector3(3.6, 0.38, 0.45), Color(0.94, 0.69, 0.12),
             GATE_POSITION + Vector3(0.0, 3.2, 0.0))
-    # Blue kiosk: only offers actions physically available in this district.
-    _box(_scenery, Vector3(2.4, 1.4, 1.6), Color(0.13, 0.39, 0.69),
-            KIOSK_POSITION + Vector3(0.0, 0.7, 0.0))
-    _box(_scenery, Vector3(3.2, 0.22, 2.2), Color(0.88, 0.89, 0.89),
-            KIOSK_POSITION + Vector3(0.0, 1.6, 0.0))
+    if _scenery.name != "PublicScene_LOGISTICS_DEPOT":
+        # Blue kiosk: only offers actions physically available in this district.
+        _box(_scenery, Vector3(2.4, 1.4, 1.6), Color(0.13, 0.39, 0.69),
+                KIOSK_POSITION + Vector3(0.0, 0.7, 0.0))
+        _box(_scenery, Vector3(3.2, 0.22, 2.2), Color(0.88, 0.89, 0.89),
+                KIOSK_POSITION + Vector3(0.0, 1.6, 0.0))
 
 func _tree(at: Vector3) -> void:
     _add_obstacle(at, Vector2(0.45, 0.45))
@@ -2153,6 +2232,60 @@ func _toggle_actions() -> void:
         elif _current_place == "OFFICE" and not _api.is_busy():
             _api.list_work_orders()
 
+func _render_logistics(logistics: Dictionary) -> void:
+    if not bool(logistics.get("yours",false)):
+        _action_choices.add_child(_button("Register / acquire logistics company · 20 EUR",_freight_action.bind("register")))
+    else:
+        var carrier := Label.new()
+        carrier.text = "LOGISTICS | Bank: %s EUR | Truck: %s" % [logistics.get("cash",0),str(logistics.get("truckPlace","none"))]
+        _action_choices.add_child(carrier)
+        _action_choices.add_child(_button("Logistics: invest 25 EUR",_freight_action.bind("invest-25")))
+        _action_choices.add_child(_button("Logistics: invest 100 EUR",_freight_action.bind("invest-100")))
+        _action_choices.add_child(_button("Logistics: withdraw 25 EUR",_freight_action.bind("withdraw-25")))
+        if not bool(logistics.get("truck",false)):
+            _action_choices.add_child(_button("Buy company truck · 220 EUR",_freight_action.bind("buy-truck")))
+        else:
+            var condition := int(logistics.get("condition",100))
+            var finances: Dictionary = logistics.get("financials",{})
+            var accounts := Label.new()
+            accounts.text = "Truck condition: %s/100\nRevenue %s | Fuel %s | Relocation %s EUR\nWages %s | Hiring %s | Repairs %s EUR\nOperating net %s EUR | Deliveries %s\nTruck purchases %s | Invested %s | Withdrawn %s EUR" % [
+                condition,finances.get("revenue",0),finances.get("fuel",0),finances.get("relocation",0),
+                finances.get("wages",0),finances.get("hiring",0),finances.get("maintenance",0),
+                finances.get("operatingNet",0),finances.get("deliveries",0),finances.get("truckPurchases",0),
+                finances.get("invested",0),finances.get("withdrawn",0)]
+            _action_choices.add_child(accounts)
+            if condition<100:
+                var service_note := " + transport" if str(logistics.get("truckPlace",""))!=_current_place else ""
+                _action_choices.add_child(_button("Service company truck · 15 EUR + 1 part"+service_note,_freight_action.bind("service-truck")))
+            var driver_name = logistics.get("driverName")
+            var details := Label.new()
+            details.text = "Driver: %s | Automated deliveries: %s" % ["none" if driver_name==null else str(driver_name),logistics.get("completed",0)]
+            _action_choices.add_child(details)
+            if driver_name==null:
+                for candidate in logistics.get("candidates",[]):
+                    _action_choices.add_child(_button("Hire driver: "+str(candidate.get("name",""))+" · 10 EUR",_hire_driver.bind(str(candidate.get("id","")))))
+            else:
+                var enabled := bool(logistics.get("automatic",false))
+                _action_choices.add_child(_button("Disable automatic freight" if enabled else "Enable automatic freight",_freight_action.bind("auto-off" if enabled else "auto-on")))
+            var second: Dictionary = logistics.get("secondTruck",{})
+            if not bool(second.get("purchased",false)):
+                _action_choices.add_child(_button("Buy second truck · 220 EUR",_freight_action.bind("buy-truck-2")))
+            else:
+                var second_driver = second.get("driverName")
+                var second_status := Label.new()
+                second_status.text = "TRUCK 2 | %s | %s/100\nDriver: %s | Deliveries: %s\n%s" % [
+                    str(second.get("place","")),second.get("condition",0),"none" if second_driver==null else str(second_driver),
+                    second.get("completed",0),("Cargo: %s (%s)" % [second.get("cargo",""),second.get("units",0)]) if bool(second.get("active",false)) else "Idle"]
+                _action_choices.add_child(second_status)
+                if second_driver==null:
+                    for candidate in logistics.get("candidates",[]):
+                        _action_choices.add_child(_button("Hire driver 2: "+str(candidate.get("name",""))+" · 10 EUR",_hire_second_driver.bind(str(candidate.get("id","")))))
+                else:
+                    var second_enabled := bool(second.get("automatic",false))
+                    _action_choices.add_child(_button("Disable truck 2 dispatch" if second_enabled else "Enable truck 2 dispatch",_freight_action.bind("auto-off-2" if second_enabled else "auto-on-2")))
+                if int(second.get("condition",100))<100 and not bool(second.get("active",false)):
+                    _action_choices.add_child(_button("Service truck 2 · 15 EUR + 1 part (transport extra)",_freight_action.bind("service-truck-2")))
+
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     _action_title.text = "Local actions — " + _current_place.capitalize()
@@ -2254,59 +2387,10 @@ func _render_actions() -> void:
                 if _car_place()==_current_place:
                     _action_choices.add_child(_button("Refuel · up to 3 units",_car_action.bind("refuel")))
                 _action_choices.add_child(_button("Apply: fuel station attendant",_apply_job.bind("fuel-attendant")))
+        "LOGISTICS_DEPOT":
+            _render_logistics(logistics)
         "WORKSHOP":
-            if not bool(logistics.get("yours",false)):
-                _action_choices.add_child(_button("Register / acquire logistics company · 20 EUR",_freight_action.bind("register")))
-            else:
-                var carrier := Label.new()
-                carrier.text = "LOGISTICS | Bank: %s EUR | Truck: %s" % [logistics.get("cash",0),str(logistics.get("truckPlace","none"))]
-                _action_choices.add_child(carrier)
-                _action_choices.add_child(_button("Logistics: invest 25 EUR",_freight_action.bind("invest-25")))
-                _action_choices.add_child(_button("Logistics: invest 100 EUR",_freight_action.bind("invest-100")))
-                _action_choices.add_child(_button("Logistics: withdraw 25 EUR",_freight_action.bind("withdraw-25")))
-                if not bool(logistics.get("truck",false)):
-                    _action_choices.add_child(_button("Buy company truck · 220 EUR",_freight_action.bind("buy-truck")))
-                else:
-                    var condition := int(logistics.get("condition",100))
-                    var finances: Dictionary = logistics.get("financials",{})
-                    var accounts := Label.new()
-                    accounts.text = "Truck condition: %s/100\nRevenue %s | Fuel %s | Relocation %s EUR\nWages %s | Hiring %s | Repairs %s EUR\nOperating net %s EUR | Deliveries %s\nTruck purchases %s | Invested %s | Withdrawn %s EUR" % [
-                        condition,finances.get("revenue",0),finances.get("fuel",0),finances.get("relocation",0),
-                        finances.get("wages",0),finances.get("hiring",0),finances.get("maintenance",0),
-                        finances.get("operatingNet",0),finances.get("deliveries",0),finances.get("truckPurchases",0),
-                        finances.get("invested",0),finances.get("withdrawn",0)]
-                    _action_choices.add_child(accounts)
-                    if condition<100:
-                        var service_note := " + transport" if str(logistics.get("truckPlace",""))!="WORKSHOP" else ""
-                        _action_choices.add_child(_button("Service company truck · 15 EUR + 1 part"+service_note,_freight_action.bind("service-truck")))
-                    var driver_name = logistics.get("driverName")
-                    var details := Label.new()
-                    details.text = "Driver: %s | Automated deliveries: %s" % ["none" if driver_name==null else str(driver_name),logistics.get("completed",0)]
-                    _action_choices.add_child(details)
-                    if driver_name==null:
-                        for candidate in logistics.get("candidates",[]):
-                            _action_choices.add_child(_button("Hire driver: "+str(candidate.get("name",""))+" · 10 EUR",_hire_driver.bind(str(candidate.get("id","")))))
-                    else:
-                        var enabled := bool(logistics.get("automatic",false))
-                        _action_choices.add_child(_button("Disable automatic freight" if enabled else "Enable automatic freight",_freight_action.bind("auto-off" if enabled else "auto-on")))
-                    var second: Dictionary = logistics.get("secondTruck",{})
-                    if not bool(second.get("purchased",false)):
-                        _action_choices.add_child(_button("Buy second truck · 220 EUR",_freight_action.bind("buy-truck-2")))
-                    else:
-                        var second_driver = second.get("driverName")
-                        var second_status := Label.new()
-                        second_status.text = "TRUCK 2 | %s | %s/100\nDriver: %s | Deliveries: %s\n%s" % [
-                            str(second.get("place","")),second.get("condition",0),"none" if second_driver==null else str(second_driver),
-                            second.get("completed",0),("Cargo: %s (%s)" % [second.get("cargo",""),second.get("units",0)]) if bool(second.get("active",false)) else "Idle"]
-                        _action_choices.add_child(second_status)
-                        if second_driver==null:
-                            for candidate in logistics.get("candidates",[]):
-                                _action_choices.add_child(_button("Hire driver 2: "+str(candidate.get("name",""))+" · 10 EUR",_hire_second_driver.bind(str(candidate.get("id","")))))
-                        else:
-                            var second_enabled := bool(second.get("automatic",false))
-                            _action_choices.add_child(_button("Disable truck 2 dispatch" if second_enabled else "Enable truck 2 dispatch",_freight_action.bind("auto-off-2" if second_enabled else "auto-on-2")))
-                        if int(second.get("condition",100))<100 and not bool(second.get("active",false)):
-                            _action_choices.add_child(_button("Service truck 2 · 15 EUR + 1 part (transport extra)",_freight_action.bind("service-truck-2")))
+            _render_logistics(logistics)
             if _car_place().is_empty():
                 _action_choices.add_child(_button("Buy used car · 180 EUR",_car_action.bind("buy")))
             elif _car_place()=="WORKSHOP":

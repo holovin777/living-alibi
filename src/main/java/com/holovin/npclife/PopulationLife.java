@@ -48,7 +48,8 @@ final class PopulationLife {
         if(sick)desired=c.home;
         else if(freightRun)desired=freightDestination;
         else if(sleeping)desired=c.home;
-        else if((shopEmployee||carrier) && working)desired=TownLife.Place.WORKSHOP;
+        else if(carrier && working)desired=c.workplace;
+        else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
         else if(marketOpen && needFood)desired=TownLife.Place.MARKET;
         else if(marketOpen && publicWater)desired=TownLife.Place.PARK;
         else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;

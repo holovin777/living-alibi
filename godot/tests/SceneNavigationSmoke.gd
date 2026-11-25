@@ -69,7 +69,7 @@ func _exercise() -> void:
     world._follow_player()
 
     var layout = world._town_map
-    if not _check(layout.DISTRICTS.size() == 19
+    if not _check(layout.DISTRICTS.size() == 20
             and layout.world_center("PARK") == Vector3.ZERO
             and layout.adjacent("PARK", "SCHOOL")
             and not layout.adjacent("PARK", "QUARRY")
@@ -439,6 +439,25 @@ func _exercise() -> void:
     world._on_world_updated(carrier)
     if not _check(_has_button(world._action_choices,"Enable truck 2 dispatch") and _has_button(world._action_choices,"Service truck 2"),
             "second truck has independent dispatch and maintenance controls"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
+    var depot := _world("LOGISTICS_DEPOT","Deposito Logistico")
+    depot["logistics"] = {"registered":true,"yours":true,"cash":100,"truck":true,"truckPlace":"LOGISTICS_DEPOT","condition":80,
+        "secondTruck":{"purchased":true,"place":"LOGISTICS_DEPOT","condition":90}}
+    world._on_world_updated(depot)
+    world._avatar.position = world.DEPOT_DESK+Vector3(0,0,-1.2)
+    world._render_actions()
+    if not _check(layout.motor_road("FUEL_STATION","LOGISTICS_DEPOT")
+            and not layout.motor_road("FARM","LOGISTICS_DEPOT")
+            and world._scenery.has_node("DepositoLogistico/Office")
+            and world._scenery.get_node("DepositoLogistico/Garage/Truck1").visible
+            and world._scenery.get_node("DepositoLogistico/Garage/Truck2").visible
+            and world._near_kiosk() and _has_button(world._action_choices,"Logistics: invest 100 EUR")
+            and world._can_stand(Vector3(-9,0,6),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(-14,0,10),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(6.5,0,12),world.WALKER_RADIUS),
+            "depot office doorway, management desk, garage trucks and road are accessible"):
         return
     world._on_world_updated(_world("PARK","Park"))
 

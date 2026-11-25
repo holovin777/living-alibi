@@ -119,7 +119,7 @@ final class PlayerLife {
             TownLife.Place.CLINIC, TownLife.Place.SCHOOL, TownLife.Place.WORKSHOP,
             TownLife.Place.NORTH_RESIDENCES, TownLife.Place.SOUTH_RESIDENCES,
             TownLife.Place.RIVER, TownLife.Place.WOODS,
-            TownLife.Place.QUARRY, TownLife.Place.FACTORY, TownLife.Place.CENTRO, TownLife.Place.PORTICI, TownLife.Place.FARM, TownLife.Place.FUEL_STATION);
+            TownLife.Place.QUARRY, TownLife.Place.FACTORY, TownLife.Place.CENTRO, TownLife.Place.PORTICI, TownLife.Place.FARM, TownLife.Place.FUEL_STATION, TownLife.Place.LOGISTICS_DEPOT);
 
     static List<TownLife.Place> publicPlaces() {return PUBLIC_PLACES;}
     static TownLife.Place destination(String input) {

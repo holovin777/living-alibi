@@ -13,6 +13,42 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void logisticsDepotIsPublicAndSupportsCompanyManagement() throws Exception {
+        Path file=directory.resolve("depot.db");
+        try(var game=new GameSession(file)) {
+            game.move("logistics_depot");
+            assertEquals("LOGISTICS_DEPOT",game.snapshot().player().placeId());
+            game.freightAction("register",null);
+            assertEquals(30,game.snapshot().player().money());
+            assertTrue(game.snapshot().logistics().yours());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            LogisticsLife.set(town,LogisticsLife.CASH,500);
+            LogisticsLife.manage(town,"buy-truck");
+            SecondFleetLife.manage(town,"buy-truck-2",null,state.day);
+            assertEquals(TownLife.Place.LOGISTICS_DEPOT,LogisticsLife.truckPlace(town));
+            assertEquals(TownLife.Place.LOGISTICS_DEPOT,SecondFleetLife.place(town));
+            assertEquals(60,LogisticsLife.get(town,LogisticsLife.CASH));
+            var worker=town.people.values().stream().filter(c->c.generationIndex>0&&c.alive).findFirst().orElseThrow();
+            worker.place=TownLife.Place.LOGISTICS_DEPOT;worker.destination=worker.place;worker.travelRemaining=0;worker.sickUntilDay=0;
+            LogisticsLife.hire(town,worker.id,state.day);
+            assertEquals(TownLife.Place.LOGISTICS_DEPOT,worker.workplace);
+            town.player.carPlace=TownLife.Place.LOGISTICS_DEPOT;
+            town.player.carFuel=6;town.player.carCondition=80;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals("LOGISTICS_DEPOT",game.snapshot().logistics().truckPlace());
+            assertEquals("LOGISTICS_DEPOT",game.snapshot().logistics().secondTruck().place());
+            assertTrue(game.snapshot().player().carDestinations().contains("FUEL_STATION"));
+            game.drive("fuel_station");game.drive("logistics_depot");
+            assertEquals("LOGISTICS_DEPOT",game.snapshot().player().placeId());
+            assertEquals(4,game.snapshot().player().carFuel());
+        }
+    }
+
+    @Test
     void twoTrucksReserveDistinctCargoAndPersistIndependentDrivers() throws Exception {
         Path file=directory.resolve("two-trucks.db");
         try(var game=new GameSession(file)) {

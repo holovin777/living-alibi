@@ -15,7 +15,7 @@ final class TownLife {
         NORTH_RESIDENCES("North residences"), SOUTH_RESIDENCES("South residences"),
         OFFICE("Office"), CLINIC("Clinic"), SCHOOL("School"),
         WORKSHOP("Workshop"), LIBRARY("Library"),
-        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory"), CENTRO("Centro Storico"), PORTICI("Via dei Portici"), FARM("Cascina delle Risaie"), FUEL_STATION("Stazione di servizio");
+        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory"), CENTRO("Centro Storico"), PORTICI("Via dei Portici"), FARM("Cascina delle Risaie"), FUEL_STATION("Stazione di servizio"), LOGISTICS_DEPOT("Deposito Logistico");
         final String label;
         Place(String label) { this.label=label; }
     }

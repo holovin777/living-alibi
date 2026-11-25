@@ -14,7 +14,8 @@ final class MotorLife {
             case WORKSHOP -> List.of(LIBRARY,FACTORY,QUARRY);
             case FACTORY -> List.of(OFFICE,WORKSHOP);
             case QUARRY -> List.of(WORKSHOP,FUEL_STATION);
-            case FUEL_STATION -> List.of(QUARRY);
+            case FUEL_STATION -> List.of(QUARRY,LOGISTICS_DEPOT);
+            case LOGISTICS_DEPOT -> List.of(FUEL_STATION);
             default -> List.of();
         };
     }

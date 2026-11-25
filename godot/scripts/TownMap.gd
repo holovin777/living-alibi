@@ -10,12 +10,12 @@ const DISTRICTS := {
     "WORKSHOP": Vector2i(4,1),
     "SOUTH_RESIDENCES": Vector2i(0,2), "PORTICI": Vector2i(1,2),
     "RIVER": Vector2i(2,2), "WOODS": Vector2i(3,2),
-    "QUARRY": Vector2i(4,2), "BAKERY": Vector2i(1,3), "CAFE": Vector2i(0,3), "FARM": Vector2i(2,3), "FUEL_STATION": Vector2i(4,3)
+    "QUARRY": Vector2i(4,2), "BAKERY": Vector2i(1,3), "CAFE": Vector2i(0,3), "FARM": Vector2i(2,3), "FUEL_STATION": Vector2i(4,3), "LOGISTICS_DEPOT": Vector2i(3,3)
 }
 const LABELS := {
-    "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes", "CENTRO": "Centro storico", "PORTICI": "Via dei Portici", "FARM": "Cascina", "FUEL_STATION": "Fuel station"
+    "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes", "CENTRO": "Centro storico", "PORTICI": "Via dei Portici", "FARM": "Cascina", "FUEL_STATION": "Fuel station", "LOGISTICS_DEPOT": "Logistics depot"
 }
-const MOTOR_DISTRICTS := ["OFFICE","LIBRARY","WORKSHOP","FACTORY","QUARRY","FUEL_STATION"]
+const MOTOR_DISTRICTS := ["OFFICE","LIBRARY","WORKSHOP","FACTORY","QUARRY","FUEL_STATION","LOGISTICS_DEPOT"]
 const TILE_SPACING := 48.0
 var current_place := "PARK"
 var travel_minutes: Dictionary = {}
@@ -81,7 +81,7 @@ func _draw() -> void:
             color = Color("#947453")
         elif id == "RIVER":
             color = Color("#326c85")
-        elif id in ["FACTORY","QUARRY","WORKSHOP","FUEL_STATION"]:
+        elif id in ["FACTORY","QUARRY","WORKSHOP","FUEL_STATION","LOGISTICS_DEPOT"]:
             color = Color("#675a50")
         draw_rect(rect,color)
         draw_rect(rect,Color("#edcb75") if id == current_place else Color("#a9b6a9"),false,2.0)
