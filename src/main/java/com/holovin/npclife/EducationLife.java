@@ -56,7 +56,8 @@ final class EducationLife {
             set(t,c,"last-school",day);
             set(t,c,"school-days",Math.addExact(get(t,c,"school-days"),1));
             set(t,LESSONS,Math.addExact(get(t,LESSONS),1));
-            String f=SUBJECTS.get(Math.floorMod(day+c.generationIndex,SUBJECTS.size()));
+            String f=RebirthLife.focus(t,c);
+            if(f==null)f=SUBJECTS.get(Math.floorMod(day+c.generationIndex,SUBJECTS.size()));
             learn(t,c,f,aptitude(c,f)>=4?2:1);
         }
         if(DemographyLife.workingAge(c)&&c.employed&&"WORKING".equals(c.activity)&&clock.minute%60==0

@@ -86,7 +86,7 @@ public final class GameSession implements AutoCloseable {
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
                 p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
-        var residents=PlayerLife.visible(town).stream()
+        var residents=(RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town)).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,c.name,c.activity,
@@ -337,6 +337,8 @@ public final class GameSession implements AutoCloseable {
             }
             String message;
             if(action.equals("rebirth-adult"))message=RebirthLife.adultFallback(copy);
+            else if(action.startsWith("rebirth-focus-"))message=RebirthLife.chooseFocus(copy,action.substring("rebirth-focus-".length()));
+            else if(action.startsWith("rebirth-chat-"))message=RebirthLife.chat(copy,state.day,action.substring("rebirth-chat-".length()));
             else if(action.startsWith("rebirth-family-")){
                 String[] values=action.substring("rebirth-family-".length()).split("-");
                 if(values.length!=2)throw new IllegalArgumentException("Choose two eligible parents.");

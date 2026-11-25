@@ -199,6 +199,8 @@ class GameSessionTest {
             assertEquals("CHILDHOOD",born.rebirth().phase());
             assertEquals(0,born.rebirth().age());
             assertEquals(7,born.rebirth().maxWaitDays());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-focus-technical"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-chat-"+firstId));
             assertEquals(1,born.demography().births());
             assertEquals(271,born.day());assertEquals(600,born.minute());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-family-"+first+"-"+second));
@@ -225,6 +227,45 @@ class GameSessionTest {
             var fast=game.gardenAction("rebirth-wait-fast").world();
             assertEquals(279,fast.day());
             assertEquals(600,fast.minute());
+        }
+        // School focus persists and does not award free skills.
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var child=RebirthLife.child(town);
+            assertNotNull(child);child.age=6;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var before=game.snapshot();
+            assertEquals(3,before.rebirth().maxWaitDays());
+            var after=game.gardenAction("rebirth-focus-technical").world();
+            assertEquals("technical",after.rebirth().schoolFocus());
+            assertEquals(before.rebirth().skills(),after.rebirth().skills());
+            assertEquals(before.minute(),after.minute());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-focus-invalid"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var child=RebirthLife.child(town);
+            assertEquals("technical",RebirthLife.focus(town,child));
+            child.place=TownLife.Place.SCHOOL;child.travelRemaining=0;child.activity="STUDYING";
+            state.day=281;state.minute=600;
+            town.employerFunds.put("school",10);
+            int skill=EducationLife.get(town,child,"technical");
+            int days=EducationLife.get(town,child,"school-days");
+            EducationLife.attendance(town,child,state);
+            assertTrue(EducationLife.get(town,child,"technical")>skill);
+            assertEquals(days+1,EducationLife.get(town,child,"school-days"));
+            assertEquals(9,town.employerFunds.get("school"));
+            EducationLife.attendance(town,child,state);
+            assertEquals(days+1,EducationLife.get(town,child,"school-days"));
+            child.place=child.home;child.activity="AT_HOME";
+            var parent=town.get(firstId);
+            parent.place=child.home;parent.home=child.home;parent.homeUnit=child.homeUnit;parent.travelRemaining=0;parent.activity="AT_HOME";
+            var previous=town.peerRelationships.get(SocialNetwork.key(child.id,parent.id));
+            int affinity=previous==null?50:previous.affinity;
+            RebirthLife.chat(town,state.day,firstId);
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.chat(town,state.day,firstId));
+            assertEquals(Math.min(100,affinity+2),town.peerRelationships.get(SocialNetwork.key(child.id,parent.id)).affinity);
         }
         // Move the existing child to the evening before its eighteenth birthday.
         try(var db=new WorldDatabase(file)){

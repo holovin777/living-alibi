@@ -162,17 +162,21 @@ func _process(delta: float) -> void:
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
         var before := _avatar.position
         _avatar.position = _move_on_ground(_avatar.position,
-                relative_motion * delta * _movement_speed(), WALKER_RADIUS, true)
+                relative_motion * delta * _movement_speed(), WALKER_RADIUS, not _rebirth_active())
         if _movement_speed() == CYCLE_SPEED:
             _bike_wheel_angle += before.distance_to(_avatar.position)/0.35
         _follow_player()
-        _try_road_crossing(relative_motion)
+        if not _rebirth_active():
+            _try_road_crossing(relative_motion)
 
     _sync_bicycle()
     _advance_traffic(delta)
     _animate_residents(delta)
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_inside_guest_room(),_environment)
+    if _rebirth_active():
+        _hint.text = "F: childhood choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
+        return
     _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
@@ -223,6 +227,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
     if _rebirth_active():
+        if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
+            if event.keycode == KEY_F:
+                _action_panel.visible = not _action_panel.visible
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_ESCAPE:
+                _action_panel.visible = true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
         return
     if event is InputEventKey and event.pressed and not event.echo:
         if _drive_active():
@@ -327,6 +340,8 @@ func _movement_speed() -> float:
     # and grocery interior. No vehicle parking state is simulated yet.
     var at := _avatar.position
     var in_shop := _current_place == "PORTICI" and Rect2(4.4,2.15,6.1,5.7).has_point(Vector2(at.x,at.z))
+    if _rebirth_active():
+        return WALK_SPEED * 0.65
     return CYCLE_SPEED if _cycling() and not _inside_guest_room() and not in_shop else WALK_SPEED
 
 func _truck_place() -> String:
@@ -600,7 +615,10 @@ func _follow_player() -> void:
         _camera.position = _avatar.position+Basis(Vector3.UP,_view_yaw)*DRIVER_EYE
         _camera.rotation = Vector3(_view_pitch,_view_yaw+_drive_look,0.0)
     else:
-        _camera.position = _avatar.position + Vector3(0.0,EYE_HEIGHT,0.0)
+        var eye := EYE_HEIGHT
+        if str(_last_snapshot.get("rebirth",{}).get("phase","ADULT")) == "CHILDHOOD":
+            eye = lerpf(0.65,EYE_HEIGHT,clampf(float(_last_snapshot.get("rebirth",{}).get("age",0))/18.0,0.0,1.0))
+        _camera.position = _avatar.position + Vector3(0.0,eye,0.0)
         _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
 func _build_world() -> void:
@@ -2593,6 +2611,10 @@ func _render_logistics(logistics: Dictionary) -> void:
 func _rebirth_active() -> bool:
     return str(_last_snapshot.get("rebirth",{}).get("phase","ADULT"))!="ADULT"
 
+func _child_can_walk() -> bool:
+    var r: Dictionary = _last_snapshot.get("rebirth",{})
+    return str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18
+
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _rebirth_active():
@@ -2609,9 +2631,21 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-family-%s-%s" % [family.get("first",0),family.get("second",0)])))
             _action_choices.add_child(_button("Start adult life instead",_garden_action.bind("rebirth-adult")))
         else:
-            _action_title.text = "Childhood · preview"
-            info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nYour child lives in the simulated family; independent controls are not implemented yet." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
+            _action_title.text = "Childhood · family life"
+            info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nF: choices / local first-person exploration from age 3. District travel follows the daily schedule." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
             _action_choices.add_child(info)
+            var age := int(rebirth.get("age",0))
+            if age >= 6 and age < 18:
+                var skills: Dictionary = rebirth.get("skills",{})
+                var school := Label.new()
+                school.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                var focus = rebirth.get("schoolFocus")
+                school.text = "School days: %s · Focus: %s\nTechnical %s | Social %s | Academic %s | Commerce %s" % [rebirth.get("schoolDays",0),"balanced" if focus == null else str(focus),skills.get("technical",0),skills.get("social",0),skills.get("academic",0),skills.get("commerce",0)]
+                _action_choices.add_child(school)
+                for subject in ["balanced","technical","social","academic","commerce"]:
+                    _action_choices.add_child(_button("Focus: "+subject.capitalize(),_garden_action.bind("rebirth-focus-"+subject)))
+            for partner in rebirth.get("conversations",[]):
+                _action_choices.add_child(_button("Talk with "+str(partner.get("name","")),_garden_action.bind("rebirth-chat-"+str(partner.get("id","")))))
         var max_days := int(rebirth.get("maxWaitDays",0))
         if max_days > 0:
             _action_choices.add_child(_button("Advance one shared day",_garden_action.bind("rebirth-wait")))
@@ -3337,6 +3371,9 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _status.text = "Visitor #%s | %s EUR | %s" % [
         str(player.get("incarnation", 1)), str(player.get("money", 50)), profession
     ]
+    if _rebirth_active():
+        var child: Dictionary = snapshot.get("rebirth",{})
+        _status.text = "Choose a new family" if str(child.get("phase","")) == "CHOICE" else "%s | Age %s | Childhood" % [child.get("childName",""),child.get("age",0)]
     var climate: Dictionary = snapshot.get("weather", {})
     _weather.text = "Day %s  %s:%02d | %s | %s  %s °C" % [
         str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,
