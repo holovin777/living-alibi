@@ -702,3 +702,9 @@ with the Java process running.
 ## Surface detail and antialiasing
 
 Grass, asphalt and staggered stone paving have shared 256 px procedural textures with mipmaps, and 2× MSAA smooths geometry edges in the Compatibility renderer. No external assets are required. MSAA may increase GPU load on older hardware.
+
+## Lombard town visual detail
+
+The park, Piazza Centrale, Via dei Portici and Lombard residential facades now use original shared plaster, terracotta and wood textures. Trees have irregular shared-mesh canopies, seasonal colors and snowy tints. Park flowers are batched, benches have individual slats, and street lamps have traditional lantern shapes. These are decorative changes: no collision footprints, travel rules or saved state are changed.
+
+The HUD Graphics quality selector applies immediately for this session: Low disables MSAA, sun shadows and optional foliage/flowers; Medium (default) uses 2x MSAA and 55-unit sun shadow distance; High uses 4x and 80 units; Ultra uses 8x and 105 units. All preserve Compatibility rendering, and higher levels may be demanding on integrated or older GPUs. Actual rendering performance must be evaluated on the target computer.
