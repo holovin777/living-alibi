@@ -87,7 +87,7 @@ final class ElectionLife {
         set(t,OWNER,winner==4?t.player.incarnation:0);set(t,POLICY,winner==0?BALANCED:plan(t,winner));
         set(t,LAST,day);set(t,WINNER,winner);set(t,NEXT,Math.addExact(scheduled,TERM));
         String name=winner==4?"Visitor #"+t.player.incarnation:winner==0?"Caretaker administration":DemographyLife.byIndex(t,get(t,MAYOR)).name;
-        ArchiveLife.record(t,"election:"+scheduled,day,minute,"Municipality",name+" won the municipal election with "+best+" votes. Programme: "+label(policy(t))+".");
+        ArchiveLife.record(t,"election:"+scheduled,day,minute,"Municipality",winner==0?"No candidate elected; caretaker administration continues.":name+" won the municipal election with "+best+" votes. Programme: "+label(policy(t))+".");
     }
     static String act(TownLife.Town t,String action,int day,int minute){
         TransportLife.ready(t.player);
@@ -117,9 +117,13 @@ final class ElectionLife {
     static Report report(TownLife.Town t,int day){
         var entries=new ArrayList<Candidate>();
         boolean open=campaign(t,day);
-        if(open)for(int i=1;i<=4;i++)if(valid(t,i)){
-            String name=i==4?"Visitor #"+t.player.incarnation:DemographyLife.byIndex(t,get(t,candidate(i))).name;
-            entries.add(new Candidate(i,name,label(plan(t,i)),0));
+        for(int i=1;i<=4;i++){
+            if(open&&!valid(t,i))continue;
+            if(!open&&(get(t,LAST)==0||get(t,votes(i))==0))continue;
+            var person=i==4?null:DemographyLife.byIndex(t,get(t,candidate(i)));
+            if(i!=4&&person==null)continue;
+            String name=i==4?"Visitor #"+get(t,PLAYER):person.name;
+            entries.add(new Candidate(i,name,label(plan(t,i)),open?0:get(t,votes(i))));
         }
         var mayor=DemographyLife.byIndex(t,get(t,MAYOR));
         return new Report(get(t,NEXT),get(t,LAST),open,get(t,PLAYER)==t.player.incarnation,get(t,VOTER)==t.player.incarnation,
