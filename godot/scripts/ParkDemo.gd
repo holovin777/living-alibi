@@ -3789,6 +3789,23 @@ func _render_actions() -> void:
                 var study_info := Label.new()
                 study_info.text="Education · %s · %s/%s lessons" % [college.get("enrolled",""),college.get("completed",0),college.get("required",0)]
                 _action_choices.add_child(study_info)
+            var sports = rebirth.get("sports")
+            if sports is Dictionary:
+                var sport_label := Label.new()
+                sport_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                sport_label.text = tr("Fitness %s · Endurance %s · Flexibility %s") % [sports.get("fitness",0),sports.get("endurance",0),sports.get("flexibility",0)]
+                sport_label.text += "\n"+(tr("Strength %s · Karate %s · Sessions %s") % [sports.get("strength",0),sports.get("karate",0),sports.get("sessions",0)])
+                _action_choices.add_child(sport_label)
+                var sport_names := {"run":"Running","yoga":"Yoga","karate":"Karate","gym":"Gym training","cycling":"Cycling rental"}
+                for option in sports.get("options",[]):
+                    var sport_id := str(option.get("id",""))
+                    var sport_name := tr(str(sport_names.get(sport_id,sport_id)))
+                    if option.get("available",false):
+                        _action_choices.add_child(_button(tr("%s · %s min · %s EUR") % [sport_name,option.get("minutes",0),option.get("price",0)],_garden_action.bind("rebirth-sport-"+sport_id)))
+                    else:
+                        var sport_hint := Label.new()
+                        sport_hint.text = "%s · %s" % [sport_name,tr(str(option.get("district","")))]
+                        _action_choices.add_child(sport_hint)
             var medical = rebirth.get("medical")
             if medical is Dictionary:
                 var health_label := Label.new()
@@ -4492,7 +4509,14 @@ func _garden_action(action: String) -> void:
     if not _office_action_allowed(action):return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
-    if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
+    if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit":
+        if action=="rebirth-medical-recover":
+            if not _apartment_active:return
+        elif action=="rebirth-medical-exam":
+            if _medical_station()!="consult":return
+        elif action=="rebirth-medical-collect":
+            if _medical_station()!="first-aid":return
+        elif action!="rebirth-medical-"+_medical_station():return
     if action.begins_with("rebirth-cafe-"):
         var station := _cafe_station()
         var table_action := action=="rebirth-cafe-rest" or action.begins_with("rebirth-cafe-chat-")
