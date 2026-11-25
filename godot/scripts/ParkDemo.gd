@@ -2,7 +2,7 @@ extends Node3D
 ## Living Alibi vertical slice: move around a local public scene; travel and
 ## careers are validated by the real Java/Spring server, never by a fake client wallet.
 ## WASD/arrow keys: walk relative to the camera. Click the world for mouse look.
-## V: first/third person. Escape: release mouse. E: gate. F: local kiosk.
+## First-person only. Escape: release mouse. E: gate. F: local kiosk.
 
 const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
@@ -30,7 +30,6 @@ const LiveClock = preload("res://scripts/LiveClock.gd")
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 
 # Local presentation only: true movement between districts is Java-authorized.
-var _first_person := true
 var _view_yaw := 0.0
 var _view_pitch := 0.0
 
@@ -72,7 +71,6 @@ var _weather: Label
 var _needs: Label
 var _message: Label
 var _hint: Label
-var _view_button: Button
 var _transport_button: Button
 var _parking_button: Button
 var _car_label: Label
@@ -162,13 +160,13 @@ func _process(delta: float) -> void:
     elif _current_place == "NORTH_RESIDENCES" and _avatar.position.distance_to(ROOM_EXIT) < 2.3:
         _hint.text = "Your room is open." if _has_room_lease() else "Rent a room at reception (blue kiosk)."
     elif not _nearest_resident().is_empty():
-        _hint.text = "T: talk to nearby resident · V: camera · Esc: cursor."
+        _hint.text = "T: talk to nearby resident · Esc: cursor."
     elif _near_gate():
-        _hint.text = "E: travel gate (game time). V: camera. Esc: cursor."
+        _hint.text = "E: travel gate (game time). Esc: cursor."
     elif _near_kiosk():
-        _hint.text = "F: local interactions. V: camera. Esc: cursor."
+        _hint.text = "F: local interactions. Esc: cursor."
     else:
-        _hint.text = "WASD: walk · click scene: mouse look · V: camera · Esc: cursor."
+        _hint.text = "WASD: walk · click scene: mouse look · Esc: cursor."
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -200,9 +198,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_B and not _action_panel.visible and not _travel_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
             _toggle_transport()
-            get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_V:
-            _toggle_view_mode()
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_E and _near_gate() and not _map_panel.visible:
             _toggle_travel()
@@ -329,23 +324,12 @@ func _buy_bicycle() -> void:
     if _current_place == "WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():
         _api.buy_bicycle()
 
-func _toggle_view_mode() -> void:
-    _first_person = not _first_person
-    _view_button.text = "View: first person (V)" if _first_person else "View: third person (V)"
-    _follow_player()
-
 func _follow_player() -> void:
-    # Hide the mesh at eye height to prevent looking through your own head.
-    _avatar.visible = not _first_person
+    # Fixed first-person presentation in every district and transport mode.
+    _avatar.visible = false
     _avatar.rotation.y = _view_yaw
-    if _first_person:
-        _camera.position = _avatar.position + Vector3(0.0, EYE_HEIGHT, 0.0)
-        _camera.rotation = Vector3(_view_pitch, _view_yaw, 0.0)
-    else:
-        var orbit := Basis(Vector3.UP, _view_yaw) * Vector3(
-                0.0, 3.8 - _view_pitch * 2.5, 6.0)
-        _camera.position = _avatar.position + orbit
-        _camera.look_at(_avatar.position + Vector3(0.0, 1.4, 0.0))
+    _camera.position = _avatar.position + Vector3(0.0,EYE_HEIGHT,0.0)
+    _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
 func _build_world() -> void:
     _environment = Environment.new()
@@ -365,14 +349,8 @@ func _build_world() -> void:
 
     _avatar = Node3D.new()
     _avatar.name = "OrdinaryVisitor"
+    # Position-only anchor. No third-person player mesh is needed.
     add_child(_avatar)
-    _box(_avatar, Vector3(0.65, 1.15, 0.38), Color(0.19, 0.37, 0.70),
-            Vector3(0.0, 1.0, 0.0))
-    _sphere(_avatar, 0.30, Color(0.88, 0.69, 0.53),
-            Vector3(0.0, 1.85, 0.0))
-    for x_offset in [-0.18, 0.18]:
-        _box(_avatar, Vector3(0.2, 0.65, 0.23), Color(0.19, 0.24, 0.29),
-                Vector3(x_offset, 0.33, 0.0))
 
     _traffic_root = Node3D.new()
     _traffic_root.name = "MotorTraffic"
@@ -1587,8 +1565,6 @@ func _create_interface() -> void:
     _parking_button = _button("Bicycle rack (P)",_toggle_parking)
     column.add_child(_parking_button)
     _parking_button.disabled = true
-    _view_button = _button("View: first person (V)", _toggle_view_mode)
-    column.add_child(_view_button)
     var map_button := Button.new()
     map_button.text = "Town map (M)"
     map_button.pressed.connect(_toggle_map)
@@ -1618,7 +1594,7 @@ func _create_interface() -> void:
     audio_toggle.toggled.connect(_set_weather_audio)
     atmosphere_row.add_child(audio_toggle)
     _hint = Label.new()
-    _hint.text = "WASD: walk · click scene: mouse look · V: camera · Esc: cursor."
+    _hint.text = "WASD: walk · click scene: mouse look · Esc: cursor."
     column.add_child(_hint)
     _jobs = Label.new()
     _jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

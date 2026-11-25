@@ -42,26 +42,30 @@ func _exercise() -> void:
     if not _check(world._clock.speed == 10, "speed selection restores default"):
         return
 
-    # The initial presentation is eye-level first person; V can show the
-    # placeholder avatar without moving the authoritative player in Java.
-    if not _check(world._first_person and not world._avatar.visible
+    # First person is the only camera mode, including after old V input.
+    if not _check(not world._avatar.visible and world._avatar.get_child_count()==0
             and world._camera.position.is_equal_approx(
-                    world._avatar.position + Vector3(0.0, world.EYE_HEIGHT, 0.0)),
-            "visitor starts in first-person at eye height"):
+                    world._avatar.position+Vector3(0,world.EYE_HEIGHT,0)),
+            "visitor starts at eye level without a third-person mesh"):
         return
-    world._toggle_view_mode()
-    if not _check(not world._first_person and world._avatar.visible
-            and world._camera.position.distance_to(world._avatar.position) > 5.0,
-            "third-person toggle shows the local avatar"):
-        return
-    world._toggle_view_mode()
-    world._view_yaw = PI / 2.0
+    var legacy_key := InputEventKey.new()
+    legacy_key.keycode = KEY_V
+    legacy_key.pressed = true
+    world._unhandled_key_input(legacy_key)
+    world._view_yaw = PI/2.0
+    world._view_pitch = 0.25
+    world._avatar.position = Vector3(1,0,2)
     world._follow_player()
-    if not _check(world._first_person and not world._avatar.visible
-            and is_equal_approx(world._camera.rotation.y, world._view_yaw),
-            "returning to first-person retains mouse-look orientation"):
+    if not _check(not world._avatar.visible
+            and world._camera.position.is_equal_approx(
+                    world._avatar.position+Vector3(0,world.EYE_HEIGHT,0))
+            and is_equal_approx(world._camera.rotation.y,world._view_yaw)
+            and is_equal_approx(world._camera.rotation.x,world._view_pitch),
+            "old V key cannot change first-person viewpoint"):
         return
+    world._avatar.position = Vector3.ZERO
     world._view_yaw = 0.0
+    world._view_pitch = 0.0
     world._follow_player()
 
     var layout = world._town_map
@@ -279,11 +283,13 @@ func _exercise() -> void:
             and not world._can_stand(world.CAR_PARK,world.WALKER_RADIUS),
             "owned car is parked physically and offers nearby motor routes"):
         return
+    driver = driver.duplicate(true) # A fresh server response, not mutation of the previous snapshot.
     driver["player"]["carPlace"] = "LIBRARY"
     driver["player"]["placeId"] = "LIBRARY"
     driver["player"]["place"] = "Library"
     world._on_world_updated(driver)
-    if not _check(world._avatar.position==world.CAR_ARRIVAL and world._near_car(),
+    if not _check(world._avatar.position==world.CAR_ARRIVAL and world._near_car()
+            and world._camera.position.is_equal_approx(world.CAR_ARRIVAL+Vector3(0,world.EYE_HEIGHT,0)),
             "confirmed car trip arrives at destination parking"):
         return
     world._on_world_updated(_world("PARK","Park"))
