@@ -47,7 +47,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
-                               boolean machine,int cash,String employeeId,
+                               boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
                                int lastProductionDay,int lastSaleDay) { }
     public record CandidateView(String id,String name,String currentOccupation) { }
@@ -93,7 +93,7 @@ public final class GameSession implements AutoCloseable {
     public synchronized BusinessView business() {
         var b=BusinessLife.status(town,state.day);
         return new BusinessView(b.registered(),b.yours(),b.ownerIncarnation(),
-                b.machine(),b.cash(),b.employeeId(),b.employeeName(),
+                b.machine(),b.machineCondition(),b.cash(),b.employeeId(),b.employeeName(),
                 b.spareParts(),b.paidHoursToday(),b.lastProductionDay(),b.lastSaleDay());
     }
 
@@ -119,6 +119,12 @@ public final class GameSession implements AutoCloseable {
         var copy=town.copy();
         String message=BusinessLife.machine(copy);
         return apply(copy,30,message);
+    }
+
+    public synchronized ActionView serviceBusinessMachine() throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.service(copy);
+        return apply(copy,BusinessLife.SERVICE_MINUTES,message);
     }
 
     public synchronized ActionView hireBusinessWorker(String residentId)
