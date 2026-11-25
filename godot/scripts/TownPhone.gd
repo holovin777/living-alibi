@@ -2,6 +2,13 @@ extends PanelContainer
 signal close_requested
 signal jobs_requested
 signal map_requested
+signal alarm_rang(message: String)
+var alarm_at := -1
+var _last_world_minute := -1
+var _alarm_hour: SpinBox
+var _alarm_minute: SpinBox
+var _alarm_controls: HBoxContainer
+var _alarm_cancel: Button
 var app := "home"
 var _snapshot: Dictionary = {}
 var _jobs: Array = []
@@ -38,9 +45,9 @@ func _ready() -> void:
     title.add_theme_font_size_override("font_size",22)
     col.add_child(title)
     var apps := GridContainer.new()
-    apps.columns = 2
+    apps.columns = 3
     col.add_child(apps)
-    for entry in [["home","Phone home"],["jobs","Phone jobs"],["map","Phone map"],["contacts","Phone contacts"],["bank","Phone bank"],["messages","Phone notifications"]]:
+    for entry in [["home","Phone home"],["jobs","Phone jobs"],["map","Phone map"],["contacts","Phone contacts"],["bank","Phone bank"],["messages","Phone notifications"],["calendar","Phone calendar"],["weather","Phone weather"],["alarm","Phone alarm"]]:
         var button := Button.new()
         button.text = entry[1]
         button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -55,6 +62,24 @@ func _ready() -> void:
     _body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     scroll.add_child(_body)
+    _alarm_controls = HBoxContainer.new()
+    col.add_child(_alarm_controls)
+    _alarm_hour = SpinBox.new()
+    _alarm_hour.min_value = 0
+    _alarm_hour.max_value = 23
+    _alarm_hour.value = 7
+    _alarm_controls.add_child(_alarm_hour)
+    var colon := Label.new()
+    colon.text = ":"
+    _alarm_controls.add_child(colon)
+    _alarm_minute = SpinBox.new()
+    _alarm_minute.min_value = 0
+    _alarm_minute.max_value = 59
+    _alarm_controls.add_child(_alarm_minute)
+    _alarm_cancel = Button.new()
+    _alarm_cancel.text = "Cancel alarm"
+    _alarm_cancel.pressed.connect(cancel_alarm)
+    col.add_child(_alarm_cancel)
     _action = Button.new()
     _action.pressed.connect(_app_action)
     col.add_child(_action)
@@ -75,13 +100,40 @@ func update_data(snapshot: Dictionary,jobs: Array,locations: Array) -> void:
         _contacts.clear()
         _messages.clear()
         _identity = identity
+        alarm_at = -1
+        _last_world_minute = -1
     for resident in snapshot.get("residents",[]):
         if resident is Dictionary and int(resident.get("conversations",0))>0:
             var id := str(resident.get("id",""))
             if not id.is_empty():
                 _contacts[id] = str(resident.get("name",""))
+    var now := world_minute(snapshot)
+    if alarm_at>=0 and _last_world_minute>=0 and now>=alarm_at and _last_world_minute<alarm_at:
+        var message := tr("Alarm: day %s, %s") % [alarm_at/1440+1,format_time(alarm_at%1440)]
+        alarm_at = -1
+        add_notification(message)
+        alarm_rang.emit(message)
+    _last_world_minute = now
     if visible:
         refresh()
+
+static func world_minute(snapshot: Dictionary) -> int:
+    return (maxi(1,int(snapshot.get("day",1)))-1)*1440+int(snapshot.get("minute",450))
+
+static func format_time(minute: int) -> String:
+    return "%02d:%02d" % [minute/60,minute%60]
+
+func set_alarm(hour: int, minute: int) -> void:
+    if hour<0 or hour>23 or minute<0 or minute>59:return
+    var now := world_minute(_snapshot)
+    var target := now-now%1440+hour*60+minute
+    if target<=now:target += 1440
+    alarm_at = target
+    refresh()
+
+func cancel_alarm() -> void:
+    alarm_at = -1
+    refresh()
 
 func add_notification(message: String) -> void:
     if message.is_empty():return
@@ -102,6 +154,8 @@ func _app_action() -> void:
         jobs_requested.emit()
     elif app=="map":
         map_requested.emit()
+    elif app=="alarm":
+        set_alarm(int(_alarm_hour.value),int(_alarm_minute.value))
 
 func refresh() -> void:
     if not is_instance_valid(_body):return
@@ -110,6 +164,8 @@ func refresh() -> void:
     var player: Dictionary = _snapshot.get("player",{})
     var lines := PackedStringArray()
     _action.hide()
+    _alarm_controls.visible = app=="alarm"
+    _alarm_cancel.visible = app=="alarm" and alarm_at>=0
     match app:
         "home":
             lines.append(tr("Phone home"))
@@ -150,6 +206,34 @@ func refresh() -> void:
             else:
                 lines.append(tr("Bank information unavailable."))
             lines.append("\n"+tr("Bank transactions require the bank office."))
+        "calendar":
+            lines.append(tr("Phone calendar"))
+            var day := int(_snapshot.get("day",1))
+            lines.append(tr("Year %s · Day %s of 365") % [_snapshot.get("year",(day-1)/365+1),_snapshot.get("dayOfYear",(day-1)%365+1)])
+            lines.append(tr(str(_snapshot.get("season","SPRING"))))
+            var job = player.get("jobId")
+            lines.append("\n"+tr("Occupation: %s") % (str(job) if job!=null else tr("unemployed")))
+            lines.append(tr("Work schedules are confirmed at the workplace."))
+            if alarm_at>=0:
+                lines.append(tr("Alarm: day %s, %s") % [alarm_at/1440+1,format_time(alarm_at%1440)])
+        "weather":
+            lines.append(tr("Phone weather"))
+            var weather = _snapshot.get("weather")
+            if weather is Dictionary:
+                lines.append("\n%s · %s °C" % [tr(str(weather.get("sky","CLEAR"))),weather.get("temperatureC","—")])
+                lines.append(tr(str(_snapshot.get("season","SPRING"))))
+                if weather.get("raining",false):lines.append(tr("Rain"))
+                if weather.get("snowing",false):lines.append(tr("Snow"))
+            else:
+                lines.append(tr("Weather information unavailable."))
+            lines.append("\n"+tr("Current conditions, not a forecast."))
+        "alarm":
+            lines.append(tr("Phone alarm"))
+            lines.append(tr("Choose an in-game hour and minute."))
+            lines.append(tr("Alarm: day %s, %s") % [alarm_at/1440+1,format_time(alarm_at%1440)] if alarm_at>=0 else tr("No alarm set."))
+            lines.append(tr("If the time has passed, the alarm is set for tomorrow."))
+            _action.text = "Set alarm"
+            _action.show()
         "messages":
             lines.append(tr("Phone notifications"))
             if _messages.is_empty():
