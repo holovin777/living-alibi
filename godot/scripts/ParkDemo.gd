@@ -1527,6 +1527,27 @@ func _build_home_garden() -> void:
     _cylinder(barrel,0.39,0.04,Color("#718f9c"),Vector3(0,1.10,0))
     _box(barrel,Vector3(0.11,0.12,0.20),Color("#a6aaa0"),Vector3(0,0.28,0.46))
     barrel.visible = false
+    var greenhouse := Node3D.new()
+    greenhouse.name = "Greenhouse"
+    greenhouse.position = GARDEN_CENTER
+    garden.add_child(greenhouse)
+    for x in [-2.05,2.05]:
+        for z in [-2.45,2.45]:
+            _box(greenhouse,Vector3(0.10,2.25,0.10),Color("#839e8b"),Vector3(x,1.15,z))
+        _box(greenhouse,Vector3(0.10,0.10,4.9),Color("#839e8b"),Vector3(x,2.25,0))
+    for z in [-2.45,0.0,2.45]:
+        _box(greenhouse,Vector3(4.2,0.10,0.10),Color("#839e8b"),Vector3(0,2.25,z))
+    var roof := MeshInstance3D.new()
+    var roof_mesh := BoxMesh.new()
+    roof_mesh.size = Vector3(4.2,0.06,5.0)
+    roof.mesh = roof_mesh
+    var glass := StandardMaterial3D.new()
+    glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    glass.albedo_color = Color(0.69,0.89,0.83,0.28)
+    roof.material_override = glass
+    roof.position = Vector3(0,2.3,0)
+    greenhouse.add_child(roof)
+    greenhouse.visible = false
     for stage in range(4):
         var crops := Node3D.new()
         crops.name = "Stage"+str(stage)
@@ -1545,6 +1566,9 @@ func _sync_garden() -> void:
         return
     var root: Node3D = _chunks["SOUTH_RESIDENCES"]["root"]
     var report: Dictionary = _last_snapshot.get("garden",{})
+    var greenhouse := root.get_node_or_null("OrtoPrivato/Greenhouse") as Node3D
+    if greenhouse!=null:
+        greenhouse.visible = _owns_house() and bool(report.get("greenhouse",false))
     var barrel := root.get_node_or_null("OrtoPrivato/RainBarrel") as Node3D
     if barrel!=null:
         barrel.visible = _owns_house() and bool(report.get("barrel",false))
@@ -2574,7 +2598,10 @@ func _render_actions() -> void:
             elif _near_garden():
                 var garden: Dictionary = _last_snapshot.get("garden",{})
                 var info := Label.new()
-                info.text = "Garden · growth %s/3 | %s" % [garden.get("growth",0),"Winter: dormant" if bool(garden.get("winter",false)) else ("Rain today" if bool(garden.get("rainy",false)) else ("Watered today" if bool(garden.get("wateredToday",false)) else "Dry today"))]
+                var covered := bool(garden.get("greenhouse",false))
+                info.text = "%s · growth %s/3 | %s" % ["Serra privata" if covered else "Garden",garden.get("growth",0),"Watered today" if bool(garden.get("wateredToday",false)) else ("Manual watering required" if covered else ("Winter: dormant" if bool(garden.get("winter",false)) else ("Rain today" if bool(garden.get("rainy",false)) else "Dry today")))]
+                if not covered:
+                    _action_choices.add_child(_button("Build greenhouse · %s EUR" % garden.get("greenhousePrice",25),_garden_action.bind("build-greenhouse")))
                 _action_choices.add_child(info)
                 if bool(garden.get("barrel",false)):
                     var water_stock := Label.new()
@@ -2583,11 +2610,11 @@ func _render_actions() -> void:
                 else:
                     _action_choices.add_child(_button("Install rain barrel · 8 EUR",_garden_action.bind("buy-barrel")))
                 if not bool(garden.get("planted",false)):
-                    if not bool(garden.get("winter",false)):
+                    if covered or not bool(garden.get("winter",false)):
                         _action_choices.add_child(_button("Plant vegetables · 3 EUR",_garden_action.bind("plant")))
                 elif int(garden.get("growth",0))>=3:
                     _action_choices.add_child(_button("Harvest 4 vegetables into cupboard",_garden_action.bind("harvest")))
-                elif not bool(garden.get("winter",false)) and not bool(garden.get("rainy",false)) and not bool(garden.get("wateredToday",false)) and int(_last_snapshot.get("minute",0))<1080:
+                elif (covered or (not bool(garden.get("winter",false)) and not bool(garden.get("rainy",false)))) and not bool(garden.get("wateredToday",false)) and int(_last_snapshot.get("minute",0))<1080:
                     _action_choices.add_child(_button("Water garden · 1 water",_garden_action.bind("water")))
                     if int(garden.get("rainwater",0))>0:
                         _action_choices.add_child(_button("Water from rain barrel · 1 unit",_garden_action.bind("water-rain")))

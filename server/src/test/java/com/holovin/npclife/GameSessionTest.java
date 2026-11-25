@@ -165,6 +165,54 @@ class GameSessionTest {
     }
 
     @Test
+    void greenhouseAllowsWinterGrowthAndPersistsWithoutDuplicateHarvest() throws Exception {
+        Path file=directory.resolve("greenhouse.db");
+        try(var game=new GameSession(file)) {
+            game.move("south");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("build-greenhouse"));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            var p=town.player;p.ownsHouse=true;p.place=HousingLife.HOUSE_DISTRICT;
+            p.destination=p.place;p.travelRemaining=0;p.money=50;p.bottledWater=3;
+            assertFalse(GardenLife.report(town,276,720).greenhouse());
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"plant",276,720));
+            int funds=town.employerFunds.getOrDefault("technician",0);
+            GardenLife.act(town,"build-greenhouse",276,720);
+            assertEquals(25,p.money);
+            assertEquals(funds+25,town.employerFunds.get("technician"));
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"build-greenhouse",276,720));
+            GardenLife.act(town,"plant",276,720);
+            GardenLife.tick(town,276,1080);
+            assertEquals(0,GardenLife.get(town,GardenLife.GROWTH));
+            GardenLife.act(town,"water",277,720);
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"water",277,720));
+            GardenLife.tick(town,277,1080);GardenLife.tick(town,277,1080);
+            assertEquals(1,GardenLife.get(town,GardenLife.GROWTH));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(GardenLife.report(town,278,720).greenhouse());
+            assertEquals(1,GardenLife.get(town,GardenLife.GROWTH));
+            for(int day=278;day<=279;day++) {
+                GardenLife.act(town,"water",day,720);
+                GardenLife.tick(town,day,1080);
+            }
+            GardenLife.act(town,"harvest",279,1100);
+            assertEquals(4,FoodLife.quantity(town.player,"vegetables",true));
+            assertEquals(0,town.player.bottledWater);
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"harvest",279,1100));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertTrue(game.snapshot().garden().greenhouse());
+            assertFalse(game.snapshot().garden().planted());
+            assertEquals(4,game.snapshot().player().pantry().get("vegetables"));
+        }
+    }
+
+    @Test
     void homeGardenUsesWaterAndWeatherAndPersistsCrop() throws Exception {
         Path file=directory.resolve("garden.db");
         try(var game=new GameSession(file)) {
