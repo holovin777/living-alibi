@@ -3029,12 +3029,12 @@ func _render_software() -> void:
                 if str(ticket.get("id",""))!=str(project.get("id","")):continue
                 var spec := Label.new()
                 spec.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-                spec.text="%s\n%s\n%s\n%s" % [ticket.get("number",""),ticket.get("requirement",""),ticket.get("signature",""),ticket.get("examples","")]
+                spec.text="%s · %s\n%s\n%s\n%s" % [ticket.get("number",""),ticket.get("language","Java"),ticket.get("requirement",""),ticket.get("signature",""),ticket.get("examples","")]
                 _action_choices.add_child(spec)
                 var editor := LineEdit.new()
                 editor.name="Java_"+str(ticket.get("id",""))
-                editor.placeholder_text="return ...;"
-                editor.text="return 0;"
+                editor.placeholder_text=str(ticket.get("language","Java"))+" solution"
+                editor.text=str(ticket.get("starter","return 0;"))
                 editor.max_length=180
                 editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL
                 _action_choices.add_child(editor)

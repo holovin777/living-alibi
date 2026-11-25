@@ -76,6 +76,14 @@ public final class GameSession implements AutoCloseable {
                                int oreOnTruck,int scrapRemaining,boolean westDepositDiscovered,
                                int quarryPayroll,int factoryPayroll,int cityBudget) { }
     public record RetailView(String id,String label,int price,int stock) { }
+    public synchronized List<RetailView> retailCatalog(boolean lowStock){
+        if(!SoftwareLife.deployed(town,lowStock?"retail-sql":"retail-api"))
+            throw new IllegalArgumentException("This retail service has not been deployed yet.");
+        return RetailLife.PRODUCTS.stream()
+                .map(p->new RetailView(p.id(),p.label(),p.price(),town.retailStock.getOrDefault(p.id(),0)))
+                .filter(p->!lowStock||p.stock()<3)
+                .sorted(java.util.Comparator.comparing(RetailView::id)).toList();
+    }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth) { }

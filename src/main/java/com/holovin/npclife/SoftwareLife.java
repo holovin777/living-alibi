@@ -8,7 +8,9 @@ final class SoftwareLife {
     record Project(String id,String title,String effect,String account,int wage){}
     static final List<Project> PROJECTS=List.of(
             new Project("water-control","Water control dashboard","Working pump: up to 6 instead of 4 river-water units per day","city-maintenance",45),
-            new Project("factory-planning","Factory production planning","Refining: up to 3 instead of 2 iron units per shift","machinist",60));
+            new Project("factory-planning","Factory production planning","Refining: up to 3 instead of 2 iron units per shift","machinist",60),
+            new Project("retail-api","Retail catalog REST API","Publish the live read-only product catalog","shop-assistant",40),
+            new Project("retail-sql","Low-stock report","Publish a live report of products with fewer than 3 units","shop-assistant",50));
     static String key(String id){return "software:phase:"+id;}
     static String gitKey(String id){return "software:git:"+id;}
     static void ensure(TownLife.Town t){
@@ -22,7 +24,7 @@ final class SoftwareLife {
         int stage=t.industryStocks.getOrDefault(gitKey(id),0);
         return stage==0&&phase(t,id)>0?(phase(t,id)==1?1:phase(t,id)==2?3:4):stage;
     }
-    static String branch(String id){return "feature/"+(id.equals("water-control")?"BD-101":"BD-102")+"-"+id;}
+    static String branch(String id){return "feature/"+(switch(id){case "water-control"->"BD-101";case "factory-planning"->"BD-102";case "retail-api"->"BD-103";case "retail-sql"->"BD-104";default->throw new IllegalArgumentException("Unknown ticket.");})+"-"+id;}
     static int phase(TownLife.Town t,String id){return t.industryStocks.getOrDefault(key(id),0);}
     static boolean deployed(TownLife.Town t,String id){return phase(t,id)==3;}
     static boolean linkedProgrammer(TownLife.Town t,TownLife.Citizen c){
@@ -40,7 +42,7 @@ final class SoftwareLife {
             String next,command,explanation;int duration;
             if(phase==3){next="Complete";command="";duration=0;explanation="Release deployed to the city.";}
             else if(phase==0&&stage==0){next="Create branch";command="branch";duration=5;explanation="git switch -c "+branch(p.id())+" — isolate your work from main.";}
-            else if(phase==0){next="Develop";command="code";duration=60;explanation="Edit the method and pass the acceptance tests before committing.";}
+            else if(phase==0){next="Develop";command="code";duration=60;explanation="Complete the ticket in its indicated language and pass the acceptance tests before committing.";}
             else if(phase==1&&stage==1){next="Commit";command="commit";duration=5;explanation="git add . && git commit — record a tested change in your branch.";}
             else if(phase==1&&stage==2){next="Open pull request";command="pr";duration=10;explanation="git push -u origin "+branch(p.id())+" — ask the team to review a change into main.";}
             else if(phase==1){next="CI and code review";command="review";duration=60;explanation="The simulated pipeline checks acceptance tests; reviewer checks the business rule and boundary cases.";}

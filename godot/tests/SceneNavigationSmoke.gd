@@ -1061,6 +1061,15 @@ func _exercise() -> void:
     if not _check(_has_button(world._action_choices,"Create branch") and not world._action_choices.has_node("Java_water-control"),"Git branch precedes code editor"):
         return
     world._close_software()
+    office["rebirth"]["softwareProjects"]=[{"id":"retail-sql","title":"Low-stock report","phase":"OPEN","command":"code","canAdvance":true}]
+    office["rebirth"]["javaWorkspace"]["tickets"]=[{"id":"retail-sql","number":"BD-104","language":"SQL","signature":"products(id,stock,price)","requirement":"Find low stock","examples":"bread=0","starter":"SELECT id FROM products"}]
+    world._on_world_updated(office)
+    world._software_menu=true
+    world._render_actions()
+    var sql_editor = world._action_choices.get_node_or_null("Java_retail-sql")
+    if not _check(sql_editor is LineEdit and sql_editor.text=="SELECT id FROM products","SQL ticket uses language-specific starter"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

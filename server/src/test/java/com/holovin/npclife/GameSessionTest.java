@@ -315,6 +315,37 @@ class GameSessionTest {
         assertThrows(IllegalArgumentException.class,()->JavaTicketLife.verify("factory-planning","return stock; System.exit(0);"));
     }
     @Test
+    void retailTicketsValidateMappingAndRealSqlFixtures() throws Exception {
+        JavaTicketLife.verify("retail-api","@GetMapping(\"/retail/catalog\")");
+        assertThrows(IllegalArgumentException.class,()->JavaTicketLife.verify("retail-api","@PostMapping(\"/retail/catalog\")"));
+        assertThrows(IllegalArgumentException.class,()->JavaTicketLife.verify("retail-api","@GetMapping(\"/api/v1/retail/catalog\")"));
+        JavaTicketLife.verify("retail-sql","SELECT id FROM products WHERE stock < 3 ORDER BY id;");
+        JavaTicketLife.verify("retail-sql","select id from products where stock <= 2 order by id asc");
+        assertThrows(IllegalArgumentException.class,()->JavaTicketLife.verify("retail-sql","SELECT id FROM products WHERE stock <= 3 ORDER BY id"));
+        assertThrows(IllegalArgumentException.class,()->JavaTicketLife.verify("retail-sql","DROP TABLE products"));
+        assertThrows(IllegalArgumentException.class,()->JavaTicketLife.verify("retail-sql","SELECT id FROM products WHERE stock < 3 ORDER BY id; DELETE FROM products"));
+        Path file=directory.resolve("retail-api.db");
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.retailCatalog(false));
+            assertThrows(IllegalArgumentException.class,()->game.retailCatalog(true));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            town.industryStocks.put(SoftwareLife.key("retail-api"),3);
+            town.industryStocks.put(SoftwareLife.key("retail-sql"),3);
+            town.retailStock.put("bread",0);town.retailStock.put("water",3);town.retailStock.put("eggs",2);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var all=game.retailCatalog(false);var low=game.retailCatalog(true);
+            assertTrue(all.stream().anyMatch(p->p.id().equals("water")&&p.stock()==3));
+            assertTrue(low.stream().anyMatch(p->p.id().equals("bread")&&p.stock()==0));
+            assertTrue(low.stream().anyMatch(p->p.id().equals("eggs")&&p.stock()==2));
+            assertFalse(low.stream().anyMatch(p->p.stock()>=3));
+            assertEquals(all,game.retailCatalog(false));
+        }
+    }
+    @Test
     void programmerDeploysPersistentSoftwareWithFundedContract() throws Exception {
         Path file=directory.resolve("linked-software.db");
         String id;int budget;

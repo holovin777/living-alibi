@@ -14,20 +14,27 @@ final class JavaTicketLife {
     static int factoryUnits(int stock,int limit){
         return Math.min(stock,Math.max(0,limit));
     }
-    record Ticket(String id,String number,String signature,String requirement,String examples){}
+    record Ticket(String id,String number,String signature,String requirement,String examples,String language,String starter){}
     static final List<Ticket> TICKETS=List.of(
         new Ticket("water-control","BD-101 · Utility service","int waterUnits(int requested, int stock, int freeCapacity)",
             "Return the number of units to pump. All inputs are nonnegative. Never exceed the requested amount, river stock or free tank capacity.",
-            "Examples: (6,2,9) -> 2; (6,20,1) -> 1; (6,20,0) -> 0."),
+            "Examples: (6,2,9) -> 2; (6,20,1) -> 1; (6,20,0) -> 0.","Java","return 0;"),
         new Ticket("factory-planning","BD-102 · Production service","int factoryUnits(int stock, int limit)",
             "Return the allowed production quantity. Stock is nonnegative; a negative limit must produce zero. Never exceed stock.",
-            "Examples: (7,3) -> 3; (1,4) -> 1; (5,-2) -> 0."));
+            "Examples: (7,3) -> 3; (1,4) -> 1; (5,-2) -> 0.","Java","return 0;"),
+        new Ticket("retail-api","BD-103 · Spring Boot REST","@RestController class RetailController { ... public List<RetailView> catalog() {...} }",
+            "The controller already has @RequestMapping(\"/api/v1\"). Supply the Spring annotation for a GET endpoint at /api/v1/retail/catalog. It must not mutate inventory.",
+            "GET reads a resource. @GetMapping specifies the method-level path; the class-level path is added automatically.","Spring Boot","@GetMapping(\"/TODO\")"),
+        new Ticket("retail-sql","BD-104 · SQLite reporting","products(id TEXT, stock INTEGER, price INTEGER)",
+            "Select only product IDs whose stock is strictly below 3. Sort by id ascending. The result must include sold-out products and exclude stock equal to 3.",
+            "Example rows: bread=0, water=3, eggs=2. Expected IDs: bread, eggs. Use SELECT, FROM, WHERE and ORDER BY.","SQL","SELECT id FROM products"));
     static final String INTRO="Welcome to Borgo Digital, a fictional Java consulting team serving local utilities and factories. "
         +"A product owner describes a business need in a ticket. Read the acceptance criteria, write the return statement, run tests, then review and deploy. "
         +"Use integer variables, literals, +, -, *, /, %, parentheses and Math.min/Math.max. "
         +"Example: return Math.max(0, value);. The server checks a bounded expression, not arbitrary Java. "
         +"Git keeps changes isolated in a feature branch. Commit records changes; a pull request invites review; CI checks the change; merge updates main. Deployment releases it to users. "
-        +"This is an in-game Git workflow, not a connection to a real repository. Only a delivered contract pays.";
+        +"Spring Boot maps HTTP GET requests to controller methods; JSON is the response format. SQL reads structured tables with SELECT, WHERE and ORDER BY. "
+        +"SQL tickets run against disposable test databases, not the saved city. This is an in-game Git workflow, not a connection to a real repository. Only a delivered contract pays.";
     record Workspace(String company,String intro,boolean onboarded,boolean canOnboard,List<Ticket> tickets){}
     static Workspace workspace(TownLife.Town t,int day,int minute){
         var c=RebirthLife.child(t);
@@ -45,7 +52,9 @@ final class JavaTicketLife {
         return "Completed Java team onboarding. Read a ticket and submit its return statement.";
     }
     static void verify(String id,String source){
-        if(source==null||source.length()>180)throw new IllegalArgumentException("Enter one return statement, up to 180 characters.");
+        if(source==null||source.length()>180)throw new IllegalArgumentException("Enter a solution up to 180 characters.");
+        if("retail-api".equals(id)){RetailTicketLife.verifyMapping(source);return;}
+        if("retail-sql".equals(id)){RetailTicketLife.verifyQuery(source);return;}
         String code=source.strip();
         if(!code.startsWith("return ")||!code.endsWith(";"))throw new IllegalArgumentException("Write return <expression>;");
         String expr=code.substring(7,code.length()-1);
