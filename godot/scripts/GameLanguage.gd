@@ -84,9 +84,9 @@ const IT := {
     "Open": "Aperto",
     "Closed": "Chiuso",
     "Spring": "Primavera",
-    "Summer": "Estate",
+    "Summer": "Estivo",
     "Autumn": "Autunno",
-    "Winter": "Inverno",
+    "Winter": "Invernale",
     "SPRING": "PRIMAVERA",
     "SUMMER": "ESTATE",
     "AUTUMN": "AUTUNNO",
@@ -272,7 +272,14 @@ const IT := {
     "Electricity credits used %s · Water units used %s": "Crediti elettrici usati %s · Unità d'acqua usate %s",
     "Heated a meal using one electricity credit.": "Hai riscaldato un pasto usando un credito elettrico.",
     "Cleaned your home using one water unit.": "Hai pulito casa usando un'unità d'acqua.",
-    "Washed clothes using water and electricity.": "Hai lavato i vestiti usando acqua ed elettricità."
+    "Washed clothes using water and electricity.": "Hai lavato i vestiti usando acqua ed elettricità.",
+    "Wardrobe · %s · weather comfort %s/100": "Guardaroba · %s · comfort climatico %s/100",
+    "Casual": "Informale",
+    "%s · condition %s/100": "%s · stato %s/100",
+    "Buy outfit: %s · %s EUR": "Compra abbigliamento: %s · %s EUR",
+    "Wear %s": "Indossa %s",
+    "Purchased an outfit.": "Hai acquistato un completo.",
+    "Changed outfit.": "Hai cambiato abbigliamento."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:

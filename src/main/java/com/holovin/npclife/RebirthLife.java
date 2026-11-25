@@ -194,7 +194,7 @@ final class RebirthLife {
         return Math.max(0,Math.min(2,EducationLife.get(t,c,"furniture-level")));
     }
     static int furniturePrice(int level){return level==0?80:level==1?180:0;}
-    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions,int hygiene,int furnitureLevel,int upgradePrice,boolean outsideHome,List<HomeMarketLife.Offer> properties,String interiorStyle,List<InteriorLife.Offer> furnishings,DomesticLife.View domestic){} 
+    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions,int hygiene,int furnitureLevel,int upgradePrice,boolean outsideHome,List<HomeMarketLife.Offer> properties,String interiorStyle,List<InteriorLife.Offer> furnishings,DomesticLife.View domestic,WardrobeLife.View wardrobe){} 
     static HomeOptions homeOptions(TownLife.Town t,int day){return homeOptions(t,day,-1);}
     static HomeOptions homeOptions(TownLife.Town t,int day,int minute){
         var c=child(t);
@@ -213,7 +213,7 @@ final class RebirthLife {
             if(!family.isEmpty()&&EducationLife.get(t,c,"last-family-time")<day)actions.add("family");
         }
         return new HomeOptions(c.home.label,atHome(c),stayingHome(t,c),c.food,c.water,
-                family.stream().map(p->p.name).toList(),List.copyOf(actions),hygiene(t,c),furnitureLevel(t,c),furniturePrice(furnitureLevel(t,c)),outsideHome(t,c),HomeMarketLife.offers(t,minute),InteriorLife.style(c),InteriorLife.offers(t,c),DomesticLife.view(t,c));
+                family.stream().map(p->p.name).toList(),List.copyOf(actions),hygiene(t,c),furnitureLevel(t,c),furniturePrice(furnitureLevel(t,c)),outsideHome(t,c),HomeMarketLife.offers(t,minute),InteriorLife.style(c),InteriorLife.offers(t,c),DomesticLife.view(t,c),WardrobeLife.view(t,c,day,minute));
     }
     record HomeAction(int minutes,String message){}
     static HomeAction homeAction(TownLife.Town t,int day,String action){
@@ -419,7 +419,9 @@ final class RebirthLife {
         String key=SocialNetwork.key(c.id,other.id);
         var relation=t.peerRelationships.computeIfAbsent(key,k->new SocialLife.Relationship(
                 c.id.compareTo(other.id)<=0?c.id:other.id,c.id.compareTo(other.id)<=0?other.id:c.id));
-        relation.affinity=Math.min(100,relation.affinity+2);
+        // Very poor personal cleanliness may make an ordinary adult conversation less comfortable.
+        boolean untidy=linkedAdult(t,c)&&(DomesticLife.clothes(t,c)<30||hygiene(t,c)<30);
+        relation.affinity=Math.min(100,relation.affinity+(untidy?1:2));
         relation.trust=Math.min(100,relation.trust+1);
         relation.conversations++;
         c.sociability=Math.min(100,c.sociability+1);
