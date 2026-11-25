@@ -6,7 +6,7 @@ import java.util.List;
 final class InteriorLife {
     private InteriorLife(){}
     record Package(String id,int price){}
-    static final List<Package> PACKAGES=List.of(new Package("kitchen",90),new Package("bedroom",75),new Package("children",65));
+    static final List<Package> PACKAGES=List.of(new Package("kitchen",90),new Package("bedroom",75),new Package("children",65),new Package("laundry",DomesticLife.LAUNDRY_PRICE));
     static boolean installed(TownLife.Town t,TownLife.Citizen c,String id){return EducationLife.get(t,c,"interior-"+id)>0;}
     static boolean hasChild(TownLife.Town t,TownLife.Citizen c){
         var partner=RebirthLife.partner(t,c);
@@ -30,6 +30,7 @@ final class InteriorLife {
         return new RebirthLife.HomeAction(30,switch(id){
             case "kitchen" -> "Purchased kitchen furnishings.";
             case "bedroom" -> "Purchased bedroom furnishings.";
+            case "laundry" -> "Purchased a washing machine.";
             default -> "Purchased children's furnishings.";
         });
     }

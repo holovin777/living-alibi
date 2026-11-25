@@ -13,6 +13,46 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void domesticAppliancesConsumeRealSuppliesAndPersist() throws Exception {
+        Path file=directory.resolve("domestic-appliances.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=300;c.place=c.home;c.activity="AT_HOME";c.travelRemaining=0;
+            c.food=3;c.water=3;c.hunger=80;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            assertThrows(IllegalArgumentException.class,()->DomesticLife.act(town,c,"microwave"));
+            InteriorLife.purchase(town,c,"kitchen");
+            InteriorLife.purchase(town,c,"laundry");
+            assertEquals(150,c.money);
+            state.day=2;state.minute=360;DomesticLife.tick(town,state);DomesticLife.tick(town,state);
+            assertEquals(92,DomesticLife.cleanliness(town,c));
+            assertEquals(85,DomesticLife.clothes(town,c));
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            assertEquals(5,DomesticLife.act(town,c,"microwave").minutes());
+            assertEquals(2,c.food);assertEquals(30,c.hunger);
+            DomesticLife.act(town,c,"clean");
+            DomesticLife.act(town,c,"laundry");
+            assertEquals(1,c.water);assertEquals(148,c.money);
+            assertEquals(city+2,town.employerFunds.get("city-maintenance"));
+            assertEquals(100,DomesticLife.cleanliness(town,c));
+            assertEquals(100,DomesticLife.clothes(town,c));
+            assertThrows(IllegalArgumentException.class,()->DomesticLife.act(town,c,"laundry"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            assertTrue(DomesticLife.washer(town,c));
+            assertEquals(2,DomesticLife.view(town,c).electricityUses());
+            assertEquals(2,DomesticLife.view(town,c).waterUsed());
+        }
+    }
+
+    @Test
     void furnishingPackagesUseCashAndSurviveReload() throws Exception {
         Path file=directory.resolve("furnishing-packages.db");
         String id;

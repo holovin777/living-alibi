@@ -262,7 +262,17 @@ const IT := {
     "%s · %s EUR": "%s · %s EUR",
     "Purchased kitchen furnishings.": "Acquistati arredi per la cucina.",
     "Purchased bedroom furnishings.": "Acquistati arredi per la camera da letto.",
-    "Purchased children's furnishings.": "Acquistati arredi per i bambini."
+    "Purchased children's furnishings.": "Acquistati arredi per i bambini.",
+    "Washing machine": "Lavatrice",
+    "Purchased a washing machine.": "Hai comprato una lavatrice.",
+    "Heat meal · 5 min · 1 EUR": "Riscalda il pasto · 5 min · 1 EUR",
+    "Clean home · 30 min · 1 water": "Pulisci casa · 30 min · 1 unità d'acqua",
+    "Wash clothes · 45 min · 1 water · 1 EUR": "Lava i vestiti · 45 min · 1 unità d'acqua · 1 EUR",
+    "Cleanliness %s · Clothes %s": "Pulizia casa %s · Vestiti %s",
+    "Electricity credits used %s · Water units used %s": "Crediti elettrici usati %s · Unità d'acqua usate %s",
+    "Heated a meal using one electricity credit.": "Hai riscaldato un pasto usando un credito elettrico.",
+    "Cleaned your home using one water unit.": "Hai pulito casa usando un'unità d'acqua.",
+    "Washed clothes using water and electricity.": "Hai lavato i vestiti usando acqua ed elettricità."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
