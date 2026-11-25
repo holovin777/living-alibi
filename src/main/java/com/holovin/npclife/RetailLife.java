@@ -61,6 +61,20 @@ final class RetailLife {
         FoodLife.change(player,id,false,1);
         return "Bought "+product.label()+" for "+product.price()+" EUR.";
     }
+    static String coffee(TownLife.Town t,int minute) {
+        var p=t.player;
+        PlayerLife.requireAlive(p);
+        if(p.place!=TownLife.Place.CAFE||p.travelRemaining>0||minute<420||minute+5>1260)
+            throw new IllegalArgumentException("Visit Bar Centrale between 07:00 and 21:00.");
+        if(p.money<2||t.retailStock.getOrDefault("water",0)<1)
+            throw new IllegalArgumentException("Coffee requires 2 EUR and available cafe water.");
+        p.money-=2;
+        t.employerFunds.merge("shop-assistant",2,Math::addExact);
+        t.retailStock.merge("water",-1,Integer::sum);
+        p.fatigue=Math.max(0,p.fatigue-5);
+        p.thirst=Math.max(0,p.thirst-5);
+        return "Enjoyed a coffee at Bar Centrale.";
+    }
     static final int PRODUCE_PRICE=2;
     static int produceSpace(TownLife.Town t) {
         return Math.max(0,product("vegetables").capacity()-t.retailStock.getOrDefault("vegetables",0)-FreightLife.reservedCrop(t,"vegetables"));
