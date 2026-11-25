@@ -1032,7 +1032,22 @@ func _exercise() -> void:
     var office := _world("OFFICE","Office")
     office["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","softwareProjects":[{"id":"water-control","title":"Water control","phase":"OPEN","effect":"Water capacity +2","wage":45,"nextAction":"Develop","minutes":60,"canAdvance":true,"deployed":false}]}
     world._on_world_updated(office)
-    world._avatar.position=world.KIOSK_POSITION
+    if not _check(world._scenery.has_node("BorgoDigital/DevelopmentRoom") and world._scenery.has_node("BorgoDigital/ServerRoom") and world._scenery.has_node("BorgoDigital/MeetingRoom"),"office rooms exist"):
+        return
+    var office_entry: Vector3 = world._move_on_ground(Vector3(-2,0,8),Vector3(-4,0,0),world.WALKER_RADIUS)
+    if not _check(office_entry.x < -5.9,"office doorway passable"):
+        return
+    var office_hall: Vector3 = world._move_on_ground(office_entry,Vector3(0,0,-4),world.WALKER_RADIUS)
+    var dev_walk: Vector3 = world._move_on_ground(office_hall,Vector3(-4,0,0),world.WALKER_RADIUS)
+    if not _check(dev_walk.distance_to(world.JAVA_DESK)<0.2 and world._can_stand(world.DEVOPS_DESK,world.WALKER_RADIUS) and world._can_stand(world.COMPANY_DESK,world.WALKER_RADIUS),"office stations reachable"):
+        return
+    var blocked_wall: Vector3 = world._move_on_ground(Vector3(-2,0,4),Vector3(-4,0,0),world.WALKER_RADIUS)
+    if not _check(blocked_wall.x > -4,"office facade solid"):
+        return
+    world._avatar.position=Vector3(5,0,3)
+    if not _check(not world._near_software(),"outdoor kiosk no longer opens software"):
+        return
+    world._avatar.position=dev_walk
     world._software_menu=true
     world._render_actions()
     if not _check(world._near_software() and _has_button(world._action_choices,"Develop · 60 min"),"software project menu"):
@@ -1040,7 +1055,7 @@ func _exercise() -> void:
     world._close_software()
     office["rebirth"]["javaWorkspace"]={"intro":"Welcome to the Java team.","onboarded":false,"canOnboard":true,"tickets":[{"id":"water-control","number":"BD-101","requirement":"Respect available stock and free capacity","signature":"int waterUnits(int requested, int stock, int freeCapacity)","examples":"(6,2,9) -> 2"}]}
     world._on_world_updated(office)
-    world._avatar.position=world.KIOSK_POSITION
+    world._avatar.position=world.JAVA_DESK
     world._software_menu=true
     world._render_actions()
     if not _check(_has_button(world._action_choices,"Complete onboarding"),"java team onboarding"):
@@ -1072,7 +1087,7 @@ func _exercise() -> void:
     world._close_software()
     office["rebirth"]["javaWorkspace"]["career"]={"rank":"Junior","xp":0,"technical":55,"releases":0,"audits":0,"nextRank":"Middle","requiredXp":4,"requiredTechnical":55,"requiredAudits":2,"canPromote":false,"audit":{"title":"Inventory audit","wage":18,"prompt":"Bread 3 · Water 2","available":true}}
     world._on_world_updated(office)
-    world._avatar.position=world.KIOSK_POSITION
+    world._avatar.position=world.JAVA_DESK
     world._software_menu=true
     world._render_actions()
     if not _check(_has_button(world._action_choices,"Promotion: Middle") and _has_button(world._action_choices,"Submit daily audit") and world._action_choices.has_node("DeveloperAuditAnswer"),"developer career and daily audit menu"):
@@ -1080,28 +1095,33 @@ func _exercise() -> void:
     world._close_software()
     office["rebirth"]["javaWorkspace"]["devops"]={"status":"OUTAGE","resolved":0,"guide":"Inspect the service","output":"HTTP 503","trained":true,"active":true,"canRun":true}
     world._on_world_updated(office)
-    world._avatar.position=world.KIOSK_POSITION
+    world._avatar.position=world.DEVOPS_DESK
     world._software_menu=true
     world._render_actions()
-    if not _check(_has_button(world._action_choices,"Run command") and world._action_choices.has_node("DevOpsCommand"),"DevOps training terminal"):
+    if not _check(world._office_action_allowed("rebirth-devops-train") and not world._office_action_allowed("rebirth-it:register") and not world._office_action_allowed("rebirth-java-onboard") and _has_button(world._action_choices,"Run command") and world._action_choices.has_node("DevOpsCommand"),"DevOps training terminal"):
         return
     world._close_software()
     office["rebirth"]["javaWorkspace"]["companyStatus"]={"registered":true,"cash":40,"rentUntil":8,"contracts":0,"taxPaid":0,"canInvest":true,"canWithdraw":true,"canRent":false,"offers":[{"id":"retail","title":"Retail support","gross":40,"tax":8,"prompt":"Count stock","available":true}]}
     world._on_world_updated(office)
-    world._avatar.position=world.KIOSK_POSITION
+    world._avatar.position=world.COMPANY_DESK
     world._software_menu=true
     world._render_actions()
-    if not _check(_has_button(world._action_choices,"Invest 20 EUR") and _has_button(world._action_choices,"Deliver contract") and world._action_choices.has_node("IT_retail"),"IT company account and contract UI"):
+    if not _check(world._office_action_allowed("rebirth-it:register") and not world._office_action_allowed("rebirth-devops-train") and not _has_button(world._action_choices,"Run command") and _has_button(world._action_choices,"Invest 20 EUR") and _has_button(world._action_choices,"Deliver contract") and world._action_choices.has_node("IT_retail"),"IT company account and contract UI"):
         return
     world._close_software()
     office["rebirth"]["javaWorkspace"]["companyStatus"]["staff"]={"employee":{"id":"resident-0002","name":"Marco","technical":35,"activity":"WORKING","sick":false},"canDismiss":true,"delegated":0,"delegatable":["retail"]}
     world._on_world_updated(office)
-    world._avatar.position=world.KIOSK_POSITION
+    world._avatar.position=world.COMPANY_DESK
     world._software_menu=true
     world._render_actions()
     if not _check(_has_button(world._action_choices,"Delegate · 12 EUR wage") and _has_button(world._action_choices,"End support contract"),"IT staff delegation controls"):
         return
     world._close_software()
+    office["residents"]=[{"id":"resident-0002","name":"Marco","activity":"WORKING"}]
+    world._on_world_updated(office)
+    var assistant := world._residents_root.get_node_or_null("Resident_resident-0002") as Node3D
+    if not _check(assistant!=null and assistant.position.distance_to(world.OFFICE_STAFF_ANCHOR)<0.1,"actual working assistant appears inside office"):
+        return
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

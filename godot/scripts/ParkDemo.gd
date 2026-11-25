@@ -54,6 +54,10 @@ var _medical_menu := false
 var _college_menu := false
 var _engineering_menu := false
 var _software_menu := false
+const JAVA_DESK := Vector3(-10,0,4)
+const DEVOPS_DESK := Vector3(-10,0,8)
+const COMPANY_DESK := Vector3(-10,0,12)
+const OFFICE_STAFF_ANCHOR := Vector3(-11.6,0,4.9)
 const COLLEGE_DESK := Vector3(-6.3,0,7)
 const CLINIC_COUNTER := Vector3(-6.3,0,7)
 const PHARMACY_COUNTER := Vector3(6.3,0,-7)
@@ -201,7 +205,7 @@ func _process(delta: float) -> void:
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
         if _near_software():
-            _hint.text="E: software projects · F: life choices"
+            _hint.text="E: Borgo Digital · "+_office_station()+" · F: life choices"
         elif _near_engineering():
             _hint.text="E: engineering work orders · F: life choices"
         elif _near_college():
@@ -906,10 +910,7 @@ func _generate_chunk(place_id: String) -> void:
             _box(_scenery, Vector3(4.0, 1.2, 2.0), Color(0.27, 0.30, 0.32),
                     Vector3(-8.0, 0.7, 7.0))
         "OFFICE":
-            _building("Offices", Color(0.40, 0.55, 0.72))
-            for offset in [-10.0, -7.0, -4.0]:
-                _box(_scenery, Vector3(1.6, 1.8, 0.12), Color(0.61, 0.83, 0.94),
-                        Vector3(offset, 2.3, 4.9))
+            _build_digital_office()
         "QUARRY":
             _add_obstacle(Vector3(-8.0, 0.0, 9.0), Vector2(11.0, 3.0))
             for x in [-11.0, -8.0, -5.0]:
@@ -1955,6 +1956,79 @@ func _sync_orchard() -> void:
         var fruit := tree.get_node("Fruit") as Node3D
         fruit.visible = bool(data.get("ready",false))
 
+func _build_digital_office() -> void:
+    var office := Node3D.new()
+    office.name="BorgoDigital"
+    _scenery.add_child(office)
+    var wall := Color("#e3d9c7")
+    var partition := Color("#c3ccc9")
+    var wood := Color("#a58a69")
+    var dark := Color("#333e44")
+    for part in [[Vector3(-15,0,8),Vector2(0.24,12)],
+            [Vector3(-9.5,0,2),Vector2(11,0.24)],
+            [Vector3(-9.5,0,14),Vector2(11,0.24)],
+            [Vector3(-4,0,4.4),Vector2(0.24,4.8)],
+            [Vector3(-4,0,11.6),Vector2(0.24,4.8)]]:
+        _room_wall(office,part[0],part[1],wall)
+    for z in [6.0,10.0]:
+        _room_wall(office,Vector3(-11.75,0,z),Vector2(6.5,0.20),partition)
+    _box(office,Vector3(11,0.10,12),Color("#b9b3a5"),Vector3(-9.5,0.005,8))
+    _box(office,Vector3(11.15,0.23,12.15),Color("#435359"),Vector3(-9.5,3.12,8))
+    _box(office,Vector3(11.35,0.30,12.35),Color("#93684e"),Vector3(-9.5,3.39,8))
+    _box(office,Vector3(0.22,0.40,2.35),dark,Vector3(-4,2.8,8))
+    _sign(office,"Borgo Digital · Informatica",Vector3(-3.65,3.65,8))
+    _box(office,Vector3(2.3,0.07,2.7),Color("#aaa99f"),Vector3(-2.95,0.045,8))
+    for z in [3.5,5.0,11.0,12.5]:
+        _box(office,Vector3(0.14,1.55,1.15),Color("#7999a4"),Vector3(-3.84,1.67,z))
+    for z in [4.0,8.0,12.0]:
+        var light := OmniLight3D.new()
+        light.position=Vector3(-10.8,2.72,z)
+        light.omni_range=6.5
+        light.light_energy=1.6
+        office.add_child(light)
+    var corridor_light := OmniLight3D.new()
+    corridor_light.position=Vector3(-6.0,2.7,8.0)
+    corridor_light.omni_range=7
+    corridor_light.light_energy=1.3
+    office.add_child(corridor_light)
+    var dev := Node3D.new()
+    dev.name="DevelopmentRoom"
+    office.add_child(dev)
+    _sign(dev,"Java development · E",Vector3(-10,2.35,4))
+    for z in [3.25,4.9]:
+        _room_furniture(dev,Vector3(-13.4,0,z),Vector3(1.0,0.78,1.25),wood)
+        _box(dev,Vector3(0.10,0.46,0.72),dark,Vector3(-13.6,1.12,z))
+        _box(dev,Vector3(0.045,0.38,0.62),Color("#6795a0"),Vector3(-13.53,1.12,z))
+        _box(dev,Vector3(0.30,0.04,0.59),dark,Vector3(-13.1,0.81,z))
+        _room_furniture(dev,Vector3(-12.35,0,z),Vector3(0.46,0.46,0.46),dark)
+    _box(dev,Vector3(0.12,1.12,1.9),Color("#eef0e9"),Vector3(-14.82,1.85,4))
+    _sign(dev,"Tickets · Tests · Git",Vector3(-14.65,2.0,4))
+    var server := Node3D.new()
+    server.name="ServerRoom"
+    office.add_child(server)
+    _sign(server,"Operations · DevOps · E",Vector3(-10,2.35,8))
+    for z in [7.0,8.65]:
+        _room_furniture(server,Vector3(-13.85,0,z),Vector3(1.05,2.2,1.15),dark)
+        for y in [0.48,0.83,1.18,1.53,1.88]:
+            _box(server,Vector3(0.055,0.22,0.88),Color("#596469"),Vector3(-13.30,y,z))
+            _box(server,Vector3(0.06,0.075,0.10),Color("#75bd83"),Vector3(-13.26,y,z+0.31))
+    _room_furniture(server,Vector3(-12.0,0,8),Vector3(1.0,0.82,1.6),wood)
+    _box(server,Vector3(0.11,0.51,0.82),dark,Vector3(-12.25,1.18,8))
+    _box(server,Vector3(0.05,0.42,0.72),Color("#588873"),Vector3(-12.17,1.18,8))
+    _room_furniture(server,Vector3(-11.25,0,7.1),Vector3(0.45,0.46,0.45),dark)
+    var meeting := Node3D.new()
+    meeting.name="MeetingRoom"
+    office.add_child(meeting)
+    _sign(meeting,"Clients & company · E",Vector3(-10,2.35,12))
+    _room_furniture(meeting,Vector3(-12.8,0,12),Vector3(2.25,0.82,1.2),wood)
+    for x in [-13.4,-12.1]:
+        for z in [11.02,12.98]:
+            _room_furniture(meeting,Vector3(x,0,z),Vector3(0.48,0.47,0.48),dark)
+    _box(meeting,Vector3(0.12,1.1,2.25),Color("#e9ebe6"),Vector3(-14.82,1.85,12))
+    _sign(meeting,"Contracts · Payroll · Finance",Vector3(-14.6,1.9,12))
+    for station in [JAVA_DESK,DEVOPS_DESK,COMPANY_DESK]:
+        _box(office,Vector3(1.45,0.025,1.45),Color("#6f8c85"),station+Vector3(0,0.07,0))
+
 func _build_college() -> void:
     var campus := Node3D.new()
     campus.name="IstitutoLeonardo"
@@ -2486,6 +2560,7 @@ func _render_residents() -> void:
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
+        _sync_office_employee(person,id)
         person.set_meta("display_name",str(resident.get("name","Resident")))
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
         person.set_meta("conversations",int(resident.get("conversations",0)))
@@ -2494,6 +2569,21 @@ func _render_residents() -> void:
         if not present.has(str(child.get_meta("resident_id", ""))):
             _residents_root.remove_child(child)
             child.queue_free()
+
+func _sync_office_employee(person: Node3D,id: String) -> void:
+    if _current_place!="OFFICE" or _apartment_active:return
+    var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
+    if not workspace is Dictionary:return
+    var firm = workspace.get("companyStatus")
+    if not firm is Dictionary:return
+    var staff = firm.get("staff")
+    if not staff is Dictionary:return
+    var employee = staff.get("employee")
+    if not employee is Dictionary or str(employee.get("id",""))!=id:return
+    if str(person.get_meta("activity",""))=="WORKING" and _can_stand(OFFICE_STAFF_ANCHOR,WALKER_RADIUS):
+        person.position=OFFICE_STAFF_ANCHOR
+        person.set_meta("anchor",OFFICE_STAFF_ANCHOR)
+        person.rotation.y=PI/2.0
 
 func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var person := Node3D.new()
@@ -2990,8 +3080,24 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _office_station() -> String:
+    if _apartment_active or _current_place!="OFFICE" or _last_snapshot.get("rebirth",{}).get("softwareProjects",[]).is_empty():
+        return ""
+    if _avatar.position.distance_to(JAVA_DESK)<1.25:return "java"
+    if _avatar.position.distance_to(DEVOPS_DESK)<1.25:return "devops"
+    if _avatar.position.distance_to(COMPANY_DESK)<1.25:return "company"
+    return ""
+
 func _near_software() -> bool:
-    return not _apartment_active and _current_place=="OFFICE" and _near_kiosk() and not _last_snapshot.get("rebirth",{}).get("softwareProjects",[]).is_empty()
+    return not _office_station().is_empty()
+
+func _office_action_allowed(action: String) -> bool:
+    var station := _office_station()
+    if action.begins_with("rebirth-devops-"):return station=="devops"
+    if action.begins_with("rebirth-it:"):return station=="company"
+    if action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-"):
+        return station=="java"
+    return true
 
 func _close_software() -> void:
     _software_menu=false
@@ -3000,20 +3106,26 @@ func _close_software() -> void:
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _render_software() -> void:
-    _action_title.text="Borgo Digital · Java team"
+    var station := _office_station()
+    _action_title.text="Borgo Digital · "+("Java team" if station=="java" else ("Server room" if station=="devops" else "Meeting room"))
     var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
     if workspace is Dictionary:
         var intro := Label.new()
         intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-        intro.text=str(workspace.get("intro",""))
+        intro.text=str(workspace.get("intro","")) if station=="java" else "Borgo Digital · "+station.capitalize()
         _action_choices.add_child(intro)
         if not workspace.get("onboarded",false):
             var start := _button("Complete onboarding · 15 min",_garden_action.bind("rebirth-java-onboard"))
             start.disabled=not bool(workspace.get("canOnboard",false))
-            _action_choices.add_child(start)
+            if station=="java":
+                _action_choices.add_child(start)
+            else:
+                var direction := Label.new()
+                direction.text="Complete onboarding at the Java desk first."
+                _action_choices.add_child(direction)
             _action_choices.add_child(_button("Leave",_close_software))
             return
-    if workspace is Dictionary and workspace.get("career") is Dictionary:
+    if station=="java" and workspace is Dictionary and workspace.get("career") is Dictionary:
         var career: Dictionary = workspace["career"]
         var profile := Label.new()
         profile.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3037,7 +3149,7 @@ func _render_software() -> void:
         var submit_audit := _button("Submit daily audit",_submit_developer_audit.bind(answer))
         submit_audit.disabled=not bool(audit.get("available",false))
         _action_choices.add_child(submit_audit)
-    if workspace is Dictionary and workspace.get("devops") is Dictionary:
+    if station=="devops" and workspace is Dictionary and workspace.get("devops") is Dictionary:
         var ops: Dictionary = workspace["devops"]
         var ops_info := Label.new()
         ops_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3057,7 +3169,7 @@ func _render_software() -> void:
             var run := _button("Run command · 5 min",_submit_devops.bind(terminal))
             run.disabled=not bool(ops.get("canRun",false))
             _action_choices.add_child(run)
-    if workspace is Dictionary and workspace.get("companyStatus") is Dictionary:
+    if station=="company" and workspace is Dictionary and workspace.get("companyStatus") is Dictionary:
         var firm: Dictionary = workspace["companyStatus"]
         var details := Label.new()
         details.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3111,7 +3223,8 @@ func _render_software() -> void:
                     var delegate := _button("Delegate · 12 EUR wage",_garden_action.bind("rebirth-it:delegate:"+str(contract.get("id",""))))
                     delegate.disabled=not str(contract.get("id","")) in staff.get("delegatable",[])
                     _action_choices.add_child(delegate)
-    for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
+    var projects: Array = _last_snapshot.get("rebirth",{}).get("softwareProjects",[]) if station=="java" else []
+    for project in projects:
         var info := Label.new()
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         info.text="%s · %s\n%s · Contract %s EUR" % [project.get("title",""),project.get("phase",""),project.get("effect",""),project.get("wage",0)]
@@ -4063,7 +4176,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-") or action.begins_with("rebirth-devops-") or action.begins_with("rebirth-it:")) and not _near_software():return
+    if not _office_action_allowed(action):return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
