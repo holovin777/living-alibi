@@ -13,6 +13,41 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void phoneMessagesRespectRelationshipsAndPersistAcrossReload() throws Exception {
+        Path file=directory.resolve("phone.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=PopulationGenerator.add(town,1).get(0);
+            id=resident.id;
+            resident.age=30;resident.alive=true;resident.sociability=80;resident.activity="FREE_TIME";
+            state.minute=540;
+            PhoneLife.tick(town,state);
+            assertTrue(PhoneLife.report(town).messages().isEmpty());
+            var contact=new PlayerLife.Contact(id);
+            contact.knownName="Visitor";contact.conversations=3;contact.trust=75;contact.affinity=40;
+            town.player.contacts.put(id,contact);
+            PhoneLife.tick(town,state);
+            assertEquals(1,PhoneLife.report(town).messages().size());
+            assertTrue(PhoneLife.report(town).messages().get(0).text().contains("coffee"));
+            state.minute=600;
+            PhoneLife.tick(town,state);
+            assertEquals(540,PhoneLife.report(town).messages().get(0).minute());
+            assertEquals("Message sent.",PhoneLife.reply(town,id,1));
+            assertThrows(IllegalArgumentException.class,()->PhoneLife.reply(town,id,2));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(id,PhoneLife.report(town).messages().get(0).residentId());
+            assertEquals("Thanks! See you around.",PhoneLife.report(town).messages().get(0).reply());
+            town.player.incarnation++;
+            assertTrue(PhoneLife.report(town).messages().isEmpty());
+        }
+    }
+
+
+    @Test
     void controlledKumiteRequiresPartnerAndPersistsScoreWithoutInjury() throws Exception {
         Path file=directory.resolve("kumite.db");
         String id;
