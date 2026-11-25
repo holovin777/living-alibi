@@ -332,14 +332,49 @@ final class PlayerLife {
             throw new IllegalArgumentException("Introduce yourself before sharing your name.");
         boolean rude=spoken.equalsIgnoreCase("Leave me alone!");
         boolean apology=spoken.equalsIgnoreCase("I'm sorry.");
-        boolean positive=introduction || spoken.equalsIgnoreCase("Hello") || apology
+        boolean askingMood=spoken.equalsIgnoreCase("How are you?") || spoken.equalsIgnoreCase("Come stai?");
+        boolean positive=introduction || spoken.equalsIgnoreCase("Hello") || apology || askingMood
                 || spoken.equalsIgnoreCase("What do you do?");
-        if(changedAlias)adjust(contact,-12,-4);
-        else if(rude)adjust(contact,-8,-12);
-        else if(positive && contact.lastPositiveDay!=day) {
+        boolean support=spoken.equalsIgnoreCase("I'm here for you.") || spoken.equalsIgnoreCase("Ti sono vicino.");
+        boolean recall=spoken.equalsIgnoreCase("What do you remember about me?") || spoken.equalsIgnoreCase("Cosa ricordi di me?");
+        if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan")||spoken.equalsIgnoreCase("Repay personal loan")) {
+            if(RebirthLife.active(town))throw new IllegalArgumentException("Personal loans are available to visitors only.");
+            if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan"))return PersonalLoanLife.borrow(town,resident,contact,day);
+            return PersonalLoanLife.repay(town,resident,contact,day);
+        }
+        boolean giveBread=spoken.equalsIgnoreCase("Offer bread");
+        boolean giveWater=spoken.equalsIgnoreCase("Offer water");
+        boolean askBread=spoken.equalsIgnoreCase("Ask for bread");
+        boolean askWater=spoken.equalsIgnoreCase("Ask for water");
+        if(giveBread||giveWater||askBread||askWater){
+            String item=giveWater||askWater?"water":"bread";
+            if(giveBread||giveWater){
+                boolean alreadySupported=SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT)==day;
+                if(!MutualAidLife.give(town,resident,item,day))return "I cannot accept that right now.";
+                if(!alreadySupported)adjust(contact,5,7);
+                return "Thank you for sharing your supplies.";
+            }
+            return MutualAidLife.receive(town,resident,item,day)?"Here, take this. You need it.":"Sorry, I cannot spare supplies right now.";
+        }
+        if(changedAlias){
+            adjust(contact,-12,-4);
+            SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.BROKEN_TRUST,day);
+        } else if(rude){
+            adjust(contact,-8,-12);
+            SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.HURT,day);
+        } else if(support){
+            var mood=EmotionLife.mood(town,resident,day,minute);
+            boolean difficult=switch(mood){case TIRED,STRESSED,IRRITATED,SAD,LONELY -> true;default -> false;};
+            if(difficult && SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT)!=day){
+                adjust(contact,4,6);
+                SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.SUPPORT,day);
+            }
+        } else if(positive && contact.lastPositiveDay!=day) {
             adjust(contact,apology?5:3,apology?5:(resident.sociability>=60?5:3));
             contact.lastPositiveDay=day;
         }
+        if(apology && SocialMemoryLife.unresolved(town,id))
+            SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.APOLOGY,day);
         contact.conversations++;
         contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=spoken;
         String greeting=contact.knownName==null?"stranger":contact.knownName;
@@ -347,6 +382,9 @@ final class PlayerLife {
             KnowledgeLife.shareableIntroduction(town,resident,contact.knownName,day,minute);
             return "All right. I may mention that we met.";
         }
+        if(recall)return SocialMemoryLife.recollection(town,id);
+        if(support)return SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT)==day?"Thank you for being here.":"Thank you for the kind words.";
+        if(askingMood)return EmotionLife.reply(EmotionLife.mood(town,resident,day,minute),contact.trust>=55);
         if(spoken.equalsIgnoreCase("Any news about visitors?"))
             return KnowledgeLife.visitorNews(town,resident,day,minute);
         if(changedAlias)return "I remember a different name. I'll remember "+greeting+" for now.";

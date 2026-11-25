@@ -13,6 +13,383 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void controlledKumiteRequiresPartnerAndPersistsScoreWithoutInjury() throws Exception {
+        Path file=directory.resolve("kumite.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,3);
+            var c=people.get(0);var teacher=people.get(1);var student=people.get(2);
+            id=c.id;
+            for(var p:people){p.age=30;p.health=100;p.place=TownLife.Place.SCHOOL;p.travelRemaining=0;p.activity="FREE_TIME";p.money=100;p.fatigue=10;p.hunger=10;p.thirst=10;}
+            teacher.carefulness=80;student.carefulness=30;student.goal="STAY_HEALTHY";
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            assertThrows(IllegalArgumentException.class,()->KumiteLife.act(town,1,1080,"start"));
+            DojoCommunityLife.found(town,1);
+            KumiteLife.act(town,1,1080,"start");
+            assertEquals(95,c.money);
+            assertEquals(student.id,KumiteLife.view(town,c,1,1081).partnerId());
+            for(int i=0;i<5;i++){
+                String expected=switch(KumiteLife.cue(town,c)){case "close"->"guard";case "far"->"step";default->"touch";};
+                KumiteLife.act(town,1,1081+i,i==0?(expected.equals("guard")?"step":"guard"):expected);
+            }
+            assertEquals(4,KumiteLife.view(town,c,1,1086).score());
+            assertEquals(1,KumiteLife.view(town,c,1,1086).partnerScore());
+            assertEquals(100,c.health);assertEquals(100,student.health);
+            assertEquals(1,DojoLife.get(town,c,"kumite"));
+            assertThrows(IllegalArgumentException.class,()->KumiteLife.act(town,1,1087,"start"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            assertTrue(KumiteLife.view(town,c,1,1087).completed());
+            assertEquals(4,KumiteLife.get(town,c,"score"));
+            assertEquals(1,DojoLife.get(town,c,"kumite"));
+        }
+    }
+
+    @Test
+    void dojoCommunityUsesRealResidentsAndPersistentAttendance() throws Exception {
+        Path file=directory.resolve("dojo-community.db");
+        String teacherId,studentId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var teacher=people.get(0);var student=people.get(1);
+            teacherId=teacher.id;studentId=student.id;
+            teacher.age=35;teacher.carefulness=80;student.age=25;student.carefulness=30;
+            student.goal="STAY_HEALTHY";student.money=100;
+            for(var c:people){c.health=100;c.place=TownLife.Place.SCHOOL;c.travelRemaining=0;c.activity="FREE_TIME";c.fatigue=10;c.hunger=10;c.thirst=10;}
+            assertFalse(DojoCommunityLife.scheduled(town,student,1,1080));
+            DojoCommunityLife.found(town,1);
+            assertEquals(teacher,DojoCommunityLife.instructor(town,1));
+            assertTrue(DojoCommunityLife.scheduled(town,student,1,1080));
+            assertFalse(DojoCommunityLife.scheduled(town,student,2,1080));
+            state.day=1;state.minute=1110;
+            teacher.place=TownLife.Place.PARK;
+            DojoCommunityLife.tick(town,state);assertEquals(100,student.money);
+            teacher.place=TownLife.Place.SCHOOL;
+            assertTrue(DojoCommunityLife.view(town,1,1110).instructorPresent());
+            DojoCommunityLife.tick(town,state);DojoCommunityLife.tick(town,state);
+            assertEquals(95,student.money);assertEquals(1,DojoLife.get(town,student,"sessions"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(DojoCommunityLife.founded(town));
+            assertEquals(teacherId,DojoCommunityLife.instructor(town,1).id);
+            assertEquals(1,DojoLife.get(town,town.get(studentId),"sessions"));
+            DojoCommunityLife.tick(town,state);
+            assertEquals(95,town.get(studentId).money);
+        }
+    }
+
+    @Test
+    void dojoGradesRequireAllThreeDisciplinesAndPersist() throws Exception {
+        Path file=directory.resolve("dojo.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=200;c.health=100;c.place=TownLife.Place.SCHOOL;
+            c.activity="FREE_TIME";c.travelRemaining=0;c.fatigue=10;c.hunger=10;c.thirst=10;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            assertEquals("White",DojoLife.view(town,c,1,1080).belt());
+            assertThrows(IllegalArgumentException.class,()->DojoLife.act(town,2,1080,"kihon"));
+            assertThrows(IllegalArgumentException.class,()->DojoLife.act(town,1,1080,"exam"));
+            int day=1;
+            for(String mode:DojoLife.MODES){
+                for(int i=0;i<3;i++){
+                    c.fatigue=10;c.hunger=10;c.thirst=10;
+                    DojoLife.act(town,day,1080,mode);
+                    assertThrows(IllegalArgumentException.class,()->DojoLife.act(town,SportLife.get(town,c,"last-day"),1140,"kata"));
+                    do{day++;}while(!DojoLife.open(day,1080));
+                }
+            }
+            c.fatigue=10;c.hunger=10;c.thirst=10;
+            assertTrue(DojoLife.view(town,c,day,1080).canExam());
+            DojoLife.act(town,day,1080,"exam");
+            assertEquals("Yellow",DojoLife.view(town,c,day,1140).belt());
+            assertEquals(140,c.money);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            var view=DojoLife.view(town,c,1,1080);
+            assertEquals("Yellow",view.belt());assertEquals(9,view.sessions());
+            assertEquals(3,view.kihon());assertEquals(3,view.kata());assertEquals(3,view.kumite());
+            assertEquals(6,view.required());
+        }
+    }
+
+    @Test
+    void adultSportRequiresLocationAndRecoveryAndPersistsProgress() throws Exception {
+        Path file=directory.resolve("adult-sports.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=100;c.health=100;c.place=TownLife.Place.PARK;
+            c.activity="FREE_TIME";c.travelRemaining=0;c.fatigue=10;c.hunger=10;c.thirst=10;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            assertThrows(IllegalArgumentException.class,()->SportLife.train(town,100,1100,"karate"));
+            int fitness=EducationLife.get(town,c,"fitness");
+            c.place=TownLife.Place.SCHOOL;
+            int school=town.employerFunds.getOrDefault("school",0);
+            assertEquals(60,SportLife.train(town,100,1100,"karate").minutes());
+            assertEquals(95,c.money);assertEquals(school+5,town.employerFunds.get("school"));
+            assertEquals(28,c.fatigue);assertEquals(17,c.hunger);assertEquals(20,c.thirst);
+            assertEquals(Math.min(100,fitness+2),EducationLife.get(town,c,"fitness"));
+            assertEquals(2,SportLife.get(town,c,"karate"));
+            assertThrows(IllegalArgumentException.class,()->SportLife.train(town,100,1160,"gym"));
+            c.fatigue=90;
+            assertThrows(IllegalArgumentException.class,()->SportLife.train(town,101,1100,"gym"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            assertEquals(2,SportLife.get(town,c,"karate"));
+            assertEquals(1,SportLife.get(town,c,"sessions"));
+            assertEquals(100,SportLife.get(town,c,"last-day"));
+        }
+    }
+
+    @Test
+    void recoveryKitRequiresAssessmentAndPersistsDailyProgress() throws Exception {
+        Path file=directory.resolve("medical-followup.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=100;c.health=65;c.place=TownLife.Place.CLINIC;
+            c.activity="FREE_TIME";c.travelRemaining=0;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            int shop=town.employerFunds.getOrDefault("shop-assistant",0);
+            assertThrows(IllegalArgumentException.class,()->MedicalFollowupLife.act(town,c,1,600,"collect"));
+            MedicalFollowupLife.act(town,c,1,600,"exam");
+            MedicalFollowupLife.act(town,c,1,620,"collect");
+            assertEquals(79,c.money);assertEquals(city+12,town.employerFunds.get("city-maintenance"));
+            assertEquals(shop+9,town.employerFunds.get("shop-assistant"));
+            assertThrows(IllegalArgumentException.class,()->MedicalFollowupLife.act(town,c,1,630,"recover"));
+            c.place=c.home;c.activity="AT_HOME";c.food=3;c.water=4;c.fatigue=50;
+            MedicalFollowupLife.act(town,c,1,700,"recover");
+            assertEquals(69,c.health);assertEquals(2,c.food);assertEquals(3,c.water);
+            assertEquals(2,MedicalFollowupLife.view(town,c,1,760).remainingSupplies());
+            assertThrows(IllegalArgumentException.class,()->MedicalFollowupLife.act(town,c,1,760,"recover"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            var v=MedicalFollowupLife.view(town,c,2,700);
+            assertEquals(65,v.assessedHealth());assertEquals(2,v.remainingSupplies());assertEquals(1,v.completedDays());
+            c.place=c.home;c.activity="AT_HOME";c.travelRemaining=0;
+            MedicalFollowupLife.act(town,c,2,700,"recover");
+            assertEquals(73,c.health);
+            assertEquals(1,MedicalFollowupLife.view(town,c,2,760).remainingSupplies());
+        }
+    }
+
+    @Test
+    void wardrobePurchasesWearAndComfortSurviveReload() throws Exception {
+        Path file=directory.resolve("wardrobe.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=100;c.place=TownLife.Place.PORTICI;c.activity="FREE_TIME";c.travelRemaining=0;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            int shop=town.employerFunds.getOrDefault("shop-assistant",0);
+            assertThrows(IllegalArgumentException.class,()->WardrobeLife.act(town,"buy-winter",1,400));
+            WardrobeLife.act(town,"buy-winter",1,600);
+            assertEquals(55,c.money);
+            assertEquals(shop+45,town.employerFunds.get("shop-assistant"));
+            assertThrows(IllegalArgumentException.class,()->WardrobeLife.act(town,"wear-winter",1,600));
+            assertEquals(40,WardrobeLife.comfort(town,c,0));
+            c.place=c.home;c.activity="AT_HOME";
+            WardrobeLife.act(town,"wear-winter",1,600);
+            assertEquals(100,WardrobeLife.comfort(town,c,0));
+            assertEquals(10,WardrobeLife.comfort(town,c,30));
+            state.day=2;state.minute=360;
+            WardrobeLife.tick(town,state);WardrobeLife.tick(town,state);
+            assertEquals(99,WardrobeLife.condition(town,c,WardrobeLife.worn(town,c)));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            assertEquals("winter",WardrobeLife.worn(town,c).id());
+            assertEquals(99,WardrobeLife.condition(town,c,WardrobeLife.worn(town,c)));
+            assertEquals(55,c.money);
+        }
+    }
+
+    @Test
+    void domesticAppliancesConsumeRealSuppliesAndPersist() throws Exception {
+        Path file=directory.resolve("domestic-appliances.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=300;c.place=c.home;c.activity="AT_HOME";c.travelRemaining=0;
+            c.food=3;c.water=3;c.hunger=80;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            assertThrows(IllegalArgumentException.class,()->DomesticLife.act(town,c,"microwave"));
+            InteriorLife.purchase(town,c,"kitchen");
+            InteriorLife.purchase(town,c,"laundry");
+            assertEquals(150,c.money);
+            state.day=2;state.minute=360;DomesticLife.tick(town,state);DomesticLife.tick(town,state);
+            assertEquals(92,DomesticLife.cleanliness(town,c));
+            assertEquals(85,DomesticLife.clothes(town,c));
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            assertEquals(5,DomesticLife.act(town,c,"microwave").minutes());
+            assertEquals(2,c.food);assertEquals(30,c.hunger);
+            DomesticLife.act(town,c,"clean");
+            DomesticLife.act(town,c,"laundry");
+            assertEquals(1,c.water);assertEquals(148,c.money);
+            assertEquals(city+2,town.employerFunds.get("city-maintenance"));
+            assertEquals(100,DomesticLife.cleanliness(town,c));
+            assertEquals(100,DomesticLife.clothes(town,c));
+            assertThrows(IllegalArgumentException.class,()->DomesticLife.act(town,c,"laundry"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            assertTrue(DomesticLife.washer(town,c));
+            assertEquals(2,DomesticLife.view(town,c).electricityUses());
+            assertEquals(2,DomesticLife.view(town,c).waterUsed());
+        }
+    }
+
+    @Test
+    void furnishingPackagesUseCashAndSurviveReload() throws Exception {
+        Path file=directory.resolve("furnishing-packages.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=200;c.place=c.home;c.activity="AT_HOME";c.travelRemaining=0;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            int shop=town.employerFunds.getOrDefault("shop-assistant",0);
+            assertThrows(IllegalArgumentException.class,()->InteriorLife.purchase(town,c,"children"));
+            InteriorLife.purchase(town,c,"kitchen");
+            assertEquals(110,c.money);
+            assertEquals(shop+90,town.employerFunds.get("shop-assistant"));
+            assertThrows(IllegalArgumentException.class,()->InteriorLife.purchase(town,c,"kitchen"));
+            assertThrows(IllegalArgumentException.class,()->InteriorLife.purchase(town,c,"bedroom"));
+            assertTrue(InteriorLife.installed(town,c,"kitchen"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertTrue(InteriorLife.installed(town,town.get(id),"kitchen"));
+            assertFalse(InteriorLife.installed(town,town.get(id),"bedroom"));
+        }
+    }
+
+    @Test
+    void linkedHomeMarketConservesCashAndPersistsOwnership() throws Exception {
+        Path file=directory.resolve("linked-housing.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=400;c.place=TownLife.Place.OFFICE;c.travelRemaining=0;c.activity="FREE_TIME";
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            assertThrows(IllegalArgumentException.class,()->HomeMarketLife.act(town,"buy-tiglio",480));
+            assertThrows(IllegalArgumentException.class,()->HomeMarketLife.act(town,"buy-rosa",600));
+            HomeMarketLife.act(town,"buy-tiglio",600);
+            assertEquals(160,c.money);assertEquals(city+240,town.employerFunds.get("city-maintenance"));
+            assertEquals("unit:home-market-tiglio",c.homeUnit);
+            assertEquals(TownLife.Place.NORTH_RESIDENCES,c.home);
+            assertThrows(IllegalArgumentException.class,()->HomeMarketLife.act(town,"buy-tiglio",600));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            var c=town.get(id);
+            assertEquals("tiglio",HomeMarketLife.owned(town,c).id());
+            assertEquals("unit:home-market-tiglio",c.homeUnit);
+            c.place=TownLife.Place.OFFICE;c.travelRemaining=0;c.activity="FREE_TIME";
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            HomeMarketLife.act(town,"sell-tiglio",600);
+            assertEquals(340,c.money);assertEquals(city-180,town.employerFunds.get("city-maintenance"));
+            assertNull(HomeMarketLife.owned(town,c));
+            assertEquals(TownLife.privateUnit(c.id),c.homeUnit);
+            assertThrows(IllegalArgumentException.class,()->HomeMarketLife.act(town,"sell-tiglio",600));
+        }
+    }
+
+    @Test
+    void familySavingsAreVoluntaryAndSurviveReload() throws Exception {
+        Path file=directory.resolve("family-budget.db");
+        String adultId,partnerId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var a=people.get(0);var b=people.get(1);
+            adultId=a.id;partnerId=b.id;
+            a.age=30;b.age=30;a.money=100;b.money=150;
+            a.home=b.home=TownLife.Place.NORTH_RESIDENCES;
+            b.homeUnit=a.homeUnit;
+            a.place=b.place=a.home;a.travelRemaining=b.travelRemaining=0;
+            a.activity=b.activity="AT_HOME";
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,a.generationIndex);
+            DemographyLife.set(town,a,"played-incarnation",town.player.incarnation);
+            DemographyLife.set(town,a,"partner",b.generationIndex);
+            DemographyLife.set(town,b,"partner",a.generationIndex);
+            state.day=2;state.minute=1200;
+            FamilyBudgetLife.action(town,"deposit",state);
+            assertEquals(90,a.money);assertEquals(150,b.money);
+            assertEquals(10,FamilyBudgetLife.view(town,a,b).total());
+            a.unpaidBills=7;
+            FamilyBudgetLife.action(town,"bills",state);
+            assertEquals(3,FamilyBudgetLife.savings(town,a));assertEquals(0,a.unpaidBills);
+            FamilyBudgetLife.action(town,"deposit",state);
+            assertEquals(13,FamilyBudgetLife.savings(town,a));
+            assertEquals(80,a.money);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var a=town.get(adultId);var b=town.get(partnerId);
+            assertEquals(13,FamilyBudgetLife.savings(town,a));assertEquals(0,FamilyBudgetLife.savings(town,b));
+            a.place=b.place=a.home;a.activity=b.activity="AT_HOME";a.travelRemaining=b.travelRemaining=0;
+            FamilyBudgetLife.action(town,"withdraw",state);
+            assertEquals(90,a.money);assertEquals(3,FamilyBudgetLife.savings(town,a));
+            assertThrows(IllegalArgumentException.class,()->FamilyBudgetLife.action(town,"withdraw",state));
+            FamilyBudgetLife.releaseEstate(town,a);
+            assertEquals(93,a.money);assertEquals(0,FamilyBudgetLife.savings(town,a));
+        }
+    }
+
+    @Test
     void linkedAdultFamilyIsVoluntaryAndConservesCash() throws Exception {
         Path file=directory.resolve("linked-family.db");
         String adultId,partnerId;
@@ -2962,6 +3339,191 @@ class GameSessionTest {
             var contact=town.player.contacts.values().iterator().next();
             assertEquals("WARY",PlayerLife.relationship(contact));
             assertEquals(12,contact.lastPositiveDay);
+        }
+    }
+
+    @Test
+    void personalLoansConserveMoneyAndPersistOverduePenalty() throws Exception {
+        Path file=directory.resolve("personal-loan.db");
+        String id;
+        try(var game=new GameSession(file)) { }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var lender=town.people.values().iterator().next();
+            id=lender.id;lender.age=35;lender.money=100;lender.place=TownLife.Place.PARK;
+            lender.travelRemaining=0;lender.activity="FREE_TIME";
+            town.player.money=5;
+            assertTrue(PlayerLife.speak(town,id,"Ask for a 10 EUR loan",1,450).contains("cannot lend"));
+            var contact=town.player.contacts.get(id);contact.trust=75;contact.affinity=25;
+            assertTrue(PlayerLife.speak(town,id,"Ask for a 10 EUR loan",1,451).contains("seven days"));
+            assertEquals(15,town.player.money);assertEquals(90,lender.money);
+            assertEquals(10,PersonalLoanLife.outstanding(town,id));assertEquals(8,PersonalLoanLife.dueDay(town,id));
+            PlayerLife.speak(town,id,"Ask for a 10 EUR loan",1,452);
+            assertEquals(15,town.player.money);
+            state.day=9;state.minute=480;PersonalLoanLife.tick(town,state);
+            assertEquals(65,contact.trust);
+            PersonalLoanLife.tick(town,state);
+            assertEquals(65,contact.trust);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var lender=town.get(id);lender.place=TownLife.Place.PARK;
+            lender.travelRemaining=0;lender.activity="FREE_TIME";
+            assertEquals(10,PersonalLoanLife.outstanding(town,id));
+            var contact=town.player.contacts.get(id);
+            PersonalLoanLife.tick(town,state);
+            assertEquals(65,contact.trust);
+            town.player.money=9;
+            assertTrue(PlayerLife.speak(town,id,"Repay personal loan",9,481).contains("not have enough"));
+            town.player.money=15;
+            assertTrue(PlayerLife.speak(town,id,"Repay personal loan",9,482).contains("finally"));
+            assertEquals(5,town.player.money);assertEquals(100,lender.money);
+            assertEquals(0,PersonalLoanLife.outstanding(town,id));assertEquals(67,contact.trust);
+        }
+    }
+
+    @Test
+    void residentsHelpFamilyAndFriendsWithoutPlayerInvolvement() throws Exception {
+        Path file=directory.resolve("peer-aid.db");
+        String donorId,recipientId;
+        try(var game=new GameSession(file)) { }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var donor=people.get(0);var recipient=people.get(1);
+            donorId=donor.id;recipientId=recipient.id;
+            donor.age=35;donor.sociability=80;donor.food=4;donor.hunger=10;
+            recipient.age=30;recipient.food=0;recipient.hunger=85;
+            donor.place=TownLife.Place.PARK;recipient.place=TownLife.Place.CAFE;
+            donor.travelRemaining=0;recipient.travelRemaining=0;
+            donor.activity="FREE_TIME";recipient.activity="FREE_TIME";
+            var relation=new SocialLife.Relationship(donor.id,recipient.id);
+            relation.trust=75;relation.affinity=80;relation.tension=5;
+            town.peerRelationships.put(SocialNetwork.key(donor.id,recipient.id),relation);
+            assertFalse(PeerAidLife.share(town,donor,recipient,false,3));
+            recipient.place=TownLife.Place.PARK;
+            relation.trust=20;
+            assertFalse(PeerAidLife.share(town,donor,recipient,false,3));
+            relation.trust=75;
+            state.day=3;state.minute=450;
+            var events=new java.util.ArrayList<TownLife.Event>();
+            PeerAidLife.tick(town,state,events,new java.util.ArrayList<>());
+            assertEquals(3,donor.food);assertEquals(1,recipient.food);
+            assertEquals(77,relation.trust);
+            assertEquals(1,events.size());
+            assertTrue(events.getFirst().text().contains("shared food"));
+            assertFalse(PeerAidLife.share(town,donor,recipient,false,3));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(3,town.industryStocks.get("peer-aid:"+donorId+":last-gift"));
+            assertEquals(3,town.industryStocks.get("peer-aid:"+donorId+":"+recipientId+":last-help"));
+            var donor=town.get(donorId);var recipient=town.get(recipientId);
+            donor.place=recipient.place=TownLife.Place.PARK;
+            donor.activity=recipient.activity="FREE_TIME";
+            donor.travelRemaining=recipient.travelRemaining=0;
+            donor.water=4;donor.thirst=10;recipient.water=0;recipient.thirst=90;
+            var relation=town.peerRelationships.get(SocialNetwork.key(donorId,recipientId));
+            relation.trust=20;donor.sociability=10;
+            DemographyLife.set(town,recipient,"parent-a",donor.generationIndex);
+            assertFalse(PeerAidLife.share(town,donor,recipient,true,3));
+            assertTrue(PeerAidLife.share(town,donor,recipient,true,4));
+            assertEquals(3,donor.water);assertEquals(1,recipient.water);
+        }
+    }
+
+    @Test
+    void friendsOfferSuppliesWithoutBeingAsked() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("autonomous-aid.db"))){
+            var state=db.load();var town=db.loadTown(state);
+            var donor=PopulationGenerator.add(town,1).getFirst();
+            donor.age=35;donor.sociability=80;donor.place=TownLife.Place.PARK;
+            donor.travelRemaining=0;donor.activity="FREE_TIME";donor.water=4;donor.thirst=10;
+            town.player.thirst=85;town.player.bottledWater=0;
+            var contact=new PlayerLife.Contact(donor.id);contact.trust=75;contact.affinity=25;
+            town.player.contacts.put(donor.id,contact);
+            state.day=3;state.minute=450;
+            donor.place=TownLife.Place.CAFE;
+            MutualAidLife.tick(town,state);
+            assertEquals(0,town.player.bottledWater);
+            donor.place=TownLife.Place.PARK;
+            donor.activity="SLEEPING";
+            MutualAidLife.tick(town,state);
+            assertEquals(0,town.player.bottledWater);
+            donor.activity="FREE_TIME";
+            MutualAidLife.tick(town,state);
+            assertEquals(1,town.player.bottledWater);assertEquals(3,donor.water);
+            assertEquals(1,MutualAidLife.notices(town,3).size());
+            town.player.bottledWater=0;
+            state.minute=465;MutualAidLife.tick(town,state);
+            assertEquals(0,town.player.bottledWater);assertEquals(3,donor.water);
+            assertTrue(MutualAidLife.notices(town,4).isEmpty());
+        }
+    }
+
+    @Test
+    void mutualAidConservesSuppliesAndRespectsNeedsAndTrust() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("mutual-aid.db"))){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=town.people.values().iterator().next();
+            resident.place=TownLife.Place.PARK;resident.travelRemaining=0;resident.activity="FREE_TIME";
+            resident.food=0;resident.water=3;resident.hunger=80;resident.thirst=10;
+            town.player.bread=1;town.player.bottledWater=0;town.player.thirst=80;
+            assertTrue(PlayerLife.speak(town,resident.id,"Offer bread",1,450).contains("Thank you"));
+            assertEquals(0,town.player.bread);assertEquals(1,resident.food);
+            assertEquals(1,SocialMemoryLife.last(town,resident.id,SocialMemoryLife.Kind.SUPPORT));
+            assertFalse(MutualAidLife.give(town,resident,"bread",1));
+            assertFalse(MutualAidLife.receive(town,resident,"water",1));
+            var contact=town.player.contacts.get(resident.id);
+            contact.trust=75;contact.affinity=25;
+            assertTrue(PlayerLife.speak(town,resident.id,"Ask for water",1,451).contains("Here, take this"));
+            assertEquals(1,town.player.bottledWater);assertEquals(2,resident.water);
+            assertFalse(MutualAidLife.receive(town,resident,"water",1));
+            assertFalse(MutualAidLife.receive(town,resident,"water",2));
+        }
+    }
+
+    @Test
+    void sharedMemoriesPersistAcrossYearsAndReloadWithoutInheritingReputation() throws Exception {
+        Path file=directory.resolve("social-memory.db");
+        String id;
+        try(var game=new GameSession(file)) { }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=town.people.values().iterator().next();
+            id=resident.id;resident.place=TownLife.Place.PARK;
+            resident.travelRemaining=0;resident.activity="FREE_TIME";resident.fatigue=90;
+            PlayerLife.speak(town,id,"How are you?",1,450);
+            PlayerLife.speak(town,id,"I'm here for you.",1,451);
+            var contact=town.player.contacts.get(id);
+            int affinity=contact.affinity;
+            PlayerLife.speak(town,id,"I'm here for you.",1,452);
+            assertEquals(affinity,contact.affinity);
+            assertEquals(1,SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT));
+            PlayerLife.speak(town,id,"Leave me alone!",2,450);
+            assertTrue(SocialMemoryLife.unresolved(town,id));
+            assertTrue(PlayerLife.speak(town,id,"What do you remember about me?",2,451).contains("Trust takes time"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            var resident=town.get(id);
+            resident.place=TownLife.Place.PARK;resident.travelRemaining=0;resident.activity="FREE_TIME";
+            assertEquals(1,SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT));
+            assertEquals(2,SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.HURT));
+            assertTrue(PlayerLife.speak(town,id,"Cosa ricordi di me?",1097,450).contains("Trust takes time"));
+            PlayerLife.speak(town,id,"I'm sorry.",1097,451);
+            assertFalse(SocialMemoryLife.unresolved(town,id));
+            assertTrue(PlayerLife.speak(town,id,"What do you remember about me?",1097,452).contains("apology"));
+            var next=town.copy();next.player.incarnation++;
+            assertEquals(0,SocialMemoryLife.last(next,id,SocialMemoryLife.Kind.SUPPORT));
+            assertFalse(SocialMemoryLife.unresolved(next,id));
+            assertEquals(1,SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT));
         }
     }
 

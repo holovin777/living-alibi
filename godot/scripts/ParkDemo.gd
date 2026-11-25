@@ -40,6 +40,8 @@ const DriveControls = preload("res://scripts/DriveControls.gd")
 const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
+const GameLanguage = preload("res://scripts/GameLanguage.gd")
+const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
 var _apartment: Node3D
 var _apartment_active := false
 var _home_entrance: Node3D
@@ -54,6 +56,25 @@ var _medical_menu := false
 var _college_menu := false
 var _engineering_menu := false
 var _software_menu := false
+var _office_app := "work"
+var _office_drafts: Dictionary = {}
+# Presentation only: a real co-present worker gets a stable comic personality.
+var _office_joker_id := ""
+var _office_joke_index := 0
+var _office_joke_wait := 8.0
+var _office_joke_hold := 0.0
+const OFFICE_JOKE_LINES := [
+    "WHO MERGED ON A FRIDAY?!",
+    "It works on my machine. My machine is a genius!",
+    "Coffee first. Then we debug reality.",
+    "I fixed one bug and adopted three more!",
+    "Attention! The build is green! Nobody move!",
+    "The server needs a holiday. So do I."
+]
+const JAVA_DESK := Vector3(-10,0,4)
+const DEVOPS_DESK := Vector3(-10,0,8)
+const COMPANY_DESK := Vector3(-10,0,12)
+const OFFICE_STAFF_ANCHOR := Vector3(-11.6,0,4.9)
 const COLLEGE_DESK := Vector3(-6.3,0,7)
 const CLINIC_COUNTER := Vector3(-6.3,0,7)
 const PHARMACY_COUNTER := Vector3(6.3,0,-7)
@@ -118,6 +139,7 @@ var _bike_model: Node3D
 var _bike_wheel_angle := 0.0
 var _jobs: Label
 var _bag_label: Label
+var _aid_label: Label
 var _housing_label: Label
 var _eat_button: Button
 var _water_button: Button
@@ -130,6 +152,8 @@ var _dialog_panel: PanelContainer
 var _dialog_title: Label
 var _dialog_reply: Label
 var _dialog_attitude: Label
+var _dialog_style: Label
+var _language_selector: OptionButton
 var _dialog_input: LineEdit
 var _dialog_target := ""
 var _dialog_pending := false
@@ -137,6 +161,8 @@ var _action_title: Label
 var _action_choices: VBoxContainer
 
 func _ready() -> void:
+    GameLanguage.install()
+    GameLanguage.select_locale(GameLanguage.saved_locale(),false)
     _build_world()
     _create_interface()
     _api = preload("res://examples/WorldApi.gd").new()
@@ -197,11 +223,12 @@ func _process(delta: float) -> void:
     _sync_bicycle()
     _advance_traffic(delta)
     _animate_residents(delta)
+    _tick_office_joker(delta)
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
         if _near_software():
-            _hint.text="E: software projects · F: life choices"
+            _hint.text="E: Borgo Digital · "+_office_station()+" · F: life choices"
         elif _near_engineering():
             _hint.text="E: engineering work orders · F: life choices"
         elif _near_college():
@@ -895,6 +922,7 @@ func _generate_chunk(place_id: String) -> void:
                     Vector3(4.0, 2.35, 8.0))
         "SCHOOL":
             _build_college()
+            _build_dojo()
         "LIBRARY":
             _building("Public library", Color(0.59, 0.48, 0.33))
             for offset in [-10.0, -7.0, -4.0]:
@@ -906,10 +934,7 @@ func _generate_chunk(place_id: String) -> void:
             _box(_scenery, Vector3(4.0, 1.2, 2.0), Color(0.27, 0.30, 0.32),
                     Vector3(-8.0, 0.7, 7.0))
         "OFFICE":
-            _building("Offices", Color(0.40, 0.55, 0.72))
-            for offset in [-10.0, -7.0, -4.0]:
-                _box(_scenery, Vector3(1.6, 1.8, 0.12), Color(0.61, 0.83, 0.94),
-                        Vector3(offset, 2.3, 4.9))
+            _build_digital_office()
         "QUARRY":
             _add_obstacle(Vector3(-8.0, 0.0, 9.0), Vector2(11.0, 3.0))
             for x in [-11.0, -8.0, -5.0]:
@@ -1955,6 +1980,79 @@ func _sync_orchard() -> void:
         var fruit := tree.get_node("Fruit") as Node3D
         fruit.visible = bool(data.get("ready",false))
 
+func _build_digital_office() -> void:
+    var office := Node3D.new()
+    office.name="BorgoDigital"
+    _scenery.add_child(office)
+    var wall := Color("#e3d9c7")
+    var partition := Color("#c3ccc9")
+    var wood := Color("#a58a69")
+    var dark := Color("#333e44")
+    for part in [[Vector3(-15,0,8),Vector2(0.24,12)],
+            [Vector3(-9.5,0,2),Vector2(11,0.24)],
+            [Vector3(-9.5,0,14),Vector2(11,0.24)],
+            [Vector3(-4,0,4.4),Vector2(0.24,4.8)],
+            [Vector3(-4,0,11.6),Vector2(0.24,4.8)]]:
+        _room_wall(office,part[0],part[1],wall)
+    for z in [6.0,10.0]:
+        _room_wall(office,Vector3(-11.75,0,z),Vector2(6.5,0.20),partition)
+    _box(office,Vector3(11,0.10,12),Color("#b9b3a5"),Vector3(-9.5,0.005,8))
+    _box(office,Vector3(11.15,0.23,12.15),Color("#435359"),Vector3(-9.5,3.12,8))
+    _box(office,Vector3(11.35,0.30,12.35),Color("#93684e"),Vector3(-9.5,3.39,8))
+    _box(office,Vector3(0.22,0.40,2.35),dark,Vector3(-4,2.8,8))
+    _sign(office,"Borgo Digital · Informatica",Vector3(-3.65,3.65,8))
+    _box(office,Vector3(2.3,0.07,2.7),Color("#aaa99f"),Vector3(-2.95,0.045,8))
+    for z in [3.5,5.0,11.0,12.5]:
+        _box(office,Vector3(0.14,1.55,1.15),Color("#7999a4"),Vector3(-3.84,1.67,z))
+    for z in [4.0,8.0,12.0]:
+        var light := OmniLight3D.new()
+        light.position=Vector3(-10.8,2.72,z)
+        light.omni_range=6.5
+        light.light_energy=1.6
+        office.add_child(light)
+    var corridor_light := OmniLight3D.new()
+    corridor_light.position=Vector3(-6.0,2.7,8.0)
+    corridor_light.omni_range=7
+    corridor_light.light_energy=1.3
+    office.add_child(corridor_light)
+    var dev := Node3D.new()
+    dev.name="DevelopmentRoom"
+    office.add_child(dev)
+    _sign(dev,"Java development · E",Vector3(-10,2.35,4))
+    for z in [3.25,4.9]:
+        _room_furniture(dev,Vector3(-13.4,0,z),Vector3(1.0,0.78,1.25),wood)
+        _box(dev,Vector3(0.10,0.46,0.72),dark,Vector3(-13.6,1.12,z))
+        _box(dev,Vector3(0.045,0.38,0.62),Color("#6795a0"),Vector3(-13.53,1.12,z))
+        _box(dev,Vector3(0.30,0.04,0.59),dark,Vector3(-13.1,0.81,z))
+        _room_furniture(dev,Vector3(-12.35,0,z),Vector3(0.46,0.46,0.46),dark)
+    _box(dev,Vector3(0.12,1.12,1.9),Color("#eef0e9"),Vector3(-14.82,1.85,4))
+    _sign(dev,"Tickets · Tests · Git",Vector3(-14.65,2.0,4))
+    var server := Node3D.new()
+    server.name="ServerRoom"
+    office.add_child(server)
+    _sign(server,"Operations · DevOps · E",Vector3(-10,2.35,8))
+    for z in [7.0,8.65]:
+        _room_furniture(server,Vector3(-13.85,0,z),Vector3(1.05,2.2,1.15),dark)
+        for y in [0.48,0.83,1.18,1.53,1.88]:
+            _box(server,Vector3(0.055,0.22,0.88),Color("#596469"),Vector3(-13.30,y,z))
+            _box(server,Vector3(0.06,0.075,0.10),Color("#75bd83"),Vector3(-13.26,y,z+0.31))
+    _room_furniture(server,Vector3(-12.0,0,8),Vector3(1.0,0.82,1.6),wood)
+    _box(server,Vector3(0.11,0.51,0.82),dark,Vector3(-12.25,1.18,8))
+    _box(server,Vector3(0.05,0.42,0.72),Color("#588873"),Vector3(-12.17,1.18,8))
+    _room_furniture(server,Vector3(-11.25,0,7.1),Vector3(0.45,0.46,0.45),dark)
+    var meeting := Node3D.new()
+    meeting.name="MeetingRoom"
+    office.add_child(meeting)
+    _sign(meeting,"Clients & company · E",Vector3(-10,2.35,12))
+    _room_furniture(meeting,Vector3(-12.8,0,12),Vector3(2.25,0.82,1.2),wood)
+    for x in [-13.4,-12.1]:
+        for z in [11.02,12.98]:
+            _room_furniture(meeting,Vector3(x,0,z),Vector3(0.48,0.47,0.48),dark)
+    _box(meeting,Vector3(0.12,1.1,2.25),Color("#e9ebe6"),Vector3(-14.82,1.85,12))
+    _sign(meeting,"Contracts · Payroll · Finance",Vector3(-14.6,1.9,12))
+    for station in [JAVA_DESK,DEVOPS_DESK,COMPANY_DESK]:
+        _box(office,Vector3(1.45,0.025,1.45),Color("#6f8c85"),station+Vector3(0,0.07,0))
+
 func _build_college() -> void:
     var campus := Node3D.new()
     campus.name="IstitutoLeonardo"
@@ -1996,6 +2094,43 @@ func _build_college() -> void:
     light.omni_range=8
     light.light_energy=1.5
     campus.add_child(light)
+
+func _build_dojo() -> void:
+    var dojo := Node3D.new()
+    dojo.name="DojoShotokan"
+    _scenery.add_child(dojo)
+    var wall := Color("#e2dbca")
+    var wood := Color("#8d6b48")
+    for part in [[Vector3(13,0,7),Vector2(0.24,8)],
+            [Vector3(8.5,0,3),Vector2(9,0.24)],
+            [Vector3(8.5,0,11),Vector2(9,0.24)],
+            [Vector3(4,0,4.5),Vector2(0.24,3)],
+            [Vector3(4,0,9.5),Vector2(0.24,3)]]:
+        _room_wall(dojo,part[0],part[1],wall)
+    _box(dojo,Vector3(9,0.08,8),wood,Vector3(8.5,0.025,7))
+    _box(dojo,Vector3(9.4,0.24,8.4),Color("#555c58"),Vector3(8.5,3.12,7))
+    _box(dojo,Vector3(0.24,0.55,2),wood,Vector3(4,2.75,7))
+    _sign(dojo,"Dojo Shotokan",Vector3(3.8,3.3,7))
+    var mat := Node3D.new()
+    mat.name="Tatami"
+    dojo.add_child(mat)
+    for x in range(5):
+        for z in range(4):
+            var edge := x==0 or x==4 or z==0 or z==3
+            _box(mat,Vector3(1.1,0.035,1.1),Color("#b16d61") if edge else Color("#78948a"),Vector3(6.7+x*1.1,0.095,4.65+z*1.1))
+    _room_furniture(dojo,Vector3(11.9,0,9.6),Vector3(1.5,0.45,0.45),wood)
+    for z in [4.1,4.8,5.5]:
+        _room_furniture(dojo,Vector3(12.5,0,z),Vector3(0.65,1.8,0.58),Color("#8a9696"))
+    _sign(dojo,"Rei · Kihon · Kata · Kumite",Vector3(12.7,2.25,7))
+    _sign(dojo,"Training · F",Vector3(6,1.8,7))
+    var light := OmniLight3D.new()
+    light.position=Vector3(8.5,2.65,7)
+    light.omni_range=9
+    light.light_energy=1.6
+    dojo.add_child(light)
+
+func _near_dojo() -> bool:
+    return not _apartment_active and _current_place=="SCHOOL" and Rect2(5.9,4.0,5.9,5.2).has_point(Vector2(_avatar.position.x,_avatar.position.z))
 
 func _build_medical_building(pharmacy: bool) -> void:
     var building := Node3D.new()
@@ -2486,6 +2621,11 @@ func _render_residents() -> void:
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
+        person.set_meta("mood",str(resident.get("mood","CALM")))
+        person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
+        person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
+        _sync_office_employee(person,id)
+        _sync_dojo_member(person,id)
         person.set_meta("display_name",str(resident.get("name","Resident")))
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
         person.set_meta("conversations",int(resident.get("conversations",0)))
@@ -2495,10 +2635,112 @@ func _render_residents() -> void:
             _residents_root.remove_child(child)
             child.queue_free()
 
+    _sync_office_joker()
+
+func _sync_office_joker() -> void:
+    if _current_place!="OFFICE" or _apartment_active:return
+    if _office_joker_id.is_empty():
+        var candidates: Array[String] = []
+        for person in _residents_root.get_children():
+            if str(person.get_meta("activity",""))=="WORKING":
+                candidates.append(str(person.get_meta("resident_id","")))
+        if candidates.is_empty():return
+        candidates.sort()
+        _office_joker_id=candidates[0]
+    var joker := _residents_root.get_node_or_null("Resident_"+_office_joker_id) as Node3D
+    if joker==null:return
+    if str(joker.get_meta("activity",""))!="WORKING":return
+    joker.set_meta("personality","joker")
+    if not Rect2(-15,2,11,12).has_point(Vector2(joker.position.x,joker.position.z)):
+        var anchor := Vector3(-10.8,0,3.15)
+        if _can_stand(anchor,WALKER_RADIUS):
+            joker.position=anchor
+            joker.set_meta("anchor",anchor)
+
+func _tick_office_joker(delta: float) -> void:
+    if _current_place!="OFFICE" or _apartment_active or not is_instance_valid(_residents_root):return
+    if _office_joker_id.is_empty():return
+    var joker := _residents_root.get_node_or_null("Resident_"+_office_joker_id) as Node3D
+    if joker==null:
+        _office_joke_hold=0.0
+        return
+    var bubble := joker.get_node_or_null("OfficeJoke") as Label3D
+    var inside := Rect2(-15,2,11,12).has_point(Vector2(_avatar.position.x,_avatar.position.z))
+    var can_hear := inside and _avatar.position.distance_to(joker.position)<7.0 and str(joker.get_meta("activity",""))=="WORKING"
+    if not can_hear or str(joker.get_meta("mood","CALM")) in ["TIRED","SAD","STRESSED","IRRITATED","LONELY"]:
+        if bubble!=null:bubble.hide()
+        _office_joke_hold=0.0
+        return
+    if _office_joke_hold>0.0:
+        _office_joke_hold=maxf(0.0,_office_joke_hold-delta)
+        if bubble!=null:bubble.visible=_office_joke_hold>0.0
+        if _office_joke_hold>0.0:
+            var arm := joker.get_node_or_null("ArmRight") as Node3D
+            if arm!=null:arm.rotation.x=-0.65
+        return
+    _office_joke_wait=maxf(0.0,_office_joke_wait-delta)
+    if _office_joke_wait>0.0:return
+    if bubble==null:
+        bubble=Label3D.new()
+        bubble.name="OfficeJoke"
+        bubble.position=Vector3(0,2.65,0)
+        bubble.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+        bubble.font_size=34
+        bubble.pixel_size=0.004
+        bubble.modulate=Color("#ffe6a0")
+        bubble.outline_size=9
+        joker.add_child(bubble)
+    bubble.text=OFFICE_JOKE_LINES[_office_joke_index % OFFICE_JOKE_LINES.size()]
+    bubble.show()
+    _office_joke_index+=1
+    _office_joke_hold=4.0
+    _office_joke_wait=28.0+float(_office_joke_index%3)*7.0
+
+func _sync_dojo_member(person: Node3D,id: String) -> void:
+    if _current_place!="SCHOOL" or _apartment_active:return
+    var community = _last_snapshot.get("rebirth",{}).get("dojoCommunity")
+    var members: Array = community.get("present",[]) if community is Dictionary else []
+    var index := 0
+    for member in members:
+        if str(member.get("id",""))==id:
+            var anchor := Vector3(7.2+float(index%3)*1.6,0,5.0+float((index/3)%3)*1.3)
+            if _can_stand(anchor,WALKER_RADIUS):
+                person.position=anchor
+                person.set_meta("anchor",anchor)
+                var match_view = _last_snapshot.get("rebirth",{}).get("kumite")
+                var sparring: bool = match_view is Dictionary and match_view.get("active",false) and str(match_view.get("partnerId",""))==id
+                person.set_meta("activity","KUMITE" if sparring else "DOJO")
+                if sparring:
+                    person.rotation.y=atan2(person.position.x-_avatar.position.x,person.position.z-_avatar.position.z)
+                person.set_meta("dojo_member",true)
+                return
+        index+=1
+    if person.get_meta("dojo_member",false):
+        var anchor := _open_anchor(Vector3(0,0,-4))
+        person.position=anchor
+        person.set_meta("anchor",anchor)
+        person.set_meta("dojo_member",false)
+
+func _sync_office_employee(person: Node3D,id: String) -> void:
+    if _current_place!="OFFICE" or _apartment_active:return
+    var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
+    if not workspace is Dictionary:return
+    var firm = workspace.get("companyStatus")
+    if not firm is Dictionary:return
+    var staff = firm.get("staff")
+    if not staff is Dictionary:return
+    var employee = staff.get("employee")
+    if not employee is Dictionary or str(employee.get("id",""))!=id:return
+    if str(person.get_meta("activity",""))=="WORKING" and _can_stand(OFFICE_STAFF_ANCHOR,WALKER_RADIUS):
+        person.position=OFFICE_STAFF_ANCHOR
+        person.set_meta("anchor",OFFICE_STAFF_ANCHOR)
+        person.rotation.y=PI/2.0
+
 func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var person := Node3D.new()
     person.name = "Resident_" + id
     person.set_meta("resident_id", id)
+    person.set_meta("personality",ResidentPersonality.style(id))
     var anchor := Vector3((float(index % 8)-3.5)*3.0, 0, -4.0-float(index / 8)*2.5)
     if _apartment_active:
         anchor = FamilyApartment.ANCHORS[index % FamilyApartment.ANCHORS.size()]
@@ -2556,6 +2798,14 @@ func _animate_residents(delta: float) -> void:
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
+            if activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
+                angle=-0.7
+            elif not walking and activity!="SLEEPING" and limb=="ArmRight":
+                var style := str(person.get_meta("personality","quiet"))
+                if style in ["talkative","joker"] and str(person.get_meta("mood","CALM")) in ["CALM","HAPPY","ENTHUSIASTIC"]:
+                    angle=sin(float(Time.get_ticks_msec())*0.003+phase)*0.16
+                elif style=="relaxed":
+                    angle=-0.10
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
@@ -2653,6 +2903,10 @@ func _create_interface() -> void:
     _bag_label = Label.new()
     _bag_label.text = "Bag: empty"
     column.add_child(_bag_label)
+    _aid_label = Label.new()
+    _aid_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _aid_label.visible = false
+    column.add_child(_aid_label)
     _housing_label = Label.new()
     _housing_label.text = "Housing: no room"
     column.add_child(_housing_label)
@@ -2691,6 +2945,12 @@ func _create_interface() -> void:
     map_button.text = "Town map (M)"
     map_button.pressed.connect(_toggle_map)
     column.add_child(map_button)
+    _language_selector = OptionButton.new()
+    _language_selector.add_item("English",0)
+    _language_selector.add_item("Italiano",1)
+    _language_selector.select(1 if TranslationServer.get_locale()=="it" else 0)
+    _language_selector.item_selected.connect(_on_language_selected)
+    column.add_child(_language_selector)
     var clock_row := HBoxContainer.new()
     column.add_child(clock_row)
     var clock_label := Label.new()
@@ -2764,11 +3024,23 @@ func _create_interface() -> void:
     dialog_col.add_child(_dialog_title)
     _dialog_attitude = Label.new()
     dialog_col.add_child(_dialog_attitude)
+    _dialog_style = Label.new()
+    _dialog_style.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    dialog_col.add_child(_dialog_style)
     _dialog_reply = Label.new()
     _dialog_reply.custom_minimum_size = Vector2(400,0)
     _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_reply)
     dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
+    dialog_col.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
+    dialog_col.add_child(_button("Offer support",_send_dialog.bind("I'm here for you.")))
+    dialog_col.add_child(_button("Ask about shared memories",_send_dialog.bind("What do you remember about me?")))
+    dialog_col.add_child(_button("Offer bread",_send_dialog.bind("Offer bread")))
+    dialog_col.add_child(_button("Offer water",_send_dialog.bind("Offer water")))
+    dialog_col.add_child(_button("Ask for bread",_send_dialog.bind("Ask for bread")))
+    dialog_col.add_child(_button("Ask for water",_send_dialog.bind("Ask for water")))
+    dialog_col.add_child(_button("Ask for a 10 EUR loan",_send_dialog.bind("Ask for a 10 EUR loan")))
+    dialog_col.add_child(_button("Repay personal loan",_send_dialog.bind("Repay personal loan")))
     dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
     dialog_col.add_child(_button("Allow sharing my name",_send_dialog.bind("You can tell people my name.")))
     dialog_col.add_child(_button("Ask for visitor news",_send_dialog.bind("Any news about visitors?")))
@@ -2800,6 +3072,16 @@ func _create_interface() -> void:
     action_scroll.add_child(_action_choices)
     _action_title = Label.new()
     _action_choices.add_child(_action_title)
+
+func _on_language_selected(index: int) -> void:
+    GameLanguage.select_locale("it" if index==1 else "en")
+    _refresh_localized_hud()
+    if _software_menu:
+        _render_actions()
+
+func _refresh_localized_hud() -> void:
+    if _last_snapshot.is_empty():return
+    _render_hud_summary(_last_snapshot)
 
 func _button(caption: String, callback: Callable) -> Button:
     var button := Button.new()
@@ -2844,13 +3126,31 @@ func _open_dialog() -> void:
     _action_panel.visible = false
     _map_panel.visible = false
     _dialog_title.text = str(person.get_meta("display_name","Resident"))
-    _dialog_attitude.text = "Attitude: "+str(person.get_meta("relationship","STRANGER")).capitalize()
+    _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
+    _render_dialog_mood(person)
     var known := str(person.get_meta("known_name",""))
-    _dialog_reply.text = "They know you as "+known if not known.is_empty() else (
+    _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     _dialog_input.clear()
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _render_dialog_mood(person: Node3D) -> void:
+    var mood := str(person.get_meta("mood","CALM"))
+    _dialog_style.text = tr("Seems: %s") % tr(mood.capitalize())
+    var debt := int(person.get_meta("personal_debt",0))
+    var due := int(person.get_meta("personal_debt_due",0))
+    if debt>0:
+        _dialog_style.text += "\n"+(tr("Personal debt: %s EUR · due day %s") % [debt,due])
+        if int(_last_snapshot.get("day",1))>due:
+            _dialog_style.text += " · "+tr("Overdue")
+
+func _localized_resident_reply(message: String) -> String:
+    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    if person==null:return message
+    var prefix := str(person.get_meta("display_name",""))+": "
+    if not message.begins_with(prefix):return message
+    return prefix+tr(message.substr(prefix.length()))
 
 func _close_dialog() -> void:
     _dialog_panel.visible = false
@@ -2990,30 +3290,138 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _office_station() -> String:
+    if _apartment_active or _current_place!="OFFICE" or _last_snapshot.get("rebirth",{}).get("softwareProjects",[]).is_empty():
+        return ""
+    if _avatar.position.distance_to(JAVA_DESK)<1.25:return "java"
+    if _avatar.position.distance_to(DEVOPS_DESK)<1.25:return "devops"
+    if _avatar.position.distance_to(COMPANY_DESK)<1.25:return "company"
+    return ""
+
 func _near_software() -> bool:
-    return not _apartment_active and _current_place=="OFFICE" and _near_kiosk() and not _last_snapshot.get("rebirth",{}).get("softwareProjects",[]).is_empty()
+    return not _office_station().is_empty()
+
+func _office_action_allowed(action: String) -> bool:
+    var station := _office_station()
+    if action.begins_with("rebirth-devops-"):return station=="devops"
+    if action.begins_with("rebirth-it:"):return station=="company"
+    if action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-"):
+        return station=="java"
+    return true
 
 func _close_software() -> void:
+    _office_app="work"
     _software_menu=false
     _action_panel.visible=false
     _render_actions()
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
+func _office_label(value: String) -> void:
+    var label := Label.new()
+    label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    label.text=value
+    _action_choices.add_child(label)
+
+func _switch_office_app(app: String) -> void:
+    if not _near_software():return
+    _office_app=app
+    _render_actions()
+
+func _office_draft_key(id: String) -> String:
+    return str(_last_snapshot.get("player",{}).get("incarnation",0))+":"+str(_last_snapshot.get("rebirth",{}).get("childName",""))+":"+id
+
+func _remember_office_draft(value: String,id: String) -> void:
+    _office_drafts[_office_draft_key(id)]=value.left(180)
+
+func _render_office_apps(station: String) -> void:
+    _office_label("BorgoOS · "+station.capitalize()+" workstation · Day "+str(_last_snapshot.get("day",1)))
+    var dock := HFlowContainer.new()
+    _action_choices.add_child(dock)
+    var work_title := "Code editor" if station=="java" else ("Terminal" if station=="devops" else "Company ledger")
+    for entry in [["work",work_title],["tasks","Issue tracker"],["mail","Inbox"],["browser","Intranet"],["help","Handbook"]]:
+        var app := _button(str(entry[1]),_switch_office_app.bind(str(entry[0])))
+        app.disabled=_office_app==str(entry[0])
+        dock.add_child(app)
+
+func _render_office_app(workspace: Dictionary) -> void:
+    var projects: Array = _last_snapshot.get("rebirth",{}).get("softwareProjects",[])
+    var ops = workspace.get("devops")
+    match _office_app:
+        "tasks":
+            _office_label("Issue tracker · Team backlog")
+            for project in projects:
+                _office_label("%s | %s | Next: %s | %s EUR" % [project.get("title",""),project.get("phase",""),project.get("nextAction",""),project.get("wage",0)])
+                if project.get("branch","")!="":
+                    _office_label(str(project.get("branch","")))
+            if projects.is_empty():_office_label("No assigned projects.")
+            _office_label("Use the Java code editor to advance a ticket.")
+        "mail":
+            _office_label("Inbox · Generated work notices")
+            _office_label("From: Team lead\nSubject: Welcome to Borgo Digital\nRead acceptance criteria, run tests and open a pull request before releasing your work.")
+            for project in projects:
+                if project.get("deployed",false):
+                    _office_label("From: Release automation\nSubject: %s deployed\nThe client service is released." % project.get("title",""))
+                elif str(project.get("phase",""))=="TESTED":
+                    _office_label("From: Code review\nSubject: %s reviewed\nNext step: %s" % [project.get("title",""),project.get("nextAction","")])
+            if ops is Dictionary and ops.get("active",false):
+                _office_label("From: Monitoring\nSubject: Retail incident\n"+str(ops.get("status",""))+" · Visit the operations workstation.")
+            var firm = workspace.get("companyStatus")
+            if firm is Dictionary and firm.get("registered",false):
+                _office_label("From: Company accounts\nBalance: %s EUR · Lease through day %s" % [firm.get("cash",0),firm.get("rentUntil",0)])
+        "browser":
+            _office_label("Intranet · /api/v1/retail/catalog")
+            var catalog := false
+            var low_stock := false
+            for project in projects:
+                if project.get("id","")=="retail-api":catalog=bool(project.get("deployed",false))
+                if project.get("id","")=="retail-sql":low_stock=bool(project.get("deployed",false))
+            if not catalog:
+                _office_label("Catalog not deployed. Finish BD-103 to publish this service.")
+            elif ops is Dictionary and str(ops.get("status",""))=="OUTAGE":
+                _office_label("503 Service Unavailable · Visit the server room.")
+            else:
+                _office_label("200 OK · Live inventory from world snapshot (read-only preview)")
+                var rows: Array = _last_snapshot.get("shop",[]).duplicate()
+                rows.sort_custom(func(a,b):return str(a.get("id",""))<str(b.get("id","")))
+                for item in rows:
+                    _office_label("%s · %s EUR · %s units" % [item.get("label",item.get("id","")),item.get("price",0),item.get("stock",0)])
+                if low_stock:
+                    _office_label("/api/v1/retail/low-stock · Stock below 3")
+                    for item in rows:
+                        if int(item.get("stock",0))<3:_office_label(str(item.get("id",""))+": "+str(item.get("stock",0)))
+        "help":
+            _office_label("Handbook · Java / Spring / SQL")
+            _office_label("Java: return an integer expression using variables, arithmetic, Math.min and Math.max. Test boundary cases such as zero stock.")
+            _office_label("REST: @GetMapping defines a read-only method route below the class-level @RequestMapping. SQL: SELECT columns FROM table WHERE condition ORDER BY column.")
+            _office_label("Git: feature branch → implementation → commit → pull request → CI/review → merge → deployment.")
+            _office_label("Operations: check health, inspect evidence, apply the guided recovery and verify. Terminal commands are simulated, never executed on a host.")
+    _action_choices.add_child(_button("Leave workstation",_close_software))
+
 func _render_software() -> void:
-    _action_title.text="Borgo Digital · Java team"
+    var station := _office_station()
+    _action_title.text="Borgo Digital · "+(tr("Java team") if station=="java" else (tr("Server room") if station=="devops" else tr("Meeting room")))
     var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
+    _render_office_apps(station)
+    if _office_app!="work":
+        _render_office_app(workspace if workspace is Dictionary else {})
+        return
     if workspace is Dictionary:
         var intro := Label.new()
         intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-        intro.text=str(workspace.get("intro",""))
+        intro.text=str(workspace.get("intro","")) if station=="java" else "Borgo Digital · "+station.capitalize()
         _action_choices.add_child(intro)
         if not workspace.get("onboarded",false):
             var start := _button("Complete onboarding · 15 min",_garden_action.bind("rebirth-java-onboard"))
             start.disabled=not bool(workspace.get("canOnboard",false))
-            _action_choices.add_child(start)
+            if station=="java":
+                _action_choices.add_child(start)
+            else:
+                var direction := Label.new()
+                direction.text="Complete onboarding at the Java desk first."
+                _action_choices.add_child(direction)
             _action_choices.add_child(_button("Leave",_close_software))
             return
-    if workspace is Dictionary and workspace.get("career") is Dictionary:
+    if station=="java" and workspace is Dictionary and workspace.get("career") is Dictionary:
         var career: Dictionary = workspace["career"]
         var profile := Label.new()
         profile.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3037,7 +3445,7 @@ func _render_software() -> void:
         var submit_audit := _button("Submit daily audit",_submit_developer_audit.bind(answer))
         submit_audit.disabled=not bool(audit.get("available",false))
         _action_choices.add_child(submit_audit)
-    if workspace is Dictionary and workspace.get("devops") is Dictionary:
+    if station=="devops" and workspace is Dictionary and workspace.get("devops") is Dictionary:
         var ops: Dictionary = workspace["devops"]
         var ops_info := Label.new()
         ops_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3057,7 +3465,7 @@ func _render_software() -> void:
             var run := _button("Run command · 5 min",_submit_devops.bind(terminal))
             run.disabled=not bool(ops.get("canRun",false))
             _action_choices.add_child(run)
-    if workspace is Dictionary and workspace.get("companyStatus") is Dictionary:
+    if station=="company" and workspace is Dictionary and workspace.get("companyStatus") is Dictionary:
         var firm: Dictionary = workspace["companyStatus"]
         var details := Label.new()
         details.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3111,7 +3519,8 @@ func _render_software() -> void:
                     var delegate := _button("Delegate · 12 EUR wage",_garden_action.bind("rebirth-it:delegate:"+str(contract.get("id",""))))
                     delegate.disabled=not str(contract.get("id","")) in staff.get("delegatable",[])
                     _action_choices.add_child(delegate)
-    for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
+    var projects: Array = _last_snapshot.get("rebirth",{}).get("softwareProjects",[]) if station=="java" else []
+    for project in projects:
         var info := Label.new()
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         info.text="%s · %s\n%s · Contract %s EUR" % [project.get("title",""),project.get("phase",""),project.get("effect",""),project.get("wage",0)]
@@ -3132,8 +3541,10 @@ func _render_software() -> void:
                 var editor := LineEdit.new()
                 editor.name="Java_"+str(ticket.get("id",""))
                 editor.placeholder_text=str(ticket.get("language","Java"))+" solution"
-                editor.text=str(ticket.get("starter","return 0;"))
+                var ticket_id := str(ticket.get("id",""))
+                editor.text=str(_office_drafts.get(_office_draft_key(ticket_id),ticket.get("starter","return 0;")))
                 editor.max_length=180
+                editor.text_changed.connect(_remember_office_draft.bind(ticket_id))
                 editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL
                 _action_choices.add_child(editor)
                 var submit := _button("Run tests and submit · 60 min",_submit_java.bind(str(ticket.get("id","")),editor))
@@ -3242,6 +3653,19 @@ func _render_medical() -> void:
     var service := _button("Consultation · 15 EUR · 30 min" if clinic else "Basic pharmacy care · 5 EUR · 10 min",_garden_action.bind("rebirth-medical-"+_medical_station()))
     service.disabled=not bool(medical.get("canConsult" if clinic else "canFirstAid",false))
     _action_choices.add_child(service)
+    var followup = medical.get("followup")
+    if followup is Dictionary:
+        var followup_label := Label.new()
+        followup_label.text = tr("Recovery kit: %s/3 · completed days: %s") % [followup.get("remainingSupplies",0),followup.get("completedDays",0)]
+        _action_choices.add_child(followup_label)
+        if clinic:
+            var exam := _button("Private assessment · 12 EUR · 20 min",_garden_action.bind("rebirth-medical-exam"))
+            exam.disabled=not bool(followup.get("canExam",false))
+            _action_choices.add_child(exam)
+        else:
+            var collect := _button("Collect recovery kit · 9 EUR · 10 min",_garden_action.bind("rebirth-medical-collect"))
+            collect.disabled=not bool(followup.get("canCollect",false))
+            _action_choices.add_child(collect)
     _action_choices.add_child(_button("Leave",_close_medical))
 
 func _cafe_station() -> String:
@@ -3431,11 +3855,77 @@ func _render_actions() -> void:
                 var study_info := Label.new()
                 study_info.text="Education · %s · %s/%s lessons" % [college.get("enrolled",""),college.get("completed",0),college.get("required",0)]
                 _action_choices.add_child(study_info)
+            var dojo = rebirth.get("dojo")
+            if dojo is Dictionary:
+                var dojo_label := Label.new()
+                dojo_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                dojo_label.text=tr("Shotokan · belt %s · Mon/Wed/Fri 18:00–21:00") % tr(str(dojo.get("belt","White")))
+                dojo_label.text+="\n"+(tr("Kihon %s · Kata %s · Kumite %s · next target %s each") % [dojo.get("kihon",0),dojo.get("kata",0),dojo.get("kumite",0),dojo.get("required",3)])
+                _action_choices.add_child(dojo_label)
+                var community = rebirth.get("dojoCommunity")
+                if community is Dictionary and _near_dojo():
+                    for member in community.get("present",[]):
+                        var member_label := Label.new()
+                        member_label.text = "%s · %s" % [member.get("name",""),tr("Sensei" if member.get("role","")=="instructor" else "Student")]
+                        _action_choices.add_child(member_label)
+                    if community.get("instructorPresent",false):
+                        _action_choices.add_child(_button("Rei · Greet sensei",_garden_action.bind("rebirth-dojo-rei")))
+                if _near_dojo() and dojo.get("canTrain",false):
+                    for mode in ["kihon","kata","kumite"]:
+                        _action_choices.add_child(_button(tr("Practice %s · 60 min · 5 EUR") % tr(mode.capitalize()),_garden_action.bind("rebirth-dojo-"+mode)))
+                if _near_dojo() and dojo.get("canExam",false):
+                    _action_choices.add_child(_button(tr("Belt exam · %s · 15 EUR") % tr(str(dojo.get("nextBelt",""))),_garden_action.bind("rebirth-dojo-exam")))
+            var match_view = rebirth.get("kumite")
+            if match_view is Dictionary and _near_dojo():
+                var match_label := Label.new()
+                match_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                match_label.text=tr("Controlled kumite · %s : %s") % [match_view.get("score",0),match_view.get("partnerScore",0)]
+                _action_choices.add_child(match_label)
+                if match_view.get("active",false):
+                    var cue_names := {"close":"Partner approaches","far":"Partner keeps distance","opening":"Scoring opportunity"}
+                    var cue_label := Label.new()
+                    cue_label.text=tr("Exchange %s/5 · %s") % [match_view.get("round",1),tr(str(cue_names.get(str(match_view.get("cue","")),"")))]
+                    _action_choices.add_child(cue_label)
+                    for choice in ["guard","step","touch"]:
+                        _action_choices.add_child(_button(tr(str({"guard":"Guard","step":"Adjust distance","touch":"Controlled point"}.get(choice))),_garden_action.bind("rebirth-dojo-match-"+choice)))
+                    _action_choices.add_child(_button("End practice",_garden_action.bind("rebirth-dojo-match-stop")))
+                elif match_view.get("canStart",false):
+                    _action_choices.add_child(_button(tr("Practice with %s · 5 EUR") % str(match_view.get("partnerName","")),_garden_action.bind("rebirth-dojo-match-start")))
+                elif match_view.get("completed",false):
+                    var done := Label.new()
+                    done.text=tr("Practice completed")
+                    _action_choices.add_child(done)
+            var sports = rebirth.get("sports")
+            if sports is Dictionary:
+                var sport_label := Label.new()
+                sport_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                sport_label.text = tr("Fitness %s · Endurance %s · Flexibility %s") % [sports.get("fitness",0),sports.get("endurance",0),sports.get("flexibility",0)]
+                sport_label.text += "\n"+(tr("Strength %s · Karate %s · Sessions %s") % [sports.get("strength",0),sports.get("karate",0),sports.get("sessions",0)])
+                _action_choices.add_child(sport_label)
+                var sport_names := {"run":"Running","yoga":"Yoga","karate":"Karate","gym":"Gym training","cycling":"Cycling rental"}
+                for option in sports.get("options",[]):
+                    var sport_id := str(option.get("id",""))
+                    var sport_name := tr(str(sport_names.get(sport_id,sport_id)))
+                    if option.get("available",false):
+                        _action_choices.add_child(_button(tr("%s · %s min · %s EUR") % [sport_name,option.get("minutes",0),option.get("price",0)],_garden_action.bind("rebirth-sport-"+sport_id)))
+                    else:
+                        var sport_hint := Label.new()
+                        sport_hint.text = "%s · %s" % [sport_name,tr(str(option.get("district","")))]
+                        _action_choices.add_child(sport_hint)
             var medical = rebirth.get("medical")
             if medical is Dictionary:
                 var health_label := Label.new()
                 health_label.text="Health %s/100 · %s" % [medical.get("health",100),"Ill until day "+str(medical.get("sickUntilDay",0)) if medical.get("ill",false) else "Not ill"]
                 _action_choices.add_child(health_label)
+                var followup = medical.get("followup")
+                if followup is Dictionary:
+                    var recovery_label := Label.new()
+                    recovery_label.text = tr("Recovery kit: %s/3 · completed days: %s") % [followup.get("remainingSupplies",0),followup.get("completedDays",0)]
+                    if int(followup.get("lastExamDay",0))>0:
+                        recovery_label.text += "\n"+(tr("Last assessment: day %s · health %s/100") % [followup.get("lastExamDay",0),followup.get("assessedHealth",0)])
+                    _action_choices.add_child(recovery_label)
+                    if followup.get("canRecover",false):
+                        _action_choices.add_child(_button("Supported recovery · 60 min",_garden_action.bind("rebirth-medical-recover")))
                 if medical.get("canVisit",false):
                     _action_choices.add_child(_button("Visit medical district",_garden_action.bind("rebirth-medical-visit")))
             var home_options = rebirth.get("homeOptions")
@@ -3446,10 +3936,56 @@ func _render_actions() -> void:
                 home_label.text += "\nHygiene %s · Furnishings %s/2" % [home_options.get("hygiene",100),home_options.get("furnitureLevel",0)]
                 for relative in home_options.get("family",[]):
                     home_label.text += "\nAt home: "+str(relative)
+                var domestic = home_options.get("domestic")
+                if domestic is Dictionary:
+                    home_label.text += "\n"+(tr("Cleanliness %s · Clothes %s") % [domestic.get("cleanliness",100),domestic.get("clothes",100)])
+                    home_label.text += "\n"+(tr("Electricity credits used %s · Water units used %s") % [domestic.get("electricityUses",0),domestic.get("waterUsed",0)])
                 _action_choices.add_child(home_label)
-                var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
+                var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","microwave":"Heat meal · 5 min · 1 EUR","clean":"Clean home · 30 min · 1 water","laundry":"Wash clothes · 45 min · 1 water · 1 EUR","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
                 for action in home_options.get("actions",[]):
                     _action_choices.add_child(_button(str(home_labels.get(action,action)),_garden_action.bind("rebirth-home-"+str(action))))
+                var wardrobe = home_options.get("wardrobe")
+                if wardrobe is Dictionary:
+                    var wardrobe_label := Label.new()
+                    wardrobe_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                    wardrobe_label.text=tr("Wardrobe · %s · weather comfort %s/100") % [tr(str(wardrobe.get("worn","casual")).capitalize()),wardrobe.get("comfort",100)]
+                    _action_choices.add_child(wardrobe_label)
+                    for outfit in wardrobe.get("items",[]):
+                        var outfit_id := str(outfit.get("id",""))
+                        var outfit_name := tr(outfit_id.capitalize())
+                        if outfit.get("owned",false):
+                            var condition_label := Label.new()
+                            condition_label.text=tr("%s · condition %s/100") % [outfit_name,outfit.get("condition",100)]
+                            _action_choices.add_child(condition_label)
+                        if outfit.get("canBuy",false):
+                            _action_choices.add_child(_button(tr("Buy outfit: %s · %s EUR") % [outfit_name,outfit.get("price",0)],_garden_action.bind("rebirth-wardrobe-buy-"+outfit_id)))
+                        if outfit.get("canWear",false):
+                            _action_choices.add_child(_button(tr("Wear %s") % outfit_name,_garden_action.bind("rebirth-wardrobe-wear-"+outfit_id)))
+                var furnishing_names := {"kitchen":"Kitchen furnishings","bedroom":"Bedroom furnishings","children":"Children’s furnishings","laundry":"Washing machine"}
+                for offer in home_options.get("furnishings",[]):
+                    var item_id := str(offer.get("id",""))
+                    var item_name := tr(str(furnishing_names.get(item_id,item_id)))
+                    if offer.get("installed",false):
+                        var installed_label := Label.new()
+                        installed_label.text = tr("%s · installed") % item_name
+                        _action_choices.add_child(installed_label)
+                    elif offer.get("canBuy",false):
+                        _action_choices.add_child(_button(tr("%s · %s EUR") % [item_name,offer.get("price",0)],_garden_action.bind("rebirth-home-furnish-"+item_id)))
+                var properties = home_options.get("properties",[])
+                if not properties.is_empty():
+                    var market_label := Label.new()
+                    market_label.text = "Property market · Office 09:00–17:00"
+                    _action_choices.add_child(market_label)
+                    for property in properties:
+                        var property_label := Label.new()
+                        property_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                        property_label.text = "%s · %s · %s EUR" % [property.get("name",""),tr(str(property.get("district",""))),property.get("price",0)]
+                        property_label.text += " · "+tr("Owned" if property.get("owned",false) else ("Available" if property.get("available",false) else "Unavailable"))
+                        _action_choices.add_child(property_label)
+                        if property.get("canBuy",false):
+                            _action_choices.add_child(_button(tr("Buy home · %s EUR") % property.get("price",0),_garden_action.bind("rebirth-property-buy-"+str(property.get("id","")))))
+                        if property.get("canSell",false):
+                            _action_choices.add_child(_button(tr("Sell home · %s EUR") % property.get("resale",0),_garden_action.bind("rebirth-property-sell-"+str(property.get("id","")))))
             var family_options = rebirth.get("familyOptions")
             if family_options is Dictionary:
                 var household := Label.new()
@@ -3459,6 +3995,19 @@ func _render_actions() -> void:
                 for kid in family_options.get("children",[]):
                     household.text += "\nChild: %s · age %s%s" % [kid.get("name",""),kid.get("age",0)," (deceased)" if not kid.get("alive",true) else ""]
                 _action_choices.add_child(household)
+                var budget = family_options.get("budget")
+                if budget is Dictionary:
+                    var budget_label := Label.new()
+                    budget_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    budget_label.text = tr("Family savings: %s EUR · yours %s · partner %s") % [budget.get("total",0),budget.get("personalSavings",0),budget.get("partnerSavings",0)]
+                    budget_label.text += "\n"+(tr("Outstanding bills: %s EUR · dependent children: %s") % [budget.get("unpaidBills",0),budget.get("children",0)])
+                    _action_choices.add_child(budget_label)
+                    if budget.get("canDeposit",false):
+                        _action_choices.add_child(_button("Save 10 EUR for the family",_garden_action.bind("rebirth-budget-deposit")))
+                    if budget.get("canWithdraw",false):
+                        _action_choices.add_child(_button("Withdraw your 10 EUR savings",_garden_action.bind("rebirth-budget-withdraw")))
+                    if budget.get("canPayBills",false):
+                        _action_choices.add_child(_button("Pay bills from family savings",_garden_action.bind("rebirth-budget-bills")))
                 for candidate in family_options.get("proposals",[]):
                     _action_choices.add_child(_button("Propose partnership to "+str(candidate.get("name","")),_garden_action.bind("rebirth-propose-"+str(candidate.get("id","")))))
                 if family_options.get("canMoveTogether",false):
@@ -4063,10 +4612,18 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-") or action.begins_with("rebirth-devops-") or action.begins_with("rebirth-it:")) and not _near_software():return
+    if not _office_action_allowed(action):return
+    if action.begins_with("rebirth-dojo-") and not _near_dojo():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
-    if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
+    if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit":
+        if action=="rebirth-medical-recover":
+            if not _apartment_active:return
+        elif action=="rebirth-medical-exam":
+            if _medical_station()!="consult":return
+        elif action=="rebirth-medical-collect":
+            if _medical_station()!="first-aid":return
+        elif action!="rebirth-medical-"+_medical_station():return
     if action.begins_with("rebirth-cafe-"):
         var station := _cafe_station()
         var table_action := action=="rebirth-cafe-rest" or action.begins_with("rebirth-cafe-chat-")
@@ -4106,7 +4663,16 @@ func _inventory_count(items: Dictionary) -> int:
         total += int(amount)
     return total
 
+func _render_aid_notices() -> void:
+    var lines := PackedStringArray()
+    for notice in _last_snapshot.get("aidNotices",[]):
+        var item := tr("Water") if str(notice.get("item",""))=="water" else tr("Bread")
+        lines.append(tr("%s shared %s with you today.") % [str(notice.get("name","")),item])
+    _aid_label.text = "\n".join(lines)
+    _aid_label.visible = not lines.is_empty()
+
 func _update_bag() -> void:
+    _render_aid_notices()
     var player: Dictionary = _last_snapshot.get("player",{})
     var bread := int(player.get("bread",0))
     var water := int(player.get("bottledWater",0))
@@ -4233,6 +4799,39 @@ func _set_apartment(active: bool) -> void:
         _avatar.position=Vector3.ZERO
     _follow_player()
 
+func _render_hud_summary(snapshot: Dictionary) -> void:
+    var player: Dictionary = snapshot.get("player", {})
+    var job = player.get("jobId")
+    var profession := tr("unemployed") if job == null else str(job)
+    _heading.text = "Living Alibi | " + str(player.get("place", "Park"))
+    _status.text = tr("Visitor #%s | %s EUR | %s") % [
+        str(player.get("incarnation", 1)), str(player.get("money", 50)), profession
+    ]
+    if _rebirth_active():
+        var child: Dictionary = snapshot.get("rebirth",{})
+        _status.text = tr("Choose a new family") if str(child.get("phase","")) == "CHOICE" else tr("%s | Age %s | %s") % [child.get("childName",""),child.get("age",0),tr("Adult") if str(child.get("phase","")) == "LINKED_ADULT" else tr("Childhood")]
+    var climate: Dictionary = snapshot.get("weather", {})
+    _weather.text = tr("Day %s  %s:%02d | %s | %s  %s °C") % [
+        str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,
+        int(snapshot.get("minute", 450))%60, tr(str(snapshot.get("season", "SPRING"))),
+        tr(str(climate.get("sky", "CLEAR"))), str(climate.get("temperatureC", 0))
+    ]
+    _needs.text = tr("Hunger %s  Thirst %s  Fatigue %s  Health %s  Eng %s  Inv %s") % [
+        str(player.get("hunger", 0)), str(player.get("thirst", 0)),
+        str(player.get("fatigue", 0)), str(player.get("health", 100)),
+        str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
+    ]
+    _needs.text += tr(" | Hygiene %s") % str(player.get("hygiene",100))
+    var utilities: Dictionary = snapshot.get("services", {})
+    var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
+    var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
+    _needs.text += tr("\nPark fountain: %s (%s clean units) | Street lights: %s") % [
+        tr(fountain), str(utilities.get("cleanWater", 0)), tr(lighting)
+    ]
+    _needs.text += tr("\nResidents present in this district: %s") % [
+        str(snapshot.get("residents", []).size())
+    ]
+
 func _on_world_updated(snapshot: Dictionary) -> void:
     var clock_update := _clock_pending
     var walking_transition := _home_transition or not _road_pending.is_empty()
@@ -4253,6 +4852,9 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _office_app="work"
+        _office_joke_hold=0.0
+        _office_joke_wait=8.0
         _software_menu=false
         _engineering_menu=false
         _college_menu=false
@@ -4275,40 +4877,13 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if continue_in_cabin:
         _park_in_cabin()
 
-    var job = player.get("jobId")
-    var profession := "unemployed" if job == null else str(job)
-    _heading.text = "Living Alibi | " + str(player.get("place", "Park"))
-    _status.text = "Visitor #%s | %s EUR | %s" % [
-        str(player.get("incarnation", 1)), str(player.get("money", 50)), profession
-    ]
-    if _rebirth_active():
-        var child: Dictionary = snapshot.get("rebirth",{})
-        _status.text = "Choose a new family" if str(child.get("phase","")) == "CHOICE" else "%s | Age %s | %s" % [child.get("childName",""),child.get("age",0),"Adult" if str(child.get("phase","")) == "LINKED_ADULT" else "Childhood"]
-    var climate: Dictionary = snapshot.get("weather", {})
-    _weather.text = "Day %s  %s:%02d | %s | %s  %s °C" % [
-        str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,
-        int(snapshot.get("minute", 450))%60, str(snapshot.get("season", "SPRING")),
-        str(climate.get("sky", "CLEAR")), str(climate.get("temperatureC", 0))
-    ]
-    _needs.text = "Hunger %s  Thirst %s  Fatigue %s  Health %s  Eng %s  Inv %s" % [
-        str(player.get("hunger", 0)), str(player.get("thirst", 0)),
-        str(player.get("fatigue", 0)), str(player.get("health", 100)),
-        str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
-    ]
-    _needs.text += " | Hygiene %s" % str(player.get("hygiene",100))
-    var utilities: Dictionary = snapshot.get("services", {})
-    var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
-    var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
-    _needs.text += "\nPark fountain: %s (%s clean units) | Street lights: %s" % [
-        fountain, str(utilities.get("cleanWater", 0)), lighting
-    ]
-    _needs.text += "\nResidents present in this district: %s" % [
-        str(snapshot.get("residents", []).size())
-    ]
+    _render_hud_summary(snapshot)
     var home = snapshot.get("rebirth",{}).get("homeOptions")
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
         _apartment.set_furniture_level(int(home.get("furnitureLevel",0)))
+        _apartment.set_home_style(str(home.get("interiorStyle","standard")))
+        _apartment.set_room_packages(home.get("furnishings",[]))
     _sync_family_entrance(home)
     if walking_transition and is_instance_valid(_home_entrance) and not road_arrival:
         _avatar.position=_home_entrance.position
@@ -4332,7 +4907,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         if person == null:
             _close_dialog()
         else:
-            _dialog_attitude.text = "Attitude: "+str(person.get_meta("relationship","STRANGER")).capitalize()
+            _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
+            _render_dialog_mood(person)
     _apply_weather()
     _render_actions()
     if _rebirth_active():
@@ -4471,10 +5047,10 @@ func _on_action_feedback(message: String) -> void:
     if _dialog_pending:
         _dialog_pending = false
         if _dialog_panel.visible:
-            _dialog_reply.text = message
+            _dialog_reply.text = _localized_resident_reply(message)
             _dialog_input.clear()
     if not _clock_pending:
-        _message.text = message
+        _message.text = tr(message)
 
 func _on_request_started(route: String) -> void:
     if route.begins_with("/actions/") and not _clock_pending:
