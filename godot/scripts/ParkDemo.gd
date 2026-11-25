@@ -20,6 +20,9 @@ var _avatar: Node3D
 var _camera: Camera3D
 var _scenery: Node3D
 var _residents_root: Node3D
+var _park_lamps: Array[OmniLight3D] = []
+var _fountain_water: MeshInstance3D
+var _sun: DirectionalLight3D
 var _ground_material: StandardMaterial3D
 var _environment: Environment
 var _api
@@ -84,6 +87,7 @@ func _process(delta: float) -> void:
         _avatar.position.z = clampf(_avatar.position.z, -17.0, 17.0)
         _follow_player()
 
+    _animate_residents(delta)
     if not _near_gate():
         _travel_panel.visible = false
     if not _near_kiosk():
@@ -156,10 +160,11 @@ func _build_world() -> void:
     lighting.environment = _environment
     add_child(lighting)
 
-    var sun := DirectionalLight3D.new()
-    sun.rotation_degrees = Vector3(-55.0, -25.0, 0.0)
-    sun.light_energy = 1.1
-    add_child(sun)
+    _sun = DirectionalLight3D.new()
+    _sun.rotation_degrees = Vector3(-55.0, -25.0, 0.0)
+    _sun.light_energy = 1.1
+    _sun.shadow_enabled = true
+    add_child(_sun)
 
     _avatar = Node3D.new()
     _avatar.name = "OrdinaryVisitor"
@@ -183,6 +188,8 @@ func _render_place(place_id: String) -> void:
     if _scenery != null:
         remove_child(_scenery)
         _scenery.queue_free()
+    _park_lamps.clear()
+    _fountain_water = null
     _scenery = Node3D.new()
     _scenery.name = "PublicScene_" + place_id
     add_child(_scenery)
@@ -206,13 +213,7 @@ func _render_place(place_id: String) -> void:
 
     match place_id:
         "PARK":
-            for p in [
-                Vector2(-9.0, -8.0), Vector2(10.0, -10.0),
-                Vector2(-12.0, 7.0), Vector2(9.0, 8.0)
-            ]:
-                _tree(Vector3(p.x, 0.0, p.y))
-            _box(_scenery, Vector3(2.0, 0.18, 0.75), Color(0.37, 0.23, 0.14),
-                    Vector3(-6.0, 0.65, 2.0))
+            _build_park()
         "MARKET":
             _building("Market stalls", Color(0.68, 0.39, 0.22))
             _box(_scenery, Vector3(6.0, 0.18, 3.0), Color(0.83, 0.20, 0.18),
@@ -268,42 +269,163 @@ func _render_place(place_id: String) -> void:
 
     _apply_weather()
 
+func _build_park() -> void:
+    var park := Node3D.new()
+    park.name = "ParkDetails"
+    _scenery.add_child(park)
+    var paving := Color(0.65, 0.61, 0.54)
+    _box(park, Vector3(32.0, 0.06, 2.6), paving, Vector3(0, 0.01, 5))
+    _box(park, Vector3(3.2, 0.06, 16.0), paving, Vector3(-11, 0.01, -3))
+    for p in [Vector2(-15,-13), Vector2(-8,-14), Vector2(8,-13),
+            Vector2(14,-8), Vector2(-15,9), Vector2(-7,11),
+            Vector2(10,11), Vector2(15,14), Vector2(-8,-5)]:
+        _tree(Vector3(p.x, 0.0, p.y))
+    for p in [Vector3(-5,0,3), Vector3(-5,0,7), Vector3(11,0,7)]:
+        _bench(park, p)
+    for p in [Vector3(-3,0,-9), Vector3(3,0,-3), Vector3(-3,0,8), Vector3(13,0,3)]:
+        _lamp(park, p)
+    # The pool is decorative; drinking still requires the validated Java action.
+    var fountain := Node3D.new()
+    fountain.name = "PublicFountain"
+    fountain.position = Vector3(8, 0, -5)
+    park.add_child(fountain)
+    _cylinder(fountain, 2.0, 0.35, Color(0.52,0.53,0.54), Vector3(0,0.18,0))
+    _cylinder(fountain, 1.85, 0.08, Color(0.24,0.28,0.29), Vector3(0,0.39,0))
+    _fountain_water = _cylinder(fountain, 1.78, 0.04, Color(0.24,0.63,0.76), Vector3(0,0.45,0))
+    _cylinder(fountain, 0.25, 1.1, Color(0.60,0.61,0.62), Vector3(0,0.85,0))
+    _sign(fountain, "Public fountain", Vector3(0,1.8,0))
+    _sign(park, "Town centre · E", GATE_POSITION + Vector3(0,3.7,0))
+    _sign(park, "Public services · F", KIOSK_POSITION + Vector3(0,2.2,0))
+    # A street along the edge provides visual context, not a new travel route.
+    _box(park, Vector3(38,0.08,3.2), Color(0.23,0.25,0.27), Vector3(0,0.02,-16))
+    for x in range(-16,17,4):
+        _box(park, Vector3(1.5,0.02,0.11), Color(0.92,0.85,0.61), Vector3(x,0.07,-16))
+    for x in [-14.0,-8.0,8.0,14.0]:
+        _box(park, Vector3(4.7,4.0,2.5), Color(0.69,0.59,0.47), Vector3(x,2,-19))
+        for offset in [-1.2,1.2]:
+            _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.7))
+
+func _bench(parent: Node3D, at: Vector3) -> void:
+    var wood := Color(0.43,0.27,0.14)
+    _box(parent, Vector3(2.0,0.12,0.58), wood, at + Vector3(0,0.52,0))
+    _box(parent, Vector3(2.0,0.42,0.10), wood, at + Vector3(0,0.85,0.25))
+    for x in [-0.75,0.75]:
+        _box(parent, Vector3(0.11,0.50,0.47), Color(0.20,0.23,0.24), at+Vector3(x,0.25,0))
+
+func _lamp(parent: Node3D, at: Vector3) -> void:
+    _cylinder(parent, 0.09, 3.4, Color(0.19,0.22,0.24), at+Vector3(0,1.7,0))
+    _sphere(parent, 0.23, Color(0.91,0.87,0.65), at+Vector3(0,3.4,0))
+    var lamp := OmniLight3D.new()
+    lamp.position = at+Vector3(0,3.2,0)
+    lamp.light_color = Color(1.0,0.81,0.53)
+    lamp.light_energy = 2.0
+    lamp.omni_range = 8.0
+    lamp.visible = false
+    parent.add_child(lamp)
+    _park_lamps.append(lamp)
+
+func _sign(parent: Node3D, caption: String, at: Vector3) -> void:
+    var tag := Label3D.new()
+    tag.text = caption
+    tag.position = at
+    tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    tag.font_size = 30
+    tag.pixel_size = 0.008
+    parent.add_child(tag)
+
+func _cylinder(parent: Node3D, radius: float, height: float, color: Color,
+        at: Vector3) -> MeshInstance3D:
+    var mesh := CylinderMesh.new()
+    mesh.top_radius = radius
+    mesh.bottom_radius = radius
+    mesh.height = height
+    mesh.radial_segments = 16
+    var node := MeshInstance3D.new()
+    node.mesh = mesh
+    var material := StandardMaterial3D.new()
+    material.albedo_color = color
+    node.material_override = material
+    node.position = at
+    parent.add_child(node)
+    return node
+
 func _render_residents() -> void:
-    # Draw only people the Java world reports as present in this public scene.
-    # These grid positions are visual placeholders, NOT authoritative coordinates.
+    # Stable visual identities. Java still owns presence and activity.
     if _residents_root == null:
         return
-    for child in _residents_root.get_children():
-        _residents_root.remove_child(child)
-        child.queue_free()
-
     var residents: Array = _last_snapshot.get("residents", [])
+    var present: Dictionary = {}
     for i in range(residents.size()):
         if typeof(residents[i]) != TYPE_DICTIONARY:
             continue
         var resident: Dictionary = residents[i]
-        var person := Node3D.new()
-        person.name = "Resident_" + str(resident.get("id", i))
-        person.position = Vector3(
-                (float(i % 8) - 3.5) * 3.0,
-                0.0, -4.0 - float(int(i / 8)) * 2.5)
-        _residents_root.add_child(person)
-        var jacket := Color(0.25 + float(i % 3) * 0.14,
-                0.35 + float(i % 4) * 0.11, 0.38 + float(i % 2) * 0.23)
-        _box(person, Vector3(0.65, 1.05, 0.35), jacket,
-                Vector3(0.0, 1.1, 0.0))
-        _sphere(person, 0.27, Color(0.86, 0.68, 0.51),
-                Vector3(0.0, 1.85, 0.0))
-        for offset in [-0.17, 0.17]:
-            _box(person, Vector3(0.22, 0.7, 0.25),
-                    Color(0.20, 0.25, 0.30), Vector3(offset, 0.35, 0.0))
-        var name_tag := Label3D.new()
-        name_tag.text = str(resident.get("name", "Resident"))
-        name_tag.position = Vector3(0.0, 2.45, 0.0)
-        name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-        name_tag.font_size = 26
-        name_tag.pixel_size = 0.006
-        person.add_child(name_tag)
+        var id := str(resident.get("id", ""))
+        if id.is_empty() or present.has(id):
+            continue
+        present[id] = true
+        var person := _residents_root.get_node_or_null("Resident_" + id) as Node3D
+        if person == null:
+            person = _make_resident(id, i, str(resident.get("name", "Resident")))
+        person.set_meta("activity", str(resident.get("activity", "")).to_upper())
+    for child in _residents_root.get_children():
+        if not present.has(str(child.get_meta("resident_id", ""))):
+            _residents_root.remove_child(child)
+            child.queue_free()
+
+func _make_resident(id: String, index: int, display_name: String) -> Node3D:
+    var person := Node3D.new()
+    person.name = "Resident_" + id
+    person.set_meta("resident_id", id)
+    var anchor := Vector3((float(index % 8)-3.5)*3.0, 0, -4.0-float(index / 8)*2.5)
+    anchor.z = maxf(anchor.z, -13.0)
+    person.position = anchor
+    person.set_meta("anchor", anchor)
+    person.set_meta("phase", float(absi(id.hash()) % 628) / 100.0)
+    _residents_root.add_child(person)
+    var seed := absi(id.hash())
+    var jacket := Color.from_hsv(float(seed % 360)/360.0, 0.48, 0.63)
+    var skin := Color(0.82,0.64,0.49)
+    _cylinder(person, 0.24, 0.57, jacket, Vector3(0,1.14,0))
+    _sphere(person, 0.22, skin, Vector3(0,1.66,0))
+    _sphere(person, 0.215, Color(0.22,0.16,0.12), Vector3(0,1.78,0.035))
+    for side in [-1,1]:
+        var leg := Node3D.new()
+        leg.name = "LegLeft" if side < 0 else "LegRight"
+        leg.position = Vector3(side*0.13,0.84,0)
+        person.add_child(leg)
+        _box(leg,Vector3(0.20,0.70,0.22),Color(0.20,0.25,0.30),Vector3(0,-0.35,0))
+        _box(leg,Vector3(0.22,0.13,0.34),Color(0.14,0.15,0.17),Vector3(0,-0.77,-0.06))
+        var arm := Node3D.new()
+        arm.name = "ArmLeft" if side < 0 else "ArmRight"
+        arm.position = Vector3(side*0.32,1.37,0)
+        person.add_child(arm)
+        _box(arm,Vector3(0.16,0.44,0.17),jacket,Vector3(0,-0.22,0))
+        _sphere(arm,0.085,skin,Vector3(0,-0.48,0))
+    _sign(person,display_name,Vector3(0,2.1,0))
+    return person
+
+func _animate_residents(delta: float) -> void:
+    if _residents_root == null:
+        return
+    for child in _residents_root.get_children():
+        var person := child as Node3D
+        var activity := str(person.get_meta("activity", ""))
+        var walking := activity in ["WALKING", "WANDERING", "STROLLING"]
+        var phase := float(person.get_meta("phase", 0.0))
+        if walking:
+            phase += delta * 0.65
+            person.set_meta("phase", phase)
+            var anchor: Vector3 = person.get_meta("anchor")
+            var target := anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
+            var motion := target-person.position
+            if motion.length_squared() > 0.0001:
+                person.rotation.y = atan2(-motion.x,-motion.z)
+            person.position = person.position.move_toward(target,delta*1.5)
+        var swing := sin(phase*12.0)*0.42 if walking else 0.0
+        for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
+            var part := person.get_node(limb) as Node3D
+            var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
+            part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
     _box(_scenery, Vector3(11.0, 4.5, 7.0), wall_color,
