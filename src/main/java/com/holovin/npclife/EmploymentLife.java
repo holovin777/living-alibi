@@ -39,12 +39,31 @@ final class EmploymentLife {
                 p.sickUntilDay=0;
                 log(town,clock,p,Kind.RECOVERED,"Returned to usual health after a brief illness.");
             }
+            // A company that cannot pay its employees must stop pretending
+            // they still earn wages. Former industrial workers can search the
+            // wider local job market instead of starving in an unpaid post.
+            String industryAccount=IndustryLife.companyFor(p.occupation);
+            boolean workshopEmployee=BusinessLife.isEmployee(town,p);
+            boolean insolventWorkshop=workshopEmployee &&
+                    town.business.cash<BusinessLife.HOURLY_WAGE;
+            if(p.employed && ((industryAccount!=null &&
+                    town.employerFunds.getOrDefault(industryAccount,0)<IndustryLife.HOURLY_WAGE) ||
+                    insolventWorkshop)) {
+                loseJob(town,clock,p);
+            }
             if(!p.employed) {
                 p.unemploymentDays++;
-                // Job search takes multiple days; financial stress slightly improves urgency.
-                int threshold=p.unpaidBills>0 || p.money<80?225:145;
-                if(p.unemploymentDays>=5 && roll(p,clock.day,0xB1L,1000)<threshold)
+                if((industryAccount!=null || workshopEmployee) &&
+                        p.unemploymentDays>=2) {
+                    // Simplified emergency placement after a factory closure:
+                    // the old industrial career and physical production end.
                     hire(town,clock,p,roll(p,clock.day,0xC2L,JOBS.length));
+                } else {
+                    // Other job seekers retain the slower independent search.
+                    int threshold=p.unpaidBills>0 || p.money<80?225:145;
+                    if(p.unemploymentDays>=5 && roll(p,clock.day,0xB1L,1000)<threshold)
+                        hire(town,clock,p,roll(p,clock.day,0xC2L,JOBS.length));
+                }
             } else if((p.lastHiredDay==0 || clock.day-p.lastHiredDay>=14) &&
                     roll(p,clock.day,0xA3L,1000)<17) {
                 loseJob(town,clock,p);

@@ -73,7 +73,15 @@ final class WorldDatabase implements AutoCloseable {
                         hunger INTEGER NOT NULL DEFAULT 0,
                         thirst INTEGER NOT NULL DEFAULT 0,
                         fatigue INTEGER NOT NULL DEFAULT 0,
-                        health INTEGER NOT NULL DEFAULT 100)
+                        health INTEGER NOT NULL DEFAULT 100,
+                        alive INTEGER NOT NULL DEFAULT 1,
+                        incarnation INTEGER NOT NULL DEFAULT 1,
+                        money INTEGER NOT NULL DEFAULT 50,
+                        job_id TEXT,
+                        engineering_skill INTEGER NOT NULL DEFAULT 0,
+                        investigation_skill INTEGER NOT NULL DEFAULT 0,
+                        last_work_day INTEGER NOT NULL DEFAULT 0,
+                        last_technical_day INTEGER NOT NULL DEFAULT 0)
                     """);
             st.execute("""
                     CREATE TABLE IF NOT EXISTS player_contacts (
@@ -81,6 +89,118 @@ final class WorldDatabase implements AutoCloseable {
                         conversations INTEGER NOT NULL, last_day INTEGER NOT NULL,
                         last_minute INTEGER NOT NULL, last_heard TEXT)
                     """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS player_life_contacts (
+                        incarnation INTEGER NOT NULL,
+                        resident_id TEXT NOT NULL, known_name TEXT,
+                        conversations INTEGER NOT NULL, last_day INTEGER NOT NULL,
+                        last_minute INTEGER NOT NULL, last_heard TEXT,
+                        PRIMARY KEY(incarnation,resident_id))
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS player_lives (
+                        incarnation INTEGER PRIMARY KEY, died_day INTEGER NOT NULL,
+                        died_minute INTEGER NOT NULL, died_place TEXT NOT NULL,
+                        private_name TEXT)
+                    """);
+            st.execute("CREATE TABLE IF NOT EXISTS visitor_ingredients (location TEXT NOT NULL, product_id TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>0), PRIMARY KEY(location,product_id))");
+            st.execute("CREATE TABLE IF NOT EXISTS retail_stock (product_id TEXT PRIMARY KEY, quantity INTEGER NOT NULL CHECK(quantity>=0))");
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS career_accounts (
+                        account_id TEXT PRIMARY KEY,
+                        balance INTEGER NOT NULL CHECK(balance>=0))
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS player_business (
+                        id INTEGER PRIMARY KEY CHECK(id=1),
+                        registered INTEGER NOT NULL DEFAULT 0,
+                        owner_incarnation INTEGER NOT NULL DEFAULT 0,
+                        cash INTEGER NOT NULL DEFAULT 0 CHECK(cash>=0),
+                        machine INTEGER NOT NULL DEFAULT 0,
+                        machine_condition INTEGER NOT NULL DEFAULT 100
+                            CHECK(machine_condition BETWEEN 0 AND 100),
+                        employee_id TEXT,
+                        spare_parts INTEGER NOT NULL DEFAULT 0 CHECK(spare_parts>=0),
+                        last_pay_day INTEGER NOT NULL DEFAULT 0,
+                        last_pay_minute INTEGER NOT NULL DEFAULT -1,
+                        paid_hours INTEGER NOT NULL DEFAULT 0,
+                        last_production_day INTEGER NOT NULL DEFAULT 0,
+                        last_sale_day INTEGER NOT NULL DEFAULT 0)
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS technical_materials (
+                        material_id TEXT PRIMARY KEY,
+                        stock INTEGER NOT NULL CHECK(stock>=0))
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS technical_orders (
+                        order_id TEXT PRIMARY KEY,
+                        phase TEXT NOT NULL,
+                        condition INTEGER NOT NULL CHECK(condition BETWEEN 0 AND 100),
+                        completed_day INTEGER NOT NULL DEFAULT 0)
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS industry_stocks (
+                        stock_id TEXT PRIMARY KEY,
+                        quantity INTEGER NOT NULL CHECK(quantity>=0))
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS industry_schedule (
+                        id INTEGER PRIMARY KEY CHECK(id=1),
+                        extract_day INTEGER NOT NULL DEFAULT 0,
+                        transport_day INTEGER NOT NULL DEFAULT 0,
+                        refine_day INTEGER NOT NULL DEFAULT 0,
+                        fabricate_day INTEGER NOT NULL DEFAULT 0,
+                        deliver_day INTEGER NOT NULL DEFAULT 0,
+                        arrival_day INTEGER NOT NULL DEFAULT 0,
+                        recycle_day INTEGER NOT NULL DEFAULT 0)
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS municipal_services (
+                        id INTEGER PRIMARY KEY CHECK(id=1),
+                        clean_water INTEGER NOT NULL DEFAULT 0 CHECK(clean_water>=0),
+                        last_pump_day INTEGER NOT NULL DEFAULT 0)
+                    """);
+            st.execute("""
+                    CREATE TABLE IF NOT EXISTS natural_resources (
+                        id TEXT PRIMARY KEY, quantity INTEGER NOT NULL CHECK(quantity>=0))
+                    """);
+        }
+        // Additive player-business migration: older saves retain working machines
+        // as new, and already-paid hourly wages cannot replay after restart.
+        if(!columnExists("player_business","machine_condition")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("""
+                        ALTER TABLE player_business ADD COLUMN
+                        machine_condition INTEGER NOT NULL DEFAULT 100
+                        CHECK(machine_condition BETWEEN 0 AND 100)
+                        """);
+            }
+        }
+        if(!columnExists("player_business","last_pay_minute")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("""
+                        ALTER TABLE player_business ADD COLUMN
+                        last_pay_minute INTEGER NOT NULL DEFAULT -1
+                        """);
+                st.executeUpdate("""
+                        UPDATE player_business SET last_pay_minute =
+                            CASE WHEN paid_hours>=2 THEN 780
+                                 WHEN paid_hours=1 THEN 720 ELSE -1 END
+                        """);
+            }
+        }
+        // Industrial migration: preserve existing ore, completed shipments,
+        // and old saves made before freight and recycling were added.
+        if(!columnExists("industry_schedule","arrival_day")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE industry_schedule ADD COLUMN arrival_day INTEGER NOT NULL DEFAULT 0");
+            }
+        }
+        if(!columnExists("industry_schedule","recycle_day")) {
+            try(Statement st=db.createStatement()) {
+                st.executeUpdate("ALTER TABLE industry_schedule ADD COLUMN recycle_day INTEGER NOT NULL DEFAULT 0");
+            }
         }
         // v1.16: player physical needs.
         // Existing worlds receive healthy default values.
@@ -90,6 +210,27 @@ final class WorldDatabase implements AutoCloseable {
         playerColumns.put("thirst","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("fatigue","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("health","INTEGER NOT NULL DEFAULT 100");
+        playerColumns.put("alive","INTEGER NOT NULL DEFAULT 1");
+        playerColumns.put("incarnation","INTEGER NOT NULL DEFAULT 1");
+        playerColumns.put("money","INTEGER NOT NULL DEFAULT 50");
+        playerColumns.put("bread","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("bottled_water","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("room_until","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("stored_bread","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("stored_water","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("hygiene","INTEGER NOT NULL DEFAULT 100");
+        playerColumns.put("owns_bicycle","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("cycling","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("bicycle_parked","TEXT");
+        playerColumns.put("car_place","TEXT");
+        playerColumns.put("car_fuel","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("car_condition","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("owns_house","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("job_id","TEXT");
+        playerColumns.put("engineering_skill","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("investigation_skill","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("last_work_day","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("last_technical_day","INTEGER NOT NULL DEFAULT 0");
 
         for(var col:playerColumns.entrySet()) {
             if(!columnExists("player_state",col.getKey())) {
@@ -98,6 +239,16 @@ final class WorldDatabase implements AutoCloseable {
                             "ALTER TABLE player_state ADD COLUMN "+
                             col.getKey()+" "+col.getValue()
                             );
+                }
+            }
+        }
+        for(String table:List.of("player_contacts","player_life_contacts")) {
+            for(var col:Map.of("trust","50","affinity","0","last_positive_day","0").entrySet()) {
+                if(!columnExists(table,col.getKey())) {
+                    try(Statement st=db.createStatement()) {
+                        st.executeUpdate("ALTER TABLE "+table+" ADD COLUMN "+col.getKey()+
+                                " INTEGER NOT NULL DEFAULT "+col.getValue());
+                    }
                 }
             }
         }
@@ -466,6 +617,29 @@ final class WorldDatabase implements AutoCloseable {
                 persistLifeChanges(town);
                 persistProperty(town);
                 persistPlayer(town.player);
+                try(Statement st=db.createStatement()) {st.executeUpdate("DELETE FROM visitor_ingredients");}
+                try(PreparedStatement p=db.prepareStatement("INSERT INTO visitor_ingredients(location,product_id,quantity) VALUES(?,?,?)")) {
+                    for(String location:List.of("bag","pantry")) {
+                        var items=location.equals("bag")?town.player.bagItems:town.player.pantryItems;
+                        for(var item:items.entrySet()) {
+                            p.setString(1,location);p.setString(2,item.getKey());p.setInt(3,item.getValue());p.addBatch();
+                        }
+                    }
+                    p.executeBatch();
+                }
+                persistLives(town);
+                persistNature(town);
+                persistCareerAccounts(town);
+                try(PreparedStatement p=db.prepareStatement("INSERT INTO retail_stock(product_id,quantity) VALUES(?,?) ON CONFLICT(product_id) DO UPDATE SET quantity=excluded.quantity")) {
+                    for(var item:town.retailStock.entrySet()) {
+                        p.setString(1,item.getKey());p.setInt(2,item.getValue());p.addBatch();
+                    }
+                    p.executeBatch();
+                }
+                persistTechnicalWork(town);
+                persistIndustry(town);
+                persistBusiness(town);
+                persistCityUtilities(town);
             }
             db.commit();
             if(town!=null) {
@@ -703,6 +877,86 @@ final class WorldDatabase implements AutoCloseable {
                 town.items.put(item.id,item);
             }
                 }
+        // Resources are shared town state; old worlds receive unclaimed starter stocks.
+        NatureLife.ensureSources(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT id,quantity FROM natural_resources")) {
+            while(rs.next()) {
+                var source=town.naturalResources.get(rs.getString("id"));
+                if(source!=null)
+                    source.stock=Math.max(0,Math.min(source.capacity,rs.getInt("quantity")));
+            }
+        }
+        // Conserved employer/school balances survive restarts and worker payments.
+        CareerLife.ensureEmployers(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT account_id,balance FROM career_accounts")) {
+            while(rs.next()) {
+                if(town.employerFunds.containsKey(rs.getString("account_id")))
+                    town.employerFunds.put(rs.getString("account_id"),
+                            Math.max(0,rs.getInt("balance")));
+            }
+        }
+        RetailLife.ensure(town);
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM retail_stock")) {
+            while(rs.next())if(town.retailStock.containsKey(rs.getString("product_id")))
+                town.retailStock.put(rs.getString("product_id"),rs.getInt("quantity"));
+        }
+        // Physical infrastructure and materials survive the same atomic town save.
+        TechnicalWorkLife.ensure(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT material_id,stock FROM technical_materials")) {
+            while(rs.next())if(town.technicalMaterials.containsKey(rs.getString(1)))
+                town.technicalMaterials.put(rs.getString(1),Math.max(0,rs.getInt(2)));
+        }
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT order_id,phase,condition,completed_day FROM technical_orders")) {
+            while(rs.next()) {
+                var order=town.technicalOrders.get(rs.getString(1));
+                if(order!=null) {
+                    order.phase=TechnicalWorkLife.Phase.valueOf(rs.getString(2));
+                    order.condition=Math.max(0,Math.min(100,rs.getInt(3)));
+                    order.completedDay=rs.getInt(4);
+                }
+            }
+        }
+        IndustryLife.ensure(town);
+        FarmLife.ensure(town);
+        FuelLife.ensure(town);
+        FreightLife.ensure(town);
+        GardenLife.ensure(town);
+        HenLife.ensure(town);
+        OrchardLife.ensure(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT stock_id,quantity FROM industry_stocks")) {
+            while(rs.next()) {
+                if(town.industryStocks.containsKey(rs.getString(1)))
+                    town.industryStocks.put(rs.getString(1),Math.max(0,rs.getInt(2)));
+            }
+        }
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("""
+                        SELECT extract_day,transport_day,refine_day,fabricate_day,deliver_day,
+                               arrival_day,recycle_day
+                        FROM industry_schedule WHERE id=1
+                        """)) {
+            if(rs.next()) {
+                town.lastIndustryExtractDay=Math.max(0,rs.getInt(1));
+                town.lastIndustryTransportDay=Math.max(0,rs.getInt(2));
+                town.lastIndustryRefineDay=Math.max(0,rs.getInt(3));
+                town.lastIndustryFabricateDay=Math.max(0,rs.getInt(4));
+                town.lastIndustryDeliverDay=Math.max(0,rs.getInt(5));
+                town.lastIndustryArrivalDay=Math.max(0,rs.getInt(6));
+                town.lastIndustryRecycleDay=Math.max(0,rs.getInt(7));
+            }
+        }
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT clean_water,last_pump_day FROM municipal_services WHERE id=1")) {
+            if(rs.next()) {
+                town.cleanWater=Math.max(0,Math.min(UtilityLife.TANK_CAPACITY,rs.getInt(1)));
+                town.lastWaterPumpDay=Math.max(0,rs.getInt(2));
+            }
+        }
         // Anonymous by default on migration. No resident learns the player's identity.
         try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_state WHERE id=1")) {
             if(rs.next()) {
@@ -710,9 +964,49 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.destination=TownLife.Place.valueOf(rs.getString("destination"));
                 town.player.travelRemaining=rs.getInt("travel_remaining");
                 town.player.privateName=rs.getString("private_name");
+                town.player.hunger=rs.getInt("hunger");
+                town.player.thirst=rs.getInt("thirst");
+                town.player.fatigue=rs.getInt("fatigue");
+                town.player.health=rs.getInt("health");
+                town.player.alive=rs.getInt("alive")!=0;
+                town.player.incarnation=Math.max(1,rs.getInt("incarnation"));
+                town.player.money=rs.getInt("money");
+                town.player.bread=rs.getInt("bread");
+                town.player.bottledWater=rs.getInt("bottled_water");
+                town.player.roomUntil=rs.getLong("room_until");
+                town.player.storedBread=rs.getInt("stored_bread");
+                town.player.storedWater=rs.getInt("stored_water");
+                town.player.hygiene=rs.getInt("hygiene");
+                town.player.ownsBicycle=rs.getInt("owns_bicycle")!=0;
+                String carPlace=rs.getString("car_place");
+                if(carPlace!=null)town.player.carPlace=TownLife.Place.valueOf(carPlace);
+                town.player.carFuel=rs.getInt("car_fuel");town.player.carCondition=rs.getInt("car_condition");
+                town.player.ownsHouse=rs.getInt("owns_house")!=0;
+                String parked=rs.getString("bicycle_parked");
+                if(town.player.ownsBicycle && parked!=null)town.player.bicycleParked=TownLife.Place.valueOf(parked);
+                town.player.cycling=town.player.ownsBicycle && town.player.bicycleParked==null && rs.getInt("cycling")!=0;
+                town.player.jobId=rs.getString("job_id");
+                town.player.engineeringSkill=rs.getInt("engineering_skill");
+                town.player.investigationSkill=rs.getInt("investigation_skill");
+                town.player.lastWorkDay=rs.getInt("last_work_day");
+                town.player.lastTechnicalDay=rs.getInt("last_technical_day");
             }
         }
-        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM player_contacts")) {
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM visitor_ingredients")) {
+            while(rs.next()) {
+                String id=rs.getString("product_id"),location=rs.getString("location");
+                if(id.equals("bread") || id.equals("water") ||
+                        RetailLife.PRODUCTS.stream().noneMatch(item->item.id().equals(id)))continue;
+                if(location.equals("bag"))town.player.bagItems.put(id,rs.getInt("quantity"));
+                else if(location.equals("pantry"))town.player.pantryItems.put(id,rs.getInt("quantity"));
+            }
+        }
+        // v1.15 contacts belong to the first visitor; later visitors have
+        // their own records and never inherit somebody else's introductions.
+        String contactQuery=town.player.incarnation==1
+                ? "SELECT * FROM player_contacts"
+                : "SELECT * FROM player_life_contacts WHERE incarnation="+town.player.incarnation;
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery(contactQuery)) {
             while(rs.next()) {
                 String id=rs.getString("resident_id");
                 if(!town.people.containsKey(id))continue;
@@ -721,38 +1015,291 @@ final class WorldDatabase implements AutoCloseable {
                 c.conversations=rs.getInt("conversations");
                 c.lastDay=rs.getInt("last_day");c.lastMinute=rs.getInt("last_minute");
                 c.lastHeard=rs.getString("last_heard");
+                c.trust=rs.getInt("trust");c.affinity=rs.getInt("affinity");
+                c.lastPositiveDay=rs.getInt("last_positive_day");
                 town.player.contacts.put(id,c);
+            }
+        }
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT * FROM player_lives ORDER BY incarnation")) {
+            while(rs.next()) {
+                int generation=rs.getInt("incarnation");
+                town.pastLives.put(generation,new PlayerLife.LifeRecord(
+                        generation,rs.getInt("died_day"),rs.getInt("died_minute"),
+                        TownLife.Place.valueOf(rs.getString("died_place")),
+                        rs.getString("private_name")));
+            }
+        }
+        // The visitor's workshop is another independent persistent company.
+        // Old save files have no row and correctly start without any business.
+        BusinessLife.ensure(town);
+        try(Statement st=db.createStatement();
+                ResultSet rs=st.executeQuery("SELECT * FROM player_business WHERE id=1")) {
+            if(rs.next()) {
+                var b=town.business;
+                b.registered=rs.getInt("registered")!=0;
+                b.ownerIncarnation=Math.max(0,rs.getInt("owner_incarnation"));
+                b.cash=Math.max(0,rs.getInt("cash"));
+                b.machine=rs.getInt("machine")!=0;
+                b.machineCondition=b.machine
+                        ?Math.max(0,Math.min(100,rs.getInt("machine_condition"))):0;
+                b.employeeId=rs.getString("employee_id");
+                b.parts=Math.max(0,rs.getInt("spare_parts"));
+                b.lastPayDay=Math.max(0,rs.getInt("last_pay_day"));
+                b.lastPayMinute=rs.getInt("last_pay_minute");
+                b.paidHours=Math.max(0,rs.getInt("paid_hours"));
+                b.lastProductionDay=Math.max(0,rs.getInt("last_production_day"));
+                b.lastSaleDay=Math.max(0,rs.getInt("last_sale_day"));
             }
         }
         PropertyLife.ensureStarterItems(town,state);
         return town;
     }
 
+    private void persistLives(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT OR IGNORE INTO player_lives
+                (incarnation,died_day,died_minute,died_place,private_name)
+                VALUES(?,?,?,?,?)
+                """)) {
+            for(var life:town.pastLives.values()) {
+                p.setInt(1,life.incarnation());
+                p.setInt(2,life.day());
+                p.setInt(3,life.minute());
+                p.setString(4,life.place().name());
+                p.setString(5,life.privateName());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+    }
+
+    private void persistCareerAccounts(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO career_accounts(account_id,balance) VALUES(?,?)
+                ON CONFLICT(account_id) DO UPDATE SET balance=excluded.balance
+                """)) {
+            for(var entry:town.employerFunds.entrySet()) {
+                p.setString(1,entry.getKey());
+                p.setInt(2,entry.getValue());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+    }
+
+    private void persistTechnicalWork(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO technical_materials(material_id,stock) VALUES(?,?)
+                ON CONFLICT(material_id) DO UPDATE SET stock=excluded.stock
+                """)) {
+            for(var entry:town.technicalMaterials.entrySet()) {
+                p.setString(1,entry.getKey());
+                p.setInt(2,entry.getValue());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO technical_orders(order_id,phase,condition,completed_day)
+                VALUES(?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET
+                phase=excluded.phase,condition=excluded.condition,
+                completed_day=excluded.completed_day
+                """)) {
+            for(var o:town.technicalOrders.values()) {
+                p.setString(1,o.id);
+                p.setString(2,o.phase.name());
+                p.setInt(3,o.condition);
+                p.setInt(4,o.completedDay);
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+    }
+
+    private void persistIndustry(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO industry_stocks(stock_id,quantity) VALUES(?,?)
+                ON CONFLICT(stock_id) DO UPDATE SET quantity=excluded.quantity
+                """)) {
+            for(var entry:town.industryStocks.entrySet()) {
+                p.setString(1,entry.getKey());
+                p.setInt(2,entry.getValue());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO industry_schedule(id,extract_day,transport_day,
+                                              refine_day,fabricate_day,deliver_day,
+                                              arrival_day,recycle_day)
+                VALUES(1,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                extract_day=excluded.extract_day,
+                transport_day=excluded.transport_day,
+                refine_day=excluded.refine_day,
+                fabricate_day=excluded.fabricate_day,
+                deliver_day=excluded.deliver_day,
+                arrival_day=excluded.arrival_day,
+                recycle_day=excluded.recycle_day
+                """)) {
+            p.setInt(1,town.lastIndustryExtractDay);
+            p.setInt(2,town.lastIndustryTransportDay);
+            p.setInt(3,town.lastIndustryRefineDay);
+            p.setInt(4,town.lastIndustryFabricateDay);
+            p.setInt(5,town.lastIndustryDeliverDay);
+            p.setInt(6,town.lastIndustryArrivalDay);
+            p.setInt(7,town.lastIndustryRecycleDay);
+            p.executeUpdate();
+        }
+    }
+
+    private void persistBusiness(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO player_business(id,registered,owner_incarnation,cash,machine,
+                                            machine_condition,employee_id,spare_parts,
+                                            last_pay_day,last_pay_minute,paid_hours,
+                                            last_production_day,last_sale_day)
+                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET
+                registered=excluded.registered,
+                owner_incarnation=excluded.owner_incarnation,
+                cash=excluded.cash,
+                machine=excluded.machine,
+                machine_condition=excluded.machine_condition,
+                employee_id=excluded.employee_id,
+                spare_parts=excluded.spare_parts,
+                last_pay_day=excluded.last_pay_day,
+                last_pay_minute=excluded.last_pay_minute,
+                paid_hours=excluded.paid_hours,
+                last_production_day=excluded.last_production_day,
+                last_sale_day=excluded.last_sale_day
+                """)) {
+            var b=town.business;
+            p.setInt(1,b.registered?1:0);
+            p.setInt(2,b.ownerIncarnation);
+            p.setInt(3,b.cash);
+            p.setInt(4,b.machine?1:0);
+            p.setInt(5,b.machineCondition);
+            p.setString(6,b.employeeId);
+            p.setInt(7,b.parts);
+            p.setInt(8,b.lastPayDay);
+            p.setInt(9,b.lastPayMinute);
+            p.setInt(10,b.paidHours);
+            p.setInt(11,b.lastProductionDay);
+            p.setInt(12,b.lastSaleDay);
+            p.executeUpdate();
+        }
+    }
+
+    private void persistCityUtilities(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO municipal_services(id,clean_water,last_pump_day)
+                VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET
+                clean_water=excluded.clean_water,last_pump_day=excluded.last_pump_day
+                """)) {
+            p.setInt(1,town.cleanWater);
+            p.setInt(2,town.lastWaterPumpDay);
+            p.executeUpdate();
+        }
+    }
+
+    private void persistNature(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("""
+                INSERT INTO natural_resources(id,quantity) VALUES(?,?)
+                ON CONFLICT(id) DO UPDATE SET quantity=excluded.quantity
+                """)) {
+            for(var source:town.naturalResources.values()) {
+                p.setString(1,source.id);
+                p.setInt(2,source.stock);
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+    }
+
     private void persistPlayer(PlayerLife.Player player) throws SQLException {
         try(PreparedStatement p=db.prepareStatement("""
-                    INSERT INTO player_state(id,place,destination,travel_remaining,private_name)
-                    VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
-                    place=excluded.place,destination=excluded.destination,
-                    travel_remaining=excluded.travel_remaining,private_name=excluded.private_name
-                    """)) {
-                        p.setString(1,player.place.name());p.setString(2,player.destination.name());
-                        p.setInt(3,player.travelRemaining);p.setString(4,player.privateName);
-                        p.executeUpdate();
-                    }
-        try(PreparedStatement p=db.prepareStatement("""
-                    INSERT INTO player_contacts(resident_id,known_name,conversations,last_day,last_minute,last_heard)
-                    VALUES(?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
-                    known_name=excluded.known_name,conversations=excluded.conversations,
-                    last_day=excluded.last_day,last_minute=excluded.last_minute,
-                    last_heard=excluded.last_heard
-                    """)) {
-                        for(var c:player.contacts.values()) {
-                            p.setString(1,c.residentId);p.setString(2,c.knownName);
-                            p.setInt(3,c.conversations);p.setInt(4,c.lastDay);
-                            p.setInt(5,c.lastMinute);p.setString(6,c.lastHeard);p.addBatch();
-                        }
-                        p.executeBatch();
-                    }
+                INSERT INTO player_state(id,place,destination,travel_remaining,private_name,
+                                         hunger,thirst,fatigue,health,alive,incarnation,
+                                         money,job_id,engineering_skill,investigation_skill,last_work_day,
+                                         last_technical_day,bread,bottled_water,room_until,stored_bread,stored_water,hygiene,owns_bicycle,cycling,bicycle_parked,car_place,car_fuel,car_condition,owns_house)
+                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                place=excluded.place,destination=excluded.destination,
+                travel_remaining=excluded.travel_remaining,private_name=excluded.private_name,
+                hunger=excluded.hunger,thirst=excluded.thirst,
+                fatigue=excluded.fatigue,health=excluded.health,
+                alive=excluded.alive,incarnation=excluded.incarnation,
+                money=excluded.money,job_id=excluded.job_id,
+                engineering_skill=excluded.engineering_skill,
+                investigation_skill=excluded.investigation_skill,
+                last_work_day=excluded.last_work_day,
+                last_technical_day=excluded.last_technical_day,
+                bread=excluded.bread,bottled_water=excluded.bottled_water,room_until=excluded.room_until,
+                stored_bread=excluded.stored_bread,stored_water=excluded.stored_water,hygiene=excluded.hygiene,
+                owns_bicycle=excluded.owns_bicycle,cycling=excluded.cycling,bicycle_parked=excluded.bicycle_parked,
+                car_place=excluded.car_place,car_fuel=excluded.car_fuel,car_condition=excluded.car_condition,owns_house=excluded.owns_house
+                """)) {
+            p.setString(1,player.place.name());
+            p.setString(2,player.destination.name());
+            p.setInt(3,player.travelRemaining);
+            p.setString(4,player.privateName);
+            p.setInt(5,player.hunger);
+            p.setInt(6,player.thirst);
+            p.setInt(7,player.fatigue);
+            p.setInt(8,player.health);
+            p.setInt(9,player.alive?1:0);
+            p.setInt(10,player.incarnation);
+            p.setInt(11,player.money);
+            p.setString(12,player.jobId);
+            p.setInt(13,player.engineeringSkill);
+            p.setInt(14,player.investigationSkill);
+            p.setInt(15,player.lastWorkDay);
+            p.setInt(16,player.lastTechnicalDay);
+            p.setInt(17,player.bread);p.setInt(18,player.bottledWater);
+            p.setLong(19,player.roomUntil);
+            p.setInt(20,player.storedBread);p.setInt(21,player.storedWater);p.setInt(22,player.hygiene);
+            p.setInt(23,player.ownsBicycle?1:0);p.setInt(24,player.cycling?1:0);
+            p.setString(25,player.bicycleParked==null?null:player.bicycleParked.name());
+            p.setString(26,player.carPlace==null?null:player.carPlace.name());
+            p.setInt(27,player.carFuel);p.setInt(28,player.carCondition);p.setInt(29,player.ownsHouse?1:0);
+            p.executeUpdate();
+        }
+        String contactSql=player.incarnation==1 ? """
+                INSERT INTO player_contacts
+                (resident_id,known_name,conversations,last_day,last_minute,last_heard,trust,affinity,last_positive_day)
+                VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
+                known_name=excluded.known_name,conversations=excluded.conversations,
+                last_day=excluded.last_day,last_minute=excluded.last_minute,
+                last_heard=excluded.last_heard,trust=excluded.trust,affinity=excluded.affinity,
+                last_positive_day=excluded.last_positive_day
+                """ : """
+                INSERT INTO player_life_contacts
+                (incarnation,resident_id,known_name,conversations,last_day,last_minute,last_heard,trust,affinity,last_positive_day)
+                VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(incarnation,resident_id) DO UPDATE SET
+                known_name=excluded.known_name,conversations=excluded.conversations,
+                last_day=excluded.last_day,last_minute=excluded.last_minute,
+                last_heard=excluded.last_heard,trust=excluded.trust,affinity=excluded.affinity,
+                last_positive_day=excluded.last_positive_day
+                """;
+        try(PreparedStatement p=db.prepareStatement(contactSql)) {
+            for(var c:player.contacts.values()) {
+                int offset=0;
+                if(player.incarnation!=1) {
+                    p.setInt(1,player.incarnation);
+                    offset=1;
+                }
+                p.setString(offset+1,c.residentId);
+                p.setString(offset+2,c.knownName);
+                p.setInt(offset+3,c.conversations);
+                p.setInt(offset+4,c.lastDay);
+                p.setInt(offset+5,c.lastMinute);
+                p.setString(offset+6,c.lastHeard);
+                p.setInt(offset+7,c.trust);p.setInt(offset+8,c.affinity);
+                p.setInt(offset+9,c.lastPositiveDay);
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
     }
 
     private void persistTown(TownLife.Town town,List<TownLife.Event> events,

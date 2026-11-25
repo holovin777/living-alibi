@@ -2,7 +2,12 @@ name: Java CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: java-ci-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -19,6 +24,10 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      - name: Validate one-command Linux game launcher
+        run: |
+          bash -n play.sh
+          bash play.sh --help | grep -q 'bash play.sh'
       - name: Compile sources and tests
         run: mvn --batch-mode --no-transfer-progress test-compile
       - name: Test Marco life simulation
@@ -129,3 +138,226 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
           '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerPresenceDatabaseSmokeTest' exec:exec
+      - name: Test visitor needs over time, public rest and travel isolation
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PlayerNeedsSmokeTest
+      - name: Test visitor needs SQLite migration and restart persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerNeedsDatabaseSmokeTest' exec:exec
+      - name: Test finite natural resources, local access and daily regeneration
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.NatureSmokeTest
+      - name: Test nature source migration, depletion and SQLite persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.NatureDatabaseSmokeTest' exec:exec
+      - name: Test public sleep, exposure and player mortality
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PlayerSleepSmokeTest
+      - name: Test visitor death migration and SQLite persistence
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerSleepDatabaseSmokeTest' exec:exec
+      - name: Test successive visitors and independent town continuity
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.PlayerRebirthSmokeTest
+      - name: Test private contact histories and SQLite generations
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.PlayerRebirthDatabaseSmokeTest' exec:exec
+      - name: Test starting and reopening a world without an existing SQLite file
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.FreshWorldSmokeTest' exec:exec
+      - name: Test stable seasons across game years
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.CalendarSmokeTest
+      - name: Test deterministic temperature, rain, snow and seasonal resource growth
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.WeatherSmokeTest
+      - name: Test weather-derived rain effects after SQLite restart
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.WeatherDatabaseSmokeTest' exec:exec
+      - name: Test freely chosen jobs, paid education and conserved company payroll
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.CareerSmokeTest
+      - name: Test fresh-world career saves and separation between visitor lives
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.CareerDatabaseSmokeTest' exec:exec
+      - name: Test physical work orders, spare parts, site condition and salary gate
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.TechnicalWorkSmokeTest
+      - name: Test real company registration, equipment, work wages, production and sale
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.BusinessSmokeTest
+      - name: Test full autonomous workday for a hired fabrication employee
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.BusinessIntegrationSmokeTest
+      - name: Test factory machine breakdown, repair and zero double-wage exploit
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.BusinessMachineSmokeTest
+      - name: Test old-save business migration, machinery wear and payroll across restarts
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.BusinessMachineDatabaseSmokeTest' exec:exec
+      - name: Test workshop owner's capital, employee and parts across SQLite restarts
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.BusinessDatabaseSmokeTest' exec:exec
+      - name: Test fresh-world repair persistence and finite technical inventory
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.TechnicalWorkDatabaseSmokeTest' exec:exec
+      - name: Test resident fountain use, water conservation and restored street lights
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.UtilitySmokeTest
+      - name: Test autonomous residents choose working water and avoid unlit parks
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.UtilityBehaviorSmokeTest
+      - name: Test finite natural ore with staffed quarry factory and real repair supplies
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.IndustrySmokeTest
+      - name: Test paid player mining, industrial salaries, factory recycling and geology survey
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.IndustryEconomySmokeTest
+      - name: Test industrial employer insolvency, layoffs and re-employment
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.IndustryEmploymentSmokeTest
+      - name: Test real worker commutes and factory shipments in five ordinary town days
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.IndustryIntegrationSmokeTest
+      - name: Test ore, shipments and production timing through SQLite restart and rebirth
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.IndustryDatabaseSmokeTest' exec:exec
+      - name: Test truck freight, recycling, paid geology and world continuity through restarts
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.IndustryTransportDatabaseSmokeTest' exec:exec
+      - name: Test municipal water stocks survive restart and are refilled only once
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.UtilityDatabaseSmokeTest' exec:exec
+      - name: Install Java engine so the separate Spring adapter can use it
+        run: |
+          for attempt in 1 2 3; do
+            if mvn --batch-mode --no-transfer-progress -DskipTests install; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "Transient Maven dependency error; retrying install ($attempt/3)"
+            sleep $((attempt*15))
+          done
+      - name: Build and test Spring Boot Godot API
+        run: |
+          for attempt in 1 2 3; do
+            if mvn --batch-mode --no-transfer-progress -f server/pom.xml package; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "Transient Maven dependency error; retrying Spring build ($attempt/3)"
+            sleep $((attempt*15))
+          done
+      - name: Verify first-launch Spring HTTP API on an empty database
+        run: |
+          set -euo pipefail
+          mkdir -p target/api-smoke
+          java -jar server/target/living-alibi-server-1.16.0.jar \
+            --server.port=18080 --living-alibi.database=target/api-smoke/world.db \
+            >target/api-smoke/server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:18080/api/v1/world \
+                    -o target/api-smoke/world.json; then break; fi
+            sleep 1
+          done
+          test -s target/api-smoke/world.json
+          grep -q '"incarnation":1' target/api-smoke/world.json
+          grep -q '"season":"SPRING"' target/api-smoke/world.json
+          grep -q '"weather":' target/api-smoke/world.json
+          grep -q '"temperatureC":' target/api-smoke/world.json
+          curl -fsS http://127.0.0.1:18080/api/v1/industry \
+            -o target/api-smoke/industry.json
+          grep -q '"ironRemaining":80' target/api-smoke/industry.json
+          grep -q '"copperRemaining":40' target/api-smoke/industry.json
+          grep -q '"workshopParts":6' target/api-smoke/industry.json
+          grep -q '"placeId":"PARK"' target/api-smoke/world.json
+          grep -q '"services":' target/api-smoke/world.json
+          grep -q '"fountainWorking":false' target/api-smoke/world.json
+          curl -fsS http://127.0.0.1:18080/api/v1/utilities \
+            -o target/api-smoke/utilities.json
+          grep -q '"cleanWater":0' target/api-smoke/utilities.json
+          test "$(curl --silent -o target/api-smoke/fountain-error.json -w '%{http_code}' \
+            -X POST http://127.0.0.1:18080/api/v1/actions/drink \
+            -H 'Content-Type: application/json' \
+            -d '{"sourceId":"park-fountain"}')" = "400"
+          grep -q 'pump is broken' target/api-smoke/fountain-error.json
+          curl -fsS http://127.0.0.1:18080/api/v1/locations \
+            -o target/api-smoke/locations.json
+          grep -q '"travelMinutes":10' target/api-smoke/locations.json
+          grep -q '"id":"MARKET"' target/api-smoke/locations.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/go \
+            -H 'Content-Type: application/json' \
+            -d '{"destination":"river"}' \
+            -o target/api-smoke/move.json
+          grep -q '"place":"River"' target/api-smoke/move.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/drink \
+            -H 'Content-Type: application/json' \
+            -d '{"sourceId":"river-water"}' \
+            -o target/api-smoke/drink.json
+          grep -q '"stock":119' target/api-smoke/drink.json
+          curl -fsS http://127.0.0.1:18080/api/v1/jobs \
+            -o target/api-smoke/jobs.json
+          grep -q '"shop-assistant"' target/api-smoke/jobs.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/go \
+            -H 'Content-Type: application/json' \
+            -d '{"destination":"market"}' > target/api-smoke/market.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/apply \
+            -H 'Content-Type: application/json' \
+            -d '{"jobId":"shop-assistant"}' > target/api-smoke/apply.json
+          grep -q '"jobId":"shop-assistant"' target/api-smoke/apply.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/work \
+            -H 'Content-Type: application/json' \
+            -d '{}' > target/api-smoke/work.json
+          grep -q '"money":74' target/api-smoke/work.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/go \
+            -H 'Content-Type: application/json' \
+            -d '{"destination":"school"}' \
+            -o target/api-smoke/school.json
+          grep -q '"placeId":"SCHOOL"' target/api-smoke/school.json
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/actions/study \
+            -H 'Content-Type: application/json' \
+            -d '{"subject":"engineering"}' \
+            -o target/api-smoke/study.json
+          grep -q '"engineeringSkill":1' target/api-smoke/study.json
+          grep -q '"money":64' target/api-smoke/study.json
+          curl -fsS http://127.0.0.1:18080/api/v1/work-orders \
+            -o target/api-smoke/work-orders.json
+          grep -q '"water-pump"' target/api-smoke/work-orders.json
+          grep -q '"street-lights"' target/api-smoke/work-orders.json
+          test "$(curl --silent -o target/api-smoke/rejected.json -w '%{http_code}' \
+            -X POST http://127.0.0.1:18080/api/v1/actions/diagnose \
+            -H 'Content-Type: application/json' \
+            -d '{"orderId":"water-pump"}')" = "400"
+          grep -q 'requires presence' target/api-smoke/rejected.json
+          test -f target/api-smoke/world.db
+      - name: Test one-command launch from an empty save and reopen existing world
+        run: |
+          set -euo pipefail
+          # The full Spring JAR is already built. Stub only Maven and the
+          # Godot GUI so this job can test the launch lifecycle headlessly.
+          mkdir -p target/launcher-test/bin
+          cat >target/launcher-test/bin/mvn <<'EOF'
+          #!/usr/bin/env bash
+          exit 0
+          EOF
+          cat >target/launcher-test/bin/godot <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          for arg in "$@"; do
+            if [[ "$arg" == "--headless" ]]; then exit 0; fi
+          done
+          curl -fsS http://127.0.0.1:8080/api/v1/world \
+            -o target/launcher-test/game.json
+          grep -q '"money":50' target/launcher-test/game.json
+          if [[ "${EXPECT_PLACE:-PARK}" == "PARK" ]]; then
+            grep -q '"placeId":"PARK"' target/launcher-test/game.json
+            curl -fsS -X POST http://127.0.0.1:8080/api/v1/actions/go \
+              -H 'Content-Type: application/json' \
+              -d '{"destination":"market"}' \
+              -o target/launcher-test/move.json
+            grep -q '"placeId":"MARKET"' target/launcher-test/move.json
+          else
+            grep -q '"placeId":"MARKET"' target/launcher-test/game.json
+          fi
+          EOF
+          chmod +x target/launcher-test/bin/mvn target/launcher-test/bin/godot
+          export PATH="$PWD/target/launcher-test/bin:$PATH"
+          test ! -f data/world.db
+          EXPECT_PLACE=PARK bash play.sh
+          test -f data/world.db
+          EXPECT_PLACE=MARKET bash play.sh
+          grep -q '"placeId":"MARKET"' target/launcher-test/game.json

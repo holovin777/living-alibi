@@ -50,6 +50,40 @@ final class KnowledgeLife {
         DeceptionLife.onWitness(town,event,residentId);
     }
 
+    /** The visitor explicitly allowed this particular alias to be shared.
+     *  The private name and ordinary conversations never enter the rumor network. */
+    static void shareableIntroduction(TownLife.Town town,TownLife.Citizen resident,
+                                       String alias,int day,int minute) {
+        String actor="visitor-"+town.player.incarnation;
+        String statement=resident.name+" met a visitor who introduced themselves as "+alias+".";
+        var own=town.beliefs.computeIfAbsent(resident.id,ignored->new LinkedHashMap<>());
+        if(own.values().stream().anyMatch(b->b.actorId().equals(actor)
+                && b.statement().equals(statement) && b.origin().equals("DIRECT")))return;
+        var event=new TownLife.Event(day,minute,actor,resident.place,resident.currentSpace(),statement);
+        String key=eventKey(event);
+        own.put(key,new Belief(resident.id,key,day,minute,actor,resident.currentSpace(),
+                statement,"DIRECT",resident.id,day,minute,0,100));
+    }
+
+    /** Report an actually remembered public introduction, not an identification of the listener. */
+    static String visitorNews(TownLife.Town town,TownLife.Citizen resident,int day,int minute) {
+        var own=town.beliefs.get(resident.id);
+        if(own==null)return "I haven't heard any recent news about visitors.";
+        long now=(day-1L)*1440+minute;
+        Belief latest=null;
+        for(var b:own.values()) {
+            long age=now-((b.eventDay()-1L)*1440+b.eventMinute());
+            if(!b.actorId().startsWith("visitor-") || age<0 || age>14L*1440)continue;
+            if(latest==null || b.eventDay()>latest.eventDay() ||
+                    (b.eventDay()==latest.eventDay() && b.eventMinute()>latest.eventMinute()))latest=b;
+        }
+        if(latest==null)return "I haven't heard any recent news about visitors.";
+        if(latest.origin().equals("DIRECT"))return "I remember this myself: "+latest.statement();
+        var source=town.people.get(latest.learnedFrom());
+        String name=source==null?"someone":source.name;
+        return "I heard this from "+name+": "+latest.statement()+" I can't verify it myself.";
+    }
+
     /** Only an actual conversation between co-present, awake, living residents can relay a claim. */
     static void exchange(TownLife.Town town,WorldState clock,String firstId,String secondId) {
         TownLife.Citizen first=town.get(firstId),second=town.get(secondId);
@@ -73,6 +107,11 @@ final class KnowledgeLife {
             long age=current-((long)(claim.eventDay()-1)*1440+claim.eventMinute());
             if(age<0 || age>14L*1440 || claim.hops()>=3 ||
                     receiver.containsKey(claim.eventKey()))continue;
+            // Visitor news travels only through ordinary trusted social encounters.
+            if(claim.actorId().startsWith("visitor-")) {
+                var bond=town.existingRelationship(speaker.id,listener.id);
+                if(bond==null || bond.trust<45 || speaker.sociability<40)continue;
+            }
             if(chosen==null || claim.eventDay()>chosen.eventDay() ||
                     (claim.eventDay()==chosen.eventDay() && claim.eventMinute()>chosen.eventMinute()))
                 chosen=claim;

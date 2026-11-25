@@ -45,6 +45,20 @@ final class PopulationGenerator {
             String id="resident-%04d".formatted(index);
             var c=new TownLife.Citizen(id,name,JOBS[job],home);
             c.home=home;c.workplace=WORKPLACES[job];
+            // Two genuinely employed industrial workers per initial 12 residents,
+            // with real wages, hours, travel, sickness and independent choices.
+            if(index%12==6) {
+                c.occupation="Miner";c.workplace=TownLife.Place.QUARRY;
+            } else if(index%12==7) {
+                c.occupation="Factory machinist";c.workplace=TownLife.Place.FACTORY;
+            } else if(index%12==8) {
+                c.occupation="Transport driver";c.workplace=TownLife.Place.QUARRY;
+            } else if(index%12==9) {
+                // Every new twelve-resident world has a real mechanic visiting
+                // the Workshop, so a player's first business can find a human
+                // candidate rather than relying on a random lucky job draw.
+                c.occupation="Mechanic";c.workplace=TownLife.Place.WORKSHOP;
+            }
             c.age=rng.nextInt(19,71);
             c.sociability=rng.nextInt(15,91);
             c.carefulness=rng.nextInt(15,91);

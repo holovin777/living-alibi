@@ -17,7 +17,19 @@ public final class Main {
         try (WorldDatabase db=new WorldDatabase(SAVE); Scanner scanner=new Scanner(System.in)) {
             WorldState state=db.load();
             TownLife.Town town=db.loadTown(state);
-            System.out.println("Living Alibi v1.15 — Anonymous Visitor");
+            // A legacy save may end with a dead visitor; archive and continue once.
+            if(!town.player.alive) {
+                var ended=PlayerLife.beginNewLife(town,state.day,state.minute);
+                db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+                System.out.println("Life #"+ended.incarnation()+" ended. A new visitor #"+
+                        town.player.incarnation+" begins in the same town.");
+            }
+            System.out.println("Living Alibi v1.16 — Living Visitor (work in progress)");
+            System.out.println("You arrive at "+town.player.place.label+
+                    ", with "+town.player.money+" EUR in your pockets.");
+            if(town.player.jobId==null)
+                System.out.println("No profession or mission is assigned. Find work, study, or explore.");
+            else System.out.println("Continuing your chosen path: "+CareerLife.status(town.player));
             System.out.println("OpenAI: " + (OpenAiDialogue.available() ? "available (paid, only on talk/reflect)" : "offline demonstration (no API charges)"));
             System.out.println("Save: " + SAVE.toAbsolutePath());
             if(state.offlineProgress && state.lastSavedEpoch>0) {
@@ -42,13 +54,263 @@ public final class Main {
                     if(lower.equals("status")||lower.equals("observe")) {status(state);continue;}
                     if(lower.equals("personality")) {personality(state);continue;}
                     if(lower.equals("me")||lower.equals("whereami")) {
-                        System.out.println("You | "+PlayerLife.position(town.player)+
+                        System.out.println("Visitor #"+town.player.incarnation+" | "+PlayerLife.position(town.player)+
                                 " | private name: "+(town.player.privateName==null?"not set":town.player.privateName));
+                        System.out.println(PlayerLife.condition(town.player));
+                        System.out.println(CareerLife.status(town.player));
+                        System.out.println("Year "+CalendarLife.year(state.day)+
+                                " | Season: "+CalendarLife.season(state.day));
                         System.out.println("Your name is NOT automatically known by any resident. Investigations are optional.");
                         continue;
                     }
+                    if(lower.equals("lives")) {
+                        System.out.println("Past visitor lives: "+town.pastLives.size()+
+                                " | current visitor #"+town.player.incarnation);
+                        for(var life:town.pastLives.values())
+                            System.out.println("  #"+life.incarnation()+" | Day "+life.day()+
+                                    " "+clock(life.minute())+" | "+life.place().label+
+                                    " | private name: "+(life.privateName()==null?
+                                    "not set":life.privateName()));
+                        continue;
+                    }
+                    if(lower.equals("weather")) {
+                        var climate=WeatherLife.at(state.day,state.minute);
+                        System.out.println("Year "+CalendarLife.year(state.day)+
+                                " | "+climate.season()+" | "+climate.sky()+
+                                " | "+climate.temperatureC()+" C");
+                        continue;
+                    }
+                    if(lower.equals("career")) {
+                        System.out.println(CareerLife.status(town.player));
+                        continue;
+                    }
+                    if(lower.equals("jobs")) {
+                        System.out.println("Public job board (visit the workplace to apply):");
+                        for(var vacancy:CareerLife.offers())
+                            System.out.println("  "+vacancy.id()+" | "+vacancy.title()+
+                                    " | "+vacancy.workplace().label+
+                                    " | skill "+vacancy.subject()+" "+vacancy.requiredSkill()+
+                                    " | "+vacancy.wage()+" EUR / 2h shift");
+                        System.out.println("Study engineering at School or investigation at Library, 10 EUR / hour.");
+                        continue;
+                    }
+                    if(lower.startsWith("apply ")) {
+                        var candidate=town.copy();
+                        String result=CareerLife.apply(candidate,arg(input));
+                        advanceAndSave(db,state,candidate,15);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.startsWith("study ")) {
+                        var candidate=town.copy();
+                        String result=CareerLife.study(candidate,arg(input),state.minute);
+                        advanceAndSave(db,state,candidate,CareerLife.LESSON_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(result+" "+CareerLife.status(town.player));
+                        continue;
+                    }
+                    if(lower.equals("work-orders")) {
+                        System.out.println("City technical jobs (shared assets, finite materials):");
+                        for(var order:TechnicalWorkLife.orders(town))
+                            System.out.println("  "+order.id+" | "+order.title+" | "+
+                                    order.place.label+" | "+order.phase+" | condition "+
+                                    order.condition+"/100");
+                        System.out.println("Materials: "+town.technicalMaterials);
+                        continue;
+                    }
+                    if(lower.startsWith("diagnose ")) {
+                        var candidate=town.copy();
+                        String message=TechnicalWorkLife.inspect(candidate,arg(input),state.minute);
+                        advanceAndSave(db,state,candidate,TechnicalWorkLife.INSPECTION_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(message);
+                        continue;
+                    }
+                    if(lower.startsWith("repair ")) {
+                        var candidate=town.copy();
+                        String message=TechnicalWorkLife.complete(candidate,arg(input),state.day,state.minute);
+                        advanceAndSave(db,state,candidate,TechnicalWorkLife.COMPLETION_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(message);
+                        continue;
+                    }
+                    if(lower.equals("prospect")) {
+                        var candidate=town.copy();
+                        String message=IndustryLife.prospectPlayer(candidate,state.minute);
+                        advanceAndSave(db,state,candidate,120);
+                        town.copyFrom(candidate);
+                        System.out.println(message);
+                        continue;
+                    }
+                    if(lower.equals("work")) {
+                        var candidate=town.copy();
+                        String result=CareerLife.work(candidate,state.day,state.minute);
+                        advanceAndSave(db,state,candidate,CareerLife.SHIFT_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(result+" "+CareerLife.status(town.player));
+                        continue;
+                    }
+                    if(lower.equals("needs")) {
+                        System.out.println(PlayerLife.condition(town.player));
+                        continue;
+                    }
+                    if(lower.equals("business")) {
+                        var status=BusinessLife.status(town,state.day);
+                        System.out.println("Independent workshop: "+
+                                (status.registered()?"REGISTERED":"NOT YET OPEN"));
+                        System.out.println("Owner: visitor #"+status.ownerIncarnation()+
+                                " | yours: "+status.yours()+" | company cash EUR "+
+                                status.cash()+" | machine: "+status.machine()+
+                                " | condition: "+status.machineCondition()+"/100");
+                        System.out.println("Worker: "+status.employeeName()+
+                                " | spare parts: "+status.spareParts()+
+                                " | paid hours today: "+status.paidHoursToday());
+                        System.out.println("Go to Workshop to register, invest, buy a machine and hire.");
+                        continue;
+                    }
+                    if(lower.equals("business candidates")) {
+                        for(var c:BusinessLife.candidates(town,state.day))
+                            System.out.println("  "+c.id+" | "+c.name+" | "+c.occupation);
+                        continue;
+                    }
+                    if(lower.equals("business open")) {
+                        var candidate=town.copy();
+                        String result=BusinessLife.open(candidate);
+                        advanceAndSave(db,state,candidate,15);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.startsWith("business invest ")) {
+                        var candidate=town.copy();
+                        int amount=Integer.parseInt(input.substring("business invest ".length()).strip());
+                        String result=BusinessLife.invest(candidate,amount);
+                        advanceAndSave(db,state,candidate,5);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.equals("business machine")) {
+                        var candidate=town.copy();
+                        String result=BusinessLife.machine(candidate);
+                        advanceAndSave(db,state,candidate,30);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.equals("business service")) {
+                        var candidate=town.copy();
+                        String result=BusinessLife.service(candidate);
+                        advanceAndSave(db,state,candidate,BusinessLife.SERVICE_MINUTES);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.startsWith("business hire ")) {
+                        var candidate=town.copy();
+                        String id=input.substring("business hire ".length()).strip();
+                        String result=BusinessLife.hire(candidate,id,state.day);
+                        advanceAndSave(db,state,candidate,15);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.startsWith("business withdraw ")) {
+                        var candidate=town.copy();
+                        int amount=Integer.parseInt(input.substring("business withdraw ".length()).strip());
+                        String result=BusinessLife.withdraw(candidate,amount);
+                        advanceAndSave(db,state,candidate,5);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.equals("industry")) {
+                        var r=IndustryLife.report(town);
+                        System.out.println("QUARRY deposits: iron "+r.ironRemaining()+
+                                " | copper "+r.copperRemaining());
+                        System.out.println("Ore at quarry "+r.oreAtQuarry()+
+                                " | ore at factory "+r.oreAtFactory());
+                        System.out.println("FACTORY: steel "+r.factorySteel()+
+                                " | copper "+r.factoryCopper()+
+                                " | spare parts "+r.factoryParts());
+                        System.out.println("MAINTENANCE: steel "+r.workshopSteel()+
+                                " | copper "+r.workshopCopper()+
+                                " | spare parts "+r.workshopParts());
+                        System.out.println("Workers on shift: miners "+r.minersAtWork()+
+                                " | factory machinists "+r.factoryWorkersAtWork());
+                        System.out.println("Cargo on truck: "+r.oreOnTruck()+
+                                " | recycled scrap remaining: "+r.scrapRemaining()+
+                                " | western seam surveyed: "+r.westDepositDiscovered());
+                        System.out.println("Accounts: Quarry EUR "+r.quarryPayroll()+
+                                " | Factory EUR "+r.factoryPayroll()+
+                                " | City maintenance EUR "+r.cityBudget());
+                        continue;
+                    }
+                    if(lower.equals("utilities")) {
+                        var utilities=UtilityLife.status(town);
+                        System.out.println("Park water pump: "+utilities.pumpCondition()+"/100 | fountain "+
+                                (utilities.fountainWorking()?"WORKING":"CLOSED"));
+                        System.out.println("Clean water stored: "+utilities.cleanWater()+"/"+
+                                utilities.cleanWaterCapacity()+" units");
+                        System.out.println("Street lights: "+utilities.lightingCondition()+"/100 | "+
+                                (utilities.lightsWorking()?"LIT":"DARK at night"));
+                        continue;
+                    }
+                    if(lower.equals("sources")) {
+                        var available=NatureLife.available(town);
+                        System.out.println("Natural resources at "+PlayerLife.position(town.player)+":");
+                        if(available.isEmpty())System.out.println("  No accessible resources here.");
+                        for(var source:available.values())
+                            System.out.println("  "+source.id+" | "+source.label+" | "+
+                                    source.stock+"/"+source.capacity+" available");
+                        continue;
+                    }
+                    if(lower.startsWith("drink ")) {
+                        var candidate=town.copy();
+                        String source=arg(input);
+                        String result=(source.equalsIgnoreCase("park-fountain")||
+                                source.equalsIgnoreCase("fountain"))
+                                ? UtilityLife.drinkAtFountain(candidate)
+                                : NatureLife.drink(candidate,source,state.day,state.minute);
+                        advanceAndSave(db,state,candidate,5);
+                        town.copyFrom(candidate);
+                        System.out.println(result+" "+PlayerLife.condition(town.player));
+                        continue;
+                    }
+                    if(lower.startsWith("forage ")) {
+                        var candidate=town.copy();
+                        String result=NatureLife.forage(candidate,arg(input));
+                        advanceAndSave(db,state,candidate,15);
+                        town.copyFrom(candidate);
+                        System.out.println(result+" "+PlayerLife.condition(town.player));
+                        continue;
+                    }
+                    if(lower.equals("sleep")||lower.startsWith("sleep ")) {
+                        int hours=lower.equals("sleep")?8:Integer.parseInt(arg(input));
+                        var candidate=town.copy();
+                        String sleepingPlace=candidate.player.place.label;
+                        var result=PlayerLife.sleep(candidate.player,hours,state.day,state.minute);
+                        advanceAndSave(db,state,candidate,result.minutes());
+                        town.copyFrom(candidate);
+                        System.out.println("You slept for "+hours+" hour(s) at "+
+                                sleepingPlace+". Recovered "+result.fatigueRecovered()+
+                                " fatigue. Health change: "+result.healthChange()+".");
+                        System.out.println(PlayerLife.condition(town.player));
+                        continue;
+                    }
+                    if(lower.equals("rest")||lower.startsWith("rest ")) {
+                        int minutes=lower.equals("rest")?60:Integer.parseInt(arg(input));
+                        var candidate=town.copy();
+                        int recovered=PlayerLife.rest(candidate.player,minutes);
+                        advanceAndSave(db,state,candidate,minutes);
+                        town.copyFrom(candidate);
+                        System.out.println("You rested for "+minutes+" game minutes (up to "+
+                                recovered+" fatigue recovered). "+PlayerLife.condition(town.player));
+                        continue;
+                    }
                     if(lower.equals("explore")) {
-                        System.out.println("Free exploration: locations | look | go <place> | speak <id> <text> | introduce <id> [alias]");
+                        System.out.println("Free exploration: jobs | apply <job> | work | study <subject> | career | locations | look | go <place>");
                         System.out.println("You can simply wander, wait, and meet people. No cases or missions are required.");
                         continue;
                     }
@@ -562,9 +824,16 @@ public final class Main {
         List<SocialLife.Interaction> socialEvents=new ArrayList<>();
         List<LifeSimulation.LifeEvent> events=LifeSimulation.advance(candidate,minutes,
                 current -> TownLife.tick(townCandidate,current,townEvents,observations,socialEvents));
+        PlayerLife.LifeRecord ended=null;
+        if(!townCandidate.player.alive)
+            ended=PlayerLife.beginNewLife(townCandidate,candidate.day,candidate.minute);
         db.save(candidate,events,List.of(),townCandidate,townEvents,observations,socialEvents);
         copy(candidate,s);
         town.copyFrom(townCandidate);
+        if(ended!=null)
+            System.out.println("Visitor #"+ended.incarnation()+" died on Day "+ended.day()+
+                    ". Visitor #"+town.player.incarnation+
+                    " now begins a new life in the same town.");
     }
     private static void copy(WorldState from,WorldState to) {
         // Loaded state is the only mutable reference in the console; explicit copy avoids surprising aliases.
@@ -682,9 +951,27 @@ public final class Main {
     private static void help() {
         System.out.println("Commands (English only):");
         System.out.println(" status | observe | personality | events [count] | memories [count] | facts");
-        System.out.println(" explore | me | locations | look | go <place> — move freely as an anonymous visitor");
+        System.out.println(" explore | me | career | needs | lives | weather | locations | look | go <place>");
+        System.out.println(" jobs | apply <job-id>   — find work voluntarily at the listed workplace");
+        System.out.println(" work                    — paid two-hour shift, once daily (08:00–18:00)");
+        System.out.println(" industry | utilities — public natural resources, firms and services");
+        System.out.println(" business | business candidates — manage your local fabrication company");
+        System.out.println(" business open | business invest <EUR> | business machine");
+        System.out.println(" business hire <resident-id> | business withdraw <EUR>");
+        System.out.println(" business service — repair worn machine using 2 finite spare parts");
+        System.out.println(" prospect — employed quarry miner can fund a two-hour geological survey");
+        System.out.println(" work-orders | diagnose <order-id> | repair <order-id> — city infrastructure tasks");
+        System.out.println(" technicians and engineers must finish a technical task before paid work");
+        System.out.println(" study engineering | study investigation — paid lesson at school/library");
         System.out.println(" identity <private-name> | introduce <resident-id> [alias] — voluntary identity");
         System.out.println(" speak <resident-id> <message> | contacts | contact <resident-id>");
+        System.out.println(" rest [minutes]        — pause for 15–240 game minutes (default: 60)");
+        System.out.println(" sleep [hours]         — sleep anywhere for 1–12 hours (default: 8), with exposure risks");
+        System.out.println(" sources               — inspect finite resources at your location");
+        System.out.println(" utilities             — check park pump, water supply and street lights");
+        System.out.println(" drink park-fountain    — use limited clean water if the pump works (5 min)");
+        System.out.println(" drink <source-id>     — drink local water (5 min; unsafe water can harm health)");
+        System.out.println(" forage <source-id>    — gather local wild food (15 min)");
         System.out.println(" town | population [count] | population generate 12 | resident resident-0001");
         System.out.println(" home <id>             — inspect a resident's private home unit (developer view)");
         System.out.println(" where <id> | known <id> [count] | town-events [count]");

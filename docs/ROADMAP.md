@@ -103,6 +103,128 @@ The eventual game is an emergent detective simulation. The player investigates e
 - Future: NPCs independently notice and approach visitors, fuller player life simulation,
   deeper contact memory, real anonymity-respecting dialogues, and a Godot visual client.
 
+## In progress
+
+### Player Daily Life v1.16 — Physical condition and short rest
+
+- Persistent hunger, thirst, fatigue and health for the anonymous player.
+- Clock-driven needs continue during walks, waits, live mode and offline replay.
+- `needs` and `rest` console commands; public breaks consume world time.
+- `sleep [hours]` works in any accessible public area, with an early
+  place-based exposure/health heuristic, persistent visitor mortality and
+  no mandatory property ownership. Temperature, rain and snow now affect
+  outdoor risk. Next: shelters, medicine and player access to the town economy.
+- Death automatically starts a new anonymous visitor in the same continuous
+  world; previous player lives and disclosed per-resident identities remain
+  archived without leaking into the new person's memories.
+- Details: [Player Daily Life](PLAYER_DAILY_LIFE.md).
+- Early natural-resource slice: finite river/puddle water and wild berries, local
+  harvesting and saved depletion ([Natural Resources](NATURAL_RESOURCES.md)).
+  Industrial NPC extraction and basic factories now exist
+  ([Industry](INDUSTRY.md)); wildlife, shelter, and advanced enterprises
+  with real energy, contracts and supply pricing remain future work.
+
+### Player freedom: jobs, education and careers (v1.16 draft)
+
+- New anonymous visitor starts **in the park with 50 EUR** and no occupation,
+  criminal case, detective status or preassigned mission.
+- `jobs`, `apply <job>`, `work`, `study engineering`,
+  `study investigation`, and `career` form the first voluntary career loop.
+- Shop assistant, workshop technician, junior engineer and private investigator
+  have workplace, qualification and bounded salary requirements. Education
+  costs tuition and takes actual world time; wages draw from finite institutional
+  accounts persisted in SQLite. This is an initial employer-budget model,
+  not yet the full NPC business economy.
+- Workshop technicians and engineers must now complete a **physical work
+  order** (inspection, material-consuming repair or upgrade) before their
+  paid technical shift. The park water pump and public street lighting have
+  persistent condition, shared finite component stocks, daily wear and
+  archived completion state. Repeated work will eventually need new
+  material supply chains. A first staffed quarry → factory → repair
+  warehouse supply chain now delivers finite metal and spare parts, but
+  import/recycling after deposit exhaustion is future work. See
+  [Technical Work](TECHNICAL_WORK.md) and [Industry](INDUSTRY.md).
+- Shared city water and lighting now alter both NPC well-being and **NPC choices**:
+  the park's finite public fountain gives thirsty residents a cheaper
+  destination than the market, while poor street lights send some evening
+  visitors to the cafe rather than the park. Actual source use and citizen
+  travel remain world events; see [City Utilities](CITY_UTILITIES.md).
+- A successor visitor never inherits an old career, money or qualifications.
+- Spring API adds job listings and matching voluntary player actions.
+- See [Player Careers](PLAYER_CAREERS.md).
+
+### Finite industry and material supply (v1.16 draft)
+
+- A first-run town has miners and factory machinists among 12 procedural
+  residents. They commute, work, earn NPC wages and can stop producing due
+  to illness, unemployment, death, weekends or absent resources.
+- Quarry has finite underground iron and copper deposits. NPCs mine real
+  quantities, transport ore to a factory, refine steel and copper, produce
+  spare parts, and deliver bounded batches to the existing city maintenance
+  stock. Each stage requires a working NPC at its real workplace.
+- All industrial inventories and daily processing markers persist in SQLite;
+  no repeated loading creates additional minerals or duplicate shipments.
+  Spring exposes `GET /api/v1/industry`, the console has `industry`,
+  and Godot offers a public industrial dashboard and Quarry/Factory districts.
+- Quarry miners, transport drivers and factory machinists now receive
+  salaries from finite company accounts; the factory pays for ore and
+  city maintenance pays for deliveries. Bankrupt businesses can lay
+  off employees, who then search for other local work.
+- The player can apply for quarry/factory jobs and produce real materials
+  during paid two-hour shifts. A two-hour geological survey may unlock
+  one hidden finite western deposit.
+- A limited three-unit freight truck takes 30 game minutes between
+  dispatch and arrival. Factory workers can recycle two finite scrap
+  units into one steel unit, with lossy recovery.
+- Fully modeled wages in other economic sectors, animated trucks,
+  external trade and energy consumption are future work.
+  See [Industry](INDUSTRY.md).
+
+### Player-owned small fabrication company (v1.16 draft)
+
+- An ordinary visitor can register one independent workshop business
+  at the public Workshop for a real 15 EUR license cost.
+- The business has separate persistent cash, a purchased machine,
+  a contract with one actually co-present procedural resident, finite
+  11 EUR hourly wages and a physical stock of manufactured spare parts.
+- With two paid work hours and workshop steel bought from the municipality,
+  the employee fabricates two parts. The municipality can purchase only
+  actually manufactured goods from its finite city maintenance budget.
+- The founder can invest and withdraw real cash; losing ownership on
+  death does **not** erase company assets. A future visitor can purchase
+  the existing company for a new license fee; no automatic inheritance.
+- Manufacturing now wears the machine, stopping production below 20/100.
+  The owner can service it with two real spare parts and company cash.
+  The shop also honors fixed NPC shifts and persists an idempotent wage
+  receipt to prevent double pay after restarting at the same minute.
+- One local workshop is the current limit; competing owners, realistic
+  employer negotiations, business loans, taxes and
+  a detailed construction economy remain future work.
+  See [Player Business](PLAYER_BUSINESS.md).
+
+### New world calendar and Godot API bridge (v1.16 draft)
+
+- Four recurring seasons follow the authoritative 365-day Java clock,
+  beginning in spring. Deterministic daily rain/snow/cloud/clear skies and
+  temperature affect outdoor sleep, puddles and seasonal berries. Detailed
+  weather fronts and NPC weather-aware decisions remain future work.
+  See [Weather](WEATHER.md).
+- The first launch with no saved database automatically creates a playable
+  world. The Spring server starts with Marco, Elena and twelve generated
+  residents, rather than requiring manual developer commands.
+- Standalone Spring Boot 4.2 API module under `server/` shares the same Java
+  simulation and SQLite storage. `GET /api/v1/world` exposes time, season,
+  weather and temperature, nearby NPCs, resources and visitor condition. Commands
+  over HTTP validate movement, rest, sleep, drinking, gathering and waiting.
+- Godot 4.6.1 now renders **several 3D public districts** with a
+  pedestrian avatar, travel gate (E) and local career/resource kiosk (F).
+  The Java API supplies canonical place IDs and travel time, commits movement
+  before Godot redraws the area, and validates applications, study and shifts.
+  Godot headless CI exercises park → market → school → workshop scene
+  transitions and context-specific kiosk options. Per-meter navigation,
+  real connected streets, NPC meshes and multiplayer are future work.
+- Details: [Godot / Spring Boot integration](GODOT_INTEGRATION.md).
+
 ## Proposed, not implemented
 
 1. **Shared agent engine:** move Marco, Elena and procedural residents to the same extensible NPC engine; time/position-aware action execution.

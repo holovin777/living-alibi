@@ -1,0 +1,399 @@
+package com.holovin.npclife;
+
+import jakarta.annotation.PreDestroy;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+/**
+ * Single authoritative game session for a local Godot client.
+ * All state changes are serialized and committed before a response is returned.
+ */
+@Service
+public final class GameSession implements AutoCloseable {
+    private final WorldDatabase db;
+    private WorldState state;
+    private TownLife.Town town;
+
+    @Autowired
+    public GameSession(@Value("${living-alibi.database:data/world.db}") String databasePath)
+            throws Exception {
+        this(Path.of(databasePath));
+    }
+
+    GameSession(Path databasePath) throws Exception {
+        boolean firstLaunch=Files.notExists(databasePath);
+        db=new WorldDatabase(databasePath);
+        state=db.load();
+        town=db.loadTown(state);
+        if(firstLaunch) {
+            // A fresh city should already contain a small, active population.
+            PopulationGenerator.add(town,12);
+            db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+        }
+        // Old save files might contain a deceased visitor.
+        if(!town.player.alive) {
+            PlayerLife.beginNewLife(town,state.day,state.minute);
+            db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+        }
+    }
+
+    public record PlayerView(int incarnation,String place,String placeId,String privateName,
+                             int hunger,int thirst,int fatigue,int health,boolean alive,
+                             int money,String jobId,int engineeringSkill,int investigationSkill,
+                             int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse) { }
+    public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
+                               boolean machine,int machineCondition,int cash,String employeeId,
+                               String employeeName,int spareParts,int paidHoursToday,
+                               int lastProductionDay,int lastSaleDay) { }
+    public record CandidateView(String id,String name,String currentOccupation) { }
+    public record JobView(String id,String title,String workplace,String subject,
+                          int requiredSkill,int wage,int remainingPayroll) { }
+    public record WorkOrderView(String id,String title,String jobId,String place,
+                                String phase,int condition,int completedDay,
+                                String materialA,int requiredA,String materialB,int requiredB) { }
+    public record DestinationView(String id,String label,int travelMinutes) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship) { }
+    public record SourceView(String id,String label,String kind,int stock,int capacity) { }
+    public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
+    public record ServicesView(int pumpCondition,boolean fountainWorking,int cleanWater,
+                               int cleanWaterCapacity,int lightingCondition,boolean lightsWorking) { }
+    public record IndustryView(int ironRemaining,int copperRemaining,int oreAtQuarry,
+                               int oreAtFactory,int factorySteel,int factoryCopper,
+                               int factoryParts,int workshopSteel,int workshopCopper,
+                               int workshopParts,int minersAtWork,int factoryWorkersAtWork,
+                               int oreOnTruck,int scrapRemaining,boolean westDepositDiscovered,
+                               int quarryPayroll,int factoryPayroll,int cityBudget) { }
+    public record RetailView(String id,String label,int price,int stock) { }
+    public record WorldView(int day,int minute,int year,int dayOfYear,String season,
+                            WeatherView weather,PlayerView player,List<ResidentView> residents,
+                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard) { }
+    public record ActionView(String message,WorldView world) { }
+
+    public synchronized WorldView snapshot() {
+        var p=town.player;
+        var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.place.name(),p.privateName,
+                p.hunger,p.thirst,p.fatigue,p.health,p.alive,
+                p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
+                HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,p.hygiene,
+                FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
+                p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
+                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
+        var residents=PlayerLife.visible(town).stream()
+                .map(c->{
+                    var contact=p.contacts.get(c.id);
+                    return new ResidentView(c.id,c.name,c.activity,
+                            contact==null?null:contact.knownName,
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact));
+                }).toList();
+        var resources=NatureLife.available(town).values().stream()
+                .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
+        var weather=WeatherLife.at(state.day,state.minute);
+        return new WorldView(state.day,state.minute,CalendarLife.year(state.day),
+                CalendarLife.dayOfYear(state.day),weather.season().name(),
+                new WeatherView(weather.sky().name(),weather.temperatureC(),
+                        weather.raining(),weather.snowing()),
+                player,residents,resources,services(),RetailLife.hasCounter(p.place)
+                        ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute));
+    }
+
+    public synchronized BusinessView business() {
+        var b=BusinessLife.status(town,state.day);
+        return new BusinessView(b.registered(),b.yours(),b.ownerIncarnation(),
+                b.machine(),b.machineCondition(),b.cash(),b.employeeId(),b.employeeName(),
+                b.spareParts(),b.paidHoursToday(),b.lastProductionDay(),b.lastSaleDay());
+    }
+
+    public synchronized List<CandidateView> businessCandidates() {
+        // Only names of actual nearby, available town residents.
+        return BusinessLife.candidates(town,state.day).stream()
+                .map(c->new CandidateView(c.id,c.name,c.occupation)).toList();
+    }
+
+    public synchronized ActionView openBusiness() throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.open(copy);
+        return apply(copy,15,message);
+    }
+
+    public synchronized ActionView investBusiness(int amount) throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.invest(copy,amount);
+        return apply(copy,5,message);
+    }
+
+    public synchronized ActionView buyBusinessMachine() throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.machine(copy);
+        return apply(copy,30,message);
+    }
+
+    public synchronized ActionView serviceBusinessMachine() throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.service(copy);
+        return apply(copy,BusinessLife.SERVICE_MINUTES,message);
+    }
+
+    public synchronized ActionView hireBusinessWorker(String residentId)
+            throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.hire(copy,residentId,state.day);
+        return apply(copy,15,message);
+    }
+
+    public synchronized ActionView withdrawBusiness(int amount) throws SQLException {
+        var copy=town.copy();
+        String message=BusinessLife.withdraw(copy,amount);
+        return apply(copy,5,message);
+    }
+
+    /** Authoritative condition of water and lighting infrastructure for the UI. */
+    public synchronized ServicesView services() {
+        var u=UtilityLife.status(town);
+        return new ServicesView(u.pumpCondition(),u.fountainWorking(),u.cleanWater(),
+                u.cleanWaterCapacity(),u.lightingCondition(),u.lightsWorking());
+    }
+
+    /** Public inventories of the local mining and manufacturing enterprises. */
+    public synchronized IndustryView industry() {
+        var r=IndustryLife.report(town);
+        return new IndustryView(r.ironRemaining(),r.copperRemaining(),r.oreAtQuarry(),
+                r.oreAtFactory(),r.factorySteel(),r.factoryCopper(),r.factoryParts(),
+                r.workshopSteel(),r.workshopCopper(),r.workshopParts(),
+                r.minersAtWork(),r.factoryWorkersAtWork(),r.oreOnTruck(),
+                r.scrapRemaining(),r.westDepositDiscovered(),r.quarryPayroll(),
+                r.factoryPayroll(),r.cityBudget());
+    }
+
+    /** Travel is visible to the client, but distance and time remain Java-owned. */
+    public synchronized List<DestinationView> destinations() {
+        return PlayerLife.publicPlaces().stream()
+                .map(place->new DestinationView(place.name(),place.label,
+                        PlayerLife.travelMinutes(town.player,place))).toList();
+    }
+
+    public synchronized List<WorkOrderView> workOrders() {
+        return TechnicalWorkLife.orders(town).stream()
+                .map(o->new WorkOrderView(o.id,o.title,o.jobId,o.place.name(),
+                        o.phase.name(),o.condition,o.completedDay,
+                        o.materialA,o.requiredA,o.materialB,o.requiredB)).toList();
+    }
+
+    public synchronized ActionView diagnose(String id) throws SQLException {
+        var candidate=town.copy();
+        String message=TechnicalWorkLife.inspect(candidate,id,state.minute);
+        return apply(candidate,TechnicalWorkLife.INSPECTION_MINUTES,message);
+    }
+
+    public synchronized ActionView repair(String id) throws SQLException {
+        var candidate=town.copy();
+        String message=TechnicalWorkLife.complete(candidate,id,state.day,state.minute);
+        return apply(candidate,TechnicalWorkLife.COMPLETION_MINUTES,message);
+    }
+
+    public synchronized List<JobView> jobs() {
+        return CareerLife.offers().stream()
+                .map(v->new JobView(v.id(),v.title(),v.workplace().name(),v.subject(),
+                        v.requiredSkill(),v.wage(),
+                        town.employerFunds.getOrDefault(v.id(),0))).toList();
+    }
+
+    public synchronized ActionView applyJob(String jobId) throws SQLException {
+        var candidate=town.copy();
+        String message=CareerLife.apply(candidate,jobId);
+        return apply(candidate,15,message);
+    }
+
+    public synchronized ActionView study(String subject) throws SQLException {
+        var candidate=town.copy();
+        String message=CareerLife.study(candidate,subject,state.minute);
+        return apply(candidate,CareerLife.LESSON_MINUTES,message);
+    }
+
+    public synchronized ActionView work() throws SQLException {
+        var candidate=town.copy();
+        String message=CareerLife.work(candidate,state.day,state.minute);
+        return apply(candidate,CareerLife.SHIFT_MINUTES,message);
+    }
+
+    public synchronized ActionView prospect() throws SQLException {
+        var copy=town.copy();
+        String message=IndustryLife.prospectPlayer(copy,state.minute);
+        return apply(copy,120,message);
+    }
+
+    /** Reuses the existing per-visitor, per-resident memory and atomic save. */
+    public synchronized ActionView speak(String residentId,String message) throws SQLException {
+        if(residentId==null || message==null)
+            throw new IllegalArgumentException("Resident and message are required.");
+        var copy=town.copy();
+        var resident=PlayerLife.nearby(copy,residentId);
+        String reply=PlayerLife.speak(copy,residentId,message,state.day,state.minute);
+        return apply(copy,1,resident.name+": "+reply);
+    }
+
+    public synchronized ActionView waitMinutes(int minutes) throws SQLException {
+        if(minutes<1 || minutes>1440)
+            throw new IllegalArgumentException("Wait between 1 and 1440 game minutes.");
+        return apply(town.copy(),minutes,"Waited "+minutes+" minute(s).");
+    }
+
+    public synchronized ActionView move(String destination) throws SQLException {
+        var copy=town.copy();
+        var place=PlayerLife.destination(destination);
+        int minutes=PlayerLife.startTravel(copy.player,place);
+        if(minutes==0)return new ActionView("Already at "+place.label+".",snapshot());
+        return apply(copy,minutes,(copy.player.cycling?"Cycled to ":"Walked to ")+place.label+".");
+    }
+
+    public synchronized ActionView carAction(String action) throws SQLException {
+        var copy=town.copy();
+        String message=switch(action==null?"":action) {
+            case "buy" -> MotorLife.buy(copy,state.minute);
+            case "refuel" -> MotorLife.refuel(copy,state.minute);
+            case "repair" -> MotorLife.repair(copy,state.minute);
+            default -> throw new IllegalArgumentException("Unknown car action.");
+        };
+        return apply(copy,action.equals("repair")?30:5,message);
+    }
+    public synchronized ActionView drive(String destination) throws SQLException {
+        var copy=town.copy();
+        var place=PlayerLife.destination(destination);
+        int minutes=MotorLife.drive(copy.player,place);
+        return apply(copy,minutes,"Drove to "+place.label+". Your car is parked there.");
+    }
+
+    public synchronized ActionView freightAction(String action,String destination) throws SQLException {
+        var copy=town.copy();
+        return switch(action==null?"":action) {
+            case "load" -> apply(copy,5,FreightLife.load(copy,state.day,state.minute));
+            case "service-truck-2" -> apply(copy,30,SecondFleetLife.manage(copy,action,destination,state.day));
+            case "buy-truck-2","hire-driver-2","auto-on-2","auto-off-2" -> apply(copy,5,SecondFleetLife.manage(copy,action,destination,state.day));
+            case "hire-driver" -> apply(copy,5,LogisticsLife.hire(copy,destination,state.day));
+            case "load-company" -> apply(copy,5,FreightLife.load(copy,state.day,state.minute,true));
+            case "service-truck" -> apply(copy,30,LogisticsLife.manage(copy,action));
+            case "register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off" -> apply(copy,5,LogisticsLife.manage(copy,action));
+            case "drive" -> {
+                var place=PlayerLife.destination(destination);
+                int minutes=FreightLife.drive(copy,place);
+                yield apply(copy,minutes,"Truck arrived at "+place.label+".");
+            }
+            case "unload" -> apply(copy,5,FreightLife.unload(copy,state.day));
+            default -> throw new IllegalArgumentException("Unknown freight action.");
+        };
+    }
+
+    public synchronized ActionView buyBicycle() throws SQLException {
+        var copy=town.copy();
+        return apply(copy,5,TransportLife.buyBicycle(copy,state.minute));
+    }
+    public synchronized ActionView transportMode(String mode) throws SQLException {
+        var copy=town.copy();
+        return apply(copy,1,TransportLife.mode(copy.player,mode));
+    }
+
+    public synchronized ActionView rest(int minutes) throws SQLException {
+        var copy=town.copy();
+        int recovered=PlayerLife.rest(copy.player,minutes);
+        return apply(copy,minutes,"Rested for "+minutes+" minute(s); recovered up to "+
+                recovered+" fatigue.");
+    }
+
+    public synchronized ActionView transferRoomItem(String item,boolean deposit) throws SQLException {
+        var copy=town.copy();
+        return apply(copy,1,HousingLife.transfer(copy.player,item,deposit,state.day,state.minute));
+    }
+    public synchronized ActionView cookRoomMeal() throws SQLException {
+        return cookRoomMeal("bread-soup");
+    }
+    public synchronized ActionView cookRoomMeal(String recipeId) throws SQLException {
+        var recipe=FoodLife.recipe(recipeId);
+        var copy=town.copy();
+        return apply(copy,recipe.minutes(),FoodLife.cook(copy.player,recipe,state.day,state.minute));
+    }
+    public synchronized ActionView washInRoom() throws SQLException {
+        var copy=town.copy();
+        return apply(copy,10,HousingLife.wash(copy.player,state.day,state.minute));
+    }
+
+    public synchronized ActionView gardenAction(String action) throws SQLException {
+        var copy=town.copy();
+        return apply(copy,"plant".equals(action)||"harvest".equals(action)||"buy-barrel".equals(action)||"build-coop".equals(action)||(action!=null&&(action.startsWith("orchard-plant-")||action.startsWith("orchard-harvest-")))?15:5,GardenLife.act(copy,action,state.day,state.minute));
+    }
+    public synchronized ActionView buyHouse() throws SQLException {
+        var copy=town.copy();
+        return apply(copy,5,HousingLife.buyHouse(copy,state.day,state.minute));
+    }
+    public synchronized ActionView rentRoom() throws SQLException {
+        var copy=town.copy();
+        return apply(copy,5,HousingLife.rent(copy,state.day,state.minute));
+    }
+    public synchronized ActionView sleepInRoom(int hours) throws SQLException {
+        var copy=town.copy();
+        var result=HousingLife.sleep(copy.player,hours,state.day,state.minute);
+        return apply(copy,result.minutes(),"Slept in your home for "+hours+" hours.");
+    }
+
+    public synchronized ActionView sleep(int hours) throws SQLException {
+        var copy=town.copy();
+        var result=PlayerLife.sleep(copy.player,hours,state.day,state.minute);
+        return apply(copy,result.minutes(),
+                "Slept "+hours+" hour(s). Health changed by "+result.healthChange()+".");
+    }
+
+    public synchronized ActionView buy(String productId) throws SQLException {
+        var copy=town.copy();
+        return apply(copy,2,RetailLife.buy(copy,productId,state.minute));
+    }
+    public synchronized ActionView consume(String productId) throws SQLException {
+        var copy=town.copy();
+        return apply(copy,5,RetailLife.consume(copy.player,productId));
+    }
+
+    public synchronized ActionView drink(String sourceId) throws SQLException {
+        var copy=town.copy();
+        String message="park-fountain".equals(sourceId)
+                ? UtilityLife.drinkAtFountain(copy)
+                : NatureLife.drink(copy,sourceId,state.day,state.minute);
+        return apply(copy,5,message);
+    }
+
+    public synchronized ActionView forage(String sourceId) throws SQLException {
+        var copy=town.copy();
+        String message=NatureLife.forage(copy,sourceId);
+        return apply(copy,15,message);
+    }
+
+    private ActionView apply(TownLife.Town candidateTown,int minutes,String message)
+            throws SQLException {
+        var candidateState=state.copy();
+        var events=new ArrayList<LifeSimulation.LifeEvent>();
+        var truth=new ArrayList<TownLife.Event>();
+        var observations=new ArrayList<TownLife.Observation>();
+        var interactions=new ArrayList<SocialLife.Interaction>();
+        events.addAll(LifeSimulation.advance(candidateState,minutes,
+                current->TownLife.tick(candidateTown,current,truth,observations,interactions)));
+        if(!candidateTown.player.alive) {
+            var ended=PlayerLife.beginNewLife(candidateTown,candidateState.day,candidateState.minute);
+            message+=" Visitor #"+ended.incarnation()+" died; visitor #"+
+                    candidateTown.player.incarnation+" begins a new life.";
+        }
+        db.save(candidateState,events,List.of(),candidateTown,truth,observations,interactions);
+        state=candidateState;
+        town=candidateTown;
+        return new ActionView(message,snapshot());
+    }
+
+    @Override
+    @PreDestroy
+    public synchronized void close() throws SQLException {
+        db.close();
+    }
+}

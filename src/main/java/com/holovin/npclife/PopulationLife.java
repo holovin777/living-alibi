@@ -28,18 +28,42 @@ final class PopulationLife {
         if(minute%15==0)c.fatigue=clamp(c.fatigue+(sleeping?-3:1));
         boolean workday=(clock.day-1)%7<5;
         boolean sick=EmploymentLife.sick(c,clock.day);
-        boolean working=c.employed && !sick && workday && minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset;
+        // Independent workshops use short real two-hour shifts, not fictitious
+        // wages for eight hours to fabricate one small batch of parts.
+        boolean shopEmployee=BusinessLife.isEmployee(town,c);
+        boolean carrier=LogisticsLife.isDriver(town,c);
+        TownLife.Place freightDestination=LogisticsLife.activeDriverDestination(town,c);
+        boolean freightRun=carrier && freightDestination!=null && !sick;
+        boolean working=c.employed && !sick && workday &&
+                (carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):
+                (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && c.money>=9;
-        boolean needWater=c.water<2 && c.money>=3;
+        boolean needWater=c.water<2;
+        // A repaired public fountain provides an affordable alternative to
+        // market purchases, but only while finite filtered water is available.
+        boolean publicWater=needWater && UtilityLife.status(town).fountainWorking()
+                && town.cleanWater>0;
         TownLife.Place desired;
-        if(sleeping || sick)desired=c.home;
-        else if(marketOpen && (needFood||needWater)) desired=TownLife.Place.MARKET;
+        if(sick)desired=c.home;
+        else if(freightRun)desired=freightDestination;
+        else if(sleeping)desired=c.home;
+        else if(carrier && working)desired=c.workplace;
+        else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
+        else if(marketOpen && needFood)desired=TownLife.Place.MARKET;
+        else if(marketOpen && publicWater)desired=TownLife.Place.PARK;
+        else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;
         else if(working)desired=c.workplace;
         else if(minute>=960 && minute<1200) {
             // The same resident favors a location consistently for a given day.
+            // Unlit parks lose visitors at dusk; they choose a covered cafe.
             int preference=Math.floorMod((int)(c.personalSeed^(clock.day*31L)),4);
-            desired=preference==0?TownLife.Place.CAFE:(preference==1?TownLife.Place.LIBRARY:TownLife.Place.PARK);
+            if(preference==0)desired=TownLife.Place.CAFE;
+            else if(preference==1)desired=TownLife.Place.LIBRARY;
+            else if(minute>=1080 && !UtilityLife.status(town).lightsWorking())
+                desired=TownLife.Place.CAFE;
+            else if(preference==2)desired=TownLife.Place.CENTRO;
+            else desired=TownLife.Place.PARK;
         } else desired=c.home;
         if(c.travelRemaining>0 || c.place!=desired) {
             TownLife.move(town,c,desired,clock,events,observations);
@@ -77,11 +101,18 @@ final class PopulationLife {
         if(sleeping)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
         else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
+        else if(freightRun)c.activity="WORKING";
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){
-                c.money+=11;
-                TownLife.publish(town,clock,c.id,c.place,c.name+" earned EUR 11 for one hour of work.",events,observations);
+                if(!LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
+                        !IndustryLife.payHourly(town,c,clock,events,observations)) {
+                    // Existing unrelated occupations retain their original
+                    // placeholder wage model until their companies are modeled.
+                    c.money+=11;
+                    TownLife.publish(town,clock,c.id,c.place,
+                            c.name+" earned EUR 11 for one hour of work.",events,observations);
+                }
             }
         } else c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"FREE_TIME";
         if(minute%60==0 && (c.hunger>93||c.thirst>93))c.health=clamp(c.health-2);

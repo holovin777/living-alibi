@@ -1,10 +1,137 @@
 # Living Alibi
 
-**v1.15 — Anonymous Visitor** · Java 21+ · Maven · SQLite · headless console prototype
+**v1.16 — Living Visitor (draft)** · Java 21+ · Maven · SQLite · console + optional Spring Boot API
 
 > A living town where you can be an unknown visitor, build relationships, or investigate when you choose.
 
-Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player can now roam anonymously in public places; detective cases are optional. There is no 3D world yet.** Code, documentation, and game text are English-only.
+Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player is an ordinary park visitor; detective cases are optional. A first Godot 3D park preview now exists, but it is not a complete 3D world.** Code, documentation, and game text are English-only.
+
+## Play the current 3D prototype on Linux
+
+Requires **JDK 21+**, **Maven 3.9+**, **curl** and **Godot 4** installed
+locally. For Arch Linux, install the necessary packages from the official
+repositories if missing (for example `jdk21-openjdk`, `maven`, `curl`,
+`godot`). The first Maven build requires internet access to download
+dependencies; regular game logic does not require an OpenAI key.
+
+From the **v1.16 feature branch** in the repository root:
+
+```bash
+bash play.sh --check
+bash play.sh
+```
+
+The launcher builds the Java engine and Spring Boot server, starts the
+authoritative game at **127.0.0.1:8080**, imports Godot assets on the first
+launch, and opens the game window. Close Godot to stop the local server.
+The saved world stays in `data/world.db` and is **never erased by this
+script**. If there is no previous save, a new playable park visitor is
+created automatically with 50 EUR and no assigned career.
+
+Nearby residents reported by the Java simulation are now represented
+by simple labeled 3D figures. Their on-screen positions are placeholders,
+not continuous NPC navigation; residents who are absent from the actual
+public scene are not displayed.
+
+The camera is **first-person only**; click the scene for mouse look and
+press **Esc** to release the cursor for the interface. There is no
+third-person view or camera toggle. The Java server remains responsible
+for real travel.
+
+Use WASD/arrow keys to walk within each placeholder district; **E** at
+the yellow gate to travel and **F** at the blue kiosk for work, education
+and other actions. See [Godot controls](godot/README.md).
+
+For troubleshooting, `bash play.sh --server-only` starts only the Java
+server and displays its output, and `data/server.log` records normal
+game-launch errors. Do not launch the console and Spring server
+simultaneously against the same save file.
+
+To get this branch into a *separate* folder without replacing your current
+checkout:
+
+```bash
+git clone --branch feat/player-needs-persistence-v1.16 \
+  https://github.com/holovin777/living-alibi.git living-alibi-preview
+cd living-alibi-preview
+bash play.sh
+```
+
+This is a development preview; distribution as a downloadable standalone
+Linux application (without installing Maven/Godot) is not yet implemented.
+
+## New in v1.16 (draft)
+
+The game still launches **from an empty SQLite file**. A new visitor is anonymous,
+can roam, rest, sleep in public places, drink from finite natural sources and
+gather wild berries. The new visitor starts with **50 EUR in their pocket**
+and no mandatory job, detective role or qualifications. Jobs, paid lessons,
+career changes and two-hour work shifts are optional. A mortality event creates a **new visitor in the same
+continuous city**, without resetting NPCs, resources, or historic cases.
+
+A deterministic **four-season calendar** (spring, summer, autumn, winter)
+now drives fictional weather, temperature, seasonal berry growth, rain-fed
+puddles and the health consequences of sleeping outdoors. Weather changes
+are calculated from game time and require no separate weather database.
+
+An optional **Spring Boot 4.2 API** is available under `server/` as the
+first bridge to Godot. The standalone Java simulation and console remain
+independent of Spring. The backend exposes world snapshots and accepts
+validated player actions over versioned REST/JSON endpoints.
+
+See [Godot / Spring integration](docs/GODOT_INTEGRATION.md),
+[Player Daily Life](docs/PLAYER_DAILY_LIFE.md),
+[Natural Resources](docs/NATURAL_RESOURCES.md) and
+[Weather](docs/WEATHER.md) and
+[Careers](docs/PLAYER_CAREERS.md) and
+[Technical Work](docs/TECHNICAL_WORK.md) and
+[Industry](docs/INDUSTRY.md) and
+[Player Business](docs/PLAYER_BUSINESS.md). Trained technicians and engineers
+now inspect and fix real persistent equipment using finite material stocks
+before receiving a technical wage. Working NPC miners, freight drivers and factory machinists
+extract finite iron/copper ore, move it by bounded timed truck,
+refine it and deliver new parts to the shared maintenance warehouse.
+A 10-unit finite scrap stock can be recycled; surveying can reveal one
+additional bounded mineral deposit. Industrial pay comes from finite
+company accounts, and the visitor may **choose to work as a miner
+or factory machinist**. Production, money and inventory persist
+across restarts without duplication. A visitor can now also **register a
+small repair-parts business**, invest personal savings, purchase equipment,
+hire an actual co-present resident and sell physical manufactured supplies
+to the municipality. The independent company keeps its own wallet, staff,
+machine and records in SQLite, and never transfers ownership silently to
+a new character after death. See [Industry](docs/INDUSTRY.md) and
+[Player Business](docs/PLAYER_BUSINESS.md). The GDScript client is
+[`godot/examples/WorldApi.gd`](godot/examples/WorldApi.gd). A first
+connected 3D town preview starts from [`godot/project.godot`](godot/project.godot):
+walk within a district using WASD, press E at the yellow travel gate to
+visit market/school/workshop/office, and press F at a blue kiosk to
+apply for work, study or collect a local resource. The Java server validates
+these actions and time costs before Godot changes districts.
+See [Godot controls](godot/README.md). Requires a running local Spring
+API and an installed Godot 4.6.1 editor.
+
+Repairs also affect the people living in the town: a repaired pump
+supplies a limited park water fountain for residents and the player.
+Thirsty NPCs can choose to travel there rather than buy water at the
+market, conserving their own money while using finite public stock.
+When streetlights fail, some NPCs avoid the park after dusk; when an
+engineer restores them, their evening park visits return, and extra
+outdoor nighttime fatigue disappears. The water supply is drawn from
+finite river stock, and the reservoir survives restarts.
+See [City Utilities](docs/CITY_UTILITIES.md).
+
+For a new empty world, first build the engine:
+
+```bash
+mvn -q clean test-compile
+mvn -q -DskipTests install
+mvn -f server/pom.xml spring-boot:run
+```
+
+The local API is available at `http://127.0.0.1:8080/api/v1/world`.
+It requires no previous save. Do not run the console and Spring server
+against the same SQLite database simultaneously.
 
 ## Implemented
 

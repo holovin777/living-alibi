@@ -14,7 +14,8 @@ final class TownLife {
         MARKET("Market"), PARK("Park"), CAFE("Cafe"),
         NORTH_RESIDENCES("North residences"), SOUTH_RESIDENCES("South residences"),
         OFFICE("Office"), CLINIC("Clinic"), SCHOOL("School"),
-        WORKSHOP("Workshop"), LIBRARY("Library");
+        WORKSHOP("Workshop"), LIBRARY("Library"),
+        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory"), CENTRO("Centro Storico"), PORTICI("Via dei Portici"), FARM("Cascina delle Risaie"), FUEL_STATION("Stazione di servizio"), LOGISTICS_DEPOT("Deposito Logistico");
         final String label;
         Place(String label) { this.label=label; }
     }
@@ -90,6 +91,19 @@ final class TownLife {
     static final class Town {
         final Map<String,Citizen> people=new LinkedHashMap<>();
         PlayerLife.Player player=new PlayerLife.Player();
+        BusinessLife.Shop business=new BusinessLife.Shop();
+        final Map<Integer,PlayerLife.LifeRecord> pastLives=new LinkedHashMap<>();
+        final Map<String,NatureLife.Source> naturalResources=new LinkedHashMap<>();
+        final Map<String,Integer> employerFunds=new LinkedHashMap<>();
+        final Map<String,Integer> retailStock=new LinkedHashMap<>();
+        final Map<String,Integer> technicalMaterials=new LinkedHashMap<>();
+        final Map<String,TechnicalWorkLife.Order> technicalOrders=new LinkedHashMap<>();
+        final Map<String,Integer> industryStocks=new LinkedHashMap<>();
+        int lastIndustryExtractDay,lastIndustryTransportDay,lastIndustryRefineDay;
+        int lastIndustryFabricateDay,lastIndustryDeliverDay;
+        int lastIndustryArrivalDay,lastIndustryRecycleDay;
+        int cleanWater;
+        int lastWaterPumpDay;
         boolean together;
         long meetingSinceTick=-1;
         SocialLife.Relationship relationship=new SocialLife.Relationship("marco","elena");
@@ -123,6 +137,24 @@ final class TownLife {
             t.relationship=relationship.copy();
             for(var e:peerRelationships.entrySet())t.peerRelationships.put(e.getKey(),e.getValue().copy());
             for(var e:people.entrySet())t.people.put(e.getKey(),e.getValue().copy());
+            for(var e:naturalResources.entrySet())
+                t.naturalResources.put(e.getKey(),e.getValue().copy());
+            t.pastLives.putAll(pastLives); // Immutable history records.
+            t.employerFunds.putAll(employerFunds);
+            t.retailStock.putAll(retailStock);
+            t.technicalMaterials.putAll(technicalMaterials);
+            for(var e:technicalOrders.entrySet())
+                t.technicalOrders.put(e.getKey(),e.getValue().copy());
+            t.business=business.copy();
+            t.industryStocks.putAll(industryStocks);
+            t.lastIndustryExtractDay=lastIndustryExtractDay;
+            t.lastIndustryTransportDay=lastIndustryTransportDay;
+            t.lastIndustryRefineDay=lastIndustryRefineDay;
+            t.lastIndustryFabricateDay=lastIndustryFabricateDay;
+            t.lastIndustryDeliverDay=lastIndustryDeliverDay;
+            t.lastIndustryArrivalDay=lastIndustryArrivalDay;
+            t.lastIndustryRecycleDay=lastIndustryRecycleDay;
+            t.cleanWater=cleanWater;t.lastWaterPumpDay=lastWaterPumpDay;
             for(var e:beliefs.entrySet())t.beliefs.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
             t.pendingTransfers.addAll(pendingTransfers);
             for(var e:secrets.entrySet())t.secrets.put(e.getKey(),new LinkedHashMap<>(e.getValue()));
@@ -138,6 +170,29 @@ final class TownLife {
         void copyFrom(Town other) {
             people.clear();for(var e:other.people.entrySet())people.put(e.getKey(),e.getValue().copy());
             player=other.player.copy();
+            pastLives.clear();
+            pastLives.putAll(other.pastLives);
+            employerFunds.clear();
+            employerFunds.putAll(other.employerFunds);
+            retailStock.clear();retailStock.putAll(other.retailStock);
+            technicalMaterials.clear();
+            technicalMaterials.putAll(other.technicalMaterials);
+            technicalOrders.clear();
+            for(var e:other.technicalOrders.entrySet())
+                technicalOrders.put(e.getKey(),e.getValue().copy());
+            business=other.business.copy();
+            industryStocks.clear();industryStocks.putAll(other.industryStocks);
+            lastIndustryExtractDay=other.lastIndustryExtractDay;
+            lastIndustryTransportDay=other.lastIndustryTransportDay;
+            lastIndustryRefineDay=other.lastIndustryRefineDay;
+            lastIndustryFabricateDay=other.lastIndustryFabricateDay;
+            lastIndustryDeliverDay=other.lastIndustryDeliverDay;
+            lastIndustryArrivalDay=other.lastIndustryArrivalDay;
+            lastIndustryRecycleDay=other.lastIndustryRecycleDay;
+            cleanWater=other.cleanWater;lastWaterPumpDay=other.lastWaterPumpDay;
+            naturalResources.clear();
+            for(var e:other.naturalResources.entrySet())
+                naturalResources.put(e.getKey(),e.getValue().copy());
             together=other.together;meetingSinceTick=other.meetingSinceTick;
             relationship=other.relationship.copy();
             peerRelationships.clear();
@@ -177,6 +232,18 @@ final class TownLife {
         t.people.put("elena",new Citizen("elena","Elena Rossi","Shopkeeper",desiredElena(marco.day,marco.minute)));
         t.get("elena").home=Place.ELENA_HOME;t.get("elena").workplace=Place.MARKET;
         t.get("elena").activity="WORKING";
+        NatureLife.ensureSources(t);
+        CareerLife.ensureEmployers(t);
+        RetailLife.ensure(t);
+        BusinessLife.ensure(t);
+        TechnicalWorkLife.ensure(t);
+        IndustryLife.ensure(t);
+        FarmLife.ensure(t);
+        FuelLife.ensure(t);
+        FreightLife.ensure(t);
+        GardenLife.ensure(t);
+        HenLife.ensure(t);
+        OrchardLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -187,7 +254,16 @@ final class TownLife {
     }
     static void tick(Town town,WorldState marco,List<Event> truth,List<Observation> observations,
                      List<SocialLife.Interaction> interactions) {
-        PlayerLife.tick(town.player);
+        PlayerLife.tick(town.player,marco.minute);
+        HousingLife.expire(town.player,marco.day,marco.minute);
+        GardenLife.tick(town,marco.day,marco.minute);
+        HenLife.tick(town,marco.day,marco.minute);
+        OrchardLife.tick(town,marco.day,marco.minute);
+        NatureLife.tick(town,marco.day,marco.minute);
+        RetailLife.tick(town,marco.minute);
+        FarmLife.tick(town,marco.day,marco.minute);
+        FuelLife.tick(town,marco.day,marco.minute);
+        TechnicalWorkLife.tick(town,marco.day,marco.minute);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;
@@ -198,12 +274,17 @@ final class TownLife {
         m.food=marco.food;m.water=marco.water;
         if(m.alive)move(town,m,desiredMarco(marco,m.place),marco,truth,observations);
         elenaNeeds(e,marco,truth,observations,town);
-        if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e),marco,truth,observations);
+        if(e.alive)move(town,e,desiredElena(marco.day,marco.minute,e,town),marco,truth,observations);
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
+        IndustryLife.tick(town,marco,truth,observations);
+        BusinessLife.tick(town,marco,truth,observations);
+        LogisticsLife.tick(town,marco,truth,observations);
+        SecondFleetLife.tick(town,marco,truth,observations);
         EconomyLife.tick(town,marco,truth,observations);
         PropertyLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);
+        UtilityLife.tick(town,marco,truth,observations);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {
             town.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
@@ -276,7 +357,7 @@ final class TownLife {
         if(minute>=960 && minute<1200)return (day%3==0)?Place.CAFE:Place.PARK;
         return Place.ELENA_HOME;
     }
-    private static Place desiredElena(int day,int minute,Citizen e) {
+    private static Place desiredElena(int day,int minute,Citizen e,Town town) {
         if(minute<390 || minute>=1320)return Place.ELENA_HOME;
         if(isWorkTime(day,minute))return Place.MARKET;
         // Shopping is a separate need, not an effect of having a weekday job.
@@ -284,7 +365,11 @@ final class TownLife {
         if(minute>=420 && minute<1200 &&
                 ((e.food<2 && e.money>=9) || (e.water<2 && e.money>=3)))
             return Place.MARKET;
-        if(minute>=960 && minute<1200)return (day%3==0)?Place.CAFE:Place.PARK;
+        if(minute>=960 && minute<1200) {
+            if(day%3==0 || (minute>=1080 && !UtilityLife.status(town).lightsWorking()))
+                return Place.CAFE;
+            return Place.PARK;
+        }
         return Place.ELENA_HOME;
     }
     private static Place desiredMarco(WorldState s,Place current) {
