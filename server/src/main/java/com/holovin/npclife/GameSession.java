@@ -47,7 +47,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
                              int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
-                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling) { }
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -82,7 +82,7 @@ public final class GameSession implements AutoCloseable {
                 p.hunger,p.thirst,p.fatigue,p.health,p.alive,
                 p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,p.hygiene,
-                FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling);
+                FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name());
         var residents=PlayerLife.visible(town).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);

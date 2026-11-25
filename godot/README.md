@@ -373,6 +373,18 @@ the studio and grocery interior use ordinary walking speed. This
 is the first transport abstraction: no bicycle model, mounting
 animation, parking, theft, road traffic, fuel or wear yet.
 
+## Bicycle models and parking
+
+Original procedural bicycle geometry has a frame, tires, spokes,
+handlebar, seat and rack; wheel rotation follows local movement.
+Press P near a marked bicycle rack in Park, Workshop or North
+residences to park/retrieve. The server stores the parking district;
+cycling is unavailable until the bicycle is retrieved in that
+district, including after restarting. The client enforces rack
+proximity and renders the parked model; exact parking coordinates
+and theft are not simulated. Walking with an unparked bicycle still
+abstracts carrying it. No full rider pose or vehicle steering physics.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

@@ -9,6 +9,8 @@ const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
 const INTERACTION_RADIUS := 3.5
 const WALK_SPEED := 4.5
 const CYCLE_SPEED := 8.0
+const RACK_POSITION := Vector3(6.0,0,-10.0)
+const RACK_DISTRICTS := ["PARK","WORKSHOP","NORTH_RESIDENCES"]
 const WALKER_RADIUS := 0.32
 const COLLISION_STEP := 0.12
 const ROAD_EDGE := 24.0
@@ -67,6 +69,9 @@ var _message: Label
 var _hint: Label
 var _view_button: Button
 var _transport_button: Button
+var _parking_button: Button
+var _bike_model: Node3D
+var _bike_wheel_angle := 0.0
 var _jobs: Label
 var _bag_label: Label
 var _housing_label: Label
@@ -120,11 +125,15 @@ func _process(delta: float) -> void:
     if direction.length_squared() > 0.0:
         # The Java world controls district transitions; this is local preview walking.
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
+        var before := _avatar.position
         _avatar.position = _move_on_ground(_avatar.position,
                 relative_motion * delta * _movement_speed(), WALKER_RADIUS, true)
+        if _movement_speed() == CYCLE_SPEED:
+            _bike_wheel_angle += before.distance_to(_avatar.position)/0.35
         _follow_player()
         _try_road_crossing(relative_motion)
 
+    _sync_bicycle()
     _animate_residents(delta)
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_inside_guest_room(),_environment)
@@ -137,6 +146,8 @@ func _process(delta: float) -> void:
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
+    elif _near_rack() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
+        _hint.text = "P: park or retrieve your bicycle · B: ride/walk."
     elif _near_home_station():
         _hint.text = "F: use your bed, kitchen or bathroom."
     elif _current_place == "NORTH_RESIDENCES" and _avatar.position.distance_to(ROOM_EXIT) < 2.3:
@@ -174,6 +185,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_M:
             _toggle_map()
+            get_viewport().set_input_as_handled()
+        elif event.keycode == KEY_P and not _action_panel.visible and not _travel_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
+            _toggle_parking()
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_B and not _action_panel.visible and not _travel_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
             _toggle_transport()
@@ -227,7 +241,7 @@ func _sync_guest_room() -> void:
 
 func _cycling() -> bool:
     var p: Dictionary = _last_snapshot.get("player",{})
-    return bool(p.get("ownsBicycle",false)) and bool(p.get("cycling",false))
+    return bool(p.get("ownsBicycle",false)) and bool(p.get("cycling",false)) and _parked_district().is_empty()
 
 func _movement_speed() -> float:
     # A portable bicycle is carried at walking speed in the rented studio
@@ -236,8 +250,45 @@ func _movement_speed() -> float:
     var in_shop := _current_place == "PORTICI" and Rect2(4.4,2.15,6.1,5.7).has_point(Vector2(at.x,at.z))
     return CYCLE_SPEED if _cycling() and not _inside_guest_room() and not in_shop else WALK_SPEED
 
+func _parked_district() -> String:
+    var value = _last_snapshot.get("player",{}).get("bicycleParked")
+    return "" if value == null else str(value)
+
+func _near_rack() -> bool:
+    return _current_place in RACK_DISTRICTS and _avatar.position.distance_to(RACK_POSITION)<2.8
+
+func _toggle_parking() -> void:
+    if not _connected or _api.is_busy() or not _near_rack():
+        return
+    if not bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
+        return
+    if _parked_district().is_empty():
+        _api.transport_mode("park")
+    elif _parked_district() == _current_place:
+        _api.transport_mode("retrieve")
+    else:
+        _message.text = "Your bicycle is parked at "+_parked_district().capitalize()
+
+func _sync_bicycle() -> void:
+    if not is_instance_valid(_bike_model):
+        return
+    var riding := _movement_speed() == CYCLE_SPEED
+    _bike_model.visible = riding
+    _bike_model.position = _avatar.position
+    _bike_model.rotation.y = _view_yaw
+    for wheel in _bike_model.get_children():
+        if wheel.has_meta("wheel"):
+            wheel.rotation.x = _bike_wheel_angle
+    for id in RACK_DISTRICTS:
+        if not _chunks.has(id):
+            continue
+        var root: Node3D = _chunks[id]["root"]
+        var parked := root.get_node_or_null("BicycleRack/ParkedBicycle") as Node3D
+        if parked != null:
+            parked.visible = _parked_district() == id
+
 func _toggle_transport() -> void:
-    if _connected and not _api.is_busy() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
+    if _connected and not _api.is_busy() and _parked_district().is_empty() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
         _api.transport_mode("walk" if _cycling() else "cycle")
 
 func _buy_bicycle() -> void:
@@ -289,6 +340,8 @@ func _build_world() -> void:
         _box(_avatar, Vector3(0.2, 0.65, 0.23), Color(0.19, 0.24, 0.29),
                 Vector3(x_offset, 0.33, 0.0))
 
+    _bike_model = _make_bicycle(self,"PlayerBicycle",Color("#496e50"))
+    _bike_model.visible = false
     _weather_fx = WeatherEffects.new()
     add_child(_weather_fx)
     _weather_fx.follow(_avatar.position)
@@ -441,6 +494,8 @@ func _generate_chunk(place_id: String) -> void:
             _building("Neighborhood", Color(0.57, 0.61, 0.57))
             _tree(Vector3(11.0, 0.0, 7.0))
 
+    if place_id in RACK_DISTRICTS:
+        _build_bicycle_rack()
     _build_road_links(place_id)
     _chunks[place_id] = {
         "root": _scenery, "residents": _residents_root,
@@ -547,6 +602,66 @@ func _room_wall(parent: Node3D,at: Vector3,footprint: Vector2,color: Color) -> v
 func _room_furniture(parent: Node3D,at: Vector3,size: Vector3,color: Color) -> void:
     _add_obstacle(at,Vector2(size.x,size.z))
     _box(parent,size,color,at+Vector3(0,size.y*0.5,0))
+
+func _bike_tube(parent: Node3D,a: Vector3,b: Vector3,color: Color,radius: float = 0.025) -> void:
+    var tube := _cylinder(parent,radius,a.distance_to(b),color,(a+b)*0.5)
+    tube.quaternion = Quaternion(Vector3.UP,(b-a).normalized())
+
+func _make_bicycle(parent: Node3D,caption: String,paint: Color) -> Node3D:
+    var bike := Node3D.new()
+    bike.name = caption
+    parent.add_child(bike)
+    var metal := Color("#969a97")
+    var tire := Color("#242625")
+    for z in [-0.62,0.62]:
+        var wheel := Node3D.new()
+        wheel.position = Vector3(0,0.35,z)
+        wheel.set_meta("wheel",true)
+        bike.add_child(wheel)
+        var torus := TorusMesh.new()
+        torus.inner_radius = 0.31
+        torus.outer_radius = 0.37
+        var ring := MeshInstance3D.new()
+        ring.mesh = torus
+        var material := StandardMaterial3D.new()
+        material.albedo_color = tire
+        ring.material_override = material
+        ring.rotation_degrees.z = 90
+        wheel.add_child(ring)
+        for i in range(6):
+            var angle := float(i)*PI/6.0
+            var end := Vector3(0,sin(angle)*0.31,cos(angle)*0.31)
+            _bike_tube(wheel,-end,end,metal,0.008)
+    var rear := Vector3(0,0.35,0.62)
+    var crank := Vector3(0,0.38,0.05)
+    var saddle := Vector3(0,0.88,0.20)
+    var head := Vector3(0,0.90,-0.44)
+    var front := Vector3(0,0.35,-0.62)
+    for endpoints in [[rear,crank],[rear,saddle],[crank,saddle],[saddle,head],[crank,head]]:
+        _bike_tube(bike,endpoints[0],endpoints[1],paint,0.035)
+    _bike_tube(bike,head,front,metal,0.035)
+    _bike_tube(bike,head,Vector3(0,1.12,-0.52),metal)
+    _bike_tube(bike,Vector3(-0.29,1.12,-0.52),Vector3(0.29,1.12,-0.52),metal)
+    _box(bike,Vector3(0.22,0.075,0.30),tire,saddle+Vector3(0,0.06,0))
+    _box(bike,Vector3(0.35,0.06,0.42),metal,Vector3(0,0.78,0.60))
+    _box(bike,Vector3(0.1,0.1,0.12),Color("#efe1a1"),Vector3(0,0.99,-0.58))
+    _box(bike,Vector3(0.1,0.08,0.09),Color("#be4440"),Vector3(0,0.8,0.84))
+    return bike
+
+func _build_bicycle_rack() -> void:
+    var rack := Node3D.new()
+    rack.name = "BicycleRack"
+    rack.position = RACK_POSITION
+    _scenery.add_child(rack)
+    for x in [-0.85,0.85]:
+        _bike_tube(rack,Vector3(x,0,0),Vector3(x,0.8,0),Color("#727876"),0.055)
+    _bike_tube(rack,Vector3(-0.85,0.8,0),Vector3(0.85,0.8,0),Color("#727876"),0.055)
+    _add_obstacle(RACK_POSITION,Vector2(2.0,0.45))
+    var parked := _make_bicycle(rack,"ParkedBicycle",Color("#496e50"))
+    parked.position = Vector3(0,0,0.6)
+    parked.rotation.y = PI/2.0
+    parked.visible = false
+    _sign(rack,"Bici · P",Vector3(0,1.5,0))
 
 func _build_farm() -> void:
     var farm := Node3D.new()
@@ -1158,6 +1273,9 @@ func _create_interface() -> void:
     _transport_button = _button("Transport: walking (B)",_toggle_transport)
     column.add_child(_transport_button)
     _transport_button.disabled = true
+    _parking_button = _button("Bicycle rack (P)",_toggle_parking)
+    column.add_child(_parking_button)
+    _parking_button.disabled = true
     _view_button = _button("View: first person (V)", _toggle_view_mode)
     column.add_child(_view_button)
     var map_button := Button.new()
@@ -1765,8 +1883,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         str(snapshot.get("residents", []).size())
     ]
     _sync_guest_room()
-    _transport_button.text = "Transport: cycling (B)" if _cycling() else "Transport: walking (B)"
-    _transport_button.disabled = not bool(player.get("ownsBicycle",false))
+    _refresh_transport_buttons(false)
+    _sync_bicycle()
     _follow_player()
     _update_bag()
     _town_map.update_world(_current_place, _locations)
@@ -1922,12 +2040,22 @@ func _on_request_started(route: String) -> void:
 func _on_request_finished(_route: String) -> void:
     _set_request_busy(false)
 
+func _refresh_transport_buttons(busy: bool) -> void:
+    var owns := bool(_last_snapshot.get("player",{}).get("ownsBicycle",false))
+    var parked := _parked_district()
+    _transport_button.text = "Bicycle parked: "+parked.capitalize() if not parked.is_empty() else (
+        "Transport: cycling (B)" if _cycling() else "Transport: walking (B)")
+    _transport_button.disabled = busy or not owns or not parked.is_empty()
+    _parking_button.text = "Retrieve bicycle (P)" if not parked.is_empty() else "Park bicycle (P)"
+    _parking_button.disabled = busy or not owns or (not parked.is_empty() and parked != _current_place)
+
 func _set_request_busy(busy: bool) -> void:
     for node in get_tree().get_nodes_in_group("world_api_buttons"):
         if node is Button:
             var same_place := node.has_meta("destination") and (
                     str(node.get_meta("destination")) == _current_place)
             node.disabled = busy or same_place or bool(node.get_meta("sold_out",false))
+    _refresh_transport_buttons(busy)
     if not busy:
         _update_bag()
 

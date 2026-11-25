@@ -200,7 +200,17 @@ func _exercise() -> void:
             and world._transport_button.text.contains("cycling"),
             "confirmed bicycle mode speeds up local outdoor travel"):
         return
+    if not _check(world._bike_model.visible and world._scenery.has_node("BicycleRack/ParkedBicycle"),
+            "cycling has a visible bike model and public rack"):
+        return
     cyclist["player"]["cycling"] = false
+    cyclist["player"]["bicycleParked"] = "PARK"
+    world._on_world_updated(cyclist)
+    var parked_model := world._scenery.get_node("BicycleRack/ParkedBicycle") as Node3D
+    if not _check(parked_model.visible and not world._bike_model.visible and world._transport_button.disabled,
+            "parked bicycle remains at rack and cannot be ridden"):
+        return
+    cyclist["player"]["bicycleParked"] = null
     world._on_world_updated(cyclist)
     if not _check(world._movement_speed() == world.WALK_SPEED,
             "walking mode restores ordinary movement"):

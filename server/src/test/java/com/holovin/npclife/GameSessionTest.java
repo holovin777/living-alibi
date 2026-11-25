@@ -13,6 +13,30 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void parkedBicycleCannotTeleportAndSurvivesRestart() throws Exception {
+        Path file=directory.resolve("parking.db");
+        try(var game=new GameSession(file)) {
+            game.move("workshop");game.waitMinutes(60);game.buyBicycle();
+            game.transportMode("cycle");
+            game.move("park");
+            game.transportMode("park");
+            assertEquals("PARK",game.snapshot().player().bicycleParked());
+            assertFalse(game.snapshot().player().cycling());
+            game.move("market");
+            assertThrows(IllegalArgumentException.class,()->game.transportMode("cycle"));
+            assertThrows(IllegalArgumentException.class,()->game.transportMode("retrieve"));
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals("PARK",game.snapshot().player().bicycleParked());
+            game.move("park");
+            game.transportMode("retrieve");
+            assertNull(game.snapshot().player().bicycleParked());
+            game.transportMode("cycle");
+            assertTrue(game.snapshot().player().cycling());
+        }
+    }
+
+    @Test
     void bicycleOwnershipAndTravelModePersistAndCostRealMoney() throws Exception {
         Path file=directory.resolve("bicycle.db");
         try(var game=new GameSession(file)) {
