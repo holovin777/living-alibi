@@ -862,6 +862,17 @@ func _apply_weather() -> void:
     else:
         _ground_material.albedo_color = Color(0.27, 0.49, 0.26)
         _environment.background_color = Color(0.63, 0.80, 0.96)
+    var minute := int(_last_snapshot.get("minute", 450))
+    var night := minute < 360 or minute >= 1200
+    _sun.light_energy = 0.12 if night else 1.1
+    _environment.ambient_light_energy = 0.25 if night else 1.0
+    if night:
+        _environment.background_color = Color(0.07,0.10,0.18)
+    var services: Dictionary = _last_snapshot.get("services", {})
+    for lamp in _park_lamps:
+        lamp.visible = night and bool(services.get("lightsWorking", false))
+    if _fountain_water != null:
+        _fountain_water.visible = bool(services.get("fountainWorking", false)) and int(services.get("cleanWater", 0)) > 0
 
 func _on_locations_updated(locations: Array) -> void:
     _locations = locations
