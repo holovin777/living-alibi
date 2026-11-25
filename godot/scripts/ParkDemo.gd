@@ -3795,6 +3795,21 @@ func _render_actions() -> void:
                 var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
                 for action in home_options.get("actions",[]):
                     _action_choices.add_child(_button(str(home_labels.get(action,action)),_garden_action.bind("rebirth-home-"+str(action))))
+                var properties = home_options.get("properties",[])
+                if not properties.is_empty():
+                    var market_label := Label.new()
+                    market_label.text = "Property market · Office 09:00–17:00"
+                    _action_choices.add_child(market_label)
+                    for property in properties:
+                        var property_label := Label.new()
+                        property_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                        property_label.text = "%s · %s · %s EUR" % [property.get("name",""),tr(str(property.get("district",""))),property.get("price",0)]
+                        property_label.text += " · "+tr("Owned" if property.get("owned",false) else ("Available" if property.get("available",false) else "Unavailable"))
+                        _action_choices.add_child(property_label)
+                        if property.get("canBuy",false):
+                            _action_choices.add_child(_button(tr("Buy home · %s EUR") % property.get("price",0),_garden_action.bind("rebirth-property-buy-"+str(property.get("id","")))))
+                        if property.get("canSell",false):
+                            _action_choices.add_child(_button(tr("Sell home · %s EUR") % property.get("resale",0),_garden_action.bind("rebirth-property-sell-"+str(property.get("id","")))))
             var family_options = rebirth.get("familyOptions")
             if family_options is Dictionary:
                 var household := Label.new()
