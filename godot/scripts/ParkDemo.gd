@@ -1548,6 +1548,13 @@ func _build_home_garden() -> void:
     roof.position = Vector3(0,2.3,0)
     greenhouse.add_child(roof)
     greenhouse.visible = false
+    var composter := Node3D.new()
+    composter.name = "Composter"
+    composter.position = GARDEN_CENTER+Vector3(-2.7,0,0)
+    garden.add_child(composter)
+    _box(composter,Vector3(0.7,0.85,0.7),Color("#66503b"),Vector3(0,0.425,0))
+    _box(composter,Vector3(0.80,0.08,0.80),Color("#4d603d"),Vector3(0,0.89,0))
+    composter.visible = false
     for stage in range(4):
         var crops := Node3D.new()
         crops.name = "Stage"+str(stage)
@@ -1566,6 +1573,9 @@ func _sync_garden() -> void:
         return
     var root: Node3D = _chunks["SOUTH_RESIDENCES"]["root"]
     var report: Dictionary = _last_snapshot.get("garden",{})
+    var composter := root.get_node_or_null("OrtoPrivato/Composter") as Node3D
+    if composter!=null:
+        composter.visible = _owns_house() and bool(report.get("composter",false))
     var greenhouse := root.get_node_or_null("OrtoPrivato/Greenhouse") as Node3D
     if greenhouse!=null:
         greenhouse.visible = _owns_house() and bool(report.get("greenhouse",false))
@@ -2603,6 +2613,20 @@ func _render_actions() -> void:
                 if not covered:
                     _action_choices.add_child(_button("Build greenhouse · %s EUR" % garden.get("greenhousePrice",25),_garden_action.bind("build-greenhouse")))
                 _action_choices.add_child(info)
+                if not bool(garden.get("composter",false)):
+                    _action_choices.add_child(_button("Build composter · %s EUR" % garden.get("composterPrice",10),_garden_action.bind("build-composter")))
+                else:
+                    var compost_info := Label.new()
+                    compost_info.text = "Plant scraps %s/6 · Compost %s" % [garden.get("scraps",0),garden.get("compost",0)]
+                    if int(garden.get("compostDueDay",0))>0:
+                        compost_info.text += " · Ready day %s at 18:00" % garden.get("compostDueDay",0)
+                    if bool(garden.get("fertilized",false)):
+                        compost_info.text += " · Bed fertilized"
+                    _action_choices.add_child(compost_info)
+                    if int(garden.get("scraps",0))>=3 and int(garden.get("compostDueDay",0))==0 and int(garden.get("compost",0))==0:
+                        _action_choices.add_child(_button("Start compost · 3 scraps",_garden_action.bind("start-compost")))
+                    if int(garden.get("compost",0))>0 and bool(garden.get("planted",false)) and int(garden.get("growth",0))<3 and not bool(garden.get("fertilized",false)):
+                        _action_choices.add_child(_button("Fertilize bed · +2 vegetables",_garden_action.bind("fertilize")))
                 if bool(garden.get("barrel",false)):
                     var water_stock := Label.new()
                     water_stock.text = "Rain barrel: %s/8 (irrigation only)" % garden.get("rainwater",0)
@@ -2613,7 +2637,7 @@ func _render_actions() -> void:
                     if covered or not bool(garden.get("winter",false)):
                         _action_choices.add_child(_button("Plant vegetables · 3 EUR",_garden_action.bind("plant")))
                 elif int(garden.get("growth",0))>=3:
-                    _action_choices.add_child(_button("Harvest 4 vegetables into cupboard",_garden_action.bind("harvest")))
+                    _action_choices.add_child(_button("Harvest %s vegetables into cupboard" % garden.get("harvestUnits",4),_garden_action.bind("harvest")))
                 elif (covered or (not bool(garden.get("winter",false)) and not bool(garden.get("rainy",false)))) and not bool(garden.get("wateredToday",false)) and int(_last_snapshot.get("minute",0))<1080:
                     _action_choices.add_child(_button("Water garden · 1 water",_garden_action.bind("water")))
                     if int(garden.get("rainwater",0))>0:
