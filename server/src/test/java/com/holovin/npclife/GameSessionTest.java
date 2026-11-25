@@ -13,6 +13,47 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void dojoGradesRequireAllThreeDisciplinesAndPersist() throws Exception {
+        Path file=directory.resolve("dojo.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=200;c.health=100;c.place=TownLife.Place.SCHOOL;
+            c.activity="FREE_TIME";c.travelRemaining=0;c.fatigue=10;c.hunger=10;c.thirst=10;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            assertEquals("White",DojoLife.view(town,c,1,1080).belt());
+            assertThrows(IllegalArgumentException.class,()->DojoLife.act(town,2,1080,"kihon"));
+            assertThrows(IllegalArgumentException.class,()->DojoLife.act(town,1,1080,"exam"));
+            int day=1;
+            for(String mode:DojoLife.MODES){
+                for(int i=0;i<3;i++){
+                    c.fatigue=10;c.hunger=10;c.thirst=10;
+                    DojoLife.act(town,day,1080,mode);
+                    assertThrows(IllegalArgumentException.class,()->DojoLife.act(town,SportLife.get(town,c,"last-day"),1140,"kata"));
+                    do{day++;}while(!DojoLife.open(day,1080));
+                }
+            }
+            c.fatigue=10;c.hunger=10;c.thirst=10;
+            assertTrue(DojoLife.view(town,c,day,1080).canExam());
+            DojoLife.act(town,day,1080,"exam");
+            assertEquals("Yellow",DojoLife.view(town,c,day,1140).belt());
+            assertEquals(140,c.money);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            var view=DojoLife.view(town,c,1,1080);
+            assertEquals("Yellow",view.belt());assertEquals(9,view.sessions());
+            assertEquals(3,view.kihon());assertEquals(3,view.kata());assertEquals(3,view.kumite());
+            assertEquals(6,view.required());
+        }
+    }
+
+    @Test
     void adultSportRequiresLocationAndRecoveryAndPersistsProgress() throws Exception {
         Path file=directory.resolve("adult-sports.db");
         String id;
