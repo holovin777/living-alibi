@@ -161,15 +161,24 @@ for Java's committed response. Upon success the next district loads at
 the opposite road edge without changing camera orientation. Failed
 travel leaves the player in the current district; step back before
 retrying. The river has a simple bridge. The gate remains available.
-The entire city is not simultaneously rendered: a scene seam remains
-visible, and Java's existing travel durations are unchanged. True
-continuous streaming and world-coordinate persistence remain future work.
+Godot now caches the active district and its eight neighbouring grid
+cells (where present), at most nine 48-unit chunks. Nearby geometry,
+roads and public landmarks are visible before crossing. On arrival,
+already loaded chunks are reused and rebased around the active district;
+distant chunks are freed. The same weather and utility state applies to
+all loaded scenery. Residents are shown only in the Java-confirmed
+current district, not fabricated in adjacent chunks.
+
+Java's travel durations are unchanged. The player still pauses for
+server confirmation at a boundary, and collision checks and NPC data
+are local to the active district. Continuous time and persistent
+fine-grained coordinates remain future work.
 
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world
-city. Each district currently has simple geometry rather than detailed
-buildings, roads and NPC models. Walking an avatar within a district is
+city. Districts use simple procedural geometry and are streamed in a small
+neighbourhood rather than loading a fully detailed city. Walking an avatar within a district is
 local rendering only. The transition between districts *is* committed
 by Java, including costs in world time and a SQLite save.
 

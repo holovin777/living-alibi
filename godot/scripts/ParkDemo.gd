@@ -25,6 +25,7 @@ var _view_pitch := 0.0
 var _avatar: Node3D
 var _camera: Camera3D
 var _scenery: Node3D
+var _chunks: Dictionary = {}
 var _residents_root: Node3D
 var _obstacles: Array[Rect2] = []
 var _park_lamps: Array[OmniLight3D] = []
@@ -206,11 +207,51 @@ func _build_world() -> void:
     _current_place = "PARK"
 
 func _render_place(place_id: String) -> void:
-    if _scenery != null:
-        remove_child(_scenery)
-        _scenery.queue_free()
-    _obstacles.clear()
-    _park_lamps.clear()
+    # Keep the current and nearby chunks. Positions are rebased around the
+    # active district; the Java simulation remains district-authoritative.
+    if is_instance_valid(_residents_root):
+        for resident in _residents_root.get_children():
+            _residents_root.remove_child(resident)
+            resident.queue_free()
+    var wanted: Dictionary = {}
+    var origin := TownLayout.world_center(place_id)
+    for id in TownLayout.DISTRICTS:
+        var offset := TownLayout.world_center(str(id)) - origin
+        if absf(offset.x) <= TownLayout.TILE_SPACING and absf(offset.z) <= TownLayout.TILE_SPACING:
+            wanted[id] = offset
+    # Keep even an unexpected public place renderable, rather than failing
+    # to show a valid server snapshot.
+    wanted[place_id] = Vector3.ZERO
+    for id in _chunks.keys():
+        if not wanted.has(id):
+            var old_root: Node3D = _chunks[id]["root"]
+            remove_child(old_root)
+            old_root.queue_free()
+            _chunks.erase(id)
+    for id in wanted:
+        if not _chunks.has(id):
+            _generate_chunk(str(id))
+        var chunk_root: Node3D = _chunks[id]["root"]
+        chunk_root.position = wanted[id]
+    _activate_chunk(place_id)
+    _apply_weather()
+
+func _activate_chunk(place_id: String) -> void:
+    var chunk: Dictionary = _chunks[place_id]
+    _scenery = chunk["root"]
+    _residents_root = chunk["residents"]
+    _ground_material = chunk["ground"]
+    _obstacles = chunk["obstacles"]
+    _road_links = chunk["roads"]
+    _park_lamps = chunk["lamps"]
+    _fountain_water = chunk["water"]
+
+func _generate_chunk(place_id: String) -> void:
+    # Allocate fresh per-chunk state: never clear arrays owned by a cached
+    # neighbour when creating another district.
+    _obstacles = []
+    _park_lamps = []
+    _road_links = {}
     _fountain_water = null
     _scenery = Node3D.new()
     _scenery.name = "PublicScene_" + place_id
@@ -300,7 +341,11 @@ func _render_place(place_id: String) -> void:
             _tree(Vector3(11.0, 0.0, 7.0))
 
     _build_road_links(place_id)
-    _apply_weather()
+    _chunks[place_id] = {
+        "root": _scenery, "residents": _residents_root,
+        "ground": _ground_material, "obstacles": _obstacles,
+        "roads": _road_links, "lamps": _park_lamps, "water": _fountain_water
+    }
 
 func _build_road_links(place_id: String) -> void:
     _road_links.clear()
@@ -1042,10 +1087,16 @@ func _apply_weather() -> void:
     if night:
         _environment.background_color = Color(0.07,0.10,0.18)
     var services: Dictionary = _last_snapshot.get("services", {})
-    for lamp in _park_lamps:
-        lamp.visible = night and bool(services.get("lightsWorking", false))
-    if _fountain_water != null:
-        _fountain_water.visible = bool(services.get("fountainWorking", false)) and int(services.get("cleanWater", 0)) > 0
+    # Weather and city services affect every loaded chunk, not just the
+    # one containing the visitor. Only the active chunk gets NPC data.
+    for chunk in _chunks.values():
+        var ground: StandardMaterial3D = chunk["ground"]
+        ground.albedo_color = _ground_material.albedo_color
+        for lamp in chunk["lamps"]:
+            lamp.visible = night and bool(services.get("lightsWorking", false))
+        var water: MeshInstance3D = chunk["water"]
+        if is_instance_valid(water):
+            water.visible = bool(services.get("fountainWorking", false)) and int(services.get("cleanWater", 0)) > 0
 
 func _on_locations_updated(locations: Array) -> void:
     _locations = locations

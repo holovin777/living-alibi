@@ -55,6 +55,29 @@ func _exercise() -> void:
     if not _check(not world._map_panel.visible, "map closes without travelling"):
         return
 
+    # The nine surrounding chunks are real scenery, reused across arrivals.
+    if not _check(world._chunks.size() == 9 and world._chunks.has("SCHOOL")
+            and world._chunks.has("BAKERY") and not world._chunks.has("QUARRY"),
+            "park streams its eight nearest neighbours only"):
+        return
+    var school_root: Node3D = world._chunks["SCHOOL"]["root"]
+    var park_root: Node3D = world._chunks["PARK"]["root"]
+    if not _check(school_root.position == Vector3(0,0,-48)
+            and park_root.position == Vector3.ZERO,
+            "neighbour geometry aligns with the public map coordinates"):
+        return
+    world._on_world_updated(_world("SCHOOL", "School"))
+    if not _check(world._scenery == school_root
+            and school_root.position == Vector3.ZERO
+            and park_root.position == Vector3(0,0,48)
+            and world._chunks.size() == 6,
+            "arriving at school reuses visible geometry and unloads distant rows"):
+        return
+    world._on_world_updated(_world("PARK", "Park"))
+    if not _check(world._scenery == park_root and world._chunks.size() == 9,
+            "returning to park keeps its cached geometry"):
+        return
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)
@@ -151,6 +174,9 @@ func _exercise() -> void:
             "walking residents move within the local visual scene"):
         return
     world._on_world_updated(populated_park)
+    if not _check(world._chunks["SCHOOL"]["residents"].get_child_count() == 0,
+            "neighbour scenery never fabricates unseen residents"):
+        return
     if not _check(world._residents_root.get_node("Resident_marco") == marco,
             "refresh retains the same resident model and animation state"):
         return
@@ -205,6 +231,10 @@ func _exercise() -> void:
         return
 
     world._on_world_updated(_world("MARKET", "Market"))
+    if not _check(world._chunks.size() == 6 and not world._chunks.has("PARK")
+            and world._chunks["BAKERY"]["root"].position == Vector3(48,0,0),
+            "long-distance travel unloads distant chunks and rebases the grid"):
+        return
     if not _check(layout.current_place == "MARKET" and layout.travel_minutes.is_empty(),
             "map follows committed arrival and clears stale travel estimates"):
         return
