@@ -3710,6 +3710,8 @@ func _create_interface() -> void:
     _phone.jobs_requested.connect(_phone_request_jobs)
     _phone.map_requested.connect(_phone_open_map)
     _phone.alarm_rang.connect(_on_phone_alarm)
+    _phone.sms_received.connect(_on_phone_alarm)
+    _phone.sms_reply_requested.connect(_reply_phone_sms)
     _phone_alert = Label.new()
     _phone_alert.position = Vector2(480,12)
     _phone_alert.add_theme_font_size_override("font_size",24)
@@ -5410,6 +5412,10 @@ func _on_phone_alarm(message: String) -> void:
     _phone_alert_remaining = 8.0
     _phone_alert.show()
     _town_audio.play_alarm()
+
+func _reply_phone_sms(resident_id: String,choice: int) -> void:
+    if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
+        _api.garden_action("phone-reply:%s:%s" % [choice,resident_id])
 
 func _phone_request_jobs() -> void:
     if _connected and not _api.is_busy():
