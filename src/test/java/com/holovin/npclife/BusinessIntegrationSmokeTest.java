@@ -10,6 +10,9 @@ public final class BusinessIntegrationSmokeTest {
         var clock=new WorldState();
         var town=TownLife.create(clock);
         var residents=PopulationGenerator.add(town,12);
+        check(residents.stream().anyMatch(c->c.occupation.equals("Mechanic") &&
+                        c.workplace==TownLife.Place.WORKSHOP),
+                "first launch has a living workshop mechanic available during actual work hours");
         var recruit=residents.getFirst();
         recruit.place=TownLife.Place.WORKSHOP;
         recruit.destination=TownLife.Place.WORKSHOP;
