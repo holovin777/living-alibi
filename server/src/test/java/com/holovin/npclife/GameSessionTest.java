@@ -165,6 +165,61 @@ class GameSessionTest {
     }
 
     @Test
+    void sellerWorksOnlyPaidHoursAndPayrollSurvivesRestart() throws Exception {
+        Path file=directory.resolve("stall-seller.db");
+        String sellerId,buyerId;
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            var residents=PopulationGenerator.add(town,2);
+            var seller=residents.get(0);var buyer=residents.get(1);
+            sellerId=seller.id;buyerId=buyer.id;
+            p.place=TownLife.Place.MARKET;p.destination=p.place;p.travelRemaining=0;p.money=100;
+            seller.place=p.place;seller.destination=p.place;seller.travelRemaining=0;seller.employed=false;seller.money=20;
+            buyer.place=p.place;buyer.destination=p.place;buyer.travelRemaining=0;buyer.food=0;buyer.money=10;
+            MarketStallLife.act(town,"stall-register",1,720);
+            assertThrows(IllegalArgumentException.class,()->MarketStallLife.act(town,"stall-hire-"+seller.id,1,720));
+            MarketStallLife.act(town,"stall-fund",1,720);
+            MarketStallLife.act(town,"stall-hire-"+seller.id,1,720);
+            assertEquals(70,p.money);
+            FoodLife.change(p,"vegetables",false,2);
+            MarketStallLife.act(town,"stall-stock-vegetables",1,720);
+            MarketStallLife.act(town,"stall-stock-vegetables",1,720);
+            MarketStallLife.act(town,"stall-open",1,720);
+            p.place=TownLife.Place.PARK;p.destination=p.place;
+            assertNull(MarketStallLife.purchase(town,buyer,1,720));
+            state.day=1;state.minute=720;
+            MarketStallLife.pay(town,seller,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            MarketStallLife.pay(town,seller,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(24,seller.money);assertEquals(6,MarketStallLife.get(town,MarketStallLife.RESERVE));
+            assertTrue(MarketStallLife.staffed(town,1,720));
+            assertNotNull(MarketStallLife.purchase(town,buyer,1,721));
+            assertEquals(73,p.money);assertEquals(7,buyer.money);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var seller=town.get(sellerId);var buyer=town.get(buyerId);
+            assertEquals(sellerId,MarketStallLife.worker(town).id);
+            assertTrue(MarketStallLife.staffed(town,1,720));
+            assertFalse(MarketStallLife.staffed(town,2,720));
+            MarketStallLife.pay(town,seller,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(24,seller.money);
+            state.minute=780;
+            MarketStallLife.pay(town,seller,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(28,seller.money);assertEquals(2,MarketStallLife.get(town,MarketStallLife.RESERVE));
+            assertTrue(MarketStallLife.staffed(town,1,780));
+            seller.sickUntilDay=1;
+            assertNull(MarketStallLife.purchase(town,buyer,1,780));
+            seller.sickUntilDay=0;
+            assertNull(MarketStallLife.purchase(town,buyer,1,840));
+            state.day=2;state.minute=720;
+            MarketStallLife.pay(town,seller,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertFalse(MarketStallLife.staffed(town,2,720));assertEquals(28,seller.money);
+            MarketStallLife.clear(town);
+            assertFalse(seller.employed);assertNull(MarketStallLife.worker(town));
+        }
+    }
+
+    @Test
     void stallLoyaltyRequiresSeparateShoppingDaysAndTrustedLocalRecommendation() throws Exception {
         Path file=directory.resolve("stall-reputation.db");
         String buyerId,listenerId;
@@ -176,10 +231,10 @@ class GameSessionTest {
             p.place=TownLife.Place.MARKET;p.destination=p.place;p.money=100;
             buyer.place=p.place;buyer.destination=p.place;buyer.travelRemaining=0;buyer.money=30;buyer.food=0;
             listener.place=p.place;listener.destination=p.place;listener.travelRemaining=0;listener.money=30;listener.food=0;
-            MarketStallLife.act(town,"stall-register",720);
+            MarketStallLife.act(town,"stall-register",1,720);
             FoodLife.change(p,"vegetables",false,5);
-            for(int i=0;i<5;i++)MarketStallLife.act(town,"stall-stock-vegetables",720);
-            MarketStallLife.act(town,"stall-open",720);
+            for(int i=0;i<5;i++)MarketStallLife.act(town,"stall-stock-vegetables",1,720);
+            MarketStallLife.act(town,"stall-open",1,720);
             assertNotNull(MarketStallLife.purchase(town,buyer,1,720));
             assertNotNull(MarketStallLife.purchase(town,buyer,1,721));
             assertFalse(MarketStallLife.regular(town,buyer));
@@ -195,24 +250,24 @@ class GameSessionTest {
             listener.place=TownLife.Place.MARKET;
             assertTrue(MarketStallLife.recommend(town,buyer,listener));
             assertFalse(MarketStallLife.recommend(town,buyer,listener));
-            MarketStallLife.act(town,"stall-price-up-vegetables",720);
-            assertEquals("vegetables",MarketStallLife.offer(town,buyer,720));
+            MarketStallLife.act(town,"stall-price-up-vegetables",1,720);
+            assertEquals("vegetables",MarketStallLife.offer(town,buyer,1,720));
             listener.hunger=20;
-            assertNull(MarketStallLife.offer(town,listener,720));
+            assertNull(MarketStallLife.offer(town,listener,1,720));
             listener.hunger=80;
-            assertEquals("vegetables",MarketStallLife.offer(town,listener,720));
+            assertEquals("vegetables",MarketStallLife.offer(town,listener,1,720));
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
         try(var db=new WorldDatabase(file)) {
             var state=db.load();var town=db.loadTown(state);
             assertTrue(MarketStallLife.regular(town,town.get(buyerId)));
-            assertEquals(1,MarketStallLife.report(town,720).customers());
-            assertEquals(1,MarketStallLife.report(town,720).regularCustomers());
-            assertEquals(1,MarketStallLife.report(town,720).recommendedCustomers());
-            assertEquals("vegetables",MarketStallLife.offer(town,town.get(listenerId),720));
+            assertEquals(1,MarketStallLife.report(town,1,720).customers());
+            assertEquals(1,MarketStallLife.report(town,1,720).regularCustomers());
+            assertEquals(1,MarketStallLife.report(town,1,720).recommendedCustomers());
+            assertEquals("vegetables",MarketStallLife.offer(town,town.get(listenerId),1,720));
             MarketStallLife.clear(town);
             assertFalse(MarketStallLife.regular(town,town.get(buyerId)));
-            assertEquals(0,MarketStallLife.report(town,720).recommendedCustomers());
+            assertEquals(0,MarketStallLife.report(town,1,720).recommendedCustomers());
         }
     }
 
@@ -222,21 +277,21 @@ class GameSessionTest {
         try(var db=new WorldDatabase(file)) {
             var state=db.load();var town=db.loadTown(state);var p=town.player;
             p.place=TownLife.Place.PARK;p.destination=p.place;p.travelRemaining=0;p.money=100;
-            assertThrows(IllegalArgumentException.class,()->MarketStallLife.act(town,"stall-register",720));
+            assertThrows(IllegalArgumentException.class,()->MarketStallLife.act(town,"stall-register",1,720));
             p.place=TownLife.Place.MARKET;p.destination=p.place;
-            MarketStallLife.act(town,"stall-register",720);
+            MarketStallLife.act(town,"stall-register",1,720);
             assertEquals(80,p.money);
             FoodLife.change(p,"vegetables",false,2);
-            MarketStallLife.act(town,"stall-stock-vegetables",720);
-            MarketStallLife.act(town,"stall-stock-vegetables",720);
+            MarketStallLife.act(town,"stall-stock-vegetables",1,720);
+            MarketStallLife.act(town,"stall-stock-vegetables",1,720);
             assertEquals(0,FoodLife.quantity(p,"vegetables",false));
-            MarketStallLife.act(town,"stall-price-up-vegetables",720);
-            MarketStallLife.act(town,"stall-open",720);
+            MarketStallLife.act(town,"stall-price-up-vegetables",1,720);
+            MarketStallLife.act(town,"stall-open",1,720);
             var buyer=new TownLife.Citizen("test-buyer","Test buyer","Worker",TownLife.Place.MARKET);
             buyer.generationIndex=99;buyer.money=10;buyer.food=0;
             assertNull(MarketStallLife.purchase(town,buyer,1,720));
-            MarketStallLife.act(town,"stall-price-down-vegetables",720);
-            MarketStallLife.act(town,"stall-price-down-vegetables",720);
+            MarketStallLife.act(town,"stall-price-down-vegetables",1,720);
+            MarketStallLife.act(town,"stall-price-down-vegetables",1,720);
             p.place=TownLife.Place.PARK;
             assertNull(MarketStallLife.purchase(town,buyer,1,720));
             p.place=TownLife.Place.MARKET;
@@ -248,7 +303,7 @@ class GameSessionTest {
         }
         try(var db=new WorldDatabase(file)) {
             var state=db.load();var town=db.loadTown(state);var p=town.player;
-            var report=MarketStallLife.report(town,720);
+            var report=MarketStallLife.report(town,1,720);
             assertTrue(report.registered());assertTrue(report.open());assertEquals(1,report.stocked());
             assertEquals(1,report.sales());assertEquals(2,report.revenue());assertEquals(82,p.money);
             var buyer=new TownLife.Citizen("test-buyer","Test buyer","Worker",TownLife.Place.MARKET);
