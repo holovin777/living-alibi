@@ -28,6 +28,11 @@ The saved world stays in `data/world.db` and is **never erased by this
 script**. If there is no previous save, a new playable park visitor is
 created automatically with 50 EUR and no assigned career.
 
+The camera starts **in first person**; click the scene for mouse look,
+press **V** to switch to the optional third-person view, and **Esc**
+to release the cursor for the interface. These are client-side visual
+controls only; the Java server remains responsible for real travel.
+
 Use WASD/arrow keys to walk within each placeholder district; **E** at
 the yellow gate to travel and **F** at the blue kiosk for work, education
 and other actions. See [Godot controls](godot/README.md).
