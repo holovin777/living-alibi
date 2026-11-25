@@ -8,6 +8,8 @@ const BATH := Vector3(4.4,0,2.2)
 const ENTRY := Vector3(0,0,4.5)
 const STREET_DOOR := Vector3(0,0,8.7)
 var entrance_open := false
+var _door_progress := 0.0
+const DOOR_HINGE := Vector3(-0.55,0,4.36)
 const ANCHORS := [Vector3(-1.2,0,1.5),Vector3(1.7,0,3.0),Vector3(-3.3,0,-0.6),Vector3(3.8,0,-0.7),Vector3(-2.2,0,3.4)]
 var obstacles: Array[Rect2] = []
 var residents: Node3D
@@ -138,7 +140,12 @@ func can_stand(at: Vector3,radius: float) -> bool:
         if absf(p.x)>1.9-radius or p.y>8.8-radius:return false
     elif absf(p.x)>5.8-radius or p.y< -4.3+radius:
         return false
-    if not entrance_open and Rect2(-0.9,4.38,1.8,0.24).grow(radius).has_point(p):return false
+    if (not entrance_open or _door_progress<0.85) and Rect2(-0.9,4.38,1.8,0.24).grow(radius).has_point(p):return false
+    if _door_progress>0.01:
+        var rotation := Basis(Vector3.UP,-_door_progress*PI/2.0)
+        var edge := DOOR_HINGE+rotation*Vector3(1.1,0,0)
+        var nearest := Geometry2D.get_closest_point_to_segment(p,Vector2(DOOR_HINGE.x,DOOR_HINGE.z),Vector2(edge.x,edge.z))
+        if nearest.distance_to(p)<radius+0.035:return false
     if get_node("WashingMachine").visible and Rect2(2.62,3.625,0.66,0.65).grow(radius).has_point(p):return false
     for obstacle in obstacles:
         if p.distance_squared_to(p.clamp(obstacle.position,obstacle.end))<radius*radius:
@@ -188,11 +195,35 @@ func set_room_packages(packages: Array) -> void:
     for node_name in ["WashingMachine","WasherDoor"]:
         get_node(node_name).visible="laundry" in installed
 
+func reset_entrance() -> void:
+    entrance_open = false
+    _door_progress = 0.0
+    _pose_door()
+
+func _process(delta: float) -> void:
+    if visible:
+        advance_door(delta)
+
+func advance_door(delta: float) -> void:
+    var target := 1.0 if entrance_open else 0.0
+    if is_equal_approx(target,_door_progress):return
+    _door_progress = move_toward(_door_progress,target,maxf(delta,0.0)/0.55)
+    _pose_door()
+
+func _pose_door() -> void:
+    var angle := -_door_progress*PI/2.0
+    var basis := Basis(Vector3.UP,angle)
+    for label in ["EntranceDoor","DoorHandle"]:
+        var part := get_node(label) as Node3D
+        var closed_at := Vector3(0,1.08,4.36) if label=="EntranceDoor" else Vector3(0.42,1.05,4.29)
+        part.position = DOOR_HINGE+basis*(closed_at-DOOR_HINGE)
+        part.rotation.y = angle
+        part.show()
+
 func toggle_entrance(at: Vector3) -> void:
-    if entrance_open and absf(at.z-ENTRY.z)<0.65:return
+    # Do not swing the door through the visitor in its immediate sweep area.
+    if absf(at.z-ENTRY.z)<0.65 or (at.z>4.36 and at.z<5.8 and absf(at.x+0.55)<1.35):return
     entrance_open=not entrance_open
-    get_node("EntranceDoor").visible=not entrance_open
-    get_node("DoorHandle").visible=not entrance_open
 
 func nearby_action(at: Vector3,actions: Array) -> String:
     if at.distance_to(ENTRY)<1.3:return "door"

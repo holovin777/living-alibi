@@ -44,6 +44,7 @@ const DriveControls = preload("res://scripts/DriveControls.gd")
 const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 const TownAudio = preload("res://scripts/TownAudio.gd")
+const FirstPersonHands = preload("res://scripts/FirstPersonHands.gd")
 const TownVisuals = preload("res://scripts/TownVisuals.gd")
 var _sky_material: ProceduralSkyMaterial
 var _surface_textures: Dictionary = {}
@@ -122,6 +123,8 @@ var _ground_material: StandardMaterial3D
 var _environment: Environment
 var _weather_fx: Node3D
 var _town_audio: Node3D
+var _hands: Node3D
+var _held_label: Label
 var _api
 var _current_place := ""
 var _road_links: Dictionary = {}
@@ -219,6 +222,7 @@ func _process(delta: float) -> void:
         _animate_residents(delta)
         _weather_fx.follow(_avatar.position)
         _update_town_audio(delta,0.0)
+        _hands.update_pose(delta,0.0,false)
         return
     var direction := Vector3.ZERO
     var moved := 0.0
@@ -248,6 +252,7 @@ func _process(delta: float) -> void:
     _advance_locomotion(delta,moved)
     _follow_player()
     _update_town_audio(delta,moved)
+    _hands.update_pose(delta,_step_bob,not _cycling() and (not _rebirth_active() or _child_can_walk()))
 
     if _apartment_active:
         _update_first_steps()
@@ -339,6 +344,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
             _jump_elapsed = 0.0
             get_viewport().set_input_as_handled()
         return
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_Q:
+        if _foot_controls_available():
+            _cycle_held_item()
+            get_viewport().set_input_as_handled()
+        return
     if _rebirth_active():
         if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
             if event.keycode == KEY_E and _apartment_active and not _action_panel.visible:
@@ -348,6 +358,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                     _apartment.toggle_entrance(_avatar.position)
                     if was_open != bool(_apartment.get("entrance_open")):
                         _town_audio.play_effect("door")
+                        _hands.reach()
                 elif action=="exit":
                     _request_home_transition("rebirth-home-exit")
                 elif not action.is_empty():
@@ -1012,6 +1023,9 @@ func _build_world() -> void:
     _camera = Camera3D.new()
     _camera.current = true
     add_child(_camera)
+    _hands = FirstPersonHands.new()
+    _camera.add_child(_hands)
+    _hands.update_pose(0.0,0.0,true)
     _follow_player()
     _render_place("PARK")
     _current_place = "PARK"
@@ -3559,6 +3573,14 @@ func _create_interface() -> void:
     head_bob_toggle.button_pressed = _head_bob_enabled
     head_bob_toggle.toggled.connect(_set_head_bob)
     column.add_child(head_bob_toggle)
+    var hands_toggle := CheckButton.new()
+    hands_toggle.text = "First-person hands"
+    hands_toggle.button_pressed = true
+    hands_toggle.toggled.connect(_set_hands_enabled)
+    column.add_child(hands_toggle)
+    _held_label = Label.new()
+    column.add_child(_held_label)
+    _refresh_held_item()
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
@@ -3661,6 +3683,7 @@ func _create_interface() -> void:
 func _on_language_selected(index: int) -> void:
     GameLanguage.select_locale("it" if index==1 else "en")
     _refresh_localized_hud()
+    _refresh_held_item()
     if _software_menu:
         _render_actions()
 
@@ -5239,6 +5262,31 @@ func _buy_product(id: String) -> void:
     if _near_kiosk() and not _api.is_busy() and _connected:
         _api.buy_product(id)
 
+func _set_hands_enabled(enabled: bool) -> void:
+    _hands.enabled = enabled
+    _hands.update_pose(0.0,_step_bob,not _drive_active() and not _cycling())
+
+func _holdable_items() -> Array[String]:
+    var player: Dictionary = _last_snapshot.get("player",{})
+    var bag: Dictionary = player.get("bag",{"bread":player.get("bread",0),"water":player.get("bottledWater",0)})
+    var choices: Array[String] = [""]
+    for id in ["bread","water","grape-juice"]:
+        if int(bag.get(id,0))>0:
+            choices.append(id)
+    return choices
+
+func _refresh_held_item() -> void:
+    if not _hands.held_item in _holdable_items():
+        _hands.set_item("")
+    if is_instance_valid(_held_label):
+        _held_label.text = tr("Held item (Q): %s") % (tr("Empty hands") if _hands.held_item.is_empty() else tr(str(_hands.held_item).capitalize()))
+
+func _cycle_held_item() -> void:
+    var choices := _holdable_items()
+    var index := choices.find(_hands.held_item)
+    _hands.set_item(choices[(index+1)%choices.size()])
+    _refresh_held_item()
+
 func _consume_product(id: String) -> void:
     if _connected and not _api.is_busy():
         _api.consume_product(id)
@@ -5369,9 +5417,7 @@ func _set_apartment(active: bool) -> void:
         _traffic_root.hide()
         _bike_model.hide()
         _residents_root=_apartment.get("residents")
-        _apartment.set("entrance_open",false)
-        _apartment.get_node("EntranceDoor").show()
-        _apartment.get_node("DoorHandle").show()
+        _apartment.reset_entrance()
         _avatar.position=FamilyApartment.SPAWN
         _view_yaw=0.0
         _view_pitch=0.0
@@ -5495,6 +5541,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if _drive_active():
         _update_drive_hud()
     _update_bag()
+    _refresh_held_item()
     _town_map.update_world(_current_place, _locations)
     _render_residents()
     if _dialog_panel.visible:

@@ -733,3 +733,7 @@ Original lightweight synthesized audio: distance-based footsteps on approximate 
 ### Interactive and district ambience
 
 A landing thump plays only on completed jumps, and the family apartment door plays a creak/latch only when its open state actually changes. Bicycle rolling sound plays only during bicycle movement. Nearby industrial districts have a quiet daytime machinery texture (a cosmetic schedule, not authoritative machine operation). Nocturnal crickets are heard near the park outside winter, rain and snow. All follow the existing Town sound mute control; synthesized audio still requires listening and balance checks on a real device.
+
+## First-person interaction preview
+
+The family apartment entrance now swings on a hinge in about 0.55 seconds. The door and handle remain visible, collision follows the panel, and the doorway stays blocked during most of the opening. The existing E interaction triggers the sound and a short first-person reaching gesture. Optional camera-relative hands are visible on foot; Q cycles empty hands and available bread, water or grape juice from the authoritative inventory. Selecting an item does not consume or create it, and it disappears when the server reports none remaining. Existing consumption controls still submit to Java. Hands can be hidden in the HUD. This is a stylized preview, not a full grasping system, and no stairs or extra floors are added here.
