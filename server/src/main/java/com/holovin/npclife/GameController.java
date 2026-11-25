@@ -163,6 +163,20 @@ public class GameController {
         return session.rest(request.minutes());
     }
 
+    public record StorageRequest(String item,boolean deposit) { }
+    @PostMapping("/actions/room-storage")
+    public GameSession.ActionView roomStorage(@RequestBody StorageRequest request) throws SQLException {
+        return session.transferRoomItem(request.item(),request.deposit());
+    }
+    @PostMapping("/actions/room-cook")
+    public GameSession.ActionView roomCook() throws SQLException {
+        return session.cookRoomMeal();
+    }
+    @PostMapping("/actions/room-wash")
+    public GameSession.ActionView roomWash() throws SQLException {
+        return session.washInRoom();
+    }
+
     @PostMapping("/actions/rent-room")
     public GameSession.ActionView rentRoom() throws SQLException {
         return session.rentRoom();

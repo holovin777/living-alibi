@@ -249,6 +249,7 @@ final class TownLife {
     static void tick(Town town,WorldState marco,List<Event> truth,List<Observation> observations,
                      List<SocialLife.Interaction> interactions) {
         PlayerLife.tick(town.player,marco.minute);
+        HousingLife.expire(town.player,marco.day,marco.minute);
         NatureLife.tick(town,marco.day,marco.minute);
         RetailLife.tick(town,marco.minute);
         TechnicalWorkLife.tick(town,marco.day,marco.minute);

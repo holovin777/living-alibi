@@ -13,6 +13,44 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void rentedKitchenConservesFoodAndPersistsHygiene() throws Exception {
+        Path file=directory.resolve("kitchen.db");
+        try(var game=new GameSession(file)) {
+            game.move("market");
+            game.waitMinutes(60);
+            game.buy("bread");game.buy("water");
+            assertThrows(IllegalArgumentException.class,()->game.transferRoomItem("bread",true));
+            game.move("north");game.rentRoom();
+            game.transferRoomItem("bread",true);
+            game.transferRoomItem("water",true);
+            assertEquals(0,game.snapshot().player().bread());
+            assertEquals(1,game.snapshot().player().storedBread());
+            game.transferRoomItem("bread",false);
+            assertEquals(1,game.snapshot().player().bread());
+            game.transferRoomItem("bread",true);
+            game.waitMinutes(360);
+            assertTrue(game.snapshot().player().hygiene()<95);
+            game.washInRoom();
+            assertTrue(game.snapshot().player().hygiene()>=99);
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(1,game.snapshot().player().storedBread());
+            assertEquals(1,game.snapshot().player().storedWater());
+            assertTrue(game.snapshot().player().hygiene()>=99);
+            int hunger=game.snapshot().player().hunger();
+            game.cookRoomMeal();
+            assertTrue(game.snapshot().player().hunger()<hunger);
+            assertEquals(0,game.snapshot().player().storedBread());
+            assertEquals(0,game.snapshot().player().storedWater());
+            assertThrows(IllegalArgumentException.class,game::cookRoomMeal);
+        }
+        var player=new PlayerLife.Player();
+        player.roomUntil=600;player.storedBread=2;
+        HousingLife.expire(player,1,600);
+        assertEquals(0,player.storedBread);
+    }
+
+    @Test
     void porticiGrocerySharesTheExistingMarketStock() throws Exception {
         Path file=directory.resolve("portici.db");
         try(var game=new GameSession(file)) {

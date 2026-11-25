@@ -316,6 +316,20 @@ weather occlusion. The upper floor, sink, shower and appliances are
 decorative. Java still validates lease and district for sleep, not
 exact bed coordinates; no local coordinates persist after restart.
 
+## Household supplies and hygiene
+
+The rented kitchen has a private 24-unit cupboard. Transfer one bread
+or bottled water between it and the 12-unit bag. Preparing bread soup
+takes 15 game minutes, consumes one stored bread and water, and reduces
+hunger by up to 45 and thirst by up to 20. Washing takes ten minutes;
+hygiene starts at 100 and falls by one each game hour. It has no other
+health or social effects yet. Cupboard contents and hygiene are saved
+with the player; checkout clears stored perishables (not carried items).
+Renew before expiry to keep supplies. The server checks the lease and
+district, while Godot checks proximity to the kitchen or bathroom.
+Water utilities, electricity, ingredients and cooking equipment are
+still abstracted for this first household version.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

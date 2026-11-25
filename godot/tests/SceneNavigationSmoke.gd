@@ -161,6 +161,15 @@ func _exercise() -> void:
     if not _check(world._near_room_bed() and _has_button(world._action_choices,"Sleep in guest room"),
             "bed gives sheltered sleep actions instead of reception"):
         return
+    world._avatar.position = Vector3(-5.8,0,11.1)
+    world._render_actions()
+    if not _check(world._near_kitchen() and _has_button(world._action_choices,"Cook bread soup")
+            and _has_button(world._action_choices,"Store bread"),"kitchen exposes cooking and storage"):
+        return
+    world._avatar.position = Vector3(-10.6,0,12.2)
+    world._render_actions()
+    if not _check(world._near_bath() and _has_button(world._action_choices,"Wash"),"bathroom exposes hygiene"):
+        return
     guest["weather"] = {"sky":"RAIN","raining":true}
     world._on_world_updated(guest)
     if not _check(world._weather_fx.sheltered and not world._weather_fx.rain.emitting,

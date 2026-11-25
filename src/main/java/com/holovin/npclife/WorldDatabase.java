@@ -215,6 +215,9 @@ final class WorldDatabase implements AutoCloseable {
         playerColumns.put("bread","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("bottled_water","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("room_until","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("stored_bread","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("stored_water","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("hygiene","INTEGER NOT NULL DEFAULT 100");
         playerColumns.put("job_id","TEXT");
         playerColumns.put("engineering_skill","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("investigation_skill","INTEGER NOT NULL DEFAULT 0");
@@ -947,6 +950,9 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.bread=rs.getInt("bread");
                 town.player.bottledWater=rs.getInt("bottled_water");
                 town.player.roomUntil=rs.getLong("room_until");
+                town.player.storedBread=rs.getInt("stored_bread");
+                town.player.storedWater=rs.getInt("stored_water");
+                town.player.hygiene=rs.getInt("hygiene");
                 town.player.jobId=rs.getString("job_id");
                 town.player.engineeringSkill=rs.getInt("engineering_skill");
                 town.player.investigationSkill=rs.getInt("investigation_skill");
@@ -1175,8 +1181,8 @@ final class WorldDatabase implements AutoCloseable {
                 INSERT INTO player_state(id,place,destination,travel_remaining,private_name,
                                          hunger,thirst,fatigue,health,alive,incarnation,
                                          money,job_id,engineering_skill,investigation_skill,last_work_day,
-                                         last_technical_day,bread,bottled_water,room_until)
-                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                                         last_technical_day,bread,bottled_water,room_until,stored_bread,stored_water,hygiene)
+                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,private_name=excluded.private_name,
                 hunger=excluded.hunger,thirst=excluded.thirst,
@@ -1187,7 +1193,8 @@ final class WorldDatabase implements AutoCloseable {
                 investigation_skill=excluded.investigation_skill,
                 last_work_day=excluded.last_work_day,
                 last_technical_day=excluded.last_technical_day,
-                bread=excluded.bread,bottled_water=excluded.bottled_water,room_until=excluded.room_until
+                bread=excluded.bread,bottled_water=excluded.bottled_water,room_until=excluded.room_until,
+                stored_bread=excluded.stored_bread,stored_water=excluded.stored_water,hygiene=excluded.hygiene
                 """)) {
             p.setString(1,player.place.name());
             p.setString(2,player.destination.name());
@@ -1207,6 +1214,7 @@ final class WorldDatabase implements AutoCloseable {
             p.setInt(16,player.lastTechnicalDay);
             p.setInt(17,player.bread);p.setInt(18,player.bottledWater);
             p.setLong(19,player.roomUntil);
+            p.setInt(20,player.storedBread);p.setInt(21,player.storedWater);p.setInt(22,player.hygiene);
             p.executeUpdate();
         }
         String contactSql=player.incarnation==1 ? """

@@ -19,6 +19,8 @@ const EYE_HEIGHT := 1.65
 const ROOM_BOUNDS := Rect2(-13.0,4.0,9.0,10.0)
 const ROOM_EXIT := Vector3(-3.0,0,8.5)
 const BED_POSITION := Vector3(-11.3,0,6.1)
+const KITCHEN_POSITION := Vector3(-5.05,0,12.3)
+const BATH_POSITION := Vector3(-12.1,0,12.95)
 const LiveClock = preload("res://scripts/LiveClock.gd")
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 
@@ -127,14 +129,14 @@ func _process(delta: float) -> void:
     _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
-    if not _near_kiosk() and not _near_room_bed():
+    if not _near_kiosk() and not _near_home_station():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
-    elif _near_room_bed():
-        _hint.text = "F: rest in your rented room · walk out through the door."
+    elif _near_home_station():
+        _hint.text = "F: use your bed, kitchen or bathroom."
     elif _current_place == "NORTH_RESIDENCES" and _avatar.position.distance_to(ROOM_EXIT) < 2.3:
         _hint.text = "Your room is open." if _has_room_lease() else "Rent a room at reception (blue kiosk)."
     elif not _nearest_resident().is_empty():
@@ -177,7 +179,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
         elif event.keycode == KEY_E and _near_gate() and not _map_panel.visible:
             _toggle_travel()
             get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_F and (_near_kiosk() or _near_room_bed()) and not _map_panel.visible:
+        elif event.keycode == KEY_F and (_near_kiosk() or _near_home_station()) and not _map_panel.visible:
             _toggle_actions()
             get_viewport().set_input_as_handled()
 
@@ -196,6 +198,15 @@ func _inside_guest_room() -> bool:
 
 func _near_room_bed() -> bool:
     return _inside_guest_room() and _has_room_lease() and _avatar.position.distance_to(BED_POSITION) < 2.5
+
+func _near_kitchen() -> bool:
+    return _inside_guest_room() and _has_room_lease() and _avatar.position.x > -7.9 and _avatar.position.distance_to(KITCHEN_POSITION)<2.5
+
+func _near_bath() -> bool:
+    return _inside_guest_room() and _has_room_lease() and _avatar.position.z > 11.0 and _avatar.position.x < -8.0 and _avatar.position.distance_to(BATH_POSITION)<2.5
+
+func _near_home_station() -> bool:
+    return _near_room_bed() or _near_kitchen() or _near_bath()
 
 func _sync_guest_room() -> void:
     if _chunks.has("NORTH_RESIDENCES"):
@@ -557,11 +568,13 @@ func _build_guesthouse() -> void:
     _box(house,Vector3(1.05,0.09,2.3),Color("#c4c5bc"),Vector3(-5.05,0.96,12.3))
     _box(house,Vector3(0.6,0.08,0.62),Color("#71868a"),Vector3(-5.05,1.02,12.65))
     _room_furniture(house,Vector3(-6.25,0,10.5),Vector3(1.05,0.76,0.95),Color("#ae8863"))
+    _sign(house,"Kitchen / cupboard · F",Vector3(-5.05,1.9,12.3))
     # Bathroom shower tray and toilet, not simulated plumbing yet.
     _room_furniture(house,Vector3(-12.1,0,12.95),Vector3(1.2,0.15,1.4),Color("#e5e9e4"))
     _box(house,Vector3(0.06,1.9,1.4),Color("#9ebcc1"),Vector3(-11.5,1.02,12.95))
     _room_furniture(house,Vector3(-8.8,0,13.0),Vector3(0.65,0.5,0.8),Color("#e6e7dd"))
     _box(house,Vector3(0.65,0.85,0.25),Color("#e6e7dd"),Vector3(-8.8,0.43,13.35))
+    _sign(house,"Wash · F",Vector3(-12.1,2.25,12.95))
     for at in [Vector3(-10.5,2.8,8),Vector3(-6,2.8,9),Vector3(-10.5,2.8,12.5)]:
         var light := OmniLight3D.new()
         light.position = at
@@ -1305,7 +1318,7 @@ func _travel_to(destination: String) -> void:
     _api.go_to(destination)
 
 func _toggle_actions() -> void:
-    if (not _near_kiosk() and not _near_room_bed()) or not _connected:
+    if (not _near_kiosk() and not _near_home_station()) or not _connected:
         _message.text = "Approach a local kiosk or your rented bed."
         return
     _close_dialog()
@@ -1340,6 +1353,19 @@ func _render_actions() -> void:
             if _near_room_bed():
                 _action_choices.add_child(_button("Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in guest room · 8h",_sleep_room.bind(8)))
+            elif _near_kitchen():
+                var stock := Label.new()
+                stock.text = "Cupboard %s/24 | Bread %s | Water %s" % [
+                    int(player.get("storedBread",0))+int(player.get("storedWater",0)),
+                    player.get("storedBread",0),player.get("storedWater",0)]
+                _action_choices.add_child(stock)
+                _action_choices.add_child(_button("Store bread",_room_storage.bind("bread",true)))
+                _action_choices.add_child(_button("Store water",_room_storage.bind("water",true)))
+                _action_choices.add_child(_button("Take bread",_room_storage.bind("bread",false)))
+                _action_choices.add_child(_button("Take water",_room_storage.bind("water",false)))
+                _action_choices.add_child(_button("Cook bread soup · 15m (1 bread + 1 water)",_room_cook))
+            elif _near_bath():
+                _action_choices.add_child(_button("Wash · 10m",_room_wash))
             elif _near_kiosk():
                 _action_choices.add_child(_button("Rent / renew guest room · 35 EUR / 7 days",_rent_room))
                 if _has_room_lease():
@@ -1506,6 +1532,18 @@ func _work() -> void:
         _action_panel.visible = false
         _api.work_shift()
 
+func _room_storage(item: String,deposit: bool) -> void:
+    if _near_kitchen() and _connected and not _api.is_busy():
+        _api.room_storage(item,deposit)
+
+func _room_cook() -> void:
+    if _near_kitchen() and _connected and not _api.is_busy():
+        _api.room_cook()
+
+func _room_wash() -> void:
+    if _near_bath() and _connected and not _api.is_busy():
+        _api.room_wash()
+
 func _rent_room() -> void:
     if _near_kiosk() and _connected and not _api.is_busy():
         _api.rent_room()
@@ -1616,6 +1654,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         str(player.get("fatigue", 0)), str(player.get("health", 100)),
         str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
     ]
+    _needs.text += " | Hygiene %s" % str(player.get("hygiene",100))
     var utilities: Dictionary = snapshot.get("services", {})
     var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
     var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"

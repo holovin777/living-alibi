@@ -26,6 +26,8 @@ final class PlayerLife {
         int bread;
         int bottledWater;
         long roomUntil;
+        int storedBread,storedWater;
+        int hygiene=100;
         int money=50; // Modest personal cash on first entry; no preset profession.
         String jobId; // Null until the player voluntarily applies.
         int engineeringSkill;
@@ -45,6 +47,7 @@ final class PlayerLife {
             p.incarnation=incarnation;
             p.money=money;
             p.bread=bread;p.bottledWater=bottledWater;p.roomUntil=roomUntil;
+            p.storedBread=storedBread;p.storedWater=storedWater;p.hygiene=hygiene;
             p.jobId=jobId;
             p.engineeringSkill=engineeringSkill;
             p.investigationSkill=investigationSkill;
@@ -148,6 +151,7 @@ final class PlayerLife {
         if(minute%30==0)player.hunger=Math.min(100,player.hunger+1);
         if(minute%20==0)player.thirst=Math.min(100,player.thirst+1);
         if(minute%30==0)player.fatigue=Math.min(100,player.fatigue+1);
+        if(minute%60==0)player.hygiene=Math.max(0,player.hygiene-1);
     }
 
     /** Rest is a short public break, not sleep or ownership of a private home. */
