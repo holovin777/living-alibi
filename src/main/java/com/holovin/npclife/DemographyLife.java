@@ -118,7 +118,10 @@ final class DemographyLife {
         }else t.employerFunds.merge(MunicipalLife.CITY,amount,Math::addExact);
         c.money=0;c.employed=false;set(t,c,"estate",1);
         var partner=byIndex(t,get(t,c,"partner"));
-        if(partner!=null&&get(t,partner,"partner")==c.generationIndex)set(t,partner,"partner",0);
+        if(partner!=null&&get(t,partner,"partner")==c.generationIndex){
+            FamilyBudgetLife.releaseEstate(t,partner);
+            set(t,partner,"partner",0);
+        }
         set(t,DEATHS,Math.addExact(get(t,DEATHS),1));
     }
     static void tick(TownLife.Town t,WorldState clock,List<TownLife.Event> events,List<TownLife.Observation> observations){
