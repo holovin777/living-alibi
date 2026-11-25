@@ -165,6 +165,50 @@ class GameSessionTest {
     }
 
     @Test
+    void opinionsFollowPersonalExperienceAndOnlyActuallyReadEditions() throws Exception {
+        Path file=directory.resolve("opinions.db");
+        String id,otherId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var residents=PopulationGenerator.add(town,2);
+            var reader=residents.get(0);var other=residents.get(1);
+            id=reader.id;otherId=other.id;reader.age=30;other.age=30;
+            OpinionLife.fountain(town,reader,1,true);
+            OpinionLife.fountain(town,reader,1,true);
+            assertEquals(53,OpinionLife.score(town,reader,"city"));
+            OpinionLife.purchase(town,reader,1,2);
+            OpinionLife.purchase(town,reader,1,2);
+            assertEquals(54,OpinionLife.score(town,reader,"stall"));
+            MarketStallLife.set(town,MarketStallLife.LICENSE,1);
+            ArchiveLife.record(town,"budget-low:1",8,360,"Municipality","Reserve reached.");
+            var claim=new KnowledgeLife.Belief(reader.id,"news",8,600,other.id,"public:MARKET",
+                "A resident recommended the private market stall to a neighbor.","HEARD",other.id,8,700,1,70);
+            OpinionLife.edition(town,8,claim);
+            reader.place=TownLife.Place.LIBRARY;reader.destination=reader.place;reader.travelRemaining=0;reader.activity="FREE_TIME";
+            other.place=TownLife.Place.PARK;other.destination=other.place;other.travelRemaining=0;other.activity="FREE_TIME";
+            OpinionLife.read(town,other,8,1020);
+            OpinionLife.read(town,reader,8,1020);
+            OpinionLife.read(town,reader,8,1080);
+            assertEquals(51,OpinionLife.score(town,reader,"city"));
+            assertEquals(55,OpinionLife.score(town,reader,"stall"));
+            assertEquals(50,OpinionLife.score(town,other,"city"));
+            assertEquals(1,OpinionLife.report(town).readers());
+            state.day=8;state.minute=1080;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var reader=town.get(id);var other=town.get(otherId);
+            OpinionLife.read(town,reader,8,1140);
+            assertEquals(51,OpinionLife.score(town,reader,"city"));
+            assertEquals(55,OpinionLife.score(town,reader,"stall"));
+            assertEquals(50,OpinionLife.score(town,other,"stall"));
+            OpinionLife.clearStall(town);
+            assertEquals(50,OpinionLife.score(town,reader,"stall"));
+            assertEquals(51,OpinionLife.score(town,reader,"city"));
+        }
+    }
+
+    @Test
     void newspaperUsesAttributedPublicClaimsAndRealEditorialFundsAcrossRestart() throws Exception {
         Path file=directory.resolve("newspaper.db");
         String reporterId;
