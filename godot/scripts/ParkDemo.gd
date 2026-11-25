@@ -3791,11 +3791,15 @@ func _render_actions() -> void:
                 home_label.text += "\nHygiene %s · Furnishings %s/2" % [home_options.get("hygiene",100),home_options.get("furnitureLevel",0)]
                 for relative in home_options.get("family",[]):
                     home_label.text += "\nAt home: "+str(relative)
+                var domestic = home_options.get("domestic")
+                if domestic is Dictionary:
+                    home_label.text += "\n"+(tr("Cleanliness %s · Clothes %s") % [domestic.get("cleanliness",100),domestic.get("clothes",100)])
+                    home_label.text += "\n"+(tr("Electricity credits used %s · Water units used %s") % [domestic.get("electricityUses",0),domestic.get("waterUsed",0)])
                 _action_choices.add_child(home_label)
-                var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
+                var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","microwave":"Heat meal · 5 min · 1 EUR","clean":"Clean home · 30 min · 1 water","laundry":"Wash clothes · 45 min · 1 water · 1 EUR","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
                 for action in home_options.get("actions",[]):
                     _action_choices.add_child(_button(str(home_labels.get(action,action)),_garden_action.bind("rebirth-home-"+str(action))))
-                var furnishing_names := {"kitchen":"Kitchen furnishings","bedroom":"Bedroom furnishings","children":"Children’s furnishings"}
+                var furnishing_names := {"kitchen":"Kitchen furnishings","bedroom":"Bedroom furnishings","children":"Children’s furnishings","laundry":"Washing machine"}
                 for offer in home_options.get("furnishings",[]):
                     var item_id := str(offer.get("id",""))
                     var item_name := tr(str(furnishing_names.get(item_id,item_id)))
