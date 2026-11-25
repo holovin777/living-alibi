@@ -165,6 +165,83 @@ class GameSessionTest {
     }
 
     @Test
+    void familyRebirthPersistsChoiceAndCreatesExactlyOneRealChild() throws Exception {
+        Path file=directory.resolve("family-rebirth.db");
+        String firstId,secondId;
+        int first,second;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var adults=PopulationGenerator.add(town,2);
+            var a=adults.get(0);var b=adults.get(1);
+            firstId=a.id;secondId=b.id;first=a.generationIndex;second=b.generationIndex;
+            a.age=30;b.age=31;a.money=150;b.money=150;
+            DemographyLife.set(town,a,"partner",second);
+            DemographyLife.set(town,b,"partner",first);
+            DemographyLife.set(town,a,"union-day",1);
+            DemographyLife.set(town,b,"union-day",1);
+            town.player.alive=false;town.player.health=0;
+            state.day=271;state.minute=600;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var view=game.snapshot();
+            assertEquals("CHOICE",view.rebirth().phase());
+            assertEquals(2,view.player().incarnation());
+            assertEquals(0,view.player().money());
+            assertEquals(1,view.rebirth().families().size());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-family-9999-9998"));
+            assertThrows(IllegalArgumentException.class,()->game.waitMinutes(1));
+        }
+        try(var game=new GameSession(file)){
+            assertEquals("CHOICE",game.snapshot().rebirth().phase());
+            var born=game.gardenAction("rebirth-family-"+first+"-"+second).world();
+            assertEquals("CHILDHOOD",born.rebirth().phase());
+            assertEquals(0,born.rebirth().age());
+            assertEquals(1,born.demography().births());
+            assertEquals(271,born.day());assertEquals(600,born.minute());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-family-"+first+"-"+second));
+            assertThrows(IllegalArgumentException.class,()->game.applyJob("shop-assistant"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var child=RebirthLife.child(town);
+            assertNotNull(child);assertTrue(child.alive);
+            assertEquals(20,child.money);
+            assertEquals(140,town.get(firstId).money);
+            assertEquals(140,town.get(secondId).money);
+            assertEquals(first,DemographyLife.get(town,child,"parent-a"));
+            assertEquals(second,DemographyLife.get(town,child,"parent-b"));
+            assertEquals(1,town.pastLives.size());
+        }
+        try(var game=new GameSession(file)){
+            assertEquals("CHILDHOOD",game.snapshot().rebirth().phase());
+            var next=game.gardenAction("rebirth-wait").world();
+            assertEquals(272,next.day());
+            assertEquals(1,next.demography().births());
+            assertEquals(2,next.player().incarnation());
+        }
+    }
+
+    @Test
+    void noEligibleFamilyAllowsExplicitAdultFallback() throws Exception {
+        Path file=directory.resolve("rebirth-fallback.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            town.player.alive=false;town.player.health=0;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().families().isEmpty());
+            var fallback=game.gardenAction("rebirth-adult").world();
+            assertEquals("ADULT",fallback.rebirth().phase());
+            assertTrue(fallback.player().alive());
+            assertEquals(50,fallback.player().money());
+            assertEquals("PARK",fallback.player().placeId());
+            assertEquals(2,fallback.player().incarnation());
+        }
+    }
+
+    @Test
     void electionUsesResidentPreferencesPersistsMandateAndRespectsTreasury() throws Exception {
         Path file=directory.resolve("election.db");
         try(var db=new WorldDatabase(file)){
