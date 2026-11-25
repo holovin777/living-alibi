@@ -3037,6 +3037,26 @@ func _render_software() -> void:
         var submit_audit := _button("Submit daily audit",_submit_developer_audit.bind(answer))
         submit_audit.disabled=not bool(audit.get("available",false))
         _action_choices.add_child(submit_audit)
+    if workspace is Dictionary and workspace.get("devops") is Dictionary:
+        var ops: Dictionary = workspace["devops"]
+        var ops_info := Label.new()
+        ops_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        ops_info.text="DevOps · %s · Resolved %s\n%s\n%s" % [ops.get("status",""),ops.get("resolved",0),ops.get("guide",""),ops.get("output","")]
+        _action_choices.add_child(ops_info)
+        if not ops.get("trained",false):
+            var training := _button("DevOps onboarding · 30 min",_garden_action.bind("rebirth-devops-train"))
+            training.disabled=not bool(ops.get("canTrain",false))
+            _action_choices.add_child(training)
+        elif ops.get("active",false):
+            var terminal := LineEdit.new()
+            terminal.name="DevOpsCommand"
+            terminal.placeholder_text="Enter simulated shell command"
+            terminal.max_length=120
+            terminal.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+            _action_choices.add_child(terminal)
+            var run := _button("Run command · 5 min",_submit_devops.bind(terminal))
+            run.disabled=not bool(ops.get("canRun",false))
+            _action_choices.add_child(run)
     for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
         var info := Label.new()
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3071,6 +3091,10 @@ func _render_software() -> void:
             advance.disabled=not bool(project.get("canAdvance",false))
             _action_choices.add_child(advance)
     _action_choices.add_child(_button("Leave",_close_software))
+
+func _submit_devops(editor: LineEdit) -> void:
+    if is_instance_valid(editor):
+        _garden_action("rebirth-devops-command:"+editor.text)
 
 func _submit_developer_audit(editor: LineEdit) -> void:
     if is_instance_valid(editor):
@@ -3981,7 +4005,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-")) and not _near_software():return
+    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-") or action.begins_with("rebirth-devops-")) and not _near_software():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return

@@ -1078,6 +1078,14 @@ func _exercise() -> void:
     if not _check(_has_button(world._action_choices,"Promotion: Middle") and _has_button(world._action_choices,"Submit daily audit") and world._action_choices.has_node("DeveloperAuditAnswer"),"developer career and daily audit menu"):
         return
     world._close_software()
+    office["rebirth"]["javaWorkspace"]["devops"]={"status":"OUTAGE","resolved":0,"guide":"Inspect the service","output":"HTTP 503","trained":true,"active":true,"canRun":true}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Run command") and world._action_choices.has_node("DevOpsCommand"),"DevOps training terminal"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

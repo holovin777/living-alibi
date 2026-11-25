@@ -346,6 +346,58 @@ class GameSessionTest {
         }
     }
     @Test
+    void devopsIncidentBlocksRetailUntilDiagnosedAndRecovered() throws Exception {
+        Path file=directory.resolve("devops-incident.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=30;c.hunger=10;c.thirst=10;c.fatigue=20;c.food=5;c.water=5;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.OFFICE;c.destination=c.place;c.activity="FREE_TIME";
+            c.workplace=TownLife.Place.OFFICE;c.occupation="Programmer";c.employed=true;
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            EducationLife.set(town,c,"technical",70);EducationLife.set(town,c,"diploma-programming",1);
+            EducationLife.set(town,c,"java-onboarded",1);EducationLife.set(town,c,"developer-rank",1);
+            town.industryStocks.put(SoftwareLife.key("retail-api"),3);
+            town.employerFunds.put("city-maintenance",500);
+            state.day=3;state.minute=800;
+            DevOpsLife.tick(town,3,360);
+            assertTrue(DevOpsLife.unavailable(town));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(org.springframework.web.server.ResponseStatusException.class,()->game.retailCatalog(false));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-devops-command:curl -I http://localhost/retail/health"));
+            game.gardenAction("rebirth-devops-train");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-devops-command:docker compose up -d retail"));
+            game.gardenAction("rebirth-devops-command:curl -I http://localhost/retail/health");
+            game.gardenAction("rebirth-devops-command:docker compose ps");
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(org.springframework.web.server.ResponseStatusException.class,()->game.retailCatalog(false));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-devops-command:docker compose up -d retail; echo nope"));
+            game.gardenAction("rebirth-devops-command:docker compose up -d retail");
+            assertFalse(game.retailCatalog(false).isEmpty());
+            var verified=game.gardenAction("rebirth-devops-command:curl -I http://localhost/retail/health").world();
+            assertEquals(60,verified.player().money());
+            assertEquals(1,verified.rebirth().javaWorkspace().devops().resolved());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-devops-command:curl -I http://localhost/retail/health"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(470,town.employerFunds.get("city-maintenance").intValue());
+            assertFalse(DevOpsLife.unavailable(town));
+            assertEquals(1,EducationLife.get(town,town.get(id),"devops-resolved"));
+            DevOpsLife.tick(town,3,360);
+            assertFalse(DevOpsLife.unavailable(town));
+            DevOpsLife.tick(town,6,360);
+            assertTrue(DevOpsLife.unavailable(town));
+        }
+    }
+    @Test
     void developerCareerRequiresPersonalExperienceAndPaysFromBudget() throws Exception {
         Path file=directory.resolve("developer-career.db");
         String id;

@@ -256,6 +256,7 @@ final class TownLife {
         DemographyLife.ensure(t);
         EducationLife.ensure(t);
         SoftwareLife.ensure(t);
+        DevOpsLife.ensure(t);
         NewspaperLife.ensure(t);
         OpinionLife.ensure(t);
         ElectionLife.ensure(t);
@@ -308,6 +309,7 @@ final class TownLife {
         PropertyLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);
         UtilityLife.tick(town,marco,truth,observations);
+        DevOpsLife.tick(town,marco.day,marco.minute);
         ArchiveLife.annual(town,marco.day,marco.minute);
         NewspaperLife.tick(town,marco.day,marco.minute);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;

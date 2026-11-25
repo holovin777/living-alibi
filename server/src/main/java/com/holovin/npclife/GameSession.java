@@ -79,6 +79,7 @@ public final class GameSession implements AutoCloseable {
     public synchronized List<RetailView> retailCatalog(boolean lowStock){
         if(!SoftwareLife.deployed(town,lowStock?"retail-sql":"retail-api"))
             throw new IllegalArgumentException("This retail service has not been deployed yet.");
+        if(DevOpsLife.unavailable(town))throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"Retail service temporarily unavailable.");
         return RetailLife.PRODUCTS.stream()
                 .map(p->new RetailView(p.id(),p.label(),p.price(),town.retailStock.getOrDefault(p.id(),0)))
                 .filter(p->!lowStock||p.stock()<3)
@@ -344,6 +345,13 @@ public final class GameSession implements AutoCloseable {
             if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
+            }
+            if(action.equals("rebirth-devops-train")){
+                return applyInternal(copy,30,DevOpsLife.train(copy,state.day,state.minute),true);
+            }
+            if(action.startsWith("rebirth-devops-command:")){
+                var result=DevOpsLife.command(copy,state.day,state.minute,action.substring("rebirth-devops-command:".length()));
+                return applyInternal(copy,result.minutes(),result.message(),true);
             }
             if(action.equals("rebirth-developer-promote")){
                 return applyInternal(copy,15,DeveloperCareerLife.promote(copy,state.day,state.minute),true);
