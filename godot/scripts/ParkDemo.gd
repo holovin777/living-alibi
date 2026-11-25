@@ -16,6 +16,9 @@ const ROAD_TRIGGER := 23.8
 const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
+const ROOM_BOUNDS := Rect2(-13.0,4.0,9.0,10.0)
+const ROOM_EXIT := Vector3(-3.0,0,8.5)
+const BED_POSITION := Vector3(-11.3,0,6.1)
 const LiveClock = preload("res://scripts/LiveClock.gd")
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 
@@ -120,15 +123,20 @@ func _process(delta: float) -> void:
 
     _animate_residents(delta)
     _weather_fx.follow(_avatar.position)
+    _weather_fx.set_sheltered(_inside_guest_room(),_environment)
     _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
-    if not _near_kiosk():
+    if not _near_kiosk() and not _near_room_bed():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
+    elif _near_room_bed():
+        _hint.text = "F: rest in your rented room · walk out through the door."
+    elif _current_place == "NORTH_RESIDENCES" and _avatar.position.distance_to(ROOM_EXIT) < 2.3:
+        _hint.text = "Your room is open." if _has_room_lease() else "Rent a room at reception (blue kiosk)."
     elif not _nearest_resident().is_empty():
         _hint.text = "T: talk to nearby resident · V: camera · Esc: cursor."
     elif _near_gate():
@@ -169,7 +177,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
         elif event.keycode == KEY_E and _near_gate() and not _map_panel.visible:
             _toggle_travel()
             get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_F and _near_kiosk() and not _map_panel.visible:
+        elif event.keycode == KEY_F and (_near_kiosk() or _near_room_bed()) and not _map_panel.visible:
             _toggle_actions()
             get_viewport().set_input_as_handled()
 
@@ -178,6 +186,28 @@ func _near_gate() -> bool:
 
 func _near_kiosk() -> bool:
     return _avatar.position.distance_to(KIOSK_POSITION) < INTERACTION_RADIUS
+
+func _has_room_lease() -> bool:
+    return bool(_last_snapshot.get("player",{}).get("roomActive",false))
+
+func _inside_guest_room() -> bool:
+    return _current_place == "NORTH_RESIDENCES" and ROOM_BOUNDS.has_point(
+            Vector2(_avatar.position.x,_avatar.position.z))
+
+func _near_room_bed() -> bool:
+    return _inside_guest_room() and _has_room_lease() and _avatar.position.distance_to(BED_POSITION) < 2.5
+
+func _sync_guest_room() -> void:
+    if _chunks.has("NORTH_RESIDENCES"):
+        var root: Node3D = _chunks["NORTH_RESIDENCES"]["root"]
+        var door := root.get_node_or_null("CasaOspiti/LeaseDoor") as Node3D
+        if door != null:
+            door.visible = not _has_room_lease()
+    if _inside_guest_room() and not _has_room_lease():
+        _avatar.position = ROOM_EXIT
+        _action_panel.visible = false
+        _follow_player()
+        _message.text = "Your lease ended. Renew at reception to enter again."
 
 func _toggle_view_mode() -> void:
     _first_person = not _first_person
@@ -303,6 +333,8 @@ func _generate_chunk(place_id: String) -> void:
     _scenery.add_child(_residents_root)
 
     match place_id:
+        "NORTH_RESIDENCES":
+            _build_guesthouse()
         "PORTICI":
             _build_portici()
         "CENTRO":
@@ -431,6 +463,8 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
+    if _current_place == "NORTH_RESIDENCES" and not _has_room_lease() and ROOM_BOUNDS.grow(radius).has_point(p):
+        return false
     for obstacle in _obstacles:
         var nearest := p.clamp(obstacle.position, obstacle.end)
         if p.distance_squared_to(nearest) < radius * radius:
@@ -469,6 +503,74 @@ func _open_anchor(preferred: Vector3) -> Vector3:
 
 # Piazza Centrale: fictional Lombard piazza, reusable portico modules.
 # The four axial lanes stay clear for the district road connections.
+func _room_wall(parent: Node3D,at: Vector3,footprint: Vector2,color: Color) -> void:
+    _add_obstacle(at,footprint)
+    _box(parent,Vector3(footprint.x,3.0,footprint.y),color,at+Vector3(0,1.5,0))
+
+func _room_furniture(parent: Node3D,at: Vector3,size: Vector3,color: Color) -> void:
+    _add_obstacle(at,Vector2(size.x,size.z))
+    _box(parent,size,color,at+Vector3(0,size.y*0.5,0))
+
+func _build_guesthouse() -> void:
+    var house := Node3D.new()
+    house.name = "CasaOspiti"
+    _scenery.add_child(house)
+    var plaster := Color("#d6c4a3")
+    var interior := Color("#e7d9bd")
+    _box(house,Vector3(9,0.08,10),Color("#bd9c79"),Vector3(-8.5,0.025,9))
+    _room_wall(house,Vector3(-13,0,9),Vector2(0.24,10),plaster)
+    _room_wall(house,Vector3(-8.5,0,4),Vector2(9,0.24),plaster)
+    _room_wall(house,Vector3(-8.5,0,14),Vector2(9,0.24),plaster)
+    _room_wall(house,Vector3(-4,0,5.5),Vector2(0.24,3),plaster)
+    _room_wall(house,Vector3(-4,0,12),Vector2(0.24,4),plaster)
+    _box(house,Vector3(0.35,0.45,3.1),Color("#a7805e"),Vector3(-4,2.78,8.5))
+    var door := Node3D.new()
+    door.name = "LeaseDoor"
+    house.add_child(door)
+    _box(door,Vector3(0.16,2.55,2.95),Color("#715039"),Vector3(-4,1.275,8.5))
+    _sphere(door,0.08,Color("#d5b16e"),Vector3(-3.88,1.1,7.5))
+    door.visible = not _has_room_lease()
+    _box(house,Vector3(9.25,0.22,10.3),Color("#ccb99c"),Vector3(-8.5,3.1,9))
+    # Decorative upper storey; the actual rented studio is on ground level.
+    _box(house,Vector3(9,3.2,10),Color("#c4a382"),Vector3(-8.5,4.8,9))
+    _box(house,Vector3(9.5,0.35,10.5),Color("#865747"),Vector3(-8.5,6.55,9))
+    for z in [6.0,9.0,12.0]:
+        _box(house,Vector3(0.08,1.3,1.0),Color("#3b5051"),Vector3(-3.96,4.7,z))
+        for offset in [-0.72,0.72]:
+            _box(house,Vector3(0.14,1.4,0.35),Color("#486045"),Vector3(-3.86,4.7,z+offset))
+    _sign(house,"Casa Ospiti · Camera 1",Vector3(-3.7,3.35,8.5))
+    _sign(house,"Reception · F",KIOSK_POSITION+Vector3(0,2.2,0))
+    # Bedroom opening from z=7 to z=10.
+    _room_wall(house,Vector3(-8,0,5.5),Vector2(0.17,3),interior)
+    _room_wall(house,Vector3(-8,0,12),Vector2(0.17,4),interior)
+    # Bathroom opening centred at x=-10.
+    _room_wall(house,Vector3(-12,0,11),Vector2(2,0.17),interior)
+    _room_wall(house,Vector3(-8.5,0,11),Vector2(1,0.17),interior)
+    _room_furniture(house,BED_POSITION,Vector3(2.1,0.46,2.0),Color("#806449"))
+    _box(house,Vector3(2.0,0.22,1.93),Color("#dce1db"),BED_POSITION+Vector3(0,0.57,0))
+    _box(house,Vector3(1.95,0.12,1.25),Color("#6e8494"),BED_POSITION+Vector3(0,0.73,0.3))
+    _box(house,Vector3(0.72,0.16,0.45),Color("#f0e9d8"),BED_POSITION+Vector3(0,0.76,-0.69))
+    _sign(house,"Bed · F",BED_POSITION+Vector3(0,1.6,0))
+    _room_furniture(house,Vector3(-12.35,0,9.35),Vector3(0.85,2.15,1.5),Color("#815d41"))
+    # Kitchen counter, sink, small dining table; visually usable floor plan.
+    _room_furniture(house,Vector3(-5.05,0,12.3),Vector3(1.0,0.92,2.25),Color("#8b7558"))
+    _box(house,Vector3(1.05,0.09,2.3),Color("#c4c5bc"),Vector3(-5.05,0.96,12.3))
+    _box(house,Vector3(0.6,0.08,0.62),Color("#71868a"),Vector3(-5.05,1.02,12.65))
+    _room_furniture(house,Vector3(-6.25,0,10.5),Vector3(1.05,0.76,0.95),Color("#ae8863"))
+    # Bathroom shower tray and toilet, not simulated plumbing yet.
+    _room_furniture(house,Vector3(-12.1,0,12.95),Vector3(1.2,0.15,1.4),Color("#e5e9e4"))
+    _box(house,Vector3(0.06,1.9,1.4),Color("#9ebcc1"),Vector3(-11.5,1.02,12.95))
+    _room_furniture(house,Vector3(-8.8,0,13.0),Vector3(0.65,0.5,0.8),Color("#e6e7dd"))
+    _box(house,Vector3(0.65,0.85,0.25),Color("#e6e7dd"),Vector3(-8.8,0.43,13.35))
+    for at in [Vector3(-10.5,2.8,8),Vector3(-6,2.8,9),Vector3(-10.5,2.8,12.5)]:
+        var light := OmniLight3D.new()
+        light.position = at
+        light.light_color = Color("#ffe2b8")
+        light.light_energy = 1.1
+        light.omni_range = 5.5
+        house.add_child(light)
+    _lamp(house,Vector3(-2.8,0,12))
+
 func _build_portici() -> void:
     var street := Node3D.new()
     street.name = "ViaDeiPortici"
@@ -1203,8 +1305,8 @@ func _travel_to(destination: String) -> void:
     _api.go_to(destination)
 
 func _toggle_actions() -> void:
-    if not _near_kiosk() or not _connected:
-        _message.text = "Approach the blue kiosk with the Java server running."
+    if (not _near_kiosk() and not _near_room_bed()) or not _connected:
+        _message.text = "Approach a local kiosk or your rented bed."
         return
     _close_dialog()
     _travel_panel.visible = false
@@ -1235,10 +1337,15 @@ func _render_actions() -> void:
         "CENTRO":
             _action_choices.add_child(_button("Job noticeboard",_find_jobs))
         "NORTH_RESIDENCES":
-            _action_choices.add_child(_button("Rent / renew guest room · 35 EUR / 7 days",_rent_room))
-            if bool(player.get("roomActive",false)):
+            if _near_room_bed():
                 _action_choices.add_child(_button("Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in guest room · 8h",_sleep_room.bind(8)))
+            elif _near_kiosk():
+                _action_choices.add_child(_button("Rent / renew guest room · 35 EUR / 7 days",_rent_room))
+                if _has_room_lease():
+                    var instruction := Label.new()
+                    instruction.text = "Your room is across the street. Walk to the bed."
+                    _action_choices.add_child(instruction)
         "MARKET", "PORTICI":
             for item in _last_snapshot.get("shop",[]):
                 var id := str(item.get("id",""))
@@ -1404,7 +1511,7 @@ func _rent_room() -> void:
         _api.rent_room()
 
 func _sleep_room(hours: int) -> void:
-    if _near_kiosk() and _connected and not _api.is_busy():
+    if _near_room_bed() and _connected and not _api.is_busy():
         _api.sleep_in_room(hours)
 
 func _buy_product(id: String) -> void:
@@ -1518,6 +1625,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _needs.text += "\nResidents present in this district: %s" % [
         str(snapshot.get("residents", []).size())
     ]
+    _sync_guest_room()
     _update_bag()
     _town_map.update_world(_current_place, _locations)
     _render_residents()
@@ -1570,6 +1678,7 @@ func _apply_weather() -> void:
     if climate.get("sky","CLEAR") != "CLEAR":
         _sun.light_energy *= 0.65
     _weather_fx.follow(_avatar.position)
+    _weather_fx.set_sheltered(_inside_guest_room(),_environment)
     _weather_fx.apply(climate,_environment)
     var services: Dictionary = _last_snapshot.get("services", {})
     # Weather and city services affect every loaded chunk, not just the

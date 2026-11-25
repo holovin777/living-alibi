@@ -5,6 +5,7 @@ var rain: CPUParticles3D
 var snow: CPUParticles3D
 var ambience: AudioStreamPlayer
 var visual_enabled := true
+var sheltered := false
 var audio_enabled := true
 var mode := "CLEAR"
 var _rain_sound: AudioStreamWAV
@@ -70,24 +71,32 @@ func _noise_loop(wind: bool) -> AudioStreamWAV:
 func follow(at: Vector3) -> void:
     position = at + Vector3(0.0,9.0,0.0)
 
+func set_sheltered(value: bool, environment: Environment) -> void:
+    if sheltered == value:
+        return
+    sheltered = value
+    _sync()
+    environment.fog_enabled = visual_enabled and not sheltered and mode in ["RAIN","SNOW","CLOUDY"]
+
 func apply(climate: Dictionary, environment: Environment) -> void:
     mode = "SNOW" if climate.get("snowing",false) else (
             "RAIN" if climate.get("raining",false) else str(climate.get("sky","CLEAR")))
     _sync()
     # Fog is a visual approximation of reduced visibility, not a new Java weather type.
-    environment.fog_enabled = visual_enabled and mode in ["RAIN","SNOW","CLOUDY"]
+    environment.fog_enabled = visual_enabled and not sheltered and mode in ["RAIN","SNOW","CLOUDY"]
     environment.fog_density = 0.024 if mode == "SNOW" else (0.015 if mode == "RAIN" else 0.006)
     environment.fog_light_color = environment.background_color
 
 func _sync() -> void:
     if rain == null:
         return
-    var rain_on := visual_enabled and mode == "RAIN"
-    var snow_on := visual_enabled and mode == "SNOW"
+    var rain_on := visual_enabled and not sheltered and mode == "RAIN"
+    var snow_on := visual_enabled and not sheltered and mode == "SNOW"
     rain.emitting = rain_on
     rain.visible = rain_on
     snow.emitting = snow_on
     snow.visible = snow_on
+    ambience.volume_db = -40.0 if sheltered else -28.0
     var desired: AudioStreamWAV = null
     if audio_enabled and mode == "RAIN":
         desired = _rain_sound

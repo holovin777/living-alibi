@@ -302,6 +302,20 @@ business. Other doors and upper floors are decorative. Local collision
 checks enforce the doorway; the server validates the district, not
 exact indoor coordinates. The room rental is still a kiosk action.
 
+## Casa Ospiti: first furnished room
+
+North residences now includes a walkable furnished ground-floor
+guest studio. Pay or renew at reception, then cross the street to
+Camera 1. The doorway opens only with a server-confirmed active lease.
+Approach the bed and press F to sleep. A lease that expires while
+inside returns the visitor to the doorstep. Bedroom, kitchen/dining
+corner, bathroom and wardrobe use solid local furniture footprints.
+Rain/snow particles and fog are suppressed indoors and weather audio
+is quieter; this is a local shelter presentation, not full building
+weather occlusion. The upper floor, sink, shower and appliances are
+decorative. Java still validates lease and district for sleep, not
+exact bed coordinates; no local coordinates persist after restart.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

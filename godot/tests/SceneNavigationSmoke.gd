@@ -142,6 +142,38 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    var guest := _world("NORTH_RESIDENCES","North residences")
+    world._on_world_updated(guest)
+    if not _check(world._scenery.has_node("CasaOspiti/LeaseDoor")
+            and not world._can_stand(Vector3(-5,0,8.5),world.WALKER_RADIUS),
+            "unrented guest room is locked"):
+        return
+    guest["player"]["roomActive"] = true
+    guest["player"]["roomUntil"] = 10080
+    world._on_world_updated(guest)
+    var door := world._scenery.get_node("CasaOspiti/LeaseDoor") as Node3D
+    var room_path: Vector3 = world._move_on_ground(Vector3(-3,0,8.5),Vector3(-6.7,0,0),world.WALKER_RADIUS,true)
+    if not _check(not door.visible and room_path.x < -9.5,
+            "paid room opens and bedroom can be reached through both doorways"):
+        return
+    world._avatar.position = Vector3(-9.8,0,7.7)
+    world._render_actions()
+    if not _check(world._near_room_bed() and _has_button(world._action_choices,"Sleep in guest room"),
+            "bed gives sheltered sleep actions instead of reception"):
+        return
+    guest["weather"] = {"sky":"RAIN","raining":true}
+    world._on_world_updated(guest)
+    if not _check(world._weather_fx.sheltered and not world._weather_fx.rain.emitting,
+            "room suppresses local precipitation"):
+        return
+    guest["player"]["roomActive"] = false
+    world._on_world_updated(guest)
+    if not _check(door.visible and world._avatar.position == world.ROOM_EXIT
+            and not world._weather_fx.sheltered,
+            "expired lease moves visitor safely outside and closes entrance"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)
