@@ -337,6 +337,11 @@ final class PlayerLife {
                 || spoken.equalsIgnoreCase("What do you do?");
         boolean support=spoken.equalsIgnoreCase("I'm here for you.") || spoken.equalsIgnoreCase("Ti sono vicino.");
         boolean recall=spoken.equalsIgnoreCase("What do you remember about me?") || spoken.equalsIgnoreCase("Cosa ricordi di me?");
+        if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan")||spoken.equalsIgnoreCase("Repay personal loan")) {
+            if(RebirthLife.active(town))throw new IllegalArgumentException("Personal loans are available to visitors only.");
+            if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan"))return PersonalLoanLife.borrow(town,resident,contact,day);
+            return PersonalLoanLife.repay(town,resident,contact,day);
+        }
         boolean giveBread=spoken.equalsIgnoreCase("Offer bread");
         boolean giveWater=spoken.equalsIgnoreCase("Offer water");
         boolean askBread=spoken.equalsIgnoreCase("Ask for bread");
