@@ -12,6 +12,9 @@ const CYCLE_SPEED := 8.0
 const RACK_POSITION := Vector3(6.0,0,-10.0)
 const CAR_PARK := Vector3(11.0,0,-10.0)
 const CAR_ARRIVAL := Vector3(11.0,0,-7.5)
+const TRUCK_PARK := Vector3(14.5,0,-10.0)
+const TRUCK_EXIT := Vector3(14.5,0,-7.0)
+const FREIGHT_DISTRICTS := ["QUARRY","WORKSHOP","FACTORY"]
 const RACK_DISTRICTS := ["PARK","WORKSHOP","NORTH_RESIDENCES"]
 const WALKER_RADIUS := 0.32
 const COLLISION_STEP := 0.12
@@ -86,6 +89,7 @@ var _drive_direction := Vector3.ZERO
 var _drive_look := 0.0
 var _drive_pending := false
 var _drive_parked := false
+var _drive_freight := false
 var _bike_model: Node3D
 var _bike_wheel_angle := 0.0
 var _jobs: Label
@@ -166,12 +170,14 @@ func _process(delta: float) -> void:
     _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
-    if not _near_kiosk() and not _near_home_station() and not _near_car():
+    if not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
+    elif _near_truck():
+        _hint.text = "F: assigned freight truck."
     elif _near_car():
         _hint.text = "F: choose a driving route."
     elif _near_rack() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
@@ -242,7 +248,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
         elif event.keycode == KEY_E and _near_gate() and not _map_panel.visible:
             _toggle_travel()
             get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_F and (_near_kiosk() or _near_home_station() or _near_car()) and not _map_panel.visible:
+        elif event.keycode == KEY_F and (_near_kiosk() or _near_home_station() or _near_car() or _near_truck()) and not _map_panel.visible:
             _toggle_actions()
             get_viewport().set_input_as_handled()
 
@@ -294,6 +300,23 @@ func _movement_speed() -> float:
     var in_shop := _current_place == "PORTICI" and Rect2(4.4,2.15,6.1,5.7).has_point(Vector2(at.x,at.z))
     return CYCLE_SPEED if _cycling() and not _inside_guest_room() and not in_shop else WALK_SPEED
 
+func _truck_place() -> String:
+    var value = _last_snapshot.get("freight",{}).get("truckPlace")
+    return "" if value==null else str(value)
+
+func _near_truck() -> bool:
+    return _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS and _avatar.position.distance_to(TRUCK_PARK)<3.5
+
+func _freight_action(action: String) -> void:
+    if not _connected or _api.is_busy():
+        return
+    if (action=="load" and _current_place=="QUARRY" and _near_kiosk()) or (action=="unload" and _near_truck()):
+        _api.freight_action(action)
+
+func _drive_truck(destination: String) -> void:
+    if _connected and not _api.is_busy():
+        _begin_driving(destination,true)
+
 func _car_place() -> String:
     var value = _last_snapshot.get("player",{}).get("carPlace")
     return "" if value==null else str(value)
@@ -327,11 +350,16 @@ func _drive_clear(at: Vector3) -> bool:
             return false
     return true
 
-func _begin_driving(destination: String) -> bool:
+func _begin_driving(destination: String,freight: bool = false) -> bool:
     var player: Dictionary = _last_snapshot.get("player",{})
-    if not _near_car() or not destination in player.get("carDestinations",[]) or not TownLayout.motor_road(_current_place,destination):
+    if not TownLayout.motor_road(_current_place,destination):
         return false
-    if int(player.get("carFuel",0))<1 or int(player.get("carCondition",0))<3:
+    if freight:
+        if not _near_truck() or str(_last_snapshot.get("freight",{}).get("nextDestination",""))!=destination:
+            return false
+    elif not _near_car() or not destination in player.get("carDestinations",[]):
+        return false
+    if not freight and (int(player.get("carFuel",0))<1 or int(player.get("carCondition",0))<3):
         _message.text = "The car needs fuel or service."
         return false
     if bool(player.get("ownsBicycle",false)) and _parked_district().is_empty():
@@ -344,6 +372,7 @@ func _begin_driving(destination: String) -> bool:
         _message.text = "Road occupied. Let traffic pass before departing."
         return false
     _drive = candidate
+    _drive_freight = freight
     _drive_target = destination
     _drive_parked = false
     _drive_pending = false
@@ -367,6 +396,10 @@ func _begin_driving(destination: String) -> bool:
 
 func _update_drive_hud() -> void:
     var player: Dictionary = _last_snapshot.get("player",{})
+    if _drive_freight:
+        var cargo: Dictionary = _last_snapshot.get("freight",{})
+        _drive_hud.text = "FREIGHT | %s km/h | Iron %s · Copper %s\nTo %s · W/S gas/reverse · A/D steer · Space brake\n%s" % [roundi(absf(_drive.speed)*3.6),cargo.get("iron",0),cargo.get("copper",0),_drive_target.capitalize(),"Awaiting arrival..." if _drive_pending else "Esc: cancel this leg"]
+        return
     if _drive_parked:
         var lines := PackedStringArray()
         var choices: Array = player.get("carDestinations",[])
@@ -395,11 +428,16 @@ func _process_driving(delta: float) -> void:
         if _drive.distance>=DriveControls.FINISH-0.001 and _connected and not _api.is_busy():
             _drive_pending = true
             _drive.speed = 0.0
-            _api.drive_to(_drive_target)
+            if _drive_freight:
+                _api.freight_action("drive",_drive_target)
+            else:
+                _api.drive_to(_drive_target)
     _follow_player()
     _update_drive_hud()
 
 func _end_driving(return_to_car: bool) -> void:
+    var was_freight := _drive_freight
+    _drive_freight = false
     _drive_parked = false
     _drive_target = ""
     _drive_pending = false
@@ -410,7 +448,7 @@ func _end_driving(return_to_car: bool) -> void:
     _drive_hud.visible = false
     _main_panel.visible = true
     if return_to_car:
-        _avatar.position = CAR_ARRIVAL
+        _avatar.position = TRUCK_EXIT if was_freight else CAR_ARRIVAL
     _sync_owned_car()
     _follow_player()
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -438,7 +476,10 @@ func _sync_owned_car() -> void:
         var root: Node3D = _chunks[id]["root"]
         var car := root.get_node_or_null("PublicCarPark/OwnedCar") as Node3D
         if car!=null:
-            car.visible = _car_place()==id and (not _drive_active() or id!=_current_place)
+            car.visible = _car_place()==id and (not _drive_active() or _drive_freight or id!=_current_place)
+        var truck := root.get_node_or_null("FreightParking/AssignedTruck") as Node3D
+        if truck!=null:
+            truck.visible = _truck_place()==id and (not _drive_freight or not _drive_active())
 
 func _parked_district() -> String:
     var value = _last_snapshot.get("player",{}).get("bicycleParked")
@@ -720,6 +761,8 @@ func _generate_chunk(place_id: String) -> void:
         _build_bicycle_rack()
     if place_id in TownLayout.MOTOR_DISTRICTS:
         _build_public_car_park()
+    if place_id in FREIGHT_DISTRICTS:
+        _build_freight_parking()
     _build_road_links(place_id)
     _chunks[place_id] = {
         "root": _scenery, "residents": _residents_root,
@@ -965,6 +1008,9 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         var nearest := p.clamp(obstacle.position, obstacle.end)
         if p.distance_squared_to(nearest) < radius * radius:
             return false
+    if _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS:
+        if Rect2(Vector2(TRUCK_PARK.x-1.1,TRUCK_PARK.z-2.4),Vector2(2.2,4.8)).grow(radius).has_point(p):
+            return false
     if _car_place()==_current_place and _current_place in TownLayout.MOTOR_DISTRICTS:
         if Rect2(Vector2(CAR_PARK.x-0.94,CAR_PARK.z-1.81),Vector2(1.88,3.62)).grow(radius).has_point(p):
             return false
@@ -1074,6 +1120,30 @@ func _build_bicycle_rack() -> void:
     parked.rotation.y = PI/2.0
     parked.visible = false
     _sign(rack,"Bici · P",Vector3(0,1.5,0))
+
+func _build_freight_parking() -> void:
+    var lot := Node3D.new()
+    lot.name = "FreightParking"
+    lot.position = TRUCK_PARK
+    _scenery.add_child(lot)
+    _box(lot,Vector3(3,0.045,5.8),Color("#505659"),Vector3.ZERO)
+    _sign(lot,"Merci · F",Vector3(0,2.7,-2.8))
+    var truck := Node3D.new()
+    truck.name = "AssignedTruck"
+    lot.add_child(truck)
+    var paint := Color("#b29b69")
+    _box(truck,Vector3(2.1,0.55,4.7),Color("#48494a"),Vector3(0,0.67,0))
+    _box(truck,Vector3(2.1,1.65,1.65),paint,Vector3(0,1.51,-1.43))
+    _box(truck,Vector3(1.78,0.65,0.06),Color("#577782"),Vector3(0,1.85,-2.27))
+    _box(truck,Vector3(2.1,0.45,2.7),paint,Vector3(0,1.05,0.75))
+    for x in [-1.0,1.0]:
+        _box(truck,Vector3(0.12,0.6,2.7),paint,Vector3(x,1.47,0.75))
+        for z in [-1.5,1.45]:
+            var wheel := _cylinder(truck,0.43,0.27,Color("#2b3030"),Vector3(x,0.43,z))
+            wheel.rotation_degrees.z = 90
+    for z in [0.1,0.8,1.5]:
+        _box(truck,Vector3(1.65,0.46,0.62),Color("#846d58"),Vector3(0,1.5,z))
+    truck.visible = false
 
 func _build_public_car_park() -> void:
     var lot := Node3D.new()
@@ -2047,7 +2117,7 @@ func _travel_to(destination: String) -> void:
     _api.go_to(destination)
 
 func _toggle_actions() -> void:
-    if (not _near_kiosk() and not _near_home_station() and not _near_car()) or not _connected:
+    if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck()) or not _connected:
         _message.text = "Approach a local kiosk or your rented bed."
         return
     _close_dialog()
@@ -2066,6 +2136,15 @@ func _render_actions() -> void:
     _action_title.text = "Local actions — " + _current_place.capitalize()
     var player: Dictionary = _last_snapshot.get("player", {})
     var employed := str(player.get("jobId", ""))
+    if _near_truck():
+        var cargo: Dictionary = _last_snapshot.get("freight",{})
+        _action_title.text = "Freight truck · iron %s / copper %s" % [cargo.get("iron",0),cargo.get("copper",0)]
+        var next = cargo.get("nextDestination")
+        if next!=null:
+            _action_choices.add_child(_button("Drive truck to "+str(next).capitalize(),_drive_truck.bind(str(next))))
+        else:
+            _action_choices.add_child(_button("Unload ore · earn 32 EUR",_freight_action.bind("unload")))
+        return
     if _near_car():
         _action_title.text = "Your car · choose adjacent destination"
         for id in player.get("carDestinations",[]):
@@ -2081,6 +2160,9 @@ func _render_actions() -> void:
             _action_choices.add_child(label)
             _action_choices.add_child(_button("Apply: farm worker",_apply_job.bind("farm-worker")))
         "QUARRY":
+            _action_choices.add_child(_button("Apply: freight driver",_apply_job.bind("freight-driver")))
+            if employed=="freight-driver" and not bool(_last_snapshot.get("freight",{}).get("active",false)):
+                _action_choices.add_child(_button("Load ore truck · paid delivery",_freight_action.bind("load")))
             _action_choices.add_child(_button("Apply: quarry miner",
                     _apply_job.bind("miner")))
             if employed == "miner":
@@ -2399,10 +2481,12 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _clock_pending = false
     _connected = true
     var old_car_place := _car_place()
+    var was_freight := _drive_freight
     _last_snapshot = snapshot
     var player: Dictionary = snapshot.get("player", {})
     var new_place := str(player.get("placeId", "PARK"))
-    var continue_in_cabin := _drive_pending and not _drive_target.is_empty() and new_place==_drive_target and _car_place()==new_place
+    var truck_arrival := was_freight and _drive_pending and new_place==_drive_target and _truck_place()==new_place
+    var continue_in_cabin := not was_freight and _drive_pending and not _drive_target.is_empty() and new_place==_drive_target and _car_place()==new_place
     if _drive_active() and not continue_in_cabin and (_drive_pending or new_place!=_current_place or _car_place()!=_current_place):
         _end_driving(new_place==_current_place)
     var road_arrival := new_place == _road_pending and not _road_pending.is_empty()
@@ -2414,7 +2498,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _current_place = new_place
         _render_place(new_place)
         var car_arrival := not old_car_place.is_empty() and old_car_place!=_car_place() and _car_place()==new_place
-        _avatar.position = CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO)
+        _avatar.position = TRUCK_EXIT if truck_arrival else (CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO))
         if not _can_stand(_avatar.position, WALKER_RADIUS, true):
             _avatar.position = Vector3.ZERO
         _locations.clear() # Previous-origin travel estimates are now stale.

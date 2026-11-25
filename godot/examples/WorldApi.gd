@@ -90,6 +90,9 @@ func speak_to(resident_id: String, message: String) -> void:
 func car_action(action: String) -> void:
     _send("/actions/car",HTTPClient.METHOD_POST,{"action":action})
 
+func freight_action(action: String,destination: String = "") -> void:
+    _send("/actions/freight",HTTPClient.METHOD_POST,{"action":action,"destination":destination})
+
 func drive_to(destination: String) -> void:
     _send("/actions/drive",HTTPClient.METHOD_POST,{"destination":destination})
 

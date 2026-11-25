@@ -362,6 +362,27 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    var cargo := _world("QUARRY","Quarry")
+    cargo["player"]["jobId"] = "freight-driver"
+    cargo["freight"] = {"active":true,"truckPlace":"QUARRY","nextDestination":"WORKSHOP","iron":2,"copper":1}
+    world._on_world_updated(cargo)
+    world._avatar.position = world.TRUCK_EXIT
+    world._render_actions()
+    if not _check(world._near_truck()
+            and world._scenery.get_node("FreightParking/AssignedTruck").visible
+            and _has_button(world._action_choices,"Drive truck to Workshop"),
+            "assigned truck has visible cargo and a legal route"):
+        return
+    for edge in world._traffic_edges.values():
+        for record in edge["cars"]:
+            record["node"].visible = false
+    if not _check(world._begin_driving("WORKSHOP",true) and world._drive_freight
+            and world._cockpit.visible and world._drive_hud.text.contains("FREIGHT"),
+            "truck uses the first-person driving controls"):
+        return
+    world._end_driving(true)
+    world._on_world_updated(_world("PARK","Park"))
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)

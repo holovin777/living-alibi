@@ -240,6 +240,7 @@ final class TownLife {
         IndustryLife.ensure(t);
         FarmLife.ensure(t);
         FuelLife.ensure(t);
+        FreightLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;

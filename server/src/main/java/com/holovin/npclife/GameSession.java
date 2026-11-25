@@ -73,7 +73,7 @@ public final class GameSession implements AutoCloseable {
     public record RetailView(String id,String label,int price,int stock) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel) { }
+                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -101,7 +101,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town));
     }
 
     public synchronized BusinessView business() {
@@ -268,6 +268,20 @@ public final class GameSession implements AutoCloseable {
         var place=PlayerLife.destination(destination);
         int minutes=MotorLife.drive(copy.player,place);
         return apply(copy,minutes,"Drove to "+place.label+". Your car is parked there.");
+    }
+
+    public synchronized ActionView freightAction(String action,String destination) throws SQLException {
+        var copy=town.copy();
+        return switch(action==null?"":action) {
+            case "load" -> apply(copy,5,FreightLife.load(copy,state.day,state.minute));
+            case "drive" -> {
+                var place=PlayerLife.destination(destination);
+                int minutes=FreightLife.drive(copy,place);
+                yield apply(copy,minutes,"Truck arrived at "+place.label+".");
+            }
+            case "unload" -> apply(copy,5,FreightLife.unload(copy,state.day));
+            default -> throw new IllegalArgumentException("Unknown freight action.");
+        };
     }
 
     public synchronized ActionView buyBicycle() throws SQLException {

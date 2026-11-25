@@ -178,6 +178,12 @@ public class GameController {
         return session.washInRoom();
     }
 
+    public record FreightRequest(String action,String destination) { }
+    @PostMapping("/actions/freight")
+    public GameSession.ActionView freight(@RequestBody FreightRequest request) throws SQLException {
+        return session.freightAction(request.action(),request.destination());
+    }
+
     public record CarRequest(String action) { }
     public record DriveRequest(String destination) { }
     @PostMapping("/actions/car")

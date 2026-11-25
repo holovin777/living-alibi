@@ -461,6 +461,24 @@ actions are still at the kiosk, not physical pump controls; supplier
 transport is abstract, and the new car's included fuel remains part
 of its purchase package.
 
+## First player-operated freight delivery
+
+Apply for Freight driver at Quarry. Load up to two iron and one
+copper ore units if available. Employer funds reserve the 32 EUR
+wage, factory money reserves the ore purchase, and two fuel units
+are bought from the station. The assigned truck is distinct from
+the existing NPC truck. Press F near it to drive Quarry → Workshop
+→ Factory using the same first-person lane controls. On arrival
+the truck parks; approach it and press F to continue or unload.
+Only unloading transfers the cargo into factory stock, pays the
+quarry and releases the driver's wage. The active manifest and
+escrow survive restart. On visitor death the cargo and escrow
+return to their sources (allocated fuel is not refunded). A
+completed delivery uses the daily work allowance. Truck driving
+reuses the compact car cabin and lane physics; no cargo weight
+or custom gearbox yet. Farm and station supplier deliveries are
+still scheduled abstractly.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

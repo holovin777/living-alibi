@@ -27,12 +27,12 @@ final class IndustryLife {
     private static final String WEST_IRON="seam:west-iron-ore";
     private static final String WEST_COPPER="seam:west-copper-ore";
     private static final String WEST_KNOWN="survey:west-discovered";
-    private static final String QUARRY_IRON="quarry:iron-ore";
-    private static final String QUARRY_COPPER="quarry:copper-ore";
+    static final String QUARRY_IRON="quarry:iron-ore";
+    static final String QUARRY_COPPER="quarry:copper-ore";
     private static final String TRUCK_IRON="truck:iron-ore";
     private static final String TRUCK_COPPER="truck:copper-ore";
-    private static final String FACTORY_IRON="factory:iron-ore";
-    private static final String FACTORY_COPPER_ORE="factory:copper-ore";
+    static final String FACTORY_IRON="factory:iron-ore";
+    static final String FACTORY_COPPER_ORE="factory:copper-ore";
     private static final String FACTORY_STEEL="factory:steel";
     private static final String FACTORY_COPPER="factory:copper";
     private static final String FACTORY_PARTS="factory:spare-parts";

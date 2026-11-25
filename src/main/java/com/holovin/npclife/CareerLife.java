@@ -33,7 +33,8 @@ final class CareerLife {
             new Offer("machinist","Factory machinist",TownLife.Place.FACTORY,
                     "none",0,34,560),
             new Offer("farm-worker","Farm worker",TownLife.Place.FARM,"none",0,26,300),
-            new Offer("fuel-attendant","Fuel station attendant",TownLife.Place.FUEL_STATION,"none",0,25,300)
+            new Offer("fuel-attendant","Fuel station attendant",TownLife.Place.FUEL_STATION,"none",0,25,300),
+            new Offer(FreightLife.JOB,"Freight driver",TownLife.Place.QUARRY,"none",0,FreightLife.WAGE,320)
     );
 
     static List<Offer> offers() {return OFFERS;}
@@ -83,6 +84,7 @@ final class CareerLife {
     static String apply(TownLife.Town town,String job) {
         var p=town.player;
         var vacancy=offer(job);
+        if(FreightLife.active(town))throw new IllegalArgumentException("Finish the freight delivery before changing jobs.");
         requirePresent(p,vacancy.workplace);
         if(vacancy.id.equals(p.jobId))
             throw new IllegalArgumentException("You already hold this job.");
@@ -127,6 +129,7 @@ final class CareerLife {
         if(p.jobId==null)
             throw new IllegalArgumentException("Find and apply for a job first.");
         var vacancy=offer(p.jobId);
+        if(FreightLife.JOB.equals(p.jobId))throw new IllegalArgumentException("Load and deliver a truck to earn your freight wage.");
         requirePresent(p,vacancy.workplace);
         if(minute<480 || minute+SHIFT_MINUTES>1080)
             throw new IllegalArgumentException("Two-hour shifts start between 08:00 and 16:00.");
