@@ -13,6 +13,41 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void adultSportRequiresLocationAndRecoveryAndPersistsProgress() throws Exception {
+        Path file=directory.resolve("adult-sports.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=100;c.health=100;c.place=TownLife.Place.PARK;
+            c.activity="FREE_TIME";c.travelRemaining=0;c.fatigue=10;c.hunger=10;c.thirst=10;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            assertThrows(IllegalArgumentException.class,()->SportLife.train(town,100,1100,"karate"));
+            int fitness=EducationLife.get(town,c,"fitness");
+            c.place=TownLife.Place.SCHOOL;
+            int school=town.employerFunds.getOrDefault("school",0);
+            assertEquals(60,SportLife.train(town,100,1100,"karate").minutes());
+            assertEquals(95,c.money);assertEquals(school+5,town.employerFunds.get("school"));
+            assertEquals(28,c.fatigue);assertEquals(17,c.hunger);assertEquals(20,c.thirst);
+            assertEquals(Math.min(100,fitness+2),EducationLife.get(town,c,"fitness"));
+            assertEquals(2,SportLife.get(town,c,"karate"));
+            assertThrows(IllegalArgumentException.class,()->SportLife.train(town,100,1160,"gym"));
+            c.fatigue=90;
+            assertThrows(IllegalArgumentException.class,()->SportLife.train(town,101,1100,"gym"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            assertEquals(2,SportLife.get(town,c,"karate"));
+            assertEquals(1,SportLife.get(town,c,"sessions"));
+            assertEquals(100,SportLife.get(town,c,"last-day"));
+        }
+    }
+
+    @Test
     void recoveryKitRequiresAssessmentAndPersistsDailyProgress() throws Exception {
         Path file=directory.resolve("medical-followup.db");
         String id;

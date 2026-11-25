@@ -399,6 +399,10 @@ public final class GameSession implements AutoCloseable {
                 RebirthLife.travel(copy,TownLife.Place.SCHOOL,state.day);
                 return applyInternal(copy,60,result,true);
             }
+            if(action.startsWith("rebirth-sport-")){
+                var session=SportLife.train(copy,state.day,state.minute,action.substring("rebirth-sport-".length()));
+                return applyInternal(copy,session.minutes(),session.message(),true);
+            }
             if(action.equals("rebirth-medical-visit")){
                 int duration=RebirthLife.medicalVisit(copy,state.day,state.minute);
                 return applyInternal(copy,duration,"Went to the medical district.",true);

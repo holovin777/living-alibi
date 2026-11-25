@@ -287,7 +287,16 @@ const IT := {
     "Supported recovery · 60 min": "Recupero assistito · 60 min",
     "Completed a private health assessment.": "Valutazione sanitaria privata completata.",
     "Collected a three-day recovery kit.": "Ritirato un kit di recupero per tre giorni.",
-    "Completed a day of supported recovery.": "Completato un giorno di recupero assistito."
+    "Completed a day of supported recovery.": "Completato un giorno di recupero assistito.",
+    "Fitness %s · Endurance %s · Flexibility %s": "Forma fisica %s · Resistenza %s · Flessibilità %s",
+    "Strength %s · Karate %s · Sessions %s": "Forza %s · Karate %s · Allenamenti %s",
+    "Running": "Corsa",
+    "Yoga": "Yoga",
+    "Karate": "Karate",
+    "Gym training": "Allenamento in palestra",
+    "Cycling rental": "Ciclismo con bici a noleggio",
+    "%s · %s min · %s EUR": "%s · %s min · %s EUR",
+    "Completed a training session.": "Allenamento completato."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
