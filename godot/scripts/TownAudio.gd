@@ -103,7 +103,7 @@ func set_enabled(value: bool) -> void:
             player.stop()
         _step_distance = 0.0
 
-func _loop(player: Node, active: bool) -> void:
+func _loop(player, active: bool) -> void:
     if active and not player.playing:
         player.play()
     elif not active and player.playing:
