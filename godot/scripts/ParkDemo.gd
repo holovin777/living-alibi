@@ -2658,10 +2658,21 @@ func _render_actions() -> void:
                         personal.text += "\nGraduation recorded. Continue as the same person."
                         _action_choices.add_child(_button("Continue adult life",_garden_action.bind("rebirth-continue")))
                 _action_choices.add_child(personal)
+                var personality = identity.get("personality")
+                if personality is Dictionary:
+                    var traits := Label.new()
+                    traits.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    traits.text = "Sociability %s · Carefulness %s · Curiosity %s" % [personality.get("sociability",0),personality.get("carefulness",0),personality.get("curiosity",0)]
+                    var ambition = personality.get("ambition")
+                    if ambition is Dictionary:
+                        traits.text += "\nAmbition: %s · %s/%s %s" % [ambition.get("description",""),ambition.get("progress",0),ambition.get("target",0),ambition.get("unit","")]
+                    _action_choices.add_child(traits)
+                    for goal in personality.get("choices",[]):
+                        _action_choices.add_child(_button("Aim: "+str(goal).replace("_"," ").capitalize(),_garden_action.bind("rebirth-ambition-"+str(goal))))
                 for person in identity.get("relationships",[]):
                     var relation := Label.new()
                     relation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                    relation.text = "%s%s%s · Trust %s · Affinity %s" % [person.get("name","")," (family)" if person.get("family",false) else ""," (deceased)" if not person.get("alive",true) else "",person.get("trust",0),person.get("affinity",0)]
+                    relation.text = "%s · %s%s · Trust %s · Affinity %s" % [person.get("name",""),person.get("bond","Acquaintance")," (deceased)" if not person.get("alive",true) else "",person.get("trust",0),person.get("affinity",0)]
                     _action_choices.add_child(relation)
             if age >= 6:
                 var skills: Dictionary = rebirth.get("skills",{})

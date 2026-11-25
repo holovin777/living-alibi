@@ -306,9 +306,12 @@ class GameSessionTest {
             assertEquals(97,parent.money);
             assertThrows(IllegalArgumentException.class,()->RebirthLife.allowance(town,state.day,state.minute));
             int technical=EducationLife.get(town,child,"technical");
+            int careful=child.carefulness;
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.chooseAmbition(town,"LEARN_SKILLS"));
             RebirthLife.hobby(town,state.day,state.minute,"build");
             assertEquals(Math.min(100,technical+1),EducationLife.get(town,child,"technical"));
             assertEquals(1,EducationLife.get(town,child,"hobby-days"));
+            assertEquals(Math.min(100,careful+1),child.carefulness);
             assertThrows(IllegalArgumentException.class,()->RebirthLife.hobby(town,state.day,state.minute,"read"));
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
@@ -321,6 +324,8 @@ class GameSessionTest {
             assertEquals(3,EducationLife.get(town,child,"allowance-total"));
             assertEquals(1,EducationLife.get(town,child,"hobby-days"));
             child.age=17;
+            RebirthLife.chooseAmbition(town,"LEARN_SKILLS");
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.chooseAmbition(town,"unknown"));
             state.day=DemographyLife.get(town,child,"born")+18*365-1;
             state.minute=600;
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
@@ -335,6 +340,10 @@ class GameSessionTest {
             assertTrue(adult.rebirth().identity().graduated());
             assertEquals(3,adult.rebirth().identity().allowanceTotal());
             assertEquals(1,adult.rebirth().identity().hobbyDays());
+            var ambition=adult.rebirth().identity().personality().ambition();
+            assertEquals("LEARN_SKILLS",ambition.id());
+            assertEquals(60,ambition.target());
+            assertTrue(ambition.progress()>0);
             assertEquals("technical",adult.rebirth().schoolFocus());
             assertTrue(adult.rebirth().skills().get("technical")>0);
             assertEquals(2,adult.rebirth().identity().relationships().stream().filter(RebirthLife.KnownPerson::family).count());
@@ -353,6 +362,9 @@ class GameSessionTest {
             assertEquals("LINKED_ADULT",continued.rebirth().phase());
             assertEquals(id,continued.rebirth().identity().residentId());
             assertEquals(savings,continued.player().money());
+            var changed=game.gardenAction("rebirth-ambition-SAVE_MONEY").world();
+            assertEquals("SAVE_MONEY",changed.rebirth().identity().personality().ambition().id());
+            assertEquals(savings,changed.rebirth().identity().personality().ambition().progress());
             assertTrue(continued.player().alive());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-continue"));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-job-unknown"));
@@ -367,6 +379,7 @@ class GameSessionTest {
             var adult=game.snapshot();
             assertEquals("LINKED_ADULT",adult.rebirth().phase());
             assertEquals("Barista",adult.rebirth().adultOptions().occupation());
+            assertEquals("SAVE_MONEY",adult.rebirth().identity().personality().ambition().id());
             assertEquals("PARK",adult.rebirth().adultOptions().destination());
             assertEquals(adult.rebirth().identity().savings(),adult.player().money());
             var resumed=game.gardenAction("rebirth-routine").world();

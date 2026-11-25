@@ -221,6 +221,8 @@ final class RebirthLife {
                 .orElseThrow(()->new IllegalArgumentException("This hobby is not available now."));
         String skill=switch(id){case "read" -> "academic";case "build" -> "technical";case "sport" -> "fitness";default -> throw new IllegalArgumentException("Unknown hobby.");};
         EducationLife.learn(t,c,skill,1);
+        if("read".equals(id))c.curiosity=Math.min(100,c.curiosity+1);
+        if("build".equals(id))c.carefulness=Math.min(100,c.carefulness+1);
         c.fatigue=Math.min(100,c.fatigue+("sport".equals(id)?8:3));
         EducationLife.set(t,c,"last-hobby",day);
         EducationLife.set(t,c,"hobby-days",Math.addExact(EducationLife.get(t,c,"hobby-days"),1));
@@ -306,6 +308,7 @@ final class RebirthLife {
         relation.affinity=Math.min(100,relation.affinity+2);
         relation.trust=Math.min(100,relation.trust+1);
         relation.conversations++;
+        c.sociability=Math.min(100,c.sociability+1);
         t.industryStocks.put(LAST_CHAT,day);
         return "Spent time talking with "+other.name+".";
     }
@@ -326,8 +329,43 @@ final class RebirthLife {
         t.industryStocks.put(PHASE,ADULT);t.industryStocks.put(CHILD,0);
         return "Started an adult life in the park.";
     }
-    record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations){}
-    record Identity(String residentId,int generationIndex,int bornDay,int savings,boolean graduated,List<KnownPerson> relationships,int fitness,int hobbyDays,int allowanceTotal){}
+    record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations,String bond){}
+    private static String bond(boolean family,SocialLife.Relationship r){
+        if(family)return "Family";
+        if(r==null)return "Stranger";
+        if(r.tension>=58||r.affinity<27)return "Strained";
+        if(r.affinity>=82&&r.trust>=75&&r.encounters>=5)return "Close friend";
+        if(r.affinity>=65&&r.trust>=58&&r.encounters>=3)return "Friend";
+        return "Acquaintance";
+    }
+    static final List<String> AMBITIONS=List.of("LEARN_SKILLS","MAKE_FRIENDS","SAVE_MONEY","STAY_HEALTHY","FIND_BALANCE");
+    static boolean canChooseAmbition(TownLife.Town t,TownLife.Citizen c){
+        return linkedAdult(t,c)||(linkedChild(t,c)&&c.age>=13);
+    }
+    static String chooseAmbition(TownLife.Town t,String goal){
+        var c=child(t);
+        if(!canChooseAmbition(t,c)||!AMBITIONS.contains(goal))
+            throw new IllegalArgumentException("Choose a valid ambition from age thirteen.");
+        c.goal=goal;
+        return "Life ambition: "+goal.replace('_',' ').toLowerCase(java.util.Locale.ROOT)+".";
+    }
+    record Ambition(String id,String description,int progress,int target,String unit){}
+    record Personality(int sociability,int carefulness,int curiosity,Ambition ambition,List<String> choices){}
+    static Personality personality(TownLife.Town t,TownLife.Citizen c,List<KnownPerson> known){
+        if(c==null)return null;
+        int best=EducationLife.SUBJECTS.stream().mapToInt(s->EducationLife.get(t,c,s)).max().orElse(0);
+        int friends=(int)known.stream().filter(p->p.alive()&&("Friend".equals(p.bond())||"Close friend".equals(p.bond()))).count();
+        var ambition=switch(c.goal){
+            case "LEARN_SKILLS" -> new Ambition(c.goal,"Develop a strong skill",best,60,"skill points");
+            case "MAKE_FRIENDS" -> new Ambition(c.goal,"Build lasting friendships",friends,3,"friends");
+            case "SAVE_MONEY" -> new Ambition(c.goal,"Build personal savings",c.money,500,"EUR");
+            case "STAY_HEALTHY" -> new Ambition(c.goal,"Improve physical fitness",EducationLife.get(t,c,"fitness"),50,"fitness points");
+            case "FIND_BALANCE" -> new Ambition(c.goal,"Develop varied abilities",EducationLife.SUBJECTS.stream().mapToInt(s->EducationLife.get(t,c,s)).min().orElse(0),25,"minimum skill");
+            default -> null;
+        };
+        return new Personality(c.sociability,c.carefulness,c.curiosity,ambition,canChooseAmbition(t,c)?AMBITIONS:List.of());
+    }
+    record Identity(String residentId,int generationIndex,int bornDay,int savings,boolean graduated,List<KnownPerson> relationships,int fitness,int hobbyDays,int allowanceTotal,Personality personality){}
     static Identity identity(TownLife.Town t,TownLife.Citizen c){
         if(c==null)return null;
         int a=DemographyLife.get(t,c,"parent-a"),b=DemographyLife.get(t,c,"parent-b");
@@ -338,12 +376,12 @@ final class RebirthLife {
             var relation=t.peerRelationships.get(SocialNetwork.key(c.id,p.id));
             if(!family&&(relation==null||relation.conversations==0))continue;
             known.add(new KnownPerson(p.id,p.name,family,p.alive,relation==null?0:relation.affinity,
-                    relation==null?0:relation.trust,relation==null?0:relation.conversations));
+                    relation==null?0:relation.trust,relation==null?0:relation.conversations,bond(family,relation)));
         }
         known.sort(java.util.Comparator.comparing(KnownPerson::family).reversed()
                 .thenComparing(KnownPerson::name).thenComparing(KnownPerson::id));
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
-                EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"));
+                EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known));
     }
     record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
