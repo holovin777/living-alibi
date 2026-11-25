@@ -910,6 +910,15 @@ func _exercise() -> void:
             and not world._can_stand(Vector3(3.8,0,0.95),world.WALKER_RADIUS),
             "bathroom opening, furnishings and wall collision"):
         return
+    if not _check(not world._apartment.get_node("KitchenMicrowave").visible and not world._apartment.get_node("ChildPlayMat").visible,"unpurchased furniture hidden"):
+        return
+    apartment["rebirth"]["homeOptions"]["interiorStyle"]="rosa"
+    apartment["rebirth"]["homeOptions"]["furnishings"]=[{"id":"kitchen","installed":true},{"id":"children","installed":true}]
+    world._on_world_updated(apartment)
+    if not _check(world._apartment.get_node("KitchenMicrowave").visible and world._apartment.get_node("ChildPlayMat").visible and not world._apartment.get_node("BedroomArtwork").visible,"server purchases control installed furnishings"):
+        return
+    if not _check(world._can_stand(Vector3(3,0,0),world.WALKER_RADIUS) and world._can_stand(Vector3(-3,0,0),world.WALKER_RADIUS),"furnishings preserve room access"):
+        return
     world._avatar.position=Vector3(4.4,0,2.2)
     if not _check(world._apartment_action()=="wash","bathroom contextual wash"):
         return

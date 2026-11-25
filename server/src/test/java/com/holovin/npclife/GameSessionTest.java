@@ -13,6 +13,35 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void furnishingPackagesUseCashAndSurviveReload() throws Exception {
+        Path file=directory.resolve("furnishing-packages.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=200;c.place=c.home;c.activity="AT_HOME";c.travelRemaining=0;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            int shop=town.employerFunds.getOrDefault("shop-assistant",0);
+            assertThrows(IllegalArgumentException.class,()->InteriorLife.purchase(town,c,"children"));
+            InteriorLife.purchase(town,c,"kitchen");
+            assertEquals(110,c.money);
+            assertEquals(shop+90,town.employerFunds.get("shop-assistant"));
+            assertThrows(IllegalArgumentException.class,()->InteriorLife.purchase(town,c,"kitchen"));
+            assertThrows(IllegalArgumentException.class,()->InteriorLife.purchase(town,c,"bedroom"));
+            assertTrue(InteriorLife.installed(town,c,"kitchen"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertTrue(InteriorLife.installed(town,town.get(id),"kitchen"));
+            assertFalse(InteriorLife.installed(town,town.get(id),"bedroom"));
+        }
+    }
+
+    @Test
     void linkedHomeMarketConservesCashAndPersistsOwnership() throws Exception {
         Path file=directory.resolve("linked-housing.db");
         String id;
