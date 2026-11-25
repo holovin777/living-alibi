@@ -346,6 +346,61 @@ class GameSessionTest {
         }
     }
     @Test
+    void itStaffUsesRealResidentAndCompanyWages() throws Exception {
+        Path file=directory.resolve("it-staff.db");
+        String ownerId,workerId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var c=people.get(0);var worker=people.get(1);ownerId=c.id;workerId=worker.id;
+            c.age=30;c.money=200;c.hunger=10;c.thirst=10;c.fatigue=20;c.food=5;c.water=5;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.OFFICE;c.destination=c.place;c.activity="FREE_TIME";
+            c.workplace=TownLife.Place.OFFICE;c.occupation="Programmer";c.employed=true;
+            worker.age=30;worker.money=30;worker.food=5;worker.water=5;worker.hunger=10;worker.thirst=10;worker.fatigue=10;
+            worker.home=TownLife.Place.NORTH_RESIDENCES;worker.place=TownLife.Place.OFFICE;worker.destination=worker.place;
+            worker.activity="FREE_TIME";worker.employed=false;worker.occupation="Job seeker";
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            EducationLife.set(town,c,"technical",70);EducationLife.set(town,c,"diploma-programming",1);
+            EducationLife.set(town,c,"java-onboarded",1);EducationLife.set(town,c,"developer-rank",2);
+            EducationLife.set(town,worker,"technical",35);
+            ITBusinessLife.set(town,c,"registered",1);ITBusinessLife.set(town,c,"cash",50);ITBusinessLife.set(town,c,"rent-until",8);
+            town.industryStocks.put(SoftwareLife.key("retail-api"),3);town.employerFunds.put("shop-assistant",500);
+            state.day=2;state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-it:delegate:retail"));
+            var hired=game.gardenAction("rebirth-it:hire:"+workerId).world();
+            assertEquals(workerId,hired.rebirth().javaWorkspace().companyStatus().staff().employee().id());
+            assertEquals(40,hired.rebirth().javaWorkspace().companyStatus().cash());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-it:hire:"+workerId));
+            var done=game.gardenAction("rebirth-it:delegate:retail").world();
+            assertEquals(60,done.rebirth().javaWorkspace().companyStatus().cash());
+            assertEquals(1,done.rebirth().javaWorkspace().companyStatus().staff().delegated());
+            assertEquals(200,done.player().money());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-it:delegate:retail"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(52,town.get(workerId).money);
+            assertEquals(460,town.employerFunds.get("shop-assistant").intValue());
+            assertTrue(ITStaffLife.isEmployee(town,town.get(workerId)));
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(1,game.snapshot().rebirth().javaWorkspace().companyStatus().staff().delegated());
+            game.gardenAction("rebirth-it:dismiss");
+            assertNull(game.snapshot().rebirth().javaWorkspace().companyStatus().staff().employee());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertFalse(town.get(workerId).employed);
+            assertEquals(0,ITBusinessLife.get(town,town.get(ownerId),"employee"));
+        }
+    }
+    @Test
     void itCompanyKeepsSeparateFundsAndPaysTax() throws Exception {
         Path file=directory.resolve("it-company.db");
         String id;

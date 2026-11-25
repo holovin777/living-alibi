@@ -3072,6 +3072,28 @@ func _render_software() -> void:
                 var operation := _button(str(choice["label"]),_garden_action.bind("rebirth-it:"+str(choice["id"])))
                 operation.disabled=not bool(choice["enabled"])
                 _action_choices.add_child(operation)
+            var staff = firm.get("staff")
+            if staff is Dictionary:
+                var staffing := Label.new()
+                staffing.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                staffing.text="IT assistant · 10 EUR signing bonus · 12 EUR per delegated report · No idle wages"
+                _action_choices.add_child(staffing)
+                var employee = staff.get("employee")
+                if employee is Dictionary:
+                    var cv := Label.new()
+                    cv.text="%s · Technical %s/100 · %s · Delegated %s" % [employee.get("name",""),employee.get("technical",0),"Sick leave" if employee.get("sick",false) else employee.get("activity",""),staff.get("delegated",0)]
+                    cv.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                    _action_choices.add_child(cv)
+                    var dismiss := _button("End support contract",_garden_action.bind("rebirth-it:dismiss"))
+                    dismiss.disabled=not bool(staff.get("canDismiss",false))
+                    _action_choices.add_child(dismiss)
+                else:
+                    for candidate in staff.get("candidates",[]):
+                        var resume := Label.new()
+                        resume.text="%s · Age %s · Technical %s/100%s" % [candidate.get("name",""),candidate.get("age",0),candidate.get("technical",0)," · programming diploma" if candidate.get("diploma",false) else ""]
+                        resume.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                        _action_choices.add_child(resume)
+                        _action_choices.add_child(_button("Hire "+str(candidate.get("name","")),_garden_action.bind("rebirth-it:hire:"+str(candidate.get("id","")))))
             for contract in firm.get("offers",[]):
                 var terms := Label.new()
                 terms.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3085,6 +3107,10 @@ func _render_software() -> void:
                 var deliver := _button("Deliver contract · 60 min",_submit_it_contract.bind(str(contract.get("id","")),response))
                 deliver.disabled=not bool(contract.get("available",false))
                 _action_choices.add_child(deliver)
+                if staff is Dictionary and staff.get("employee") is Dictionary:
+                    var delegate := _button("Delegate · 12 EUR wage",_garden_action.bind("rebirth-it:delegate:"+str(contract.get("id",""))))
+                    delegate.disabled=not str(contract.get("id","")) in staff.get("delegatable",[])
+                    _action_choices.add_child(delegate)
     for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
         var info := Label.new()
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART

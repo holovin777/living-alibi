@@ -1094,6 +1094,14 @@ func _exercise() -> void:
     if not _check(_has_button(world._action_choices,"Invest 20 EUR") and _has_button(world._action_choices,"Deliver contract") and world._action_choices.has_node("IT_retail"),"IT company account and contract UI"):
         return
     world._close_software()
+    office["rebirth"]["javaWorkspace"]["companyStatus"]["staff"]={"employee":{"id":"resident-0002","name":"Marco","technical":35,"activity":"WORKING","sick":false},"canDismiss":true,"delegated":0,"delegatable":["retail"]}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Delegate · 12 EUR wage") and _has_button(world._action_choices,"End support contract"),"IT staff delegation controls"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

@@ -8,7 +8,7 @@ final class ITBusinessLife {
     static final int REGISTRATION=50,TRANSFER=20,RENT=20;
     record Offer(String id,String title,int gross,int tax,String prompt,boolean available){}
     record Status(boolean registered,int cash,int rentUntil,int contracts,int taxPaid,
-                  boolean canRegister,boolean canInvest,boolean canWithdraw,boolean canRent,String guide,List<Offer> offers){}
+                  boolean canRegister,boolean canInvest,boolean canWithdraw,boolean canRent,String guide,List<Offer> offers,ITStaffLife.Staff staff){}
     static int get(TownLife.Town t,TownLife.Citizen c,String key){return EducationLife.get(t,c,"it-"+key);}
     static void set(TownLife.Town t,TownLife.Citizen c,String key,int value){EducationLife.set(t,c,"it-"+key,value);}
     static boolean registered(TownLife.Town t,TownLife.Citizen c){return get(t,c,"registered")>0;}
@@ -36,7 +36,7 @@ final class ITBusinessLife {
         return new Status(own,cash,rent,get(t,c,"contracts"),get(t,c,"tax-paid"),
             !own&&at&&DeveloperCareerLife.rank(t,c)>=2&&c.money>=REGISTRATION,
             own&&at&&c.money>=TRANSFER,own&&at&&cash>=TRANSFER,own&&at&&cash>=RENT&&rent<day,
-            "Senior Developer can register for EUR 50. Keep business funds separate. Rent a shared office for seven days, then deliver each available client report at most once per seven days. A fictional 20% revenue tax is paid to the town; this is not real tax law.",offers);
+            "Senior Developer can register for EUR 50. Keep business funds separate. Rent a shared office for seven days, then deliver each available client report at most once per seven days. A fictional 20% revenue tax is paid to the town; this is not real tax law.",offers,ITStaffLife.report(t,c,day,minute,offers));
     }
     static boolean eligibleWeek(TownLife.Town t,TownLife.Citizen c,String id,int day){
         int last=get(t,c,"last-"+id);return last==0||day-last>=7;
@@ -47,6 +47,7 @@ final class ITBusinessLife {
     static RebirthLife.HomeAction action(TownLife.Town t,int day,int minute,String action){
         var c=RebirthLife.requireAdult(t);var status=report(t,day,minute);
         if(status==null)throw new IllegalArgumentException("Join the programming team first.");
+        if(action.startsWith("hire:")||action.equals("dismiss")||action.startsWith("delegate:"))return ITStaffLife.action(t,c,day,minute,action,status);
         int duration=5;String message;
         switch(action){
             case "register" -> {
@@ -92,6 +93,7 @@ final class ITBusinessLife {
     /** Sole proprietor liquidates remaining cash into the existing inheritance flow once. */
     static void liquidate(TownLife.Town t,TownLife.Citizen c){
         if(c.alive||!registered(t,c))return;
+        ITStaffLife.release(t,c);
         c.money=Math.addExact(c.money,get(t,c,"cash"));set(t,c,"cash",0);
         set(t,c,"registered",0);set(t,c,"rent-until",0);
     }
