@@ -19,9 +19,11 @@ final class RetailLife {
             new Product("pears","Pears",3,12,0),
             new Product("plums","Plums",3,12,0),
             new Product("grapes","Grapes",3,12,0),
-            new Product("honey","Honey",5,8,0));
+            new Product("honey","Honey",5,8,0),
+            new Product("grape-juice","Grape juice",7,8,0),
+            new Product("wine","Wine",10,8,0));
     static void ensure(TownLife.Town t) {
-        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),(OrchardLife.isFruit(p.id())||p.id().equals("honey"))?0:p.capacity());
+        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),(OrchardLife.isFruit(p.id())||p.id().equals("honey")||p.id().equals("grape-juice")||p.id().equals("wine"))?0:p.capacity());
     }
     static void tick(TownLife.Town t,int minute) {
         if(minute!=360)return;
@@ -121,6 +123,23 @@ final class RetailLife {
         t.employerFunds.put("shop-assistant",funds-OrchardLife.HONEY_PRICE);p.money=newMoney;
         return "Sold one honey unit for 3 EUR.";
     }
+    static int cellarSpace(TownLife.Town t,String id) {
+        if(!id.equals("grape-juice")&&!id.equals("wine"))throw new IllegalArgumentException("Unknown cellar product.");
+        return Math.max(0,product(id).capacity()-t.retailStock.getOrDefault(id,0));
+    }
+    static String buyCellarProduct(TownLife.Town t,String id,int minute) {
+        var p=t.player;TransportLife.ready(p);
+        int space=cellarSpace(t,id);
+        if(p.place!=TownLife.Place.MARKET||minute<480||minute>=1200)
+            throw new IllegalArgumentException("Sell cellar products at Market 08:00–20:00.");
+        int price=id.equals("wine")?OrchardLife.WINE_PRICE:OrchardLife.JUICE_PRICE;
+        int funds=t.employerFunds.getOrDefault("shop-assistant",0);
+        if(space<1||funds<price)throw new IllegalArgumentException("Market cannot accept more "+id+".");
+        int newMoney=Math.addExact(p.money,price);
+        FoodLife.change(p,id,false,-1);t.retailStock.merge(id,1,Math::addExact);
+        t.employerFunds.put("shop-assistant",funds-price);p.money=newMoney;
+        return "Sold one "+id+" unit for "+price+" EUR.";
+    }
     static String consume(PlayerLife.Player p,String id) {
         PlayerLife.requireAlive(p);
         if(p.travelRemaining>0)throw new IllegalArgumentException("Finish traveling first.");
@@ -131,7 +150,12 @@ final class RetailLife {
             p.bread--;p.hunger=Math.max(0,p.hunger-35);
             return "Ate bread.";
         }
-        if(!id.equals("water"))throw new IllegalArgumentException("Use this ingredient in your rented kitchen.");
+        if(id.equals("grape-juice")) {
+            if(p.thirst==0&&p.hunger==0)throw new IllegalArgumentException("You do not need a drink.");
+            FoodLife.change(p,id,false,-1);p.thirst=Math.max(0,p.thirst-30);p.hunger=Math.max(0,p.hunger-10);
+            return "Drank grape juice.";
+        }
+        if(!id.equals("water"))throw new IllegalArgumentException("This item is not directly consumable.");
         if(p.bottledWater<1)throw new IllegalArgumentException("No bottled water in your bag.");
         if(p.thirst==0)throw new IllegalArgumentException("You are not thirsty.");
         p.bottledWater--;p.thirst=Math.max(0,p.thirst-40);
