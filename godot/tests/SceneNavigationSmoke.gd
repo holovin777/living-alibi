@@ -272,6 +272,15 @@ func _exercise() -> void:
             and world._traffic_phase(16.0)==0,
             "loaded motor link has cars and a three-phase crossing signal"):
         return
+    var style_sample := Node3D.new()
+    world.add_child(style_sample)
+    var hatchback = world._make_city_car(style_sample,Color.WHITE,0)
+    var wagon = world._make_city_car(style_sample,Color.WHITE,2)
+    if not _check(hatchback.get_meta("body_style") != wagon.get_meta("body_style")
+            and world._car_footprint(hatchback) == world._car_footprint(wagon),
+            "distinct car silhouettes retain the same collision footprint"):
+        return
+    style_sample.queue_free()
     var traffic: Dictionary = world._traffic_edges["FACTORY:WORKSHOP"]
     var inbound: Dictionary = traffic["cars"][1]
     inbound["delay"] = 0.0
@@ -653,6 +662,14 @@ func _exercise() -> void:
             "only actually co-present residents appear in the park"):
         return
     var marco = world._residents_root.get_node("Resident_marco")
+    var original_scale: Vector3 = marco.scale
+    var original_seed: int = marco.get_meta("appearance_seed")
+    var original_gait: float = marco.get_meta("gait_speed")
+    var elena = world._residents_root.get_node("Resident_elena")
+    if not _check(elena.get_meta("appearance_seed") != original_seed
+            and elena.scale != original_scale and original_gait > 0.0,
+            "different residents receive stable distinct proportions and gait"):
+        return
     var start_position: Vector3 = marco.position
     world._animate_residents(0.5)
     if not _check(marco.position.distance_to(start_position) > 0.01,
@@ -664,6 +681,9 @@ func _exercise() -> void:
         return
     if not _check(world._residents_root.get_node("Resident_marco") == marco,
             "refresh retains the same resident model and animation state"):
+        return
+    if not _check(marco.scale == original_scale and marco.get_meta("gait_speed") == original_gait,
+            "refresh preserves visual identity and gait"):
         return
     var rainy := _world("PARK", "Park")
     rainy["weather"] = {"sky":"RAIN","raining":true,"snowing":false}
