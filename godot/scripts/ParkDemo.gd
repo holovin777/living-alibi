@@ -3587,6 +3587,19 @@ func _render_medical() -> void:
     var service := _button("Consultation · 15 EUR · 30 min" if clinic else "Basic pharmacy care · 5 EUR · 10 min",_garden_action.bind("rebirth-medical-"+_medical_station()))
     service.disabled=not bool(medical.get("canConsult" if clinic else "canFirstAid",false))
     _action_choices.add_child(service)
+    var followup = medical.get("followup")
+    if followup is Dictionary:
+        var followup_label := Label.new()
+        followup_label.text = tr("Recovery kit: %s/3 · completed days: %s") % [followup.get("remainingSupplies",0),followup.get("completedDays",0)]
+        _action_choices.add_child(followup_label)
+        if clinic:
+            var exam := _button("Private assessment · 12 EUR · 20 min",_garden_action.bind("rebirth-medical-exam"))
+            exam.disabled=not bool(followup.get("canExam",false))
+            _action_choices.add_child(exam)
+        else:
+            var collect := _button("Collect recovery kit · 9 EUR · 10 min",_garden_action.bind("rebirth-medical-collect"))
+            collect.disabled=not bool(followup.get("canCollect",false))
+            _action_choices.add_child(collect)
     _action_choices.add_child(_button("Leave",_close_medical))
 
 func _cafe_station() -> String:
@@ -3781,6 +3794,15 @@ func _render_actions() -> void:
                 var health_label := Label.new()
                 health_label.text="Health %s/100 · %s" % [medical.get("health",100),"Ill until day "+str(medical.get("sickUntilDay",0)) if medical.get("ill",false) else "Not ill"]
                 _action_choices.add_child(health_label)
+                var followup = medical.get("followup")
+                if followup is Dictionary:
+                    var recovery_label := Label.new()
+                    recovery_label.text = tr("Recovery kit: %s/3 · completed days: %s") % [followup.get("remainingSupplies",0),followup.get("completedDays",0)]
+                    if int(followup.get("lastExamDay",0))>0:
+                        recovery_label.text += "\n"+(tr("Last assessment: day %s · health %s/100") % [followup.get("lastExamDay",0),followup.get("assessedHealth",0)])
+                    _action_choices.add_child(recovery_label)
+                    if followup.get("canRecover",false):
+                        _action_choices.add_child(_button("Supported recovery · 60 min",_garden_action.bind("rebirth-medical-recover")))
                 if medical.get("canVisit",false):
                     _action_choices.add_child(_button("Visit medical district",_garden_action.bind("rebirth-medical-visit")))
             var home_options = rebirth.get("homeOptions")

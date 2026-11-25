@@ -279,7 +279,15 @@ const IT := {
     "Buy outfit: %s · %s EUR": "Compra abbigliamento: %s · %s EUR",
     "Wear %s": "Indossa %s",
     "Purchased an outfit.": "Hai acquistato un completo.",
-    "Changed outfit.": "Hai cambiato abbigliamento."
+    "Changed outfit.": "Hai cambiato abbigliamento.",
+    "Recovery kit: %s/3 · completed days: %s": "Kit di recupero: %s/3 · giorni completati: %s",
+    "Private assessment · 12 EUR · 20 min": "Valutazione sanitaria · 12 EUR · 20 min",
+    "Collect recovery kit · 9 EUR · 10 min": "Ritira kit di recupero · 9 EUR · 10 min",
+    "Last assessment: day %s · health %s/100": "Ultima valutazione: giorno %s · salute %s/100",
+    "Supported recovery · 60 min": "Recupero assistito · 60 min",
+    "Completed a private health assessment.": "Valutazione sanitaria privata completata.",
+    "Collected a three-day recovery kit.": "Ritirato un kit di recupero per tre giorni.",
+    "Completed a day of supported recovery.": "Completato un giorno di recupero assistito."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:

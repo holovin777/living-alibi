@@ -647,7 +647,7 @@ final class RebirthLife {
         return new HomeAction(order.minutes(),"Enjoyed "+order.label()+" for EUR "+order.price()+".");
     }
     record Medical(int health,boolean ill,int sickUntilDay,boolean canVisit,boolean atClinic,boolean open,
-                   boolean canConsult,boolean canFirstAid,int consultPrice,int firstAidPrice){}
+                   boolean canConsult,boolean canFirstAid,int consultPrice,int firstAidPrice,MedicalFollowupLife.View followup){}
     static Medical medical(TownLife.Town t,int day,int minute){
         var c=child(t);
         if(!linkedAdult(t,c))return null;
@@ -656,7 +656,7 @@ final class RebirthLife {
         boolean open=minute>=480&&minute<1140;
         return new Medical(c.health,ill,c.sickUntilDay,awake&&!present&&open&&(ill||c.health<100),present,open,
                 present&&open&&minute+30<=1140&&(ill||c.health<100)&&c.money>=15&&EducationLife.get(t,c,"last-consult")<day,
-                present&&open&&minute+10<=1140&&c.health<100&&c.money>=5&&EducationLife.get(t,c,"last-first-aid")<day,15,5);
+                present&&open&&minute+10<=1140&&c.health<100&&c.money>=5&&EducationLife.get(t,c,"last-first-aid")<day,15,5,MedicalFollowupLife.view(t,c,day,minute));
     }
     static int medicalVisit(TownLife.Town t,int day,int minute){
         var m=medical(t,day,minute);
@@ -665,6 +665,11 @@ final class RebirthLife {
     }
     static HomeAction medicalAction(TownLife.Town t,int day,int minute,String action){
         var c=requireAdult(t);var m=medical(t,day,minute);
+        if(List.of("exam","collect","recover").contains(action)){
+            var result=MedicalFollowupLife.act(t,c,day,minute,action);
+            t.industryStocks.put(TRAVEL,action.equals("recover")?HOME_DESTINATION:PlayerLife.publicPlaces().indexOf(TownLife.Place.CLINIC)+1);
+            return result;
+        }
         if("consult".equals(action)&&m.canConsult()){
             int funds=Math.addExact(t.employerFunds.getOrDefault("city-maintenance",0),15);
             c.money-=15;t.employerFunds.put("city-maintenance",funds);
