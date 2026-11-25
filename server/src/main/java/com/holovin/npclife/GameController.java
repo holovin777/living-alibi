@@ -178,6 +178,16 @@ public class GameController {
         return session.washInRoom();
     }
 
+    public record TransportRequest(String mode) { }
+    @PostMapping("/actions/buy-bicycle")
+    public GameSession.ActionView buyBicycle() throws SQLException {
+        return session.buyBicycle();
+    }
+    @PostMapping("/actions/transport")
+    public GameSession.ActionView transport(@RequestBody TransportRequest request) throws SQLException {
+        return session.transportMode(request.mode());
+    }
+
     @PostMapping("/actions/rent-room")
     public GameSession.ActionView rentRoom() throws SQLException {
         return session.rentRoom();

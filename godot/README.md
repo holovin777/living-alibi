@@ -361,6 +361,18 @@ illustrations, not individual harvestable plants; the tractor is not
 driveable, and shipment timing is abstract rather than a moving truck.
 No named farm NPC or irrigation network yet.
 
+## First transport: used bicycle
+
+The workshop sells one portable used bicycle for 45 EUR during
+08:00–18:00. The money goes to the existing technician account.
+Ownership and walk/cycle preference persist in SQLite; a new visitor
+owns none. Press B or use the transport button to switch modes.
+Server-validated district journeys take half the existing walking
+time when cycling (5 or 4 minutes). Outdoor local movement is faster;
+the studio and grocery interior use ordinary walking speed. This
+is the first transport abstraction: no bicycle model, mounting
+animation, parking, theft, road traffic, fuel or wear yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

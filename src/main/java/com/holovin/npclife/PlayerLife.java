@@ -26,6 +26,8 @@ final class PlayerLife {
         int bread;
         int bottledWater;
         long roomUntil;
+        boolean ownsBicycle;
+        boolean cycling;
         int storedBread,storedWater;
         final Map<String,Integer> bagItems=new LinkedHashMap<>();
         final Map<String,Integer> pantryItems=new LinkedHashMap<>();
@@ -49,6 +51,7 @@ final class PlayerLife {
             p.incarnation=incarnation;
             p.money=money;
             p.bread=bread;p.bottledWater=bottledWater;p.roomUntil=roomUntil;
+            p.ownsBicycle=ownsBicycle;p.cycling=cycling;
             p.storedBread=storedBread;p.storedWater=storedWater;p.hygiene=hygiene;
             p.bagItems.putAll(bagItems);p.pantryItems.putAll(pantryItems);
             p.jobId=jobId;
@@ -131,7 +134,8 @@ final class PlayerLife {
         if(player.travelRemaining>0)
             throw new IllegalArgumentException("Already traveling to "+player.destination.label+".");
         if(player.place==place)return 0;
-        return player.place==TownLife.Place.PARK||place==TownLife.Place.PARK?10:8;
+        int walking=player.place==TownLife.Place.PARK||place==TownLife.Place.PARK?10:8;
+        return player.ownsBicycle&&player.cycling?(walking+1)/2:walking;
     }
     static int startTravel(Player player,TownLife.Place place) {
         int minutes=travelMinutes(player,place);

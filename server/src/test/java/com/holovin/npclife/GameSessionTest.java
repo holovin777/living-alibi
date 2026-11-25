@@ -13,6 +13,34 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void bicycleOwnershipAndTravelModePersistAndCostRealMoney() throws Exception {
+        Path file=directory.resolve("bicycle.db");
+        try(var game=new GameSession(file)) {
+            assertThrows(IllegalArgumentException.class,()->game.transportMode("cycle"));
+            assertThrows(IllegalArgumentException.class,game::buyBicycle);
+            game.move("workshop");game.waitMinutes(60);
+            int before=game.jobs().stream().filter(x->x.id().equals("technician")).findFirst().orElseThrow().remainingPayroll();
+            game.buyBicycle();
+            assertEquals(5,game.snapshot().player().money());
+            assertTrue(game.snapshot().player().ownsBicycle());
+            assertEquals(before+45,game.jobs().stream().filter(x->x.id().equals("technician")).findFirst().orElseThrow().remainingPayroll());
+            assertThrows(IllegalArgumentException.class,game::buyBicycle);
+            assertEquals(10,game.destinations().stream().filter(x->x.id().equals("PARK")).findFirst().orElseThrow().travelMinutes());
+            game.transportMode("cycle");
+            assertEquals(5,game.destinations().stream().filter(x->x.id().equals("PARK")).findFirst().orElseThrow().travelMinutes());
+        }
+        try(var game=new GameSession(file)) {
+            assertTrue(game.snapshot().player().ownsBicycle());
+            assertTrue(game.snapshot().player().cycling());
+            int minute=game.snapshot().minute();
+            game.move("park");
+            assertEquals(minute+5,game.snapshot().minute());
+            game.transportMode("walk");
+            assertFalse(game.snapshot().player().cycling());
+        }
+    }
+
+    @Test
     void farmHarvestAndWholesaleAreConservedAndPersistent() throws Exception {
         Path file=directory.resolve("farm.db");
         int barn;
@@ -415,7 +443,7 @@ class GameSessionTest {
     void ordinaryVisitorCanBecomeMinerOrMachinistAndSurveyNewOre() throws Exception {
         Path mine=directory.resolve("visitor-miner.db");
         try(var game=new GameSession(mine)) {
-            assertEquals(6,game.jobs().size());
+            assertEquals(7,game.jobs().size());
             game.move("quarry");
             game.applyJob("miner");
             game.waitMinutes(30);
@@ -496,7 +524,7 @@ class GameSessionTest {
             assertEquals(50,visitor.money());
             assertNull(visitor.jobId());
             assertEquals(0,visitor.engineeringSkill());
-            assertEquals(6,game.jobs().size());
+            assertEquals(7,game.jobs().size());
 
             assertThrows(IllegalArgumentException.class,
                     ()->game.applyJob("shop-assistant"));
@@ -524,7 +552,7 @@ class GameSessionTest {
             assertEquals("SCHOOL",restarted.snapshot().player().placeId());
             assertEquals("shop-assistant",restarted.snapshot().player().jobId());
             assertEquals(1,restarted.snapshot().player().engineeringSkill());
-            assertEquals(6,restarted.jobs().size(),"job board remains stable");
+            assertEquals(7,restarted.jobs().size(),"job board remains stable");
         }
     }
 

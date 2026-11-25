@@ -192,6 +192,20 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    var cyclist := _world("PARK","Park")
+    cyclist["player"]["ownsBicycle"] = true
+    cyclist["player"]["cycling"] = true
+    world._on_world_updated(cyclist)
+    if not _check(world._movement_speed() == world.CYCLE_SPEED
+            and world._transport_button.text.contains("cycling"),
+            "confirmed bicycle mode speeds up local outdoor travel"):
+        return
+    cyclist["player"]["cycling"] = false
+    world._on_world_updated(cyclist)
+    if not _check(world._movement_speed() == world.WALK_SPEED,
+            "walking mode restores ordinary movement"):
+        return
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)

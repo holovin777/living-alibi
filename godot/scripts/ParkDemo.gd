@@ -8,6 +8,7 @@ const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
 const INTERACTION_RADIUS := 3.5
 const WALK_SPEED := 4.5
+const CYCLE_SPEED := 8.0
 const WALKER_RADIUS := 0.32
 const COLLISION_STEP := 0.12
 const ROAD_EDGE := 24.0
@@ -65,6 +66,7 @@ var _needs: Label
 var _message: Label
 var _hint: Label
 var _view_button: Button
+var _transport_button: Button
 var _jobs: Label
 var _bag_label: Label
 var _housing_label: Label
@@ -119,7 +121,7 @@ func _process(delta: float) -> void:
         # The Java world controls district transitions; this is local preview walking.
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
         _avatar.position = _move_on_ground(_avatar.position,
-                relative_motion * delta * WALK_SPEED, WALKER_RADIUS, true)
+                relative_motion * delta * _movement_speed(), WALKER_RADIUS, true)
         _follow_player()
         _try_road_crossing(relative_motion)
 
@@ -173,6 +175,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
         elif event.keycode == KEY_M:
             _toggle_map()
             get_viewport().set_input_as_handled()
+        elif event.keycode == KEY_B and not _action_panel.visible and not _travel_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
+            _toggle_transport()
+            get_viewport().set_input_as_handled()
         elif event.keycode == KEY_V:
             _toggle_view_mode()
             get_viewport().set_input_as_handled()
@@ -219,6 +224,25 @@ func _sync_guest_room() -> void:
         _action_panel.visible = false
         _follow_player()
         _message.text = "Your lease ended. Renew at reception to enter again."
+
+func _cycling() -> bool:
+    var p: Dictionary = _last_snapshot.get("player",{})
+    return bool(p.get("ownsBicycle",false)) and bool(p.get("cycling",false))
+
+func _movement_speed() -> float:
+    # A portable bicycle is carried at walking speed in the rented studio
+    # and grocery interior. No vehicle parking state is simulated yet.
+    var at := _avatar.position
+    var in_shop := _current_place == "PORTICI" and Rect2(4.4,2.15,6.1,5.7).has_point(Vector2(at.x,at.z))
+    return CYCLE_SPEED if _cycling() and not _inside_guest_room() and not in_shop else WALK_SPEED
+
+func _toggle_transport() -> void:
+    if _connected and not _api.is_busy() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
+        _api.transport_mode("walk" if _cycling() else "cycle")
+
+func _buy_bicycle() -> void:
+    if _current_place == "WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():
+        _api.buy_bicycle()
 
 func _toggle_view_mode() -> void:
     _first_person = not _first_person
@@ -1131,6 +1155,9 @@ func _create_interface() -> void:
     buttons.add_child(_button("Industry", _view_industry))
     buttons.add_child(_button("Business", _view_business))
     buttons.add_child(_button("Wait 60m", _wait_one_hour))
+    _transport_button = _button("Transport: walking (B)",_toggle_transport)
+    column.add_child(_transport_button)
+    _transport_button.disabled = true
     _view_button = _button("View: first person (V)", _toggle_view_mode)
     column.add_child(_view_button)
     var map_button := Button.new()
@@ -1442,6 +1469,8 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Apply: market assistant",
                         _apply_job.bind("shop-assistant")))
         "WORKSHOP":
+            if not bool(player.get("ownsBicycle",false)):
+                _action_choices.add_child(_button("Buy used bicycle · 45 EUR",_buy_bicycle))
             _action_choices.add_child(_button("Apply: technician",
                     _apply_job.bind("technician")))
             var business: Dictionary = _business_report
@@ -1736,6 +1765,9 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         str(snapshot.get("residents", []).size())
     ]
     _sync_guest_room()
+    _transport_button.text = "Transport: cycling (B)" if _cycling() else "Transport: walking (B)"
+    _transport_button.disabled = not bool(player.get("ownsBicycle",false))
+    _follow_player()
     _update_bag()
     _town_map.update_world(_current_place, _locations)
     _render_residents()
