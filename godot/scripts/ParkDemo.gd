@@ -2625,6 +2625,7 @@ func _render_residents() -> void:
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
         _sync_office_employee(person,id)
+        _sync_dojo_member(person,id)
         person.set_meta("display_name",str(resident.get("name","Resident")))
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
         person.set_meta("conversations",int(resident.get("conversations",0)))
@@ -2694,6 +2695,27 @@ func _tick_office_joker(delta: float) -> void:
     _office_joke_index+=1
     _office_joke_hold=4.0
     _office_joke_wait=28.0+float(_office_joke_index%3)*7.0
+
+func _sync_dojo_member(person: Node3D,id: String) -> void:
+    if _current_place!="SCHOOL" or _apartment_active:return
+    var community = _last_snapshot.get("rebirth",{}).get("dojoCommunity")
+    var members: Array = community.get("present",[]) if community is Dictionary else []
+    var index := 0
+    for member in members:
+        if str(member.get("id",""))==id:
+            var anchor := Vector3(7.2+float(index%3)*1.6,0,5.0+float((index/3)%3)*1.3)
+            if _can_stand(anchor,WALKER_RADIUS):
+                person.position=anchor
+                person.set_meta("anchor",anchor)
+                person.set_meta("activity","DOJO")
+                person.set_meta("dojo_member",true)
+                return
+        index+=1
+    if person.get_meta("dojo_member",false):
+        var anchor := _open_anchor(Vector3(0,0,-4))
+        person.position=anchor
+        person.set_meta("anchor",anchor)
+        person.set_meta("dojo_member",false)
 
 func _sync_office_employee(person: Node3D,id: String) -> void:
     if _current_place!="OFFICE" or _apartment_active:return
@@ -3834,6 +3856,14 @@ func _render_actions() -> void:
                 dojo_label.text=tr("Shotokan · belt %s · Mon/Wed/Fri 18:00–21:00") % tr(str(dojo.get("belt","White")))
                 dojo_label.text+="\n"+(tr("Kihon %s · Kata %s · Kumite %s · next target %s each") % [dojo.get("kihon",0),dojo.get("kata",0),dojo.get("kumite",0),dojo.get("required",3)])
                 _action_choices.add_child(dojo_label)
+                var community = rebirth.get("dojoCommunity")
+                if community is Dictionary and _near_dojo():
+                    for member in community.get("present",[]):
+                        var member_label := Label.new()
+                        member_label.text = "%s · %s" % [member.get("name",""),tr("Sensei" if member.get("role","")=="instructor" else "Student")]
+                        _action_choices.add_child(member_label)
+                    if community.get("instructorPresent",false):
+                        _action_choices.add_child(_button("Rei · Greet sensei",_garden_action.bind("rebirth-dojo-rei")))
                 if _near_dojo() and dojo.get("canTrain",false):
                     for mode in ["kihon","kata","kumite"]:
                         _action_choices.add_child(_button(tr("Practice %s · 60 min · 5 EUR") % tr(mode.capitalize()),_garden_action.bind("rebirth-dojo-"+mode)))
