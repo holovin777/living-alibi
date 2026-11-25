@@ -13,6 +13,51 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void familySavingsAreVoluntaryAndSurviveReload() throws Exception {
+        Path file=directory.resolve("family-budget.db");
+        String adultId,partnerId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var a=people.get(0);var b=people.get(1);
+            adultId=a.id;partnerId=b.id;
+            a.age=30;b.age=30;a.money=100;b.money=150;
+            a.home=b.home=TownLife.Place.NORTH_RESIDENCES;
+            b.homeUnit=a.homeUnit;
+            a.place=b.place=a.home;a.travelRemaining=b.travelRemaining=0;
+            a.activity=b.activity="AT_HOME";
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,a.generationIndex);
+            DemographyLife.set(town,a,"played-incarnation",town.player.incarnation);
+            DemographyLife.set(town,a,"partner",b.generationIndex);
+            DemographyLife.set(town,b,"partner",a.generationIndex);
+            state.day=2;state.minute=1200;
+            FamilyBudgetLife.action(town,"deposit",state);
+            assertEquals(90,a.money);assertEquals(150,b.money);
+            assertEquals(10,FamilyBudgetLife.view(town,a,b).total());
+            a.unpaidBills=7;
+            FamilyBudgetLife.action(town,"bills",state);
+            assertEquals(3,FamilyBudgetLife.savings(town,a));assertEquals(0,a.unpaidBills);
+            FamilyBudgetLife.action(town,"deposit",state);
+            assertEquals(13,FamilyBudgetLife.savings(town,a));
+            assertEquals(80,a.money);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var a=town.get(adultId);var b=town.get(partnerId);
+            assertEquals(13,FamilyBudgetLife.savings(town,a));assertEquals(0,FamilyBudgetLife.savings(town,b));
+            a.place=b.place=a.home;a.activity=b.activity="AT_HOME";a.travelRemaining=b.travelRemaining=0;
+            FamilyBudgetLife.action(town,"withdraw",state);
+            assertEquals(90,a.money);assertEquals(3,FamilyBudgetLife.savings(town,a));
+            assertThrows(IllegalArgumentException.class,()->FamilyBudgetLife.action(town,"withdraw",state));
+            FamilyBudgetLife.releaseEstate(town,a);
+            assertEquals(93,a.money);assertEquals(0,FamilyBudgetLife.savings(town,a));
+        }
+    }
+
+    @Test
     void linkedAdultFamilyIsVoluntaryAndConservesCash() throws Exception {
         Path file=directory.resolve("linked-family.db");
         String adultId,partnerId;
