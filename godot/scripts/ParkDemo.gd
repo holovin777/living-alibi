@@ -1654,6 +1654,14 @@ func _build_orchard() -> void:
     orchard.name = "FruttetoPrivato"
     _scenery.add_child(orchard)
     _sign(orchard,"Frutteto · F",ORCHARD_CENTER+Vector3(0,2.4,3.5))
+    var hive := Node3D.new()
+    hive.name = "Beehive"
+    hive.position = ORCHARD_CENTER
+    orchard.add_child(hive)
+    for h in range(3):
+        _box(hive,Vector3(0.65,0.24,0.65),Color("#cfaa5c"),Vector3(0,0.25+0.24*h,0))
+    _box(hive,Vector3(0.78,0.12,0.78),Color("#85633f"),Vector3(0,0.91,0))
+    hive.visible = false
     for n in range(4):
         var plot: Vector3 = ORCHARD_PLOTS[n]
         _box(orchard,Vector3(1.8,0.05,1.8),Color("#866449"),plot+Vector3(0,0.02,0))
@@ -1683,6 +1691,9 @@ func _sync_orchard() -> void:
     if not _chunks.has("SOUTH_RESIDENCES"):
         return
     var root: Node3D = _chunks["SOUTH_RESIDENCES"]["root"]
+    var hive := root.get_node_or_null("FruttetoPrivato/Beehive") as Node3D
+    if hive!=null:
+        hive.visible = _owns_house() and bool(_last_snapshot.get("orchard",{}).get("hive",false))
     var plants: Array = _last_snapshot.get("orchard",{}).get("plants",[])
     for n in range(4):
         var model := root.get_node_or_null("FruttetoPrivato/Plant"+str(n)) as Node3D
@@ -2575,6 +2586,16 @@ func _render_actions() -> void:
         "NORTH_RESIDENCES", "SOUTH_RESIDENCES":
             if _near_orchard():
                 var orchard: Dictionary = _last_snapshot.get("orchard",{})
+                if not bool(orchard.get("hive",false)):
+                    _action_choices.add_child(_button("Install beehive · 30 EUR",_garden_action.bind("orchard-build-hive")))
+                else:
+                    var bee_info := Label.new()
+                    bee_info.text = "Honey %s/4 | %s" % [orchard.get("honey",0),"Winter rest" if bool(orchard.get("winter",false)) else ("Watered today" if bool(orchard.get("beesWateredToday",false)) else "Needs drinking water")]
+                    _action_choices.add_child(bee_info)
+                    if not bool(orchard.get("winter",false)) and not bool(orchard.get("beesWateredToday",false)) and int(_last_snapshot.get("minute",0))<1080:
+                        _action_choices.add_child(_button("Water bees · 1 water",_garden_action.bind("orchard-water-bees")))
+                    if int(orchard.get("honey",0))>0:
+                        _action_choices.add_child(_button("Collect honey into cupboard",_garden_action.bind("orchard-collect-honey")))
                 for plant in orchard.get("plants",[]):
                     var id := str(plant.get("id",""))
                     var label := Label.new()
@@ -2651,7 +2672,7 @@ func _render_actions() -> void:
                 var stock := Label.new()
                 stock.text = "Cupboard %s/24" % _inventory_count(pantry)
                 _action_choices.add_child(stock)
-                for item in ["bread","water","flour","eggs","pasta","vegetables","milk","rice","apples","pears","plums","grapes"]:
+                for item in ["bread","water","flour","eggs","pasta","vegetables","milk","rice","apples","pears","plums","grapes","honey"]:
                     if item not in ["bread","water"] and int(bag.get(item,0))+int(pantry.get(item,0)) == 0:
                         continue
                     var line := HBoxContainer.new()
@@ -2663,6 +2684,7 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Frittata · 20m (eggs + veg)",_room_cook.bind("frittata")))
                 _action_choices.add_child(_button("Pancakes · 25m (flour + eggs + milk)",_room_cook.bind("pancakes")))
                 _action_choices.add_child(_button("Rice verdure · 25m (rice + veg + water)",_room_cook.bind("rice-verdure")))
+                _action_choices.add_child(_button("Honey bread · 5m (bread + honey)",_room_cook.bind("honey-bread")))
                 _action_choices.add_child(_button("Garden soup · 20m (bread + veg + water)",_room_cook.bind("garden-soup")))
                 _action_choices.add_child(_button("Omelette · 15m (eggs + milk)",_room_cook.bind("omelette")))
                 for fruit in ["apple","pear","plum","grape"]:
@@ -2701,6 +2723,10 @@ func _render_actions() -> void:
                         var fruit_sale := _button("Sell "+fruit_id+" · 2 EUR / unit",_garden_action.bind("sell-fruit-"+fruit_id))
                         fruit_sale.disabled = int(fruit.get("marketFree",0))<=0 or int(orchard.get("marketBudget",0))<2
                         _action_choices.add_child(fruit_sale)
+                if int(player.get("bag",{}).get("honey",0))>0:
+                    var honey_sale := _button("Sell honey · 3 EUR / unit",_garden_action.bind("sell-honey"))
+                    honey_sale.disabled = int(orchard.get("honeyMarketFree",0))<=0 or int(orchard.get("marketBudget",0))<3
+                    _action_choices.add_child(honey_sale)
                 var eggs: Dictionary = _last_snapshot.get("hens",{})
                 if int(player.get("bag",{}).get("eggs",0))>0:
                     var egg_sale := _button("Sell eggs · 2 EUR / unit",_garden_action.bind("sell-eggs"))
@@ -2891,7 +2917,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (_near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs"] or action.begins_with("sell-fruit-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if (_near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey"] or action.begins_with("sell-fruit-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:
