@@ -222,7 +222,10 @@ const IT := {
     "I cannot accept that right now.": "Non posso accettare in questo momento.",
     "Thank you for sharing your supplies.": "Grazie per aver condiviso le tue provviste.",
     "Here, take this. You need it.": "Tieni, prendilo. Ne hai bisogno.",
-    "Sorry, I cannot spare supplies right now.": "Mi dispiace, non posso cedere provviste in questo momento."
+    "Sorry, I cannot spare supplies right now.": "Mi dispiace, non posso cedere provviste in questo momento.",
+    "Bread": "Pane",
+    "Water": "Acqua",
+    "%s shared %s with you today.": "Oggi %s ha condiviso con te: %s."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:

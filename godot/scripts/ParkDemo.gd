@@ -139,6 +139,7 @@ var _bike_model: Node3D
 var _bike_wheel_angle := 0.0
 var _jobs: Label
 var _bag_label: Label
+var _aid_label: Label
 var _housing_label: Label
 var _eat_button: Button
 var _water_button: Button
@@ -2834,6 +2835,10 @@ func _create_interface() -> void:
     _bag_label = Label.new()
     _bag_label.text = "Bag: empty"
     column.add_child(_bag_label)
+    _aid_label = Label.new()
+    _aid_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _aid_label.visible = false
+    column.add_child(_aid_label)
     _housing_label = Label.new()
     _housing_label.text = "Housing: no room"
     column.add_child(_housing_label)
@@ -4436,7 +4441,16 @@ func _inventory_count(items: Dictionary) -> int:
         total += int(amount)
     return total
 
+func _render_aid_notices() -> void:
+    var lines := PackedStringArray()
+    for notice in _last_snapshot.get("aidNotices",[]):
+        var item := tr("Water") if str(notice.get("item",""))=="water" else tr("Bread")
+        lines.append(tr("%s shared %s with you today.") % [str(notice.get("name","")),item])
+    _aid_label.text = "\n".join(lines)
+    _aid_label.visible = not lines.is_empty()
+
 func _update_bag() -> void:
+    _render_aid_notices()
     var player: Dictionary = _last_snapshot.get("player",{})
     var bread := int(player.get("bread",0))
     var water := int(player.get("bottledWater",0))

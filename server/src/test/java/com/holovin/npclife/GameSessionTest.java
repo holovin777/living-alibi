@@ -2966,6 +2966,35 @@ class GameSessionTest {
     }
 
     @Test
+    void friendsOfferSuppliesWithoutBeingAsked() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("autonomous-aid.db"))){
+            var state=db.load();var town=db.loadTown(state);
+            var donor=PopulationGenerator.add(town,1).getFirst();
+            donor.age=35;donor.sociability=80;donor.place=TownLife.Place.PARK;
+            donor.travelRemaining=0;donor.activity="FREE_TIME";donor.water=4;donor.thirst=10;
+            town.player.thirst=85;town.player.bottledWater=0;
+            var contact=new PlayerLife.Contact(donor.id);contact.trust=75;contact.affinity=25;
+            town.player.contacts.put(donor.id,contact);
+            state.day=3;state.minute=450;
+            donor.place=TownLife.Place.CAFE;
+            MutualAidLife.tick(town,state);
+            assertEquals(0,town.player.bottledWater);
+            donor.place=TownLife.Place.PARK;
+            donor.activity="SLEEPING";
+            MutualAidLife.tick(town,state);
+            assertEquals(0,town.player.bottledWater);
+            donor.activity="FREE_TIME";
+            MutualAidLife.tick(town,state);
+            assertEquals(1,town.player.bottledWater);assertEquals(3,donor.water);
+            assertEquals(1,MutualAidLife.notices(town,3).size());
+            town.player.bottledWater=0;
+            state.minute=465;MutualAidLife.tick(town,state);
+            assertEquals(0,town.player.bottledWater);assertEquals(3,donor.water);
+            assertTrue(MutualAidLife.notices(town,4).isEmpty());
+        }
+    }
+
+    @Test
     void mutualAidConservesSuppliesAndRespectsNeedsAndTrust() throws Exception {
         try(var db=new WorldDatabase(directory.resolve("mutual-aid.db"))){
             var state=db.load();var town=db.loadTown(state);
