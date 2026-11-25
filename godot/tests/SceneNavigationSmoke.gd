@@ -1029,6 +1029,15 @@ func _exercise() -> void:
     if not _check(world._near_engineering() and _has_button(world._action_choices,"Inspect · 30 min") and _has_button(world._action_choices,"Repair · 90 min"),"linked engineering work orders"):
         return
     world._close_engineering()
+    var office := _world("OFFICE","Office")
+    office["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","softwareProjects":[{"id":"water-control","title":"Water control","phase":"OPEN","effect":"Water capacity +2","wage":45,"nextAction":"Develop","minutes":60,"canAdvance":true,"deployed":false}]}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(world._near_software() and _has_button(world._action_choices,"Develop · 60 min"),"software project menu"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

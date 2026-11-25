@@ -307,6 +307,54 @@ class GameSessionTest {
         }
     }
     @Test
+    void programmerDeploysPersistentSoftwareWithFundedContract() throws Exception {
+        Path file=directory.resolve("linked-software.db");
+        String id;int budget;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=30;c.hunger=10;c.thirst=10;c.fatigue=20;c.food=5;c.water=5;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.OFFICE;c.destination=c.place;c.activity="FREE_TIME";
+            c.workplace=TownLife.Place.OFFICE;c.occupation="Programmer";c.employed=true;
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            EducationLife.set(town,c,"technical",70);EducationLife.set(town,c,"diploma-programming",1);
+            budget=town.employerFunds.getOrDefault("city-maintenance",0);
+            state.day=2;state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var developed=game.gardenAction("rebirth-software-water-control").world();
+            assertEquals(860,developed.minute());
+            assertEquals("DEVELOPED",developed.rebirth().softwareProjects().getFirst().phase());
+            assertEquals(30,developed.player().money());
+        }
+        try(var game=new GameSession(file)){
+            var tested=game.gardenAction("rebirth-software-water-control").world();
+            assertEquals("TESTED",tested.rebirth().softwareProjects().getFirst().phase());
+            var deployed=game.gardenAction("rebirth-software-water-control").world();
+            assertEquals(950,deployed.minute());
+            assertEquals(75,deployed.player().money());
+            assertTrue(deployed.rebirth().softwareProjects().getFirst().deployed());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-software-water-control"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(SoftwareLife.deployed(town,"water-control"));
+            assertEquals(budget-45,town.employerFunds.get("city-maintenance").intValue());
+            assertEquals(75,town.get(id).money);
+            town.technicalOrders.get("water-pump").condition=100;
+            town.cleanWater=0;town.naturalResources.get("river-water").stock=20;
+            int before=town.naturalResources.get("river-water").stock;
+            state.day=3;state.minute=0;
+            UtilityLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(6,town.cleanWater);
+            assertEquals(before-6,town.naturalResources.get("river-water").stock);
+        }
+    }
+    @Test
     void linkedAdultHomeUsesRealSuppliesAndPrivateSpace() throws Exception {
         Path file=directory.resolve("linked-home.db");
         String id;

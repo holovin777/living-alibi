@@ -255,6 +255,7 @@ final class TownLife {
         MunicipalLife.ensure(t);
         DemographyLife.ensure(t);
         EducationLife.ensure(t);
+        SoftwareLife.ensure(t);
         NewspaperLife.ensure(t);
         OpinionLife.ensure(t);
         ElectionLife.ensure(t);

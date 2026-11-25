@@ -53,6 +53,7 @@ var _cafe_menu := false
 var _medical_menu := false
 var _college_menu := false
 var _engineering_menu := false
+var _software_menu := false
 const COLLEGE_DESK := Vector3(-6.3,0,7)
 const CLINIC_COUNTER := Vector3(-6.3,0,7)
 const PHARMACY_COUNTER := Vector3(6.3,0,-7)
@@ -199,7 +200,9 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
-        if _near_engineering():
+        if _near_software():
+            _hint.text="E: software projects · F: life choices"
+        elif _near_engineering():
             _hint.text="E: engineering work orders · F: life choices"
         elif _near_college():
             _hint.text="E: Istituto Leonardo · F: life choices"
@@ -276,6 +279,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_software() and not _action_panel.visible:
+                _software_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
             elif event.keycode == KEY_E and _near_engineering() and not _action_panel.visible:
                 _engineering_menu=true
                 _render_actions()
@@ -315,6 +324,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 _medical_menu=false
                 _college_menu=false
                 _engineering_menu=false
+                _software_menu=false
                 _render_actions()
                 _action_panel.visible = not _action_panel.visible
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
@@ -2980,6 +2990,28 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _near_software() -> bool:
+    return not _apartment_active and _current_place=="OFFICE" and _near_kiosk() and not _last_snapshot.get("rebirth",{}).get("softwareProjects",[]).is_empty()
+
+func _close_software() -> void:
+    _software_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_software() -> void:
+    _action_title.text="Software projects"
+    for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
+        var info := Label.new()
+        info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        info.text="%s · %s\n%s · Contract %s EUR" % [project.get("title",""),project.get("phase",""),project.get("effect",""),project.get("wage",0)]
+        _action_choices.add_child(info)
+        if not project.get("deployed",false):
+            var advance := _button("%s · %s min" % [project.get("nextAction",""),project.get("minutes",0)],_garden_action.bind("rebirth-software-"+str(project.get("id",""))))
+            advance.disabled=not bool(project.get("canAdvance",false))
+            _action_choices.add_child(advance)
+    _action_choices.add_child(_button("Leave",_close_software))
+
 func _near_engineering() -> bool:
     if _apartment_active or not _near_kiosk():return false
     for order in _last_snapshot.get("rebirth",{}).get("engineeringOrders",[]):
@@ -3106,6 +3138,10 @@ func _close_grocery() -> void:
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _software_menu and _near_software():
+        _render_software()
+        return
+    _software_menu=false
     if _engineering_menu and _near_engineering():
         _render_engineering()
         return
@@ -3877,6 +3913,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("rebirth-software-") and not _near_software():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
@@ -4066,6 +4103,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _software_menu=false
         _engineering_menu=false
         _college_menu=false
         _medical_menu=false

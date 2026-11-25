@@ -50,7 +50,7 @@ final class UtilityLife {
                      List<TownLife.Observation> observations) {
         if(clock.minute==0 && clock.day>town.lastWaterPumpDay) {
             town.lastWaterPumpDay=clock.day;
-            transferRiverWater(town,DAILY_PUMP_UNITS);
+            transferRiverWater(town,DAILY_PUMP_UNITS+(SoftwareLife.deployed(town,"water-control")?2:0));
         }
         if(clock.minute%60==0) {
             for(var c:town.people.values()) {
