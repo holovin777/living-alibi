@@ -6,7 +6,7 @@ package com.holovin.npclife;
  */
 final class SocialMemoryLife {
     private SocialMemoryLife() {}
-    enum Kind { SUPPORT, HURT, BROKEN_TRUST, APOLOGY, UNRESOLVED }
+    enum Kind { SUPPORT, HURT, BROKEN_TRUST, APOLOGY, UNRESOLVED, RECEIVED_AID }
     private static String key(TownLife.Town town,String resident,Kind kind) {
         return "social-memory:"+town.player.incarnation+":"+resident+":"+kind.name();
     }

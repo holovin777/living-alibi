@@ -337,6 +337,20 @@ final class PlayerLife {
                 || spoken.equalsIgnoreCase("What do you do?");
         boolean support=spoken.equalsIgnoreCase("I'm here for you.") || spoken.equalsIgnoreCase("Ti sono vicino.");
         boolean recall=spoken.equalsIgnoreCase("What do you remember about me?") || spoken.equalsIgnoreCase("Cosa ricordi di me?");
+        boolean giveBread=spoken.equalsIgnoreCase("Offer bread");
+        boolean giveWater=spoken.equalsIgnoreCase("Offer water");
+        boolean askBread=spoken.equalsIgnoreCase("Ask for bread");
+        boolean askWater=spoken.equalsIgnoreCase("Ask for water");
+        if(giveBread||giveWater||askBread||askWater){
+            String item=giveWater||askWater?"water":"bread";
+            if(giveBread||giveWater){
+                boolean alreadySupported=SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT)==day;
+                if(!MutualAidLife.give(town,resident,item,day))return "I cannot accept that right now.";
+                if(!alreadySupported)adjust(contact,5,7);
+                return "Thank you for sharing your supplies.";
+            }
+            return MutualAidLife.receive(town,resident,item,day)?"Here, take this. You need it.":"Sorry, I cannot spare supplies right now.";
+        }
         if(changedAlias){
             adjust(contact,-12,-4);
             SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.BROKEN_TRUST,day);
