@@ -397,6 +397,21 @@ car models with solid collision footprints. Garage bay 1 is walkable.
 Cars are static scenery, not owned or driveable; there is no traffic
 AI, signal control, motor-road routing or vehicle physics yet.
 
+## First motor traffic
+
+Motor links between loaded districts now share two lane-following
+compact cars, with positions rebased when the visitor changes chunks.
+Cars travel in opposite right-hand lanes on the central section of
+the link, stop at red/amber pedestrian crossings, yield to nearby
+visible pedestrians and have dynamic local collision footprints.
+A 24-second local visual cycle switches traffic lights green, amber,
+red. When Java reports failed public lighting, the signals go dark
+and cars slow down while still yielding. Historic pedestrian links
+remain car-free. This is ambient traffic, not actual NPC car ownership
+or Java-managed transport: cars respawn after a short delay at the
+ends of each road segment. No junction routing, accidents, player
+driving or persistent traffic state yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

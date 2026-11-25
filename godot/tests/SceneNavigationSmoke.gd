@@ -227,6 +227,36 @@ func _exercise() -> void:
             and not world._can_stand(Vector3(-13.1,0,-10),world.WALKER_RADIUS),
             "parking court has a solid car and marked motor links"):
         return
+    if not _check(world._traffic_edges.has("FACTORY:WORKSHOP")
+            and world._scenery.has_node("DistrictRoads/MotorLane/TrafficSignal")
+            and world._traffic_phase(0.0)==2 and world._traffic_phase(11.0)==1
+            and world._traffic_phase(16.0)==0,
+            "loaded motor link has cars and a three-phase crossing signal"):
+        return
+    var traffic: Dictionary = world._traffic_edges["FACTORY:WORKSHOP"]
+    var inbound: Dictionary = traffic["cars"][1]
+    inbound["delay"] = 0.0
+    inbound["distance"] = 14.9
+    world._traffic_seconds = 16.0
+    world._position_traffic_edge(traffic,"WORKSHOP")
+    world._advance_traffic(0.1)
+    if not _check(is_equal_approx(float(inbound["distance"]),15.0),
+            "car stops before crossing on red"):
+        return
+    world._traffic_seconds = 0.0
+    world._advance_traffic(0.1)
+    if not _check(float(inbound["distance"])>15.0,
+            "car proceeds on green"):
+        return
+    var inbound_car: Node3D = inbound["node"]
+    world._avatar.position = inbound_car.position+Vector3(0,0,-3)
+    var stopped := float(inbound["distance"])
+    world._advance_traffic(0.1)
+    if not _check(is_equal_approx(float(inbound["distance"]),stopped)
+            and not world._can_stand(inbound_car.position,world.WALKER_RADIUS,true),
+            "car yields to pedestrian ahead and has a collision footprint"):
+        return
+    world._avatar.position = Vector3.ZERO
     var garage_entry: Vector3 = world._move_on_ground(Vector3(7.5,0,5),Vector3(0,0,7),world.WALKER_RADIUS)
     if not _check(garage_entry.z > 11.9
             and not world._can_stand(Vector3(10,0,12),world.WALKER_RADIUS)

@@ -47,6 +47,9 @@ var _weather_fx: Node3D
 var _api
 var _current_place := ""
 var _road_links: Dictionary = {}
+var _traffic_root: Node3D
+var _traffic_edges: Dictionary = {}
+var _traffic_seconds := 0.0
 var _road_pending := ""
 var _road_arrival := Vector3.ZERO
 var _road_blocked := ""
@@ -134,6 +137,7 @@ func _process(delta: float) -> void:
         _try_road_crossing(relative_motion)
 
     _sync_bicycle()
+    _advance_traffic(delta)
     _animate_residents(delta)
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_inside_guest_room(),_environment)
@@ -340,6 +344,9 @@ func _build_world() -> void:
         _box(_avatar, Vector3(0.2, 0.65, 0.23), Color(0.19, 0.24, 0.29),
                 Vector3(x_offset, 0.33, 0.0))
 
+    _traffic_root = Node3D.new()
+    _traffic_root.name = "MotorTraffic"
+    add_child(_traffic_root)
     _bike_model = _make_bicycle(self,"PlayerBicycle",Color("#496e50"))
     _bike_model.visible = false
     _weather_fx = WeatherEffects.new()
@@ -380,6 +387,7 @@ func _render_place(place_id: String) -> void:
         var chunk_root: Node3D = _chunks[id]["root"]
         chunk_root.position = wanted[id]
     _activate_chunk(place_id)
+    _sync_traffic_edges(place_id)
     _apply_weather()
 
 func _activate_chunk(place_id: String) -> void:
@@ -538,12 +546,168 @@ func _mark_motor_road(parent: Node3D,direction: Vector3) -> void:
     for z in [13.5,16.5,19.5,22.5]:
         _box(lane,Vector3(0.10,0.018,1.25),white,Vector3(0,0.06,z))
     for i in range(9):
-        _box(lane,Vector3(0.34,0.022,1.5),white,Vector3(-2.6+float(i)*0.65,0.065,11.0))
+        _box(lane,Vector3(0.34,0.022,1.5),white,Vector3(-2.6+float(i)*0.65,0.065,18.0))
     # Small roadside crossing markers, outside the road corridor.
+    _box(lane,Vector3(2.9,0.022,0.15),white,Vector3(-1.5,0.065,16.7))
+    _box(lane,Vector3(2.9,0.022,0.15),white,Vector3(1.5,0.065,19.3))
+    _build_traffic_signal(lane)
     for x in [-3.7,3.7]:
-        _box(lane,Vector3(0.12,1.8,0.12),Color("#686c70"),Vector3(x,0.9,11.0))
-        _box(lane,Vector3(0.45,0.45,0.12),Color("#416d9c"),Vector3(x,1.8,11.0))
+        _box(lane,Vector3(0.12,1.8,0.12),Color("#686c70"),Vector3(x,0.9,18.0))
+        _box(lane,Vector3(0.45,0.45,0.12),Color("#416d9c"),Vector3(x,1.8,18.0))
         _box(lane,Vector3(0.25,0.25,0.14),white,Vector3(x,1.8,11.0))
+
+func _build_traffic_signal(lane: Node3D) -> void:
+    var signal_root := Node3D.new()
+    signal_root.name = "TrafficSignal"
+    signal_root.position = Vector3(-3.9,0,16.7)
+    lane.add_child(signal_root)
+    _box(signal_root,Vector3(0.12,2.6,0.12),Color("#62686a"),Vector3(0,1.3,0))
+    _box(signal_root,Vector3(0.45,1.04,0.34),Color("#303639"),Vector3(0,2.8,0))
+    var colors := [Color("#f74c43"),Color("#ffbd3c"),Color("#51d879")]
+    for i in range(3):
+        var dark := colors[i].darkened(0.80)
+        var at := Vector3(0,3.12-float(i)*0.32,0)
+        _sphere(signal_root,0.115,dark,at+Vector3(0,0,-0.18))
+        _sphere(signal_root,0.115,dark,at+Vector3(0,0,0.18))
+        var lamp := Node3D.new()
+        lamp.name = "Lamp"+str(i)
+        signal_root.add_child(lamp)
+        for face in [-1.0,1.0]:
+            var mesh := SphereMesh.new()
+            mesh.radius = 0.121
+            mesh.height = 0.242
+            var bulb := MeshInstance3D.new()
+            bulb.mesh = mesh
+            var material := StandardMaterial3D.new()
+            material.albedo_color = colors[i]
+            material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+            bulb.material_override = material
+            bulb.position = at+Vector3(0,0,face*0.19)
+            lamp.add_child(bulb)
+        lamp.visible = false
+
+func _traffic_phase(seconds: float) -> int:
+    # Local visual traffic clock, not Java world time. Both ends of each
+    # link share a phase. -1 represents failed street electricity.
+    if not bool(_last_snapshot.get("services",{}).get("lightsWorking",true)):
+        return -1
+    var phase := fposmod(seconds,24.0)
+    if phase<10.0:
+        return 2 # green
+    if phase<13.0:
+        return 1 # amber
+    return 0 # red / pedestrian interval
+
+func _sync_traffic_edges(origin_id: String) -> void:
+    var wanted: Dictionary = {}
+    for first in _chunks:
+        for second in _chunks:
+            if str(first)>=str(second) or not TownLayout.motor_road(str(first),str(second)):
+                continue
+            var key := str(first)+":"+str(second)
+            wanted[key] = true
+            if not _traffic_edges.has(key):
+                var cars: Array[Dictionary] = []
+                for i in range(2):
+                    var car := _make_city_car(_traffic_root,Color("#7894aa") if i==0 else Color("#ad7965"))
+                    car.visible = false
+                    cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0})
+                _traffic_edges[key] = {"first":str(first),"second":str(second),"cars":cars}
+    for key in _traffic_edges.keys():
+        if not wanted.has(key):
+            for record in _traffic_edges[key]["cars"]:
+                var car: Node3D = record["node"]
+                car.visible = false
+                car.queue_free()
+            _traffic_edges.erase(key)
+    for edge in _traffic_edges.values():
+        _position_traffic_edge(edge,origin_id)
+
+func _position_traffic_edge(edge: Dictionary,origin_id: String) -> void:
+    var origin := TownLayout.world_center(origin_id)
+    var first := TownLayout.world_center(edge["first"])-origin
+    var second := TownLayout.world_center(edge["second"])-origin
+    for i in range(2):
+        var record: Dictionary = edge["cars"][i]
+        var start := first if i==0 else second
+        var direction := (second-first).normalized() if i==0 else (first-second).normalized()
+        var right := Vector3(-direction.z,0,direction.x)
+        var car: Node3D = record["node"]
+        car.position = start+direction*float(record["distance"])+right*1.6
+        car.rotation.y = atan2(-direction.x,-direction.z)
+
+func _car_footprint(car: Node3D) -> Rect2:
+    var dimensions := Vector2(1.88,3.62) if absf(cos(car.rotation.y))>0.5 else Vector2(3.62,1.88)
+    return Rect2(Vector2(car.position.x,car.position.z)-dimensions*0.5,dimensions)
+
+func _traffic_people() -> Array[Vector3]:
+    var people: Array[Vector3] = [_avatar.position]
+    if is_instance_valid(_residents_root):
+        for person in _residents_root.get_children():
+            if person is Node3D:
+                people.append(person.position)
+    return people
+
+func _advance_traffic(delta: float) -> void:
+    if not is_instance_valid(_traffic_root):
+        return
+    var dt := clampf(delta,0.0,0.1)
+    _traffic_seconds += dt
+    var phase := _traffic_phase(_traffic_seconds)
+    var origin := TownLayout.world_center(_current_place)
+    var people := _traffic_people()
+    for edge in _traffic_edges.values():
+        var first := TownLayout.world_center(edge["first"])-origin
+        var second := TownLayout.world_center(edge["second"])-origin
+        for i in range(2):
+            var record: Dictionary = edge["cars"][i]
+            var car: Node3D = record["node"]
+            var start := first if i==0 else second
+            var direction := (second-first).normalized() if i==0 else (first-second).normalized()
+            var right := Vector3(-direction.z,0,direction.x)
+            var distance := float(record["distance"])
+            var blocked := false
+            # Yield to pedestrians anywhere immediately ahead, including
+            # a pedestrian already on either crossing.
+            for person in people:
+                var relative := person-(start+direction*distance+right*1.6)
+                var ahead := relative.dot(direction)
+                if ahead>=-2.2 and ahead<=4.3 and absf(relative.dot(right))<1.45:
+                    blocked = true
+                    break
+            if float(record["delay"])>0.0:
+                record["delay"] = maxf(0.0,float(record["delay"])-dt)
+                car.visible = false
+                continue
+            if not car.visible and blocked:
+                continue
+            car.visible = true
+            if blocked:
+                continue
+            var next := distance+dt*(2.0 if phase==-1 else 4.0)
+            if phase in [0,1]:
+                for stop in [15.0,27.0]:
+                    if distance<=stop and next>stop:
+                        next = stop
+                        break
+            if next>=33.8:
+                record["distance"] = 14.2
+                record["delay"] = 4.0
+                car.visible = false
+            else:
+                record["distance"] = next
+        _position_traffic_edge(edge,_current_place)
+    for chunk in _chunks.values():
+        var root: Node3D = chunk["root"]
+        var roads := root.get_node_or_null("DistrictRoads")
+        if roads==null:
+            continue
+        for lane in roads.get_children():
+            var signal_root := lane.get_node_or_null("TrafficSignal")
+            if signal_root==null:
+                continue
+            for i in range(3):
+                signal_root.get_node("Lamp"+str(i)).visible = phase==i
 
 func _road_destination(at: Vector3, minimum: float) -> String:
     for key in _road_links:
@@ -586,6 +750,11 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         var nearest := p.clamp(obstacle.position, obstacle.end)
         if p.distance_squared_to(nearest) < radius * radius:
             return false
+    for edge in _traffic_edges.values():
+        for record in edge["cars"]:
+            var car: Node3D = record["node"]
+            if car.visible and _car_footprint(car).grow(radius).has_point(p):
+                return false
     return true
 
 func _move_on_ground(from: Vector3, displacement: Vector3, radius: float,
