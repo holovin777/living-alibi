@@ -53,6 +53,11 @@ final class PopulationGenerator {
                 c.occupation="Factory machinist";c.workplace=TownLife.Place.FACTORY;
             } else if(index%12==8) {
                 c.occupation="Transport driver";c.workplace=TownLife.Place.QUARRY;
+            } else if(index%12==9) {
+                // Every new twelve-resident world has a real mechanic visiting
+                // the Workshop, so a player's first business can find a human
+                // candidate rather than relying on a random lucky job draw.
+                c.occupation="Mechanic";c.workplace=TownLife.Place.WORKSHOP;
             }
             c.age=rng.nextInt(19,71);
             c.sociability=rng.nextInt(15,91);
