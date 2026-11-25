@@ -959,6 +959,20 @@ func _exercise() -> void:
     world._close_grocery()
     if not _check(not world._grocery_menu and not world._action_panel.visible,"leave shop counter and continue walking"):
         return
+    var bakery := _world("BAKERY","Bakery")
+    bakery["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","grocery":{"name":"Panetteria del Borgo","hours":"07:00–18:00","open":true,"food":4,"water":2,"capacity":24,"items":[{"id":"bread","label":"Bread","price":3,"stock":2,"available":true}]}}
+    world._on_world_updated(bakery)
+    if not _check(world._scenery.has_node("PanetteriaDelBorgo/BreadOven") and world._scenery.has_node("PanetteriaDelBorgo/BakeryCounter") and not world._near_grocery_counter(),"bakery interior and checkout"):
+        return
+    var bakery_walk: Vector3 = world._move_on_ground(Vector3(-2,0,7),Vector3(-4.3,0,0),world.WALKER_RADIUS)
+    if not _check(bakery_walk.x < -6 and not world._can_stand(Vector3(-4,0,4.7),world.WALKER_RADIUS),"bakery doorway passable and facade solid"):
+        return
+    world._avatar.position=bakery_walk
+    world._grocery_menu=true
+    world._render_actions()
+    if not _check(world._near_grocery_counter() and world._action_title.text=="Panetteria del Borgo" and _has_button(world._action_choices,"Bread · 3 EUR"),"bakery has distinct name and live stock"):
+        return
+    world._close_grocery()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

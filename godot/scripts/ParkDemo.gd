@@ -46,6 +46,7 @@ var _home_entrance: Node3D
 var _home_transition := false
 var _grocery_menu := false
 const GROCERY_COUNTER := Vector3(7.3,0,3.8)
+const BAKERY_COUNTER := Vector3(-6.3,0,7.0)
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
@@ -190,7 +191,7 @@ func _process(delta: float) -> void:
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
         if _near_grocery_counter():
-            _hint.text="E: Bottega Alimentare · F: life choices"
+            _hint.text="E: "+str(_last_snapshot["rebirth"]["grocery"].get("name","Shop"))+" · F: life choices"
         elif _near_family_entrance():
             _hint.text="E: enter your home · F: life choices"
         elif _can_walk_roads() and not _road_destination(_avatar.position,ROAD_TRIGGER).is_empty():
@@ -824,6 +825,8 @@ func _generate_chunk(place_id: String) -> void:
             _build_centro()
         "PARK":
             _build_park()
+        "BAKERY":
+            _build_bakery()
         "MARKET":
             _building("Market stalls", Color(0.68, 0.39, 0.22))
             _box(_scenery, Vector3(6.0, 0.18, 3.0), Color(0.83, 0.20, 0.18),
@@ -1894,6 +1897,59 @@ func _sync_orchard() -> void:
         var fruit := tree.get_node("Fruit") as Node3D
         fruit.visible = bool(data.get("ready",false))
 
+func _build_bakery() -> void:
+    var bakery := Node3D.new()
+    bakery.name="PanetteriaDelBorgo"
+    _scenery.add_child(bakery)
+    var plaster := Color("#d4b598")
+    var wood := Color("#845f42")
+    var stone := Color("#ded1ba")
+    # 8 x 7 m shop; east-facing doorway at z=7.0 remains unobstructed.
+    for part in [[Vector3(-12,0,7),Vector2(0.24,7.0)],
+            [Vector3(-8,0,3.5),Vector2(8.0,0.24)],
+            [Vector3(-8,0,10.5),Vector2(8.0,0.24)],
+            [Vector3(-4,0,4.7),Vector2(0.24,2.4)],
+            [Vector3(-4,0,9.3),Vector2(0.24,2.4)]]:
+        _room_wall(bakery,part[0],part[1],plaster)
+    _box(bakery,Vector3(8,0.08,7),Color("#b69c7a"),Vector3(-8,0.025,7))
+    _box(bakery,Vector3(8,3.15,7),plaster,Vector3(-8,4.57,7))
+    _box(bakery,Vector3(8.3,0.28,7.3),Color("#92543c"),Vector3(-8,6.28,7))
+    _box(bakery,Vector3(0.25,0.48,2.25),wood,Vector3(-4,2.76,7))
+    _box(bakery,Vector3(1.35,0.12,2.45),Color("#b45b43"),Vector3(-3.4,2.98,7))
+    for z in [4.85,9.15]:
+        _box(bakery,Vector3(0.12,1.25,1.15),Color("#5b7278"),Vector3(-3.82,1.55,z))
+        _box(bakery,Vector3(0.24,0.12,1.4),stone,Vector3(-3.72,0.88,z))
+        _box(bakery,Vector3(0.16,1.25,1.10),Color("#526554"),Vector3(-3.85,4.55,z))
+    _sign(bakery,"Panetteria del Borgo",Vector3(-3.1,3.36,7))
+    _box(bakery,Vector3(2.1,0.07,4.0),stone,Vector3(-2.95,0.045,7))
+    var counter := Node3D.new()
+    counter.name="BakeryCounter"
+    bakery.add_child(counter)
+    _room_furniture(counter,Vector3(-8.1,0,7.1),Vector3(1.05,0.95,3.0),wood)
+    _box(counter,Vector3(1.12,0.1,3.1),stone,Vector3(-8.1,1.0,7.1))
+    _box(counter,Vector3(0.06,0.46,2.1),Color("#a4b7bd"),Vector3(-7.53,1.24,7.0))
+    for z in [6.35,6.75,7.15,7.55]:
+        _box(counter,Vector3(0.53,0.16,0.24),Color("#bc8a4d"),Vector3(-8.08,1.13,z))
+    _box(counter,Vector3(0.33,0.28,0.42),Color("#444b4c"),Vector3(-8.1,1.18,8.25))
+    _sign(counter,"Pane fresco · E",Vector3(-7.3,2.0,7))
+    var oven := Node3D.new()
+    oven.name="BreadOven"
+    bakery.add_child(oven)
+    _room_furniture(oven,Vector3(-10.75,0,5.1),Vector3(1.85,1.9,1.9),Color("#9a7256"))
+    _box(oven,Vector3(0.08,0.64,1.1),Color("#36302c"),Vector3(-9.78,1.03,5.1))
+    _box(oven,Vector3(0.1,0.08,0.63),Color("#b0a598"),Vector3(-9.71,1.38,5.1))
+    _room_furniture(bakery,Vector3(-11.3,0,8.6),Vector3(0.65,2.0,2.4),wood)
+    for y in [0.75,1.3,1.85]:
+        _box(bakery,Vector3(0.72,0.08,2.4),stone,Vector3(-11.3,y,8.6))
+        for z in [7.9,8.5,9.1]:
+            _box(bakery,Vector3(0.38,0.15,0.36),Color("#c79b59"),Vector3(-11.1,y+0.14,z))
+    var light := OmniLight3D.new()
+    light.position=Vector3(-7,2.65,7)
+    light.light_color=Color("#ffe1b4")
+    light.light_energy=1.5
+    light.omni_range=7
+    bakery.add_child(light)
+
 func _build_portici() -> void:
     var street := Node3D.new()
     street.name = "ViaDeiPortici"
@@ -2739,7 +2795,8 @@ func _child_can_walk() -> bool:
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
 func _near_grocery_counter() -> bool:
-    return not _apartment_active and _current_place=="PORTICI" and str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT" and _avatar.position.distance_to(GROCERY_COUNTER)<1.5 and _last_snapshot.get("rebirth",{}).get("grocery") is Dictionary
+    var counter := BAKERY_COUNTER if _current_place=="BAKERY" else GROCERY_COUNTER
+    return not _apartment_active and _current_place in ["PORTICI","BAKERY"] and str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT" and _avatar.position.distance_to(counter)<1.5 and _last_snapshot.get("rebirth",{}).get("grocery") is Dictionary
 
 func _close_grocery() -> void:
     _grocery_menu=false
@@ -2751,10 +2808,10 @@ func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _grocery_menu and _near_grocery_counter():
         var grocery: Dictionary = _last_snapshot["rebirth"]["grocery"]
-        _action_title.text = "Bottega Alimentare"
+        _action_title.text = str(grocery.get("name","Bottega Alimentare"))
         var info := Label.new()
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-        info.text="Open 08:00–20:00 · %s\nFood %s · Water %s · Capacity %s" % ["Open" if grocery.get("open",false) else "Closed",grocery.get("food",0),grocery.get("water",0),grocery.get("capacity",24)]
+        info.text="%s · %s\nFood %s · Water %s · Capacity %s" % [grocery.get("hours","08:00–20:00"),"Open" if grocery.get("open",false) else "Closed",grocery.get("food",0),grocery.get("water",0),grocery.get("capacity",24)]
         _action_choices.add_child(info)
         for item in grocery.get("items",[]):
             var caption := "%s · %s EUR · %s left" % [item.get("label",""),item.get("price",0),item.get("stock",0)]

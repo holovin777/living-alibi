@@ -570,31 +570,33 @@ final class RebirthLife {
     // as first-life visitors. Food is represented by the existing resident portions.
     static final List<String> GROCERY_ITEMS=List.of("bread","water","pasta","vegetables","eggs","milk","rice");
     record GroceryItem(String id,String label,int price,int stock,boolean available){}
-    record Grocery(String name,boolean open,int food,int water,int capacity,List<GroceryItem> items){}
+    record Grocery(String name,boolean open,int food,int water,int capacity,List<GroceryItem> items,String hours){}
     static Grocery grocery(TownLife.Town t,int day,int minute){
         var c=child(t);
-        if(!linkedAdult(t,c)||c.place!=TownLife.Place.PORTICI||!awakePresent(c)||atHome(c))return null;
-        boolean open=minute>=480&&minute+5<=1200&&!EmploymentLife.sick(c,day);
+        if(!linkedAdult(t,c)||!awakePresent(c)||atHome(c))return null;
+        boolean bakery=c.place==TownLife.Place.BAKERY;
+        if(!bakery&&c.place!=TownLife.Place.PORTICI)return null;
+        boolean open=minute>=(bakery?420:480)&&minute+5<=(bakery?1080:1200)&&!EmploymentLife.sick(c,day);
         int capacity=24;
-        var items=GROCERY_ITEMS.stream().map(id->{
+        var items=(bakery?List.of("bread","water"):GROCERY_ITEMS).stream().map(id->{
             var product=RetailLife.product(id);
             int stock=t.retailStock.getOrDefault(id,0);
             return new GroceryItem(id,product.label(),product.price(),stock,open&&stock>0&&c.money>=product.price()
                     &&(long)c.food+c.water<capacity);
         }).toList();
-        return new Grocery("Bottega Alimentare",open,c.food,c.water,capacity,items);
+        return new Grocery(bakery?"Panetteria del Borgo":"Bottega Alimentare",open,c.food,c.water,capacity,items,bakery?"07:00–18:00":"08:00–20:00");
     }
     static String buyGrocery(TownLife.Town t,int day,int minute,String id){
         var c=requireAdult(t);
         var shop=grocery(t,day,minute);
-        if(shop==null||!shop.open())throw new IllegalArgumentException("Visit the grocery in Via dei Portici during opening hours (08:00–20:00).");
+        if(shop==null||!shop.open())throw new IllegalArgumentException("Visit an open grocery or bakery counter.");
         var item=shop.items().stream().filter(p->p.id().equals(id)&&p.available()).findFirst()
                 .orElseThrow(()->new IllegalArgumentException("Product unavailable, insufficient money or carrying capacity."));
         int funds=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),item.price());
         t.retailStock.put(id,item.stock()-1);
         c.money-=item.price();t.employerFunds.put("shop-assistant",funds);
         if("water".equals(id))c.water++;else c.food++;
-        t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(TownLife.Place.PORTICI)+1);
+        t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(c.place)+1);
         return "Bought "+item.label()+" for EUR "+item.price()+".";
     }
     record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery){}

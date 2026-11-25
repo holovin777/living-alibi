@@ -117,6 +117,40 @@ class GameSessionTest {
         }
     }
     @Test
+    void bakeryCounterSharesBreadStockAndHasItsOwnHours() throws Exception {
+        Path file=directory.resolve("linked-bakery.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();
+            c.age=30;c.money=20;c.food=3;c.water=3;c.home=TownLife.Place.NORTH_RESIDENCES;
+            c.place=TownLife.Place.BAKERY;c.destination=c.place;c.activity="FREE_TIME";
+            c.hunger=10;c.thirst=10;c.employed=false;
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            state.day=2;state.minute=430;
+            town.retailStock.put("bread",1);
+            assertFalse(RebirthLife.grocery(town,2,419).open());
+            assertTrue(RebirthLife.grocery(town,2,420).open());
+            assertFalse(RebirthLife.grocery(town,2,1076).open());
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.buyGrocery(town,2,430,"eggs"));
+            assertEquals("Panetteria del Borgo",RebirthLife.grocery(town,2,430).name());
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var bought=game.gardenAction("rebirth-grocery-bread").world();
+            assertEquals(17,bought.player().money());
+            assertEquals(4,bought.rebirth().grocery().food());
+            assertEquals(435,bought.minute());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-grocery-bread"));
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(0,game.snapshot().rebirth().grocery().items().getFirst().stock());
+            assertEquals(17,game.snapshot().player().money());
+        }
+    }
+    @Test
     void linkedAdultHomeUsesRealSuppliesAndPrivateSpace() throws Exception {
         Path file=directory.resolve("linked-home.db");
         String id;
