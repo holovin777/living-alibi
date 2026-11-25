@@ -13,6 +13,7 @@ final class LogisticsLife {
         for(String key:new String[]{OWNER,CASH,TRUCK,DRIVER,AUTO,LAST_DAY,COMPLETED,REVENUE,FUEL_COST,RELOCATION_COST,WAGE_COST,HIRING_COST,REPAIR_COST,CAPITAL_COST,INVESTED,WITHDRAWN,DELIVERIES})t.industryStocks.putIfAbsent(key,0);
         // Additive migration: existing trucks start with full condition, not zero.
         t.industryStocks.putIfAbsent(CONDITION,100);
+        SecondFleetLife.ensure(t);
     }
     static int get(TownLife.Town t,String key){return t.industryStocks.getOrDefault(key,0);}
     static void set(TownLife.Town t,String key,int value){t.industryStocks.put(key,value);}
@@ -41,7 +42,12 @@ final class LogisticsLife {
         if(index<=0)return null;
         return t.people.values().stream().filter(c->c.generationIndex==index && c.alive && c.employed && OCCUPATION.equals(c.occupation)).findFirst().orElse(null);
     }
-    static boolean isDriver(TownLife.Town t,TownLife.Citizen c){return c==driver(t);}
+    static boolean isDriver(TownLife.Town t,TownLife.Citizen c){return c==driver(t)||c==SecondFleetLife.driver(t);}
+    static TownLife.Place activeDriverDestination(TownLife.Town t,TownLife.Citizen c) {
+        if(c==driver(t)&&FreightLife.automated(t))return FreightLife.truckPlace(t);
+        if(c==SecondFleetLife.driver(t)&&SecondFleetLife.active(t))return SecondFleetLife.place(t);
+        return null;
+    }
     static java.util.List<TownLife.Citizen> candidates(TownLife.Town t,int day) {
         if(!yours(t)||t.player.place!=TownLife.Place.WORKSHOP||t.player.travelRemaining>0)return java.util.List.of();
         return t.people.values().stream().filter(c->c.generationIndex>0 && c.presentAt(TownLife.Place.WORKSHOP)
@@ -161,10 +167,10 @@ final class LogisticsLife {
         return new Financials(revenue,fuel,relocation,wages,hiring,repair,get(t,CAPITAL_COST),get(t,INVESTED),get(t,WITHDRAWN),revenue-fuel-relocation-wages-hiring-repair,get(t,DELIVERIES));
     }
     record Candidate(String id,String name) {}
-    record Report(boolean registered,boolean yours,int cash,boolean truck,String truckPlace,int contractFee,int relocationFee,String driverName,boolean automatic,int completed,java.util.List<Candidate> candidates,int condition,Financials financials) {}
+    record Report(boolean registered,boolean yours,int cash,boolean truck,String truckPlace,int contractFee,int relocationFee,String driverName,boolean automatic,int completed,java.util.List<Candidate> candidates,int condition,Financials financials,SecondFleetLife.Report secondTruck) {}
     static Report report(TownLife.Town t,int day) {
         var place=truckPlace(t);
         var worker=driver(t);
-        return new Report(get(t,OWNER)>0,yours(t),get(t,CASH),hasTruck(t),place==null?null:place.name(),FreightLife.CONTRACT_FEE,RELOCATION,worker==null?null:worker.name,get(t,AUTO)>0,get(t,COMPLETED),candidates(t,day).stream().map(c->new Candidate(c.id,c.name)).toList(),hasTruck(t)?get(t,CONDITION):0,financials(t));
+        return new Report(get(t,OWNER)>0,yours(t),get(t,CASH),hasTruck(t),place==null?null:place.name(),FreightLife.CONTRACT_FEE,RELOCATION,worker==null?null:worker.name,get(t,AUTO)>0,get(t,COMPLETED),candidates(t,day).stream().map(c->new Candidate(c.id,c.name)).toList(),hasTruck(t)?get(t,CONDITION):0,financials(t),SecondFleetLife.report(t));
     }
 }

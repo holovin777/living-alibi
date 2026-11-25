@@ -36,8 +36,8 @@ final class FreightLife {
         return active(t)&&stock(t,STAGE)<route(t).places.size()?route(t).places.get(stock(t,STAGE)):null;
     }
     static int reservedCrop(TownLife.Town t,String crop) {
-        if(!active(t)||stock(t,KIND)!=2)return 0;
-        return switch(crop){case "vegetables"->stock(t,IRON);case "rice"->stock(t,COPPER);default->0;};
+        int primary=(!active(t)||stock(t,KIND)!=2)?0:switch(crop){case "vegetables"->stock(t,IRON);case "rice"->stock(t,COPPER);default->0;};
+        return primary+SecondFleetLife.reservedCrop(t,crop);
     }
     static void requireDriver(TownLife.Town t) {
         TransportLife.ready(t.player);
@@ -63,8 +63,8 @@ final class FreightLife {
         if(active(t))throw new IllegalArgumentException("A freight contract is already active.");
         int first=Math.min(2,stock(t,r.first)),second=Math.min(1,stock(t,r.second));
         if(r.kind==2) {
-            first=Math.min(first,RetailLife.product("vegetables").capacity()-t.retailStock.getOrDefault("vegetables",0));
-            second=Math.min(second,RetailLife.product("rice").capacity()-t.retailStock.getOrDefault("rice",0));
+            first=Math.min(first,RetailLife.product("vegetables").capacity()-t.retailStock.getOrDefault("vegetables",0)-reservedCrop(t,"vegetables"));
+            second=Math.min(second,RetailLife.product("rice").capacity()-t.retailStock.getOrDefault("rice",0)-reservedCrop(t,"rice"));
         }
         first=Math.max(0,first);second=Math.max(0,second);
         int units=first+second,cost=first*r.firstPrice+second*r.secondPrice;

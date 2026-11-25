@@ -13,6 +13,60 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void twoTrucksReserveDistinctCargoAndPersistIndependentDrivers() throws Exception {
+        Path file=directory.resolve("two-trucks.db");
+        try(var game=new GameSession(file)) {
+            game.move("workshop");game.waitMinutes(90);game.freightAction("register",null);
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            LogisticsLife.set(town,LogisticsLife.CASH,400);
+            LogisticsLife.park(town,TownLife.Place.WORKSHOP);
+            SecondFleetLife.manage(town,"buy-truck-2",null,state.day);
+            var workers=town.people.values().stream().filter(c->c.generationIndex>0&&c.alive).limit(2).toList();
+            for(var worker:workers) {
+                worker.place=TownLife.Place.WORKSHOP;worker.destination=worker.place;worker.travelRemaining=0;
+                worker.sickUntilDay=0;worker.money=100;
+            }
+            LogisticsLife.hire(town,workers.get(0).id,state.day);
+            assertThrows(IllegalArgumentException.class,()->SecondFleetLife.manage(town,"hire-driver-2",workers.get(0).id,state.day));
+            SecondFleetLife.manage(town,"hire-driver-2",workers.get(1).id,state.day);
+            FarmLife.set(town,FarmLife.barn("vegetables"),8);FarmLife.set(town,FarmLife.barn("rice"),8);
+            town.retailStock.put("vegetables",14);town.retailStock.put("rice",18);
+            FreightLife.dispatch(town,FreightLife.ROUTES.get(2),true,true);
+            SecondFleetLife.dispatch(town,FreightLife.ROUTES.get(2));
+            assertEquals(4,FreightLife.reservedCrop(town,"vegetables"));
+            assertEquals(2,FreightLife.reservedCrop(town,"rice"));
+            assertEquals(0,FarmLife.deliver(town));
+            assertEquals(88,LogisticsLife.get(town,LogisticsLife.CASH));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(FreightLife.automated(town));assertTrue(SecondFleetLife.active(town));
+            var a=LogisticsLife.driver(town);var b=SecondFleetLife.driver(town);
+            assertNotEquals(a.id,b.id);
+            assertEquals(TownLife.Place.FARM,LogisticsLife.activeDriverDestination(town,a));
+            assertEquals(TownLife.Place.FARM,LogisticsLife.activeDriverDestination(town,b));
+            for(int k=0;k<5;k++) {
+                a.place=FreightLife.truckPlace(town);a.destination=a.place;a.travelRemaining=0;
+                b.place=SecondFleetLife.place(town);b.destination=b.place;b.travelRemaining=0;
+                state.minute=555+15*k;
+                LogisticsLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+                SecondFleetLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            }
+            assertFalse(FreightLife.active(town));assertFalse(SecondFleetLife.active(town));
+            assertEquals(18,town.retailStock.get("vegetables"));assertEquals(20,town.retailStock.get("rice"));
+            assertEquals(128,a.money);assertEquals(128,b.money);
+            assertEquals(85,LogisticsLife.get(town,LogisticsLife.CONDITION));
+            assertEquals(85,LogisticsLife.get(town,SecondFleetLife.HEALTH));
+            assertEquals(168,LogisticsLife.get(town,LogisticsLife.CASH));
+            assertEquals(2,LogisticsLife.financials(town).deliveries());
+            assertEquals(80,LogisticsLife.financials(town).revenue());
+        }
+    }
+
+    @Test
     void logisticsMaintenanceAndLedgerPersistAndChargeRealResources() throws Exception {
         Path file=directory.resolve("carrier-service.db");
         try(var game=new GameSession(file)) {

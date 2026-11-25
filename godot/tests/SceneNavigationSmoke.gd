@@ -429,6 +429,19 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    carrier = _world("WORKSHOP","Workshop")
+    carrier["logistics"] = {"registered":true,"yours":true,"cash":300,"truck":true,"driverName":"Driver One","secondTruck":{"purchased":false}}
+    world._on_world_updated(carrier)
+    if not _check(_has_button(world._action_choices,"Buy second truck"),"company can expand to second truck"):
+        return
+    carrier = carrier.duplicate(true)
+    carrier["logistics"]["secondTruck"] = {"purchased":true,"place":"WORKSHOP","condition":65,"driverName":"Driver Two","active":false,"automatic":false}
+    world._on_world_updated(carrier)
+    if not _check(_has_button(world._action_choices,"Enable truck 2 dispatch") and _has_button(world._action_choices,"Service truck 2"),
+            "second truck has independent dispatch and maintenance controls"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)

@@ -85,6 +85,7 @@ final class PlayerLife {
                 previous.place,previous.privateName);
         town.pastLives.put(record.incarnation(),record);
         FreightLife.recover(town);
+        SecondFleetLife.recover(town);
         Player next=new Player();
         next.incarnation=previous.incarnation+1;
         town.player=next;

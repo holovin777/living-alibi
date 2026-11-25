@@ -32,7 +32,8 @@ final class PopulationLife {
         // wages for eight hours to fabricate one small batch of parts.
         boolean shopEmployee=BusinessLife.isEmployee(town,c);
         boolean carrier=LogisticsLife.isDriver(town,c);
-        boolean freightRun=carrier && FreightLife.automated(town) && !sick;
+        TownLife.Place freightDestination=LogisticsLife.activeDriverDestination(town,c);
+        boolean freightRun=carrier && freightDestination!=null && !sick;
         boolean working=c.employed && !sick && workday &&
                 (carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
@@ -45,7 +46,7 @@ final class PopulationLife {
                 && town.cleanWater>0;
         TownLife.Place desired;
         if(sick)desired=c.home;
-        else if(freightRun)desired=FreightLife.truckPlace(town);
+        else if(freightRun)desired=freightDestination;
         else if(sleeping)desired=c.home;
         else if((shopEmployee||carrier) && working)desired=TownLife.Place.WORKSHOP;
         else if(marketOpen && needFood)desired=TownLife.Place.MARKET;

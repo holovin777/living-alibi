@@ -555,6 +555,21 @@ cash is retained and new counters begin at zero. Both manual and
 automatic contracts use these same constraints. One truck remains
 the fleet limit.
 
+## Two-truck fleet
+
+The Workshop office can purchase a second truck for 220 EUR, hire
+a distinct resident for 10 EUR and enable its own automatic dispatch.
+It has independent condition, district, cargo manifest, daily dispatch
+marker, driver and completed count. Both trucks use the same cash,
+fuel and physical warehouse ledgers; reserved farm cargo is counted
+across both manifests. The second truck uses all three existing routes,
+pays 18 EUR to its driver at delivery and 40 EUR to the company.
+Service uses the same money and spare parts as truck one. Both can
+deliver at the same time, with independent recovery on illness/death.
+The second truck is automated only, represented in the office report,
+not yet a separate physical vehicle in the 3D scene. Fleet capacity
+is two; the depot remains the Workshop office.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

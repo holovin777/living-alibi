@@ -274,6 +274,7 @@ final class TownLife {
         IndustryLife.tick(town,marco,truth,observations);
         BusinessLife.tick(town,marco,truth,observations);
         LogisticsLife.tick(town,marco,truth,observations);
+        SecondFleetLife.tick(town,marco,truth,observations);
         EconomyLife.tick(town,marco,truth,observations);
         PropertyLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);

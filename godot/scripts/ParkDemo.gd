@@ -317,10 +317,14 @@ func _hire_driver(id: String) -> void:
     if _connected and not _api.is_busy() and _current_place=="WORKSHOP" and _near_kiosk():
         _api.freight_action("hire-driver",id)
 
+func _hire_second_driver(id: String) -> void:
+    if _connected and not _api.is_busy() and _current_place=="WORKSHOP" and _near_kiosk():
+        _api.freight_action("hire-driver-2",id)
+
 func _freight_action(action: String) -> void:
     if not _connected or _api.is_busy():
         return
-    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off","service-truck"] and _current_place=="WORKSHOP" and _near_kiosk()):
+    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck","auto-on","auto-off","service-truck","buy-truck-2","auto-on-2","auto-off-2","service-truck-2"] and _current_place=="WORKSHOP" and _near_kiosk()):
         _api.freight_action(action)
 
 func _drive_truck(destination: String) -> void:
@@ -2285,6 +2289,24 @@ func _render_actions() -> void:
                     else:
                         var enabled := bool(logistics.get("automatic",false))
                         _action_choices.add_child(_button("Disable automatic freight" if enabled else "Enable automatic freight",_freight_action.bind("auto-off" if enabled else "auto-on")))
+                    var second: Dictionary = logistics.get("secondTruck",{})
+                    if not bool(second.get("purchased",false)):
+                        _action_choices.add_child(_button("Buy second truck · 220 EUR",_freight_action.bind("buy-truck-2")))
+                    else:
+                        var second_driver = second.get("driverName")
+                        var second_status := Label.new()
+                        second_status.text = "TRUCK 2 | %s | %s/100\nDriver: %s | Deliveries: %s\n%s" % [
+                            str(second.get("place","")),second.get("condition",0),"none" if second_driver==null else str(second_driver),
+                            second.get("completed",0),("Cargo: %s (%s)" % [second.get("cargo",""),second.get("units",0)]) if bool(second.get("active",false)) else "Idle"]
+                        _action_choices.add_child(second_status)
+                        if second_driver==null:
+                            for candidate in logistics.get("candidates",[]):
+                                _action_choices.add_child(_button("Hire driver 2: "+str(candidate.get("name",""))+" · 10 EUR",_hire_second_driver.bind(str(candidate.get("id","")))))
+                        else:
+                            var second_enabled := bool(second.get("automatic",false))
+                            _action_choices.add_child(_button("Disable truck 2 dispatch" if second_enabled else "Enable truck 2 dispatch",_freight_action.bind("auto-off-2" if second_enabled else "auto-on-2")))
+                        if int(second.get("condition",100))<100 and not bool(second.get("active",false)):
+                            _action_choices.add_child(_button("Service truck 2 · 15 EUR + 1 part (transport extra)",_freight_action.bind("service-truck-2")))
             if _car_place().is_empty():
                 _action_choices.add_child(_button("Buy used car · 180 EUR",_car_action.bind("buy")))
             elif _car_place()=="WORKSHOP":
