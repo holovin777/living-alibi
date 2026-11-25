@@ -28,6 +28,11 @@ The saved world stays in `data/world.db` and is **never erased by this
 script**. If there is no previous save, a new playable park visitor is
 created automatically with 50 EUR and no assigned career.
 
+Nearby residents reported by the Java simulation are now represented
+by simple labeled 3D figures. Their on-screen positions are placeholders,
+not continuous NPC navigation; residents who are absent from the actual
+public scene are not displayed.
+
 The camera starts **in first person**; click the scene for mouse look,
 press **V** to switch to the optional third-person view, and **Esc**
 to release the cursor for the interface. These are client-side visual
