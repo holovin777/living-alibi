@@ -46,6 +46,14 @@ const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 const TownVisuals = preload("res://scripts/TownVisuals.gd")
 var _sky_material: ProceduralSkyMaterial
 var _surface_textures: Dictionary = {}
+var _graphics_quality := 1
+var _leaf_mesh: SphereMesh
+var _leaf_materials: Array[StandardMaterial3D] = []
+var _foliage_season := ""
+var _water_material: ShaderMaterial
+var _lantern_glass: StandardMaterial3D
+var _shop_glass: StandardMaterial3D
+var _graphics_details: Array[Node3D] = []
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
 const GameLanguage = preload("res://scripts/GameLanguage.gd")
 const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
@@ -886,9 +894,75 @@ func _follow_player() -> void:
         _camera.position = _avatar.position + Vector3(0.0,eye * (1.0 - 0.35 * _crouch_amount) + _jump_height + _step_bob,0.0)
         _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
+func _set_graphics_quality(index: int) -> void:
+    _graphics_quality = clampi(index,0,3)
+    # Godot Compatibility supports these MSAA levels; no renderer restart needed.
+    match _graphics_quality:
+        0:
+            get_viewport().msaa_3d = Viewport.MSAA_DISABLED
+        1:
+            get_viewport().msaa_3d = Viewport.MSAA_2X
+        2:
+            get_viewport().msaa_3d = Viewport.MSAA_4X
+        3:
+            get_viewport().msaa_3d = Viewport.MSAA_8X
+    _sun.shadow_enabled = _graphics_quality > 0
+    _sun.directional_shadow_max_distance = [25.0,55.0,80.0,105.0][_graphics_quality]
+    for detail in _graphics_details:
+        if is_instance_valid(detail):
+            detail.visible = _graphics_quality > 0
+    for chunk in _chunks.values():
+        var water: MeshInstance3D = chunk["water"]
+        if is_instance_valid(water):
+            var spray := water.get_node_or_null("FountainSpray") as CPUParticles3D
+            if spray != null:
+                spray.emitting = water.visible and _graphics_quality > 0
+
+func _register_graphics_detail(detail: Node3D) -> void:
+    # Visual-only decoration never alters an obstacle or interaction.
+    _graphics_details.append(detail)
+    detail.visible = _graphics_quality > 0
+
+func _update_foliage(season: String, snowy: bool) -> void:
+    var key := season + str(snowy)
+    if key == _foliage_season:
+        return
+    _foliage_season = key
+    var color := Color("#537f3b")
+    match season:
+        "SPRING": color = Color("#659747")
+        "AUTUMN": color = Color("#b17a38")
+        "WINTER": color = Color("#66705a")
+    if snowy:
+        color = color.lerp(Color("#dce4df"),0.50)
+    for i in range(_leaf_materials.size()):
+        _leaf_materials[i].albedo_color = color.lightened(float(i)*0.07)
+
 func _build_world() -> void:
     _environment = Environment.new()
-    _surface_textures={"grass":TownVisuals.texture("grass"),"paving":TownVisuals.texture("paving"),"asphalt":TownVisuals.texture("asphalt")}
+    for kind in ["grass","paving","asphalt","stucco","terracotta","wood"]:
+        _surface_textures[kind] = TownVisuals.texture(kind)
+    _leaf_mesh = SphereMesh.new()
+    _leaf_mesh.radius = 1.0
+    _leaf_mesh.height = 2.0
+    _leaf_mesh.radial_segments = 12
+    _leaf_mesh.rings = 6
+    for i in range(4):
+        var leaf := StandardMaterial3D.new()
+        leaf.roughness = 1.0
+        _leaf_materials.append(leaf)
+    _update_foliage("SPRING",false)
+    _water_material = ShaderMaterial.new()
+    _water_material.shader = preload("res://shaders/TownWater.gdshader")
+    _lantern_glass = StandardMaterial3D.new()
+    _lantern_glass.albedo_color = Color("#e4d4ac")
+    _lantern_glass.emission = Color("#ffca78")
+    _lantern_glass.emission_energy_multiplier = 1.2
+    _shop_glass = StandardMaterial3D.new()
+    _shop_glass.albedo_color = Color("#496064")
+    _shop_glass.roughness = 0.26
+    _shop_glass.emission = Color("#e4b77a")
+    _shop_glass.emission_energy_multiplier = 0.55
     _sky_material=ProceduralSkyMaterial.new()
     var sky := Sky.new()
     sky.sky_material=_sky_material
@@ -908,6 +982,7 @@ func _build_world() -> void:
     _sun.directional_shadow_max_distance=65.0
     _sun.shadow_blur=1.2
     add_child(_sun)
+    _set_graphics_quality(_graphics_quality)
 
     _avatar = Node3D.new()
     _avatar.name = "OrdinaryVisitor"
@@ -986,6 +1061,12 @@ func _render_place(place_id: String) -> void:
             remove_child(old_root)
             old_root.queue_free()
             _chunks.erase(id)
+    # Prune freed scenery references before new chunks are generated.
+    var retained: Array[Node3D] = []
+    for detail in _graphics_details:
+        if is_instance_valid(detail) and detail.is_inside_tree():
+            retained.append(detail)
+    _graphics_details = retained
     for id in wanted:
         if not _chunks.has(id):
             _generate_chunk(str(id))
@@ -1107,8 +1188,14 @@ func _generate_chunk(place_id: String) -> void:
             # A bridge keeps the east-west public road dry.
             for z in [-10.0, 10.0]:
                 _add_obstacle(Vector3(-11.0, 0.0, z), Vector2(10.0, 15.0))
-            _box(_scenery, Vector3(10.0, 0.11, 35.0), Color(0.12, 0.40, 0.67),
-                    Vector3(-11.0, 0.02, 0.0))
+            var river_mesh := BoxMesh.new()
+            river_mesh.size = Vector3(10.0,0.11,35.0)
+            var river_water := MeshInstance3D.new()
+            river_water.name = "RiverWater"
+            river_water.mesh = river_mesh
+            river_water.material_override = _water_material
+            river_water.position = Vector3(-11.0,0.02,0.0)
+            _scenery.add_child(river_water)
             _box(_scenery, Vector3(10.5, 0.12, 4.8), Color(0.45,0.34,0.23),
                     Vector3(-11.0, 0.10, 0.0))
             _tree(Vector3(12.0, 0.0, 7.0))
@@ -1821,8 +1908,8 @@ func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: 
     var shutter := Color("#4c6255")
     var dark := Color("#394c52")
     _add_obstacle(at,Vector2(width,depth))
-    _box(building,Vector3(width,height,depth),wall,at+Vector3(0,height/2,0))
-    _box(building,Vector3(width+0.4,0.35,depth+0.4),Color("#8e503a"),at+Vector3(0,height+0.12,0))
+    _box(building,Vector3(width,height,depth),wall,at+Vector3(0,height/2,0),"stucco")
+    _box(building,Vector3(width+0.4,0.35,depth+0.4),Color("#8e503a"),at+Vector3(0,height+0.12,0),"terracotta")
     _box(building,Vector3(width+0.16,0.45,0.12),stone,Vector3(at.x,0.23,face+0.07))
     for level in range(floors):
         var y := 1.6+float(level)*3.1
@@ -2459,8 +2546,8 @@ func _portici_house(parent: Node3D,side: float,z: float,length: float,height: fl
     var center := side*9.2
     var trim := Color("#dfc9a5")
     _add_obstacle(Vector3(center,0,z),Vector2(9.6,length))
-    _box(parent,Vector3(9.6,height,length),wall,Vector3(center,height*0.5,z))
-    _box(parent,Vector3(9.85,0.32,length+0.2),Color("#744536"),Vector3(center,height+0.12,z))
+    _box(parent,Vector3(9.6,height,length),wall,Vector3(center,height*0.5,z),"stucco")
+    _box(parent,Vector3(9.85,0.32,length+0.2),Color("#91523c"),Vector3(center,height+0.12,z),"terracotta")
     _box(parent,Vector3(0.12,0.18,length),trim,Vector3(front-side*0.06,3.3,z))
     for offset in [-length/3.0,0.0,length/3.0]:
         for y in [4.5,6.5]:
@@ -2616,9 +2703,9 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
     var front := side*11.7
     var trim := Color(0.89,0.78,0.60)
     _add_obstacle(Vector3(back,0,z),Vector2(2.2,12.0))
-    _box(parent,Vector3(2.2,7.1,12),wall,Vector3(back,3.55,z))
-    _box(parent,Vector3(5.2,3.9,12),wall,Vector3(side*14,5.15,z))
-    _box(parent,Vector3(5.5,0.32,12.2),Color(0.48,0.26,0.20),Vector3(side*14,7.25,z))
+    _box(parent,Vector3(2.2,7.1,12),wall,Vector3(back,3.55,z),"stucco")
+    _box(parent,Vector3(5.2,3.9,12),wall,Vector3(side*14,5.15,z),"stucco")
+    _box(parent,Vector3(5.5,0.32,12.2),Color("#95503a"),Vector3(side*14,7.25,z),"terracotta")
     _box(parent,Vector3(5.7,0.14,12.3),trim,Vector3(side*14,7.03,z))
     _box(parent,Vector3(5.2,0.16,12),trim,Vector3(side*14,3.25,z))
     _box(parent,Vector3(0.16,0.16,12),trim,Vector3(side*11.35,5.35,z))
@@ -2626,6 +2713,8 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
         var at := Vector3(front,0,z+offset)
         _add_obstacle(at,Vector2(0.55,0.55))
         _box(parent,Vector3(0.55,1.95,0.55),trim,at+Vector3(0,0.975,0))
+        _box(parent,Vector3(0.70,0.15,0.70),trim.darkened(0.12),at+Vector3(0,0.075,0))
+        _box(parent,Vector3(0.71,0.17,0.71),trim,at+Vector3(0,1.88,0))
     for offset in [-4.0,0.0,4.0]:
         # Segmented semicircular stone arches; the open space below is walkable.
         for i in range(9):
@@ -2638,10 +2727,12 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
         for y in [4.4,6.15]:
             var face := side*11.36
             _box(parent,Vector3(0.08,1.1,0.85),Color(0.19,0.28,0.30),Vector3(face,y,z+offset))
+            _box(parent,Vector3(0.09,1.08,0.055),trim,Vector3(face-side*0.035,y,z+offset))
+            _box(parent,Vector3(0.09,0.05,0.83),trim,Vector3(face-side*0.035,y,z+offset))
             var shutters := Color("#415943") if variant%2 == 0 else Color("#64513f")
             _box(parent,Vector3(0.15,0.12,1.6),trim,Vector3(face-side*0.06,y-0.61,z+offset))
             for shutter in [-0.64,0.64]:
-                _box(parent,Vector3(0.13,1.18,0.35),shutters,Vector3(face-side*0.06,y,z+offset+shutter))
+                _box(parent,Vector3(0.13,1.18,0.35),shutters,Vector3(face-side*0.06,y,z+offset+shutter),"wood")
             if y < 5.0 and (variant == 1 or variant == 3) and offset == 0.0:
                 _centro_balcony(parent,side,face,y,z+offset)
             elif y > 5.0 and variant%2 == 0:
@@ -2651,6 +2742,10 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
         _box(parent,Vector3(0.12,2.35,2.55),Color("#6d5140"),Vector3(rear,1.175,z+offset))
         for pane in [-0.83,0.83]:
             _box(parent,Vector3(0.08,1.52,0.72),Color("#496064"),Vector3(rear-side*0.09,1.29,z+offset+pane))
+            var pane_node := parent.get_child(parent.get_child_count()-1) as MeshInstance3D
+            pane_node.material_override = _shop_glass
+            _box(parent,Vector3(0.09,0.055,0.72),Color("#b99b74"),Vector3(rear-side*0.145,0.91,z+offset+pane))
+            _box(parent,Vector3(0.09,0.055,0.72),Color("#b99b74"),Vector3(rear-side*0.145,1.67,z+offset+pane))
             _box(parent,Vector3(0.09,0.045,0.72),trim,Vector3(rear-side*0.14,1.29,z+offset+pane))
         _box(parent,Vector3(0.09,1.94,0.65),Color("#3c3028"),Vector3(rear-side*0.1,0.97,z+offset))
         _box(parent,Vector3(0.14,0.28,2.55),Color("#9c6b45"),Vector3(rear-side*0.11,2.45,z+offset))
@@ -2687,6 +2782,8 @@ func _build_park() -> void:
         _bench(park, p)
     for p in [Vector3(-3,0,-9), Vector3(3,0,-3), Vector3(-3,0,8), Vector3(13,0,3)]:
         _lamp(park, p)
+    for at in [Vector3(-8,0,-5),Vector3(-15,0,9),Vector3(10,0,11)]:
+        _park_flowers(park,at)
     # The pool is decorative; drinking still requires the validated Java action.
     var fountain := Node3D.new()
     fountain.name = "PublicFountain"
@@ -2696,7 +2793,24 @@ func _build_park() -> void:
     _cylinder(fountain, 2.0, 0.35, Color(0.52,0.53,0.54), Vector3(0,0.18,0))
     _cylinder(fountain, 1.85, 0.08, Color(0.24,0.28,0.29), Vector3(0,0.39,0))
     _fountain_water = _cylinder(fountain, 1.78, 0.04, Color(0.24,0.63,0.76), Vector3(0,0.45,0))
+    _fountain_water.name = "FountainWater"
+    _fountain_water.material_override = _water_material
+    var rim := TorusMesh.new()
+    rim.inner_radius = 1.77
+    rim.outer_radius = 2.0
+    rim.rings = 32
+    rim.ring_segments = 12
+    var rim_node := MeshInstance3D.new()
+    rim_node.mesh = rim
+    var stone := StandardMaterial3D.new()
+    stone.albedo_color = Color("#b6ad99")
+    rim_node.material_override = stone
+    rim_node.position = Vector3(0,0.43,0)
+    fountain.add_child(rim_node)
+    _cylinder(fountain,0.38,0.16,Color("#b6ad99"),Vector3(0,0.55,0))
     _cylinder(fountain, 0.25, 1.1, Color(0.60,0.61,0.62), Vector3(0,0.85,0))
+    _cylinder(fountain,0.36,0.12,Color("#b6ad99"),Vector3(0,1.39,0))
+    _add_fountain_spray(_fountain_water)
     _sign(fountain, "Public fountain", Vector3(0,1.8,0))
     # Shared gate and kiosk already have labelled signs.
     # A street along the edge provides visual context, not a new travel route.
@@ -2705,22 +2819,94 @@ func _build_park() -> void:
         _box(park, Vector3(1.5,0.02,0.11), Color(0.92,0.85,0.61), Vector3(x,0.07,-16))
     for x in [-14.0,-8.0,8.0,14.0]:
         _add_obstacle(Vector3(x,0,-19), Vector2(4.7,2.5))
-        _box(park, Vector3(4.7,4.0,2.5), Color(0.69,0.59,0.47), Vector3(x,2,-19))
+        _box(park, Vector3(4.7,4.0,2.5), Color(0.76,0.64,0.49), Vector3(x,2,-19),"stucco")
+        _box(park,Vector3(5.0,0.22,2.8),Color("#95533e"),Vector3(x,4.07,-19),"terracotta")
+        _box(park,Vector3(4.85,0.12,0.18),Color("#e0c6a0"),Vector3(x,2.05,-17.68))
+        _box(park,Vector3(1.05,1.85,0.12),Color("#71513b"),Vector3(x,0.925,-17.68),"wood")
         for offset in [-1.2,1.2]:
-            _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.7))
+            _box(park,Vector3(0.98,1.28,0.10),Color("#ddc7a6"),Vector3(x+offset,2.8,-17.70))
+            _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.62))
+            _box(park,Vector3(0.055,1.08,0.08),Color("#e0c6a0"),Vector3(x+offset,2.8,-17.56))
+
+func _add_fountain_spray(water: MeshInstance3D) -> void:
+    var spray := CPUParticles3D.new()
+    spray.name = "FountainSpray"
+    spray.position = Vector3(0,1.03,0)
+    spray.amount = 48
+    spray.lifetime = 0.95
+    spray.local_coords = true
+    spray.direction = Vector3.UP
+    spray.spread = 28.0
+    spray.initial_velocity_min = 1.65
+    spray.initial_velocity_max = 2.5
+    spray.gravity = Vector3(0,-8.5,0)
+    spray.emitting = false
+    var droplet := SphereMesh.new()
+    droplet.radius = 0.023
+    droplet.height = 0.046
+    droplet.radial_segments = 6
+    droplet.rings = 3
+    var mat := StandardMaterial3D.new()
+    mat.albedo_color = Color("#bbdfdf")
+    mat.roughness = 0.23
+    droplet.material = mat
+    spray.mesh = droplet
+    water.add_child(spray)
+
+func _park_flowers(parent: Node3D, at: Vector3) -> void:
+    # Small decorative flowers hug the tree bases, never create obstacles.
+    var blossom := SphereMesh.new()
+    blossom.radius = 0.065
+    blossom.height = 0.10
+    blossom.radial_segments = 6
+    blossom.rings = 3
+    var mat := StandardMaterial3D.new()
+    mat.vertex_color_use_as_albedo = true
+    mat.roughness = 0.95
+    blossom.material = mat
+    var batch := MultiMesh.new()
+    batch.transform_format = MultiMesh.TRANSFORM_3D
+    batch.use_colors = true
+    batch.mesh = blossom
+    batch.instance_count = 40
+    var rng := RandomNumberGenerator.new()
+    rng.seed = absi(roundi(at.x*127.0+at.z*53.0))
+    var colors := [Color("#f0c250"),Color("#e0a5b7"),Color("#f5ede0"),Color("#ae727d")]
+    for i in range(batch.instance_count):
+        var angle := rng.randf_range(0.0,TAU)
+        var radius := rng.randf_range(0.38,0.85)
+        var pos := at+Vector3(cos(angle)*radius,rng.randf_range(0.035,0.09),sin(angle)*radius)
+        batch.set_instance_transform(i,Transform3D(Basis.IDENTITY,pos))
+        batch.set_instance_color(i,colors[i%colors.size()])
+    var bed := MultiMeshInstance3D.new()
+    bed.name = "Wildflowers"
+    bed.multimesh = batch
+    parent.add_child(bed)
+    _register_graphics_detail(bed)
 
 func _bench(parent: Node3D, at: Vector3) -> void:
     _add_obstacle(at, Vector2(2.0, 0.66))
     var wood := Color(0.43,0.27,0.14)
-    _box(parent, Vector3(2.0,0.12,0.58), wood, at + Vector3(0,0.52,0))
-    _box(parent, Vector3(2.0,0.42,0.10), wood, at + Vector3(0,0.85,0.25))
+    for z in [-0.20,0.0,0.20]:
+        _box(parent,Vector3(2.0,0.09,0.17),wood,at+Vector3(0,0.52,z),"wood")
+    for y in [0.70,0.86,1.02]:
+        _box(parent,Vector3(2.0,0.13,0.09),wood,at+Vector3(0,y,0.25),"wood")
     for x in [-0.75,0.75]:
         _box(parent, Vector3(0.11,0.50,0.47), Color(0.20,0.23,0.24), at+Vector3(x,0.25,0))
 
 func _lamp(parent: Node3D, at: Vector3) -> void:
     _add_obstacle(at, Vector2(0.18, 0.18))
     _cylinder(parent, 0.09, 3.4, Color(0.19,0.22,0.24), at+Vector3(0,1.7,0))
-    _sphere(parent, 0.23, Color(0.91,0.87,0.65), at+Vector3(0,3.4,0))
+    _cylinder(parent,0.18,0.3,Color("#3c4140"),at+Vector3(0,0.15,0))
+    _cylinder(parent,0.14,0.10,Color("#3c4140"),at+Vector3(0,3.17,0))
+    _box(parent,Vector3(0.32,0.39,0.32),Color("#e4d4ac"),at+Vector3(0,3.4,0))
+    var glass := parent.get_child(parent.get_child_count()-1) as MeshInstance3D
+    glass.material_override = _lantern_glass
+    for x in [-0.17,0.17]:
+        for z in [-0.17,0.17]:
+            _box(parent,Vector3(0.035,0.46,0.035),Color("#3c4140"),at+Vector3(x,3.4,z))
+    _cylinder(parent,0.24,0.08,Color("#343b39"),at+Vector3(0,3.64,0))
+    _sphere(parent,0.07,Color("#343b39"),at+Vector3(0,3.72,0))
     var lamp := OmniLight3D.new()
     lamp.position = at+Vector3(0,3.2,0)
     lamp.light_color = Color(1.0,0.81,0.53)
@@ -3015,27 +3201,33 @@ func _create_gate_and_kiosk() -> void:
 
 func _tree(at: Vector3) -> void:
     _add_obstacle(at, Vector2(0.45, 0.45))
-    _box(_scenery, Vector3(0.45, 1.8, 0.45), Color(0.33, 0.19, 0.11),
-            at + Vector3(0.0, 0.9, 0.0))
+    var tree_seed := absi(roundi(at.x*43.0+at.z*79.0))
+    var rng := RandomNumberGenerator.new()
+    rng.seed = tree_seed
+    var trunk_height := rng.randf_range(2.0,2.6)
+    var trunk := _cylinder(_scenery,0.22,trunk_height,Color("#70513b"),at+Vector3(0,trunk_height*0.5,0))
+    TownVisuals.surface(trunk.material_override as StandardMaterial3D,_surface_textures["wood"],0.75)
     var crown := Node3D.new()
     crown.name="TreeCrown"
-    crown.position=at
+    crown.position=at+Vector3(0,trunk_height+0.55,0)
     _scenery.add_child(crown)
-    var leaves := Color("#476f39")
-    for offset in [Vector3(-0.55,2.5,0),Vector3(0.55,2.6,0.2),Vector3(0,3.25,-0.1),Vector3(0,2.55,-0.65)]:
-        var mesh := SphereMesh.new()
-        mesh.radius=0.88
-        mesh.height=1.65
-        mesh.radial_segments=10
-        mesh.rings=5
+    for i in range(8):
+        var angle := float(i)*TAU/8.0
         var foliage := MeshInstance3D.new()
-        foliage.mesh=mesh
-        var mat := StandardMaterial3D.new()
-        mat.albedo_color=leaves.lightened(0.06*float(crown.get_child_count()))
-        mat.roughness=1.0
-        foliage.material_override=mat
-        foliage.position=offset
+        foliage.mesh = _leaf_mesh
+        foliage.material_override = _leaf_materials[i%4]
+        var spread := rng.randf_range(0.55,0.95)
+        foliage.position = Vector3(cos(angle)*spread,rng.randf_range(-0.1,0.5),sin(angle)*spread)
+        foliage.scale = Vector3(rng.randf_range(0.77,1.12),rng.randf_range(0.88,1.35),rng.randf_range(0.77,1.12))
         crown.add_child(foliage)
+        if i%2 == 1:
+            _register_graphics_detail(foliage)
+    var top := MeshInstance3D.new()
+    top.mesh = _leaf_mesh
+    top.material_override = _leaf_materials[2]
+    top.position = Vector3(0,1.0,0)
+    top.scale = Vector3(1.08,1.14,1.08)
+    crown.add_child(top)
 
 func _box(parent: Node3D, size: Vector3, color: Color,
         where: Vector3, surface: String = "") -> void:
@@ -3169,6 +3361,17 @@ func _create_interface() -> void:
     _clock_selector.select(3)
     _clock_selector.item_selected.connect(_on_clock_speed_selected)
     clock_row.add_child(_clock_selector)
+    var graphics_row := HBoxContainer.new()
+    column.add_child(graphics_row)
+    var graphics_label := Label.new()
+    graphics_label.text = "Graphics quality"
+    graphics_row.add_child(graphics_label)
+    var quality := OptionButton.new()
+    for caption in ["Low","Medium","High","Ultra"]:
+        quality.add_item(caption)
+    quality.select(_graphics_quality)
+    quality.item_selected.connect(_set_graphics_quality)
+    graphics_row.add_child(quality)
     var atmosphere_row := HBoxContainer.new()
     column.add_child(atmosphere_row)
     var effects_toggle := CheckButton.new()
@@ -5154,6 +5357,7 @@ func _apply_weather() -> void:
     if _ground_material == null:
         return
     var climate: Dictionary = _last_snapshot.get("weather", {})
+    _update_foliage(str(_last_snapshot.get("season","SPRING")),bool(climate.get("snowing",false)))
     if climate.get("snowing", false):
         _ground_material.albedo_color = Color(0.80, 0.86, 0.88)
         _environment.background_color = Color(0.72, 0.76, 0.83)
@@ -5173,9 +5377,9 @@ func _apply_weather() -> void:
     var daylight := sin(day_progress * PI)
     _sun.rotation_degrees = Vector3(-8.0-65.0*daylight,
             -90.0+180.0*day_progress,0.0)
-    _sun.light_energy = lerpf(0.08,1.18,daylight)
+    _sun.light_energy = lerpf(0.08,1.27,daylight)
     _sun.light_color=Color("#f1bd83").lerp(Color("#fff5df"),smoothstep(0.0,0.65,daylight))
-    _environment.ambient_light_energy = lerpf(0.28,0.72,daylight)
+    _environment.ambient_light_energy = lerpf(0.30,0.66,daylight)
     _environment.background_color = Color(0.07,0.10,0.18).lerp(
             _environment.background_color, smoothstep(0.0,0.35,daylight))
     if climate.get("sky","CLEAR") != "CLEAR":
@@ -5193,6 +5397,9 @@ func _apply_weather() -> void:
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     _weather_fx.apply(climate,_environment)
     var services: Dictionary = _last_snapshot.get("services", {})
+    _lantern_glass.emission_enabled = night and bool(services.get("lightsWorking",false))
+    # Decorative windows suggest warm interiors, not server-owned opening hours.
+    _shop_glass.emission_enabled = minute >= 1080 or minute < 360
     # Weather and city services affect every loaded chunk, not just the
     # one containing the visitor. Only the active chunk gets NPC data.
     for chunk in _chunks.values():
@@ -5203,6 +5410,9 @@ func _apply_weather() -> void:
         var water: MeshInstance3D = chunk["water"]
         if is_instance_valid(water):
             water.visible = bool(services.get("fountainWorking", false)) and int(services.get("cleanWater", 0)) > 0
+            var spray := water.get_node_or_null("FountainSpray") as CPUParticles3D
+            if spray != null:
+                spray.emitting = water.visible and _graphics_quality > 0
 
 func _on_locations_updated(locations: Array) -> void:
     _locations = locations

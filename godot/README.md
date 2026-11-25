@@ -705,3 +705,13 @@ with the Java process running.
 ## Surface detail and antialiasing
 
 Grass, asphalt and staggered stone paving have shared 256 px procedural textures with mipmaps, and 2× MSAA smooths geometry edges in the Compatibility renderer. No external assets are required. MSAA may increase GPU load on older hardware.
+
+## Lombard town visual detail
+
+The park, Piazza Centrale, Via dei Portici and Lombard residential facades now use original shared plaster, terracotta and wood textures. Trees have irregular shared-mesh canopies, seasonal colors and snowy tints. Park flowers are batched, benches have individual slats, and street lamps have traditional lantern shapes. These are decorative changes: no collision footprints, travel rules or saved state are changed.
+
+The HUD Graphics quality selector applies immediately for this session: Low disables MSAA, sun shadows and optional foliage/flowers; Medium (default) uses 2x MSAA and 55-unit sun shadow distance; High uses 4x and 80 units; Ultra uses 8x and 105 units. All preserve Compatibility rendering, and higher levels may be demanding on integrated or older GPUs. Actual rendering performance must be evaluated on the target computer.
+
+### Water and evening streets
+
+The public fountain and river share a lightweight animated opaque water shader, without screen-space reflections or refraction. The fountain has a stone rim and a small local particle spray, only while Java confirms a working fountain and available clean water. Low graphics quality disables spray. Municipal lantern glass emits warm light only when the committed time is night and the street-light service works. Historic shopfronts show decorative warm windows in the evening; this does not imply shops are open or change business schedules. No new game state or collision geometry is introduced.

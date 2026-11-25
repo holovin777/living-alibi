@@ -113,11 +113,27 @@ func _exercise() -> void:
         return
     if not _check(world._environment.background_mode==Environment.BG_SKY
             and world._environment.sky.sky_material is ProceduralSkyMaterial
-            and world._surface_textures.size()==3
+            and world._surface_textures.has_all(["grass","paving","asphalt","stucco","terracotta","wood"])
             and world._ground_material.albedo_texture==world._surface_textures["grass"]
             and world._chunks["SCHOOL"]["ground"].albedo_texture==world._surface_textures["grass"]
             and world._scenery.has_node("TreeCrown"),
             "procedural sky, textured shared ground and clustered trees are available"):
+        return
+    world._set_graphics_quality(0)
+    if not _check(not world._sun.shadow_enabled and not world._graphics_details[0].visible,
+            "low quality hides optional details and sun shadows"):
+        return
+    world._set_graphics_quality(2)
+    if not _check(world._sun.shadow_enabled and world._graphics_details[0].visible
+            and is_equal_approx(world._sun.directional_shadow_max_distance,80.0),
+            "high quality restores visual detail and extended shadows"):
+        return
+    world._set_graphics_quality(1)
+    world._update_foliage("AUTUMN",false)
+    var autumn: Color = world._leaf_materials[0].albedo_color
+    world._update_foliage("WINTER",true)
+    if not _check(world._leaf_materials[0].albedo_color != autumn,
+            "shared foliage responds to seasons and snow"):
         return
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
     var park_root: Node3D = world._chunks["PARK"]["root"]
@@ -731,12 +747,17 @@ func _exercise() -> void:
     night["services"] = {"lightsWorking": true, "fountainWorking": true, "cleanWater": 5}
     world._on_world_updated(night)
     if not _check(world._park_lamps.size() == 4 and world._park_lamps[0].visible
-            and world._fountain_water.visible,
-            "night park lights and water reflect working municipal services"):
+            and world._fountain_water.visible
+            and world._fountain_water.material_override is ShaderMaterial
+            and world._fountain_water.get_node("FountainSpray").emitting
+            and world._lantern_glass.emission_enabled and world._shop_glass.emission_enabled,
+            "night park lights, animated water and spray reflect working municipal services"):
         return
     night["services"] = {"lightsWorking": false, "fountainWorking": false, "cleanWater": 0}
     world._on_world_updated(night)
-    if not _check(not world._park_lamps[0].visible and not world._fountain_water.visible,
+    if not _check(not world._park_lamps[0].visible and not world._fountain_water.visible
+            and not world._fountain_water.get_node("FountainSpray").emitting
+            and not world._lantern_glass.emission_enabled,
             "broken services turn off real visual indicators"):
         return
     world._on_world_updated(_world("PARK", "Park"))
