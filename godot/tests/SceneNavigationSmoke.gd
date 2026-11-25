@@ -175,6 +175,28 @@ func _exercise() -> void:
     if not _check(world._hands.held_item=="","removed inventory item no longer appears in hand"):
         return
     world._last_snapshot = old_bag_snapshot
+    world._toggle_phone()
+    if not _check(world._phone.visible and world._phone.app=="home"
+            and not world._foot_controls_available(),
+            "phone opens a modal first-person interface"):
+        return
+    world._phone.update_data({"player":{"incarnation":1,"money":42},"bank":{"personal":99},
+        "residents":[{"id":"test-contact","name":"Test Resident","conversations":1}]},
+        [{"title":"Test job","wage":25}],[])
+    world._phone.open_app("bank")
+    if not _check("99" in world._phone._body.text and "42" in world._phone._body.text,
+            "phone wallet reflects server snapshot"):
+        return
+    world._phone.open_app("contacts")
+    if not _check("Test Resident" in world._phone._body.text,
+            "known residents appear in session contacts"):
+        return
+    world._phone.update_data({"player":{"incarnation":2}},[],[])
+    if not _check(world._phone._contacts.is_empty(),"new life clears local contacts"):
+        return
+    world._close_phone()
+    if not _check(not world._phone.visible,"phone closes"):
+        return
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
     var park_root: Node3D = world._chunks["PARK"]["root"]
     if not _check(school_root.position == Vector3(0,0,-48)
