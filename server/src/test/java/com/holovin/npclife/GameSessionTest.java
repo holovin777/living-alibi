@@ -13,6 +13,55 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void rainBarrelAndProduceTradeConserveWaterStockAndCash() throws Exception {
+        Path file=directory.resolve("rain-trade.db");
+        try(var game=new GameSession(file)) { game.move("south"); }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            var p=town.player;p.ownsHouse=true;p.money=50;p.bottledWater=1;
+            GardenLife.act(town,"buy-barrel",1,720);
+            assertEquals(42,p.money);
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"buy-barrel",1,720));
+            int rainDays=0;
+            for(int day=1;rainDays<3;day++) {
+                if(WeatherLife.at(day,1080).raining()) {
+                    GardenLife.tick(town,day,1080);GardenLife.tick(town,day,1080);
+                    rainDays++;
+                    assertEquals(Math.min(8,rainDays*3),GardenLife.get(town,GardenLife.RAIN));
+                }
+            }
+            int dry=1;
+            while(GardenLife.winter(dry)||WeatherLife.at(dry,720).raining())dry++;
+            GardenLife.act(town,"plant",dry,720);
+            GardenLife.act(town,"water-rain",dry,720);
+            assertEquals(7,GardenLife.get(town,GardenLife.RAIN));assertEquals(1,p.bottledWater);
+            FoodLife.change(p,"vegetables",false,2);
+            p.place=TownLife.Place.MARKET;p.destination=p.place;
+            town.retailStock.put("vegetables",18);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buyProduce(town,720));
+            town.retailStock.put("vegetables",17);
+            FreightLife.set(town,FreightLife.STAGE,1);FreightLife.set(town,FreightLife.KIND,2);FreightLife.set(town,FreightLife.IRON,1);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buyProduce(town,720));
+            FreightLife.clear(town);
+            town.employerFunds.put("shop-assistant",1);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buyProduce(town,720));
+            town.employerFunds.put("shop-assistant",50);
+            RetailLife.buyProduce(town,720);
+            assertEquals(41,p.money);
+            assertEquals(48,town.employerFunds.get("shop-assistant"));
+            assertEquals(18,town.retailStock.get("vegetables"));
+            assertEquals(1,FoodLife.quantity(p,"vegetables",false));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertTrue(game.snapshot().garden().barrel());
+            assertEquals(7,game.snapshot().garden().rainwater());
+            assertEquals(1,game.snapshot().player().bag().get("vegetables"));
+            assertEquals(41,game.snapshot().player().money());
+        }
+    }
+
+    @Test
     void homeGardenUsesWaterAndWeatherAndPersistsCrop() throws Exception {
         Path file=directory.resolve("garden.db");
         try(var game=new GameSession(file)) {

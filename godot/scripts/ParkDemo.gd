@@ -1055,6 +1055,10 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
+    if _current_place=="SOUTH_RESIDENCES" and _owns_house() and bool(_last_snapshot.get("garden",{}).get("barrel",false)):
+        var barrel_at := Vector2(GARDEN_CENTER.x+2.85,GARDEN_CENTER.z)
+        if p.distance_to(barrel_at)<0.43+radius:
+            return false
     if _current_place in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"] and not _has_room_lease() and ROOM_BOUNDS.grow(radius).has_point(p):
         return false
     for obstacle in _obstacles:
@@ -1491,6 +1495,14 @@ func _build_home_garden() -> void:
     for z in [-2.45,2.45]:
         _box(garden,Vector3(4.2,0.34,0.16),Color("#a28a66"),GARDEN_CENTER+Vector3(0,0.15,z))
     _sign(garden,"Orto privato · F",GARDEN_CENTER+Vector3(0,1.5,2.65))
+    var barrel := Node3D.new()
+    barrel.name = "RainBarrel"
+    garden.add_child(barrel)
+    barrel.position = GARDEN_CENTER+Vector3(2.85,0,0)
+    _cylinder(barrel,0.43,1.05,Color("#486a76"),Vector3(0,0.55,0))
+    _cylinder(barrel,0.39,0.04,Color("#718f9c"),Vector3(0,1.10,0))
+    _box(barrel,Vector3(0.11,0.12,0.20),Color("#a6aaa0"),Vector3(0,0.28,0.46))
+    barrel.visible = false
     for stage in range(4):
         var crops := Node3D.new()
         crops.name = "Stage"+str(stage)
@@ -1509,6 +1521,9 @@ func _sync_garden() -> void:
         return
     var root: Node3D = _chunks["SOUTH_RESIDENCES"]["root"]
     var report: Dictionary = _last_snapshot.get("garden",{})
+    var barrel := root.get_node_or_null("OrtoPrivato/RainBarrel") as Node3D
+    if barrel!=null:
+        barrel.visible = _owns_house() and bool(report.get("barrel",false))
     for stage in range(4):
         var crops := root.get_node_or_null("OrtoPrivato/Stage"+str(stage)) as Node3D
         if crops!=null:
@@ -2396,6 +2411,12 @@ func _render_actions() -> void:
                 var info := Label.new()
                 info.text = "Garden · growth %s/3 | %s" % [garden.get("growth",0),"Winter: dormant" if bool(garden.get("winter",false)) else ("Rain today" if bool(garden.get("rainy",false)) else ("Watered today" if bool(garden.get("wateredToday",false)) else "Dry today"))]
                 _action_choices.add_child(info)
+                if bool(garden.get("barrel",false)):
+                    var water_stock := Label.new()
+                    water_stock.text = "Rain barrel: %s/8 (irrigation only)" % garden.get("rainwater",0)
+                    _action_choices.add_child(water_stock)
+                else:
+                    _action_choices.add_child(_button("Install rain barrel · 8 EUR",_garden_action.bind("buy-barrel")))
                 if not bool(garden.get("planted",false)):
                     if not bool(garden.get("winter",false)):
                         _action_choices.add_child(_button("Plant vegetables · 3 EUR",_garden_action.bind("plant")))
@@ -2403,6 +2424,8 @@ func _render_actions() -> void:
                     _action_choices.add_child(_button("Harvest 4 vegetables into cupboard",_garden_action.bind("harvest")))
                 elif not bool(garden.get("winter",false)) and not bool(garden.get("rainy",false)) and not bool(garden.get("wateredToday",false)) and int(_last_snapshot.get("minute",0))<1080:
                     _action_choices.add_child(_button("Water garden · 1 water",_garden_action.bind("water")))
+                    if int(garden.get("rainwater",0))>0:
+                        _action_choices.add_child(_button("Water from rain barrel · 1 unit",_garden_action.bind("water-rain")))
             elif _near_room_bed():
                 _action_choices.add_child(_button("Sleep in your house · 2h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in your house · 8h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 8h",_sleep_room.bind(8)))
@@ -2445,6 +2468,11 @@ func _render_actions() -> void:
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
             if _current_place == "MARKET":
+                var trade: Dictionary = _last_snapshot.get("garden",{})
+                if int(player.get("bag",{}).get("vegetables",0))>0:
+                    var sale := _button("Sell vegetables · 2 EUR / unit",_garden_action.bind("sell-vegetables"))
+                    sale.disabled = int(trade.get("marketFree",0))<=0 or int(trade.get("marketBudget",0))<2
+                    _action_choices.add_child(sale)
                 _action_choices.add_child(_button("Apply: market assistant",
                         _apply_job.bind("shop-assistant")))
             elif _current_place=="FUEL_STATION":
@@ -2630,7 +2658,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if _near_garden() and _connected and not _api.is_busy():
+    if (_near_garden() or (action=="sell-vegetables" and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:

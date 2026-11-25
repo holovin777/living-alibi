@@ -615,6 +615,24 @@ Growth uses game time, not real-world elapsed time. Death resets
 the private bed. No produce sales, additional crops, or separate
 seed inventory yet.
 
+## Rainwater and produce trade
+
+Install one rain barrel beside the private garden for 8 EUR.
+It collects three irrigation units at 18:00 on rainy days, up
+to eight stored units; snowfall does not fill it. Rainwater is
+not drinking water and cannot enter the player's bag. On dry
+days, choose bottled water or a barrel unit for the same daily
+watering action. The barrel and water survive restart and reset
+with the private garden on death.
+
+Retrieve vegetables from the cupboard into the bag and sell them
+at Market 08:00–20:00 for 2 EUR per unit. Sales move physical
+inventory and debit the market account; both freight manifests'
+reserved shelf space remains unavailable for sale. All vegetables
+in the bag are eligible, not only those harvested at home; buying
+at 3 EUR and reselling at 2 EUR loses money. No market stall or
+other crop types yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

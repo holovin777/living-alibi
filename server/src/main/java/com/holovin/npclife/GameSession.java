@@ -325,7 +325,7 @@ public final class GameSession implements AutoCloseable {
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
         var copy=town.copy();
-        return apply(copy,"plant".equals(action)?15:"harvest".equals(action)?15:5,GardenLife.act(copy,action,state.day,state.minute));
+        return apply(copy,"plant".equals(action)||"harvest".equals(action)||"buy-barrel".equals(action)?15:5,GardenLife.act(copy,action,state.day,state.minute));
     }
     public synchronized ActionView buyHouse() throws SQLException {
         var copy=town.copy();

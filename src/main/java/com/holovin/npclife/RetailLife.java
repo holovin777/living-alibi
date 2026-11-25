@@ -52,6 +52,23 @@ final class RetailLife {
         FoodLife.change(player,id,false,1);
         return "Bought "+product.label()+" for "+product.price()+" EUR.";
     }
+    static final int PRODUCE_PRICE=2;
+    static int produceSpace(TownLife.Town t) {
+        return Math.max(0,product("vegetables").capacity()-t.retailStock.getOrDefault("vegetables",0)-FreightLife.reservedCrop(t,"vegetables"));
+    }
+    static String buyProduce(TownLife.Town t,int minute) {
+        var p=t.player;TransportLife.ready(p);
+        if(p.place!=TownLife.Place.MARKET)throw new IllegalArgumentException("Sell produce at the market.");
+        if(minute<480||minute>=1200)throw new IllegalArgumentException("Market opens 08:00–20:00.");
+        if(FoodLife.quantity(p,"vegetables",false)<1)throw new IllegalArgumentException("Bring vegetables in your bag.");
+        if(produceSpace(t)<1)throw new IllegalArgumentException("The market has no unreserved vegetable shelf space.");
+        if(t.employerFunds.getOrDefault("shop-assistant",0)<PRODUCE_PRICE)throw new IllegalArgumentException("Market cannot afford more produce.");
+        FoodLife.change(p,"vegetables",false,-1);
+        t.retailStock.merge("vegetables",1,Math::addExact);
+        t.employerFunds.merge("shop-assistant",-PRODUCE_PRICE,Integer::sum);
+        p.money=Math.addExact(p.money,PRODUCE_PRICE);
+        return "Sold one vegetable unit for 2 EUR.";
+    }
     static String consume(PlayerLife.Player p,String id) {
         PlayerLife.requireAlive(p);
         if(p.travelRemaining>0)throw new IllegalArgumentException("Finish traveling first.");
