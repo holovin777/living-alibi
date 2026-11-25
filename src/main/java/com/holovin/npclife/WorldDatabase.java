@@ -925,6 +925,7 @@ final class WorldDatabase implements AutoCloseable {
         FuelLife.ensure(town);
         FreightLife.ensure(town);
         GardenLife.ensure(town);
+        HenLife.ensure(town);
         try(Statement st=db.createStatement();
                 ResultSet rs=st.executeQuery("SELECT stock_id,quantity FROM industry_stocks")) {
             while(rs.next()) {

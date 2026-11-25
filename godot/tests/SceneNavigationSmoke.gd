@@ -490,13 +490,28 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    home = home.duplicate(true)
+    home["hens"] = {"coop":true,"hens":2,"health":85,"eggs":3}
+    world._on_world_updated(home)
+    world._avatar.position = world.COOP_CENTER+Vector3(0,0,3.2)
+    world._render_actions()
+    if not _check(world._near_coop() and _has_button(world._action_choices,"Collect egg")
+            and _has_button(world._action_choices,"Feed hens")
+            and world._scenery.get_node("PollaioPrivato/Coop/Hen2").visible
+            and not world._scenery.get_node("PollaioPrivato/Coop/Hen3").visible
+            and not world._can_stand(world.COOP_CENTER,world.WALKER_RADIUS),
+            "coop shows purchased hens and allows care and collection"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
     var trade := _world("MARKET","Market")
-    trade["player"]["bag"] = {"vegetables":2}
+    trade["player"]["bag"] = {"vegetables":2,"eggs":1}
+    trade["hens"] = {"marketFree":1,"marketBudget":20}
     trade["garden"] = {"marketFree":1,"marketBudget":20}
     world._on_world_updated(trade)
     world._avatar.position = world.KIOSK_POSITION+Vector3(0,0,1.5)
     world._render_actions()
-    if not _check(_has_button(world._action_choices,"Sell vegetables"),"market accepts carried vegetables"):
+    if not _check(_has_button(world._action_choices,"Sell vegetables") and _has_button(world._action_choices,"Sell eggs"),"market accepts carried vegetables and eggs"):
         return
     world._on_world_updated(_world("PARK","Park"))
 

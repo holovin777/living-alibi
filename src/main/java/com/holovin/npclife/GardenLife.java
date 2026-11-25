@@ -21,6 +21,8 @@ final class GardenLife {
     static boolean winter(int day){return CalendarLife.season(day)==CalendarLife.Season.WINTER;}
     static String act(TownLife.Town t,String action,int day,int minute) {
         if("sell-vegetables".equals(action))return RetailLife.buyProduce(t,minute);
+        if(java.util.Set.of("build-coop","buy-hen","feed-hens","water-hens","collect-eggs","sell-eggs").contains(action==null?"":action))
+            return HenLife.act(t,action,day,minute);
         present(t);var p=t.player;
         return switch(action==null?"":action) {
             case "plant" -> {

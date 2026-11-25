@@ -69,6 +69,23 @@ final class RetailLife {
         p.money=Math.addExact(p.money,PRODUCE_PRICE);
         return "Sold one vegetable unit for 2 EUR.";
     }
+    static final int EGG_PRICE=2;
+    static int eggSpace(TownLife.Town t) {
+        return Math.max(0,product("eggs").capacity()-t.retailStock.getOrDefault("eggs",0));
+    }
+    static String buyEggs(TownLife.Town t,int minute) {
+        var p=t.player;TransportLife.ready(p);
+        if(p.place!=TownLife.Place.MARKET||minute<480||minute>=1200)
+            throw new IllegalArgumentException("Sell eggs at Market 08:00–20:00.");
+        if(FoodLife.quantity(p,"eggs",false)<1)throw new IllegalArgumentException("Bring eggs in your bag.");
+        if(eggSpace(t)<1||t.employerFunds.getOrDefault("shop-assistant",0)<EGG_PRICE)
+            throw new IllegalArgumentException("The market has insufficient storage or cash.");
+        FoodLife.change(p,"eggs",false,-1);
+        t.retailStock.merge("eggs",1,Math::addExact);
+        t.employerFunds.merge("shop-assistant",-EGG_PRICE,Integer::sum);
+        p.money=Math.addExact(p.money,EGG_PRICE);
+        return "Sold one egg unit for 2 EUR.";
+    }
     static String consume(PlayerLife.Player p,String id) {
         PlayerLife.requireAlive(p);
         if(p.travelRemaining>0)throw new IllegalArgumentException("Finish traveling first.");

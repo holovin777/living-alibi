@@ -633,6 +633,25 @@ in the bag are eligible, not only those harvested at home; buying
 at 3 EUR and reselling at 2 EUR loses money. No market stall or
 other crop types yet.
 
+## Private chicken coop
+
+Build a three-hen coop at Casa del Glicine for 20 EUR and buy
+hens for 12 EUR each (farm-account purchases, not a breeding
+simulation). Care before 18:00 uses one rice and one bottled-water
+unit from the bag for the whole flock. The daily tick produces one
+egg unit per hen if both needs are met and flock condition is at
+least 50; in winter production is limited to one unit per day.
+Missed care reduces condition by 15 points; complete care restores
+10. The flock recovers with care; mortality and individual animal
+health are not implemented. The nest holds six units. Collect
+one at a time into the kitchen cupboard and cook existing egg
+recipes or carry eggs to Market to sell for 2 EUR, subject to
+market cash and shelf capacity. Purchases, flock condition, care
+markers and eggs persist; the private coop resets on visitor death.
+The 3D hens are static models reflecting the current flock, not
+autonomous animals. No rainwater drinking, breeding, spoilage or
+independent feed inventory yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

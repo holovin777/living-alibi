@@ -88,6 +88,7 @@ final class PlayerLife {
         FreightLife.recover(town);
         SecondFleetLife.recover(town);
         GardenLife.clear(town);
+        HenLife.clear(town);
         Player next=new Player();
         next.incarnation=previous.incarnation+1;
         town.player=next;

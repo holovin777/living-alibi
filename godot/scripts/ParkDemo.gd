@@ -27,6 +27,7 @@ const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
 const GARDEN_CENTER := Vector3(11,0,11)
+const COOP_CENTER := Vector3(-10,0,-10)
 const ROOM_BOUNDS := Rect2(-13.0,4.0,9.0,10.0)
 const ROOM_EXIT := Vector3(-3.0,0,8.5)
 const BED_POSITION := Vector3(-11.3,0,6.1)
@@ -185,6 +186,8 @@ func _process(delta: float) -> void:
         _hint.text = "F: choose a driving route."
     elif _near_rack() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
         _hint.text = "P: park or retrieve your bicycle · B: ride/walk."
+    elif _near_coop():
+        _hint.text = "F: care for chickens or collect eggs."
     elif _near_garden():
         _hint.text = "F: plant, water or harvest your garden."
     elif _near_home_station():
@@ -286,8 +289,11 @@ func _near_bath() -> bool:
 func _near_garden() -> bool:
     return _current_place=="SOUTH_RESIDENCES" and _owns_house() and _avatar.position.distance_to(GARDEN_CENTER)<3.3
 
+func _near_coop() -> bool:
+    return _current_place=="SOUTH_RESIDENCES" and _owns_house() and _avatar.position.distance_to(COOP_CENTER)<4.5
+
 func _near_home_station() -> bool:
-    return _near_room_bed() or _near_kitchen() or _near_bath() or _near_garden()
+    return _near_room_bed() or _near_kitchen() or _near_bath() or _near_garden() or _near_coop()
 
 func _sync_guest_room() -> void:
     for district in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"]:
@@ -740,6 +746,7 @@ func _generate_chunk(place_id: String) -> void:
         "SOUTH_RESIDENCES":
             _build_guesthouse(true)
             _build_home_garden()
+            _build_home_coop()
         "PORTICI":
             _build_portici()
         "CENTRO":
@@ -1055,6 +1062,9 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
+    if _current_place=="SOUTH_RESIDENCES" and _owns_house() and bool(_last_snapshot.get("hens",{}).get("coop",false)):
+        if Rect2(Vector2(COOP_CENTER.x-2.6,COOP_CENTER.z-2.4),Vector2(5.2,4.8)).grow(radius).has_point(p):
+            return false
     if _current_place=="SOUTH_RESIDENCES" and _owns_house() and bool(_last_snapshot.get("garden",{}).get("barrel",false)):
         var barrel_at := Vector2(GARDEN_CENTER.x+2.85,GARDEN_CENTER.z)
         if p.distance_to(barrel_at)<0.43+radius:
@@ -1528,6 +1538,68 @@ func _sync_garden() -> void:
         var crops := root.get_node_or_null("OrtoPrivato/Stage"+str(stage)) as Node3D
         if crops!=null:
             crops.visible = _owns_house() and bool(report.get("planted",false)) and int(report.get("growth",0))==stage
+
+func _build_home_coop() -> void:
+    var yard := Node3D.new()
+    yard.name = "PollaioPrivato"
+    yard.position = COOP_CENTER
+    _scenery.add_child(yard)
+    _sign(yard,"Pollaio · F",Vector3(0,2.4,2.7))
+    var coop := Node3D.new()
+    coop.name = "Coop"
+    yard.add_child(coop)
+    _box(coop,Vector3(5.2,0.05,4.8),Color("#a58e66"),Vector3.ZERO)
+    _box(coop,Vector3(2.5,1.6,1.6),Color("#a07951"),Vector3(0,1.1,-1.35))
+    _box(coop,Vector3(2.8,0.18,1.9),Color("#795043"),Vector3(0,2.0,-1.35))
+    _box(coop,Vector3(0.65,0.65,0.06),Color("#4c3829"),Vector3(0,0.9,-0.52))
+    _box(coop,Vector3(0.66,0.12,1.3),Color("#bc9a6c"),Vector3(0,0.3,0.1))
+    for x in [-2.5,2.5]:
+        for z in [-2.3,0.0,2.3]:
+            _box(coop,Vector3(0.11,1.2,0.11),Color("#84684a"),Vector3(x,0.6,z))
+        for y in [0.25,0.65,1.05]:
+            _box(coop,Vector3(0.045,0.045,4.6),Color("#9caaa0"),Vector3(x,y,0))
+    for z in [-2.3,2.3]:
+        for y in [0.25,0.65,1.05]:
+            _box(coop,Vector3(5,0.045,0.045),Color("#9caaa0"),Vector3(0,y,z))
+    for n in range(3):
+        var bird := Node3D.new()
+        bird.name = "Hen"+str(n+1)
+        bird.position = Vector3(-1.5+1.5*n,0,1.0)
+        coop.add_child(bird)
+        var feathers := Color("#c3a17a") if n==1 else Color("#e4ddcd")
+        _sphere(bird,0.26,feathers,Vector3(0,0.37,0))
+        _sphere(bird,0.15,feathers,Vector3(0,0.62,-0.19))
+        _box(bird,Vector3(0.11,0.08,0.15),Color("#d1a146"),Vector3(0,0.6,-0.35))
+        _sphere(bird,0.075,Color("#ae493b"),Vector3(0,0.78,-0.19))
+        for x in [-0.10,0.10]:
+            _box(bird,Vector3(0.045,0.19,0.045),Color("#b28b45"),Vector3(x,0.10,0))
+            _sphere(bird,0.028,Color("#333333"),Vector3(x,0.65,-0.26))
+        bird.visible = false
+    for n in range(6):
+        var egg := Node3D.new()
+        egg.name = "Egg"+str(n+1)
+        coop.add_child(egg)
+        egg.position = Vector3(-0.8+0.32*n,0.14,-0.2)
+        _sphere(egg,0.085,Color("#e7dfcd"),Vector3.ZERO)
+        egg.scale.y = 1.25
+        egg.visible = false
+    coop.visible = false
+
+func _sync_coop() -> void:
+    if not _chunks.has("SOUTH_RESIDENCES"):
+        return
+    var root: Node3D = _chunks["SOUTH_RESIDENCES"]["root"]
+    var coop := root.get_node_or_null("PollaioPrivato/Coop") as Node3D
+    if coop==null:
+        return
+    var report: Dictionary = _last_snapshot.get("hens",{})
+    coop.visible = _owns_house() and bool(report.get("coop",false))
+    for n in range(3):
+        var bird := coop.get_node("Hen"+str(n+1)) as Node3D
+        bird.visible = n<int(report.get("hens",0))
+    for n in range(6):
+        var egg := coop.get_node("Egg"+str(n+1)) as Node3D
+        egg.visible = n<int(report.get("eggs",0))
 
 func _build_portici() -> void:
     var street := Node3D.new()
@@ -2406,7 +2478,24 @@ func _render_actions() -> void:
         "CENTRO":
             _action_choices.add_child(_button("Job noticeboard",_find_jobs))
         "NORTH_RESIDENCES", "SOUTH_RESIDENCES":
-            if _near_garden():
+            if _near_coop():
+                var hens: Dictionary = _last_snapshot.get("hens",{})
+                if not bool(hens.get("coop",false)):
+                    _action_choices.add_child(_button("Build chicken coop · 20 EUR",_garden_action.bind("build-coop")))
+                else:
+                    var status := Label.new()
+                    status.text = "Hens %s/3 | Condition %s/100 | Nest %s/6\nFeed: %s | Water: %s" % [hens.get("hens",0),hens.get("health",0),hens.get("eggs",0),"done" if bool(hens.get("fedToday",false)) else "needed","done" if bool(hens.get("wateredToday",false)) else "needed"]
+                    _action_choices.add_child(status)
+                    if int(hens.get("hens",0))<3 and not bool(hens.get("fedToday",false)) and not bool(hens.get("wateredToday",false)):
+                        _action_choices.add_child(_button("Buy hen · 12 EUR",_garden_action.bind("buy-hen")))
+                    if int(hens.get("hens",0))>0 and int(_last_snapshot.get("minute",0))<1080:
+                        if not bool(hens.get("fedToday",false)):
+                            _action_choices.add_child(_button("Feed hens · 1 rice",_garden_action.bind("feed-hens")))
+                        if not bool(hens.get("wateredToday",false)):
+                            _action_choices.add_child(_button("Water hens · 1 drinking water",_garden_action.bind("water-hens")))
+                    if int(hens.get("eggs",0))>0:
+                        _action_choices.add_child(_button("Collect egg into cupboard",_garden_action.bind("collect-eggs")))
+            elif _near_garden():
                 var garden: Dictionary = _last_snapshot.get("garden",{})
                 var info := Label.new()
                 info.text = "Garden · growth %s/3 | %s" % [garden.get("growth",0),"Winter: dormant" if bool(garden.get("winter",false)) else ("Rain today" if bool(garden.get("rainy",false)) else ("Watered today" if bool(garden.get("wateredToday",false)) else "Dry today"))]
@@ -2473,6 +2562,11 @@ func _render_actions() -> void:
                     var sale := _button("Sell vegetables · 2 EUR / unit",_garden_action.bind("sell-vegetables"))
                     sale.disabled = int(trade.get("marketFree",0))<=0 or int(trade.get("marketBudget",0))<2
                     _action_choices.add_child(sale)
+                var eggs: Dictionary = _last_snapshot.get("hens",{})
+                if int(player.get("bag",{}).get("eggs",0))>0:
+                    var egg_sale := _button("Sell eggs · 2 EUR / unit",_garden_action.bind("sell-eggs"))
+                    egg_sale.disabled = int(eggs.get("marketFree",0))<=0 or int(eggs.get("marketBudget",0))<2
+                    _action_choices.add_child(egg_sale)
                 _action_choices.add_child(_button("Apply: market assistant",
                         _apply_job.bind("shop-assistant")))
             elif _current_place=="FUEL_STATION":
@@ -2658,7 +2752,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (_near_garden() or (action=="sell-vegetables" and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if (_near_garden() or _near_coop() or (action in ["sell-vegetables","sell-eggs"] and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:
@@ -2808,6 +2902,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     ]
     _sync_guest_room()
     _sync_garden()
+    _sync_coop()
     _sync_owned_car()
     _car_label.text = "Car: none" if _car_place().is_empty() else "Car: %s | Fuel %s/12 | Condition %s%%" % [_car_place().capitalize(),player.get("carFuel",0),player.get("carCondition",0)]
     _refresh_transport_buttons(false)

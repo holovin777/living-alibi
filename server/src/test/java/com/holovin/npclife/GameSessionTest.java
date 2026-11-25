@@ -13,6 +13,56 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void homeHensRequireCareAndPersistEggsAndMarketPayments() throws Exception {
+        Path file=directory.resolve("hens.db");
+        try(var game=new GameSession(file)) {
+            game.move("south");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("build-coop"));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            var p=town.player;p.ownsHouse=true;p.money=100;
+            FoodLife.change(p,"rice",false,2);FoodLife.change(p,"water",false,2);
+            HenLife.act(town,"build-coop",1,720);
+            for(int k=0;k<3;k++)HenLife.act(town,"buy-hen",1,720);
+            assertEquals(44,p.money);
+            assertThrows(IllegalArgumentException.class,()->HenLife.act(town,"buy-hen",1,720));
+            HenLife.act(town,"feed-hens",1,720);HenLife.act(town,"water-hens",1,720);
+            assertThrows(IllegalArgumentException.class,()->HenLife.act(town,"feed-hens",1,720));
+            HenLife.tick(town,1,1080);HenLife.tick(town,1,1080);
+            assertEquals(3,HenLife.get(town,HenLife.EGGS));
+            HenLife.tick(town,2,1080);
+            assertEquals(85,HenLife.get(town,HenLife.HEALTH));
+            assertEquals(3,HenLife.get(town,HenLife.EGGS));
+            HenLife.act(town,"feed-hens",3,720);HenLife.act(town,"water-hens",3,720);
+            HenLife.tick(town,3,1080);
+            assertEquals(6,HenLife.get(town,HenLife.EGGS));
+            assertEquals(0,p.bottledWater);assertEquals(0,FoodLife.quantity(p,"rice",false));
+            HenLife.act(town,"collect-eggs",3,1100);
+            assertEquals(1,FoodLife.quantity(p,"eggs",true));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(3,game.snapshot().hens().hens());
+            assertEquals(5,game.snapshot().hens().eggs());
+            assertEquals(95,game.snapshot().hens().health());
+            game.transferRoomItem("eggs",false);
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            town.player.place=TownLife.Place.MARKET;town.player.destination=town.player.place;
+            town.retailStock.put("eggs",16);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buyEggs(town,720));
+            town.retailStock.put("eggs",15);town.employerFunds.put("shop-assistant",10);
+            RetailLife.buyEggs(town,720);
+            assertEquals(46,town.player.money);
+            assertEquals(8,town.employerFunds.get("shop-assistant"));
+            assertEquals(16,town.retailStock.get("eggs"));
+            assertEquals(0,FoodLife.quantity(town.player,"eggs",false));
+        }
+    }
+
+    @Test
     void rainBarrelAndProduceTradeConserveWaterStockAndCash() throws Exception {
         Path file=directory.resolve("rain-trade.db");
         try(var game=new GameSession(file)) { game.move("south"); }
