@@ -214,7 +214,15 @@ const IT := {
     "I remember when you were there for me. Thank you.": "Ricordo quando mi sei stato vicino. Grazie.",
     "We haven't shared anything like that yet.": "Non abbiamo ancora condiviso esperienze del genere.",
     "Thank you for being here.": "Grazie per essermi vicino.",
-    "Thank you for the kind words.": "Grazie per le belle parole."
+    "Thank you for the kind words.": "Grazie per le belle parole.",
+    "Offer bread": "Offri pane",
+    "Offer water": "Offri acqua",
+    "Ask for bread": "Chiedi del pane",
+    "Ask for water": "Chiedi dell'acqua",
+    "I cannot accept that right now.": "Non posso accettare in questo momento.",
+    "Thank you for sharing your supplies.": "Grazie per aver condiviso le tue provviste.",
+    "Here, take this. You need it.": "Tieni, prendilo. Ne hai bisogno.",
+    "Sorry, I cannot spare supplies right now.": "Mi dispiace, non posso cedere provviste in questo momento."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
