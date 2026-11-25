@@ -72,8 +72,9 @@ final class EducationLife {
         for(int i=0;i<jobs.length;i++){
             String job=jobs[i],f=subject(job);
             int skill=get(t,c,f);
-            int minimum=switch(job){case "Teacher","Nurse" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
+            int minimum=switch(job){case "Teacher","Nurse","Journalist" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
             if(skill<minimum)continue;
+            if(NewspaperLife.OCCUPATION.equals(job)&&(t.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY*30||c.money<200))continue;
             String employer=IndustryLife.companyFor(job);
             if(employer!=null&&t.employerFunds.getOrDefault(employer,0)<IndustryLife.HOURLY_WAGE)continue;
             long occupied=t.people.values().stream().filter(x->x.alive&&x.employed&&job.equals(x.occupation)).count();

@@ -165,6 +165,60 @@ class GameSessionTest {
     }
 
     @Test
+    void newspaperUsesAttributedPublicClaimsAndRealEditorialFundsAcrossRestart() throws Exception {
+        Path file=directory.resolve("newspaper.db");
+        String reporterId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var reporter=PopulationGenerator.add(town,1).getFirst();reporterId=reporter.id;
+            reporter.age=30;reporter.occupation=NewspaperLife.OCCUPATION;
+            reporter.employed=true;reporter.workplace=TownLife.Place.LIBRARY;
+            reporter.place=reporter.workplace;reporter.destination=reporter.place;reporter.travelRemaining=0;
+            reporter.activity="WORKING";reporter.money=100;
+            town.player.place=TownLife.Place.LIBRARY;town.player.destination=town.player.place;town.player.travelRemaining=0;
+            town.player.investigationSkill=2;
+            CareerLife.apply(town,NewspaperLife.JOB);
+            assertThrows(IllegalArgumentException.class,()->CareerLife.work(town,1,600));
+            var publicEvent=new TownLife.Event(1,550,"marco",TownLife.Place.PARK,TownLife.publicSpace(TownLife.Place.PARK),
+                "Marco Bianchi and Elena Rossi crossed paths at Park.");
+            KnowledgeLife.witnessed(town,publicEvent,reporter.id);
+            var privateEvent=new TownLife.Event(1,590,"marco",TownLife.Place.PARK,TownLife.privateUnit("marco"),
+                "Private residents crossed paths at a private home.");
+            KnowledgeLife.witnessed(town,privateEvent,reporter.id);
+            assertTrue(NewspaperLife.interview(town,reporter,1,600).contains("first-hand account"));
+            assertTrue(NewspaperLife.filed(town,1));
+            assertTrue(NewspaperLife.interview(town,reporter,1,601).contains("already filed"));
+            int cash=town.employerFunds.get(NewspaperLife.JOB);
+            int playerCash=town.player.money;
+            CareerLife.work(town,1,600);
+            assertEquals(playerCash+20,town.player.money);
+            ArchiveLife.record(town,"public-construction",1,840,"Construction","Via Verdi walls completed.");
+            NewspaperLife.tick(town,1,959);
+            assertTrue(NewspaperLife.report(town,1).editions().isEmpty());
+            NewspaperLife.tick(town,1,960);NewspaperLife.tick(town,1,960);
+            var issue=NewspaperLife.report(town,1).editions().getFirst();
+            assertTrue(issue.text().contains("Official notice: Via Verdi walls completed."));
+            assertTrue(issue.text().contains("first-hand account"));
+            assertFalse(issue.text().contains("private home"));
+            assertEquals(140,reporter.money);
+            assertEquals(cash-60,town.employerFunds.get(NewspaperLife.JOB));
+            assertEquals(1,NewspaperLife.report(town,1).editions().size());
+            state.day=1;state.minute=960;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(NewspaperLife.filed(town,1));
+            assertEquals(1,NewspaperLife.report(town,1).editions().size());
+            NewspaperLife.tick(town,1,960);
+            assertEquals(140,town.get(reporterId).money);
+            town.get(reporterId).place=TownLife.Place.PARK;
+            NewspaperLife.tick(town,2,960);
+            assertEquals(1,NewspaperLife.report(town,2).editions().size());
+        }
+    }
+
+    @Test
     void historicalArchiveRetainsMilestonesAndYearPagesWithoutLeakingPrivateRecords() throws Exception {
         Path file=directory.resolve("historical-archive.db");
         try(var db=new WorldDatabase(file)){
@@ -1918,7 +1972,7 @@ class GameSessionTest {
     void ordinaryVisitorCanBecomeMinerOrMachinistAndSurveyNewOre() throws Exception {
         Path mine=directory.resolve("visitor-miner.db");
         try(var game=new GameSession(mine)) {
-            assertEquals(9,game.jobs().size());
+            assertEquals(10,game.jobs().size());
             game.move("quarry");
             game.applyJob("miner");
             game.waitMinutes(30);
@@ -1999,7 +2053,7 @@ class GameSessionTest {
             assertEquals(50,visitor.money());
             assertNull(visitor.jobId());
             assertEquals(0,visitor.engineeringSkill());
-            assertEquals(9,game.jobs().size());
+            assertEquals(10,game.jobs().size());
 
             assertThrows(IllegalArgumentException.class,
                     ()->game.applyJob("shop-assistant"));
@@ -2027,7 +2081,7 @@ class GameSessionTest {
             assertEquals("SCHOOL",restarted.snapshot().player().placeId());
             assertEquals("shop-assistant",restarted.snapshot().player().jobId());
             assertEquals(1,restarted.snapshot().player().engineeringSkill());
-            assertEquals(9,restarted.jobs().size(),"job board remains stable");
+            assertEquals(10,restarted.jobs().size(),"job board remains stable");
         }
     }
 

@@ -34,6 +34,7 @@ final class CareerLife {
                     "none",0,34,560),
             new Offer("farm-worker","Farm worker",TownLife.Place.FARM,"none",0,26,300),
             new Offer("fuel-attendant","Fuel station attendant",TownLife.Place.FUEL_STATION,"none",0,25,300),
+            new Offer(NewspaperLife.JOB,"Local journalist",TownLife.Place.LIBRARY,"investigation",2,20,1600),
             new Offer(FreightLife.JOB,"Freight driver",TownLife.Place.QUARRY,"none",0,FreightLife.WAGE,320)
     );
 
@@ -144,6 +145,7 @@ final class CareerLife {
                 p.lastTechnicalDay!=day)
             throw new IllegalArgumentException(
                     "Inspect and complete an actual city work order before this technical shift.");
+        if(NewspaperLife.JOB.equals(vacancy.id)&&!NewspaperLife.filed(town,day))throw new IllegalArgumentException("Interview a resident and file a public news dispatch before working.");
         int funds=town.employerFunds.getOrDefault(vacancy.id,0);
         if(funds<vacancy.wage)
             throw new IllegalArgumentException("Employer has insufficient payroll funds.");

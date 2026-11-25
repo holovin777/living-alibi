@@ -23,7 +23,8 @@ final class KnowledgeLife {
                s.contains("tense exchange") || s.contains("reconciled") ||
                s.contains("died") || s.contains("disappeared") ||
                s.contains("stolen") || s.contains("stole ") ||
-               s.contains("opened his own bakery");
+               s.contains("opened his own bakery") || s.contains("recommended the private market stall to") ||
+               (s.contains(" dispatched ") && s.contains(" spare parts"));
     }
 
     static String eventKey(TownLife.Event event) {

@@ -255,6 +255,7 @@ final class TownLife {
         MunicipalLife.ensure(t);
         DemographyLife.ensure(t);
         EducationLife.ensure(t);
+        NewspaperLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -303,6 +304,7 @@ final class TownLife {
         InvestigationLife.tick(town,marco,truth,observations);
         UtilityLife.tick(town,marco,truth,observations);
         ArchiveLife.annual(town,marco.day,marco.minute);
+        NewspaperLife.tick(town,marco.day,marco.minute);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {
             town.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
