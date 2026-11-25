@@ -39,6 +39,7 @@ final class EmploymentLife {
                 p.sickUntilDay=0;
                 log(town,clock,p,Kind.RECOVERED,"Returned to usual health after a brief illness.");
             }
+            if(!DemographyLife.workingAge(p))continue;
             // A company that cannot pay its employees must stop pretending
             // they still earn wages. Former industrial workers can search the
             // wider local job market instead of starving in an unpaid post.
@@ -84,7 +85,7 @@ final class EmploymentLife {
     }
 
     static void hire(TownLife.Town town,WorldState clock,TownLife.Citizen p,int roleIndex) {
-        if(!p.alive || p.generationIndex<=0 || p.employed || roleIndex<0 || roleIndex>=JOBS.length)
+        if(!p.alive || p.generationIndex<=0 || !DemographyLife.workingAge(p) || p.employed || roleIndex<0 || roleIndex>=JOBS.length)
             throw new IllegalArgumentException("Invalid job offer.");
         String previous=p.occupation;
         p.employed=true;p.unemploymentDays=0;p.lastHiredDay=clock.day;

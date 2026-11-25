@@ -27,10 +27,11 @@ final class PopulationGenerator {
 
     static List<TownLife.Citizen> add(TownLife.Town town,int count) {
         if(count<1 || count>20)throw new IllegalArgumentException("Generate 1–20 residents per command.");
-        long existing=town.people.keySet().stream().filter(id->id.startsWith("resident-")).count();
+        long existing=DemographyLife.living(town);
         if(existing+count>MAX_GENERATED)
             throw new IllegalArgumentException("Maximum "+MAX_GENERATED+" generated residents in this prototype.");
         int next=town.people.values().stream().mapToInt(p->p.generationIndex).max().orElse(0)+1;
+        if(next+count-1>9999)throw new IllegalArgumentException("Historical resident ID capacity reached.");
         Set<String> names=new HashSet<>();
         for(var citizen:town.people.values())names.add(citizen.name);
         List<TownLife.Citizen> generated=new ArrayList<>();
@@ -38,8 +39,8 @@ final class PopulationGenerator {
             int index=next+i;
             var rng=new SplittableRandom(0x5EEDCAFE3A12L+index*0x9E3779B97F4A7C15L);
             String name;
-            do{name=FIRST[rng.nextInt(FIRST.length)]+" "+LAST[rng.nextInt(LAST.length)];}
-            while(!names.add(name));
+            name=FIRST[rng.nextInt(FIRST.length)]+" "+LAST[rng.nextInt(LAST.length)];
+            if(!names.add(name)){name=name+" "+index;names.add(name);}
             int job=rng.nextInt(JOBS.length);
             var home=rng.nextBoolean()?TownLife.Place.NORTH_RESIDENCES:TownLife.Place.SOUTH_RESIDENCES;
             String id="resident-%04d".formatted(index);
