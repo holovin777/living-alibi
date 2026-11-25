@@ -134,7 +134,7 @@ final class EconomyLife {
     static Loan issueLoan(TownLife.Town town,WorldState clock,TownLife.Citizen lender,
                           TownLife.Citizen borrower,int amount,List<TownLife.Event> truth,
                           List<TownLife.Observation> observations) {
-        if(amount<10 || amount>70 || !lender.alive || !borrower.alive ||
+        if(amount<10 || amount>70 || DemographyLife.child(lender)||DemographyLife.child(borrower)|| !lender.alive || !borrower.alive ||
                 lender.id.equals(borrower.id) || hasOpenLoan(town,borrower.id) ||
                 lender.money-amount<100 || borrower.travelRemaining>0 || lender.travelRemaining>0 ||
                 !lender.currentSpace().equals(borrower.currentSpace()) ||

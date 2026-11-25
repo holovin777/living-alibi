@@ -9,6 +9,7 @@ final class DemographyLife {
     private DemographyLife(){}
     static final String LAST="demography:last-day", BIRTHS="demography:births", DEATHS="demography:deaths",
             PENSIONS="demography:pensions", INHERITED="demography:inherited";
+    static final int CHILD_DAILY_CASH=18, WEEKLY_PENSION=35;
     static final List<String> FIELDS=List.of("parent-a","parent-b","partner","union-day","born","last-birth","children","estate");
     static String key(TownLife.Citizen c,String field){return "demography:"+c.id+":"+field;}
     static int get(TownLife.Town t,String k){return t.industryStocks.getOrDefault(k,0);}
@@ -75,17 +76,17 @@ final class DemographyLife {
         return b!=null&&b.alive?b:null;
     }
     static void support(TownLife.Town t,TownLife.Citizen c){
-        if(c.money>=12)return;
+        if(c.money>=CHILD_DAILY_CASH)return;
         for(String f:List.of("parent-a","parent-b")){
             var p=byIndex(t,get(t,c,f));
             if(p!=null&&p.alive){
-                int n=Math.min(12-c.money,Math.max(0,p.money-20));
+                int n=Math.min(CHILD_DAILY_CASH-c.money,Math.max(0,p.money-20));
                 p.money-=n;c.money+=n;
             }
         }
-        if(c.money<12){
+        if(c.money<CHILD_DAILY_CASH){
             int city=t.employerFunds.getOrDefault(MunicipalLife.CITY,0);
-            int n=Math.min(12-c.money,Math.max(0,city-MunicipalLife.RESERVE));
+            int n=Math.min(CHILD_DAILY_CASH-c.money,Math.max(0,city-MunicipalLife.RESERVE));
             t.employerFunds.put(MunicipalLife.CITY,city-n);c.money+=n;
         }
     }
@@ -126,17 +127,17 @@ final class DemographyLife {
                         c.alive=false;c.activity="DECEASED";
                     }
                 }
-                if(child(c)){
+                if(c.alive&&child(c)){
                     var guardian=guardian(t,c);
                     if(guardian!=null&&(c.home!=guardian.home||!c.homeUnit.equals(guardian.homeUnit)))
                         RentalLife.moveHome(t,c,guardian.home,guardian.homeUnit);
                     support(t,c);
                 }
-                if("Retired".equals(c.occupation)&&(day-1)%7==0){
+                if(c.alive&&"Retired".equals(c.occupation)&&(day-1)%7==0){
                     int city=t.employerFunds.getOrDefault(MunicipalLife.CITY,0);
-                    if(city>=MunicipalLife.RESERVE+10){
-                        c.money=Math.addExact(c.money,10);t.employerFunds.put(MunicipalLife.CITY,city-10);
-                        set(t,PENSIONS,Math.addExact(get(t,PENSIONS),10));
+                    if(city>=MunicipalLife.RESERVE+WEEKLY_PENSION){
+                        c.money=Math.addExact(c.money,WEEKLY_PENSION);t.employerFunds.put(MunicipalLife.CITY,city-WEEKLY_PENSION);
+                        set(t,PENSIONS,Math.addExact(get(t,PENSIONS),WEEKLY_PENSION));
                     }
                 }
             }

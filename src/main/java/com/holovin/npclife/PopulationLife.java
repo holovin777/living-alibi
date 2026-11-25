@@ -76,10 +76,12 @@ final class PopulationLife {
         if((sick||child) && c.place==c.home && marketOpen) {
             if(c.food<2 && c.money>=12) {
                 c.money-=12;c.food+=3;
+                if(child)town.employerFunds.merge("shop-assistant",12,Math::addExact);
                 TownLife.publish(town,clock,c.id,c.place,c.name+" received groceries at home.",events,observations);
             }
             if(c.water<2 && c.money>=6) {
                 c.money-=6;c.water+=3;
+                if(child)town.employerFunds.merge("shop-assistant",6,Math::addExact);
                 TownLife.publish(town,clock,c.id,c.place,c.name+" received drinking water at home.",events,observations);
             }
         }
