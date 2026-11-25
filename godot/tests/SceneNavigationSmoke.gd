@@ -658,6 +658,21 @@ func _exercise() -> void:
             "only actually co-present residents appear in the park"):
         return
     var marco = world._residents_root.get_node("Resident_marco")
+    var elena = world._residents_root.get_node("Resident_elena")
+    if not _check(marco.has_node("Torso") and marco.has_node("Head") and marco.has_node("Hair")
+            and marco.has_node("ArmLeft/Sleeve") and marco.has_node("LegRight/Trouser"),
+            "residents have articulated capsule geometry and individual facial details"):
+        return
+    var adult_scale: Vector3 = marco.scale
+    var variant: int = marco.get_meta("visual_variant")
+    world._resident_age(marco,7)
+    if not _check(marco.scale.y<adult_scale.y and marco.get_meta("visual_variant")==variant,
+            "child size follows age without changing visual identity"):
+        return
+    world._resident_age(marco,30)
+    if not _check(marco.scale.is_equal_approx(adult_scale) and elena.has_node("Head"),
+            "adult proportions are restored deterministically"):
+        return
     var start_position: Vector3 = marco.position
     world._animate_residents(0.5)
     if not _check(marco.position.distance_to(start_position) > 0.01,

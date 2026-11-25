@@ -2735,6 +2735,7 @@ func _render_residents() -> void:
         var person := _residents_root.get_node_or_null("Resident_" + id) as Node3D
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
+        _resident_age(person,int(resident.get("age",30)))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
@@ -2879,6 +2880,29 @@ func _sync_office_employee(person: Node3D,id: String) -> void:
         person.set_meta("anchor",OFFICE_STAFF_ANCHOR)
         person.rotation.y=PI/2.0
 
+func _resident_capsule(parent: Node3D,radius: float,height: float,color: Color,at: Vector3,shape: Vector3,part_name: String) -> void:
+    var mesh := CapsuleMesh.new()
+    mesh.radius=radius
+    mesh.height=height
+    mesh.radial_segments=10
+    mesh.rings=4
+    var part := MeshInstance3D.new()
+    part.name=part_name
+    part.mesh=mesh
+    var material := StandardMaterial3D.new()
+    material.albedo_color=color
+    material.roughness=0.9
+    part.material_override=material
+    part.position=at
+    part.scale=shape
+    parent.add_child(part)
+
+func _resident_age(person: Node3D,age: int) -> void:
+    var adult_height := float(person.get_meta("adult_height",1.0))
+    var factor := clampf(0.48+float(age)*0.03,0.48,1.0) if age<18 else 1.0
+    person.scale=Vector3(1.0,adult_height,1.0)*factor
+    person.set_meta("age",age)
+
 func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var person := Node3D.new()
     person.name = "Resident_" + id
@@ -2894,24 +2918,45 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     person.set_meta("phase", float(absi(id.hash()) % 628) / 100.0)
     _residents_root.add_child(person)
     var seed := absi(id.hash())
-    var jacket := Color.from_hsv(float(seed % 360)/360.0, 0.48, 0.63)
-    var skin := Color(0.82,0.64,0.49)
-    _cylinder(person, 0.24, 0.57, jacket, Vector3(0,1.14,0))
-    _sphere(person, 0.22, skin, Vector3(0,1.66,0))
-    _sphere(person, 0.215, Color(0.22,0.16,0.12), Vector3(0,1.78,0.035))
+    var outfits := [Color("#485e70"),Color("#86604f"),Color("#52705e"),Color("#ac966f"),Color("#655c74"),Color("#384148"),Color("#b2a49a"),Color("#8c5554")]
+    var skins := [Color("#e5bda0"),Color("#c99572"),Color("#b78362"),Color("#8c5d46"),Color("#ecc8aa")]
+    var hairs := [Color("#30251f"),Color("#674b35"),Color("#b49762"),Color("#8b8a84"),Color("#49332d")]
+    var jacket: Color = outfits[seed%outfits.size()]
+    var skin: Color = skins[(seed/17)%skins.size()]
+    var hair: Color = hairs[(seed/37)%hairs.size()]
+    var trousers: Color = [Color("#35404a"),Color("#524d44"),Color("#53606a")][(seed/71)%3]
+    var width := 0.90+float(seed%23)/100.0
+    person.set_meta("body_width",width)
+    person.set_meta("adult_height",0.94+float((seed/11)%17)/100.0)
+    person.set_meta("visual_variant",seed%24)
+    _resident_capsule(person,0.22*width,0.61,jacket,Vector3(0,1.16,0),Vector3(1,1,0.68),"Torso")
+    _resident_capsule(person,0.11,0.22,skin,Vector3(0,1.48,0),Vector3(0.82,1,0.80),"Neck")
+    _resident_capsule(person,0.16,0.36,skin,Vector3(0,1.69,0),Vector3(0.96,1,0.92),"Head")
+    _resident_capsule(person,0.165,0.24,hair,Vector3(0,1.80,0.035),Vector3(1,0.77,1),"Hair")
+    if seed%3==0:
+        _resident_capsule(person,0.15,0.35,hair,Vector3(0,1.68,0.10),Vector3(1,1,0.62),"LongHair")
+    elif seed%3==1:
+        _resident_capsule(person,0.09,0.18,hair,Vector3(0,1.89,0.075),Vector3.ONE,"HairBun")
+    for x in [-0.055,0.055]:
+        _box(person,Vector3(0.025,0.018,0.013),Color("#42382e"),Vector3(x,1.71,-0.143))
+    _box(person,Vector3(0.035,0.035,0.035),skin.lightened(0.08),Vector3(0,1.66,-0.156))
+    _box(person,Vector3(0.055,0.012,0.012),skin.darkened(0.32),Vector3(0,1.60,-0.136))
+    _box(person,Vector3(0.075,0.36,0.018),jacket.lightened(0.21),Vector3(0,1.18,-0.153))
+    if seed%4==0:
+        _box(person,Vector3(0.15,0.10,0.10),jacket.lightened(0.20),Vector3(0.11,1.32,-0.12))
     for side in [-1,1]:
         var leg := Node3D.new()
         leg.name = "LegLeft" if side < 0 else "LegRight"
-        leg.position = Vector3(side*0.13,0.84,0)
+        leg.position = Vector3(side*0.105*width,0.86,0)
         person.add_child(leg)
-        _box(leg,Vector3(0.20,0.70,0.22),Color(0.20,0.25,0.30),Vector3(0,-0.35,0))
-        _box(leg,Vector3(0.22,0.13,0.34),Color(0.14,0.15,0.17),Vector3(0,-0.77,-0.06))
+        _resident_capsule(leg,0.09,0.74,trousers,Vector3(0,-0.36,0),Vector3(1,1,0.94),"Trouser")
+        _box(leg,Vector3(0.19,0.13,0.31),Color("#292b2c"),Vector3(0,-0.785,-0.06))
         var arm := Node3D.new()
         arm.name = "ArmLeft" if side < 0 else "ArmRight"
-        arm.position = Vector3(side*0.32,1.37,0)
+        arm.position = Vector3(side*0.25*width,1.39,0)
         person.add_child(arm)
-        _box(arm,Vector3(0.16,0.44,0.17),jacket,Vector3(0,-0.22,0))
-        _sphere(arm,0.085,skin,Vector3(0,-0.48,0))
+        _resident_capsule(arm,0.075,0.48,jacket,Vector3(0,-0.23,0),Vector3.ONE,"Sleeve")
+        _resident_capsule(arm,0.055,0.14,skin,Vector3(0,-0.49,0),Vector3(0.85,1,0.80),"Hand")
     _sign(person,display_name,Vector3(0,2.1,0))
     var activity_label := Label3D.new()
     activity_label.name="ActivityLabel"
@@ -2945,7 +2990,10 @@ func _animate_residents(delta: float) -> void:
             var old := person.position
             person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
             walking = person.position.distance_squared_to(old) > 0.000001
-        var swing := sin(phase*12.0)*0.42 if walking else 0.0
+        var swing := sin(phase*12.0)*0.36 if walking else 0.0
+        var torso := person.get_node_or_null("Torso") as Node3D
+        if torso!=null:
+            torso.rotation.z=lerpf(torso.rotation.z,sin(phase*12.0)*0.035 if walking else sin(float(Time.get_ticks_msec())*0.0015+phase)*0.018,minf(delta*6,1.0))
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
