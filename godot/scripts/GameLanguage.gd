@@ -169,7 +169,7 @@ const IT := {
     "Apply: freight driver": "Candidati come autista merci",
     "Apply: quarry miner": "Candidati come minatore",
     "Apply: factory machinist": "Candidati come operaio di fabbrica",
-    "Apply: market assistant": "Candidati come commesso",
+    "Apply: market assistant": "Candidati: addetto al mercato",
     "Study engineering · 10 EUR": "Studia ingegneria · 10 EUR",
     "Study investigation · 10 EUR": "Studia investigazione · 10 EUR",
     "Previous year": "Anno precedente",
@@ -329,7 +329,20 @@ const IT := {
     "Completed five controlled practice exchanges.": "Completati cinque scambi controllati.",
     "Controlled response scored a point.": "Risposta controllata: un punto.",
     "Partner scored a point. Reset safely.": "Punto al compagno. Riprendi in sicurezza.",
-    "Ended practice without completing the round.": "Allenamento terminato prima della conclusione."
+    "Ended practice without completing the round.": "Allenamento terminato prima della conclusione.",
+    "First steps / navigation": "Primi passi / navigazione",
+    "First steps: connecting to the world...": "Primi passi: connessione al mondo...",
+    "nearby": "qui vicino",
+    "TRAVEL · E": "VIAGGIA · E",
+    "SERVICES · F": "SERVIZI · F",
+    "Find the yellow TRAVEL gate. Follow the distance and direction in First steps.": "Cerca il portale giallo VIAGGIA. Segui distanza e direzione nei Primi passi.",
+    "Your life: F opens choices. Follow signs to shops, work and home.": "La tua vita: F apre le scelte. Segui i cartelli per negozi, lavoro e casa.",
+    "Optional goal: find the blue SERVICES kiosk %s. Press F and choose Apply: market assistant.": "Obiettivo facoltativo: raggiungi il chiosco blu SERVIZI %s. Premi F e scegli Candidati: addetto al mercato.",
+    "Optional goal: earn your first money. Walk to yellow TRAVEL gate %s, press E and choose Market.": "Obiettivo facoltativo: guadagna i primi soldi. Vai al portale giallo VIAGGIA %s, premi E e scegli Market.",
+    "Your job: blue SERVICES kiosk %s. Press F for work actions during working hours.": "Il tuo lavoro: chiosco blu SERVIZI %s. Premi F per le azioni di lavoro durante l'orario.",
+    "Your job: %s. Travel gate %s (E).": "Il tuo lavoro: %s. Portale VIAGGIA %s (E).",
+    "Explore freely: use the blue SERVICES kiosk for local actions.": "Esplora liberamente: usa il chiosco blu SERVIZI per le azioni locali.",
+    "Travel E: %s · Services F: %s · Map M · Talk T": "Viaggia E: %s · Servizi F: %s · Mappa M · Parla T"
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
