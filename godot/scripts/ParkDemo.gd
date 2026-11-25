@@ -1662,6 +1662,17 @@ func _build_orchard() -> void:
         _box(hive,Vector3(0.65,0.24,0.65),Color("#cfaa5c"),Vector3(0,0.25+0.24*h,0))
     _box(hive,Vector3(0.78,0.12,0.78),Color("#85633f"),Vector3(0,0.91,0))
     hive.visible = false
+    var cellar := Node3D.new()
+    cellar.name = "Cantina"
+    cellar.position = ORCHARD_CENTER+Vector3(3.4,0,0)
+    orchard.add_child(cellar)
+    _box(cellar,Vector3(1.7,0.12,1.6),Color("#817665"),Vector3(0,0.06,0))
+    for x in [-0.48,0.48]:
+        _cylinder(cellar,0.33,0.90,Color("#896040"),Vector3(x,0.56,0))
+        _cylinder(cellar,0.35,0.08,Color("#514c47"),Vector3(x,0.35,0))
+        _cylinder(cellar,0.35,0.08,Color("#514c47"),Vector3(x,0.78,0))
+    _sign(cellar,"Cantina",Vector3(0,1.6,0))
+    cellar.visible = false
     for n in range(4):
         var plot: Vector3 = ORCHARD_PLOTS[n]
         _box(orchard,Vector3(1.8,0.05,1.8),Color("#866449"),plot+Vector3(0,0.02,0))
@@ -1691,6 +1702,9 @@ func _sync_orchard() -> void:
     if not _chunks.has("SOUTH_RESIDENCES"):
         return
     var root: Node3D = _chunks["SOUTH_RESIDENCES"]["root"]
+    var cellar := root.get_node_or_null("FruttetoPrivato/Cantina") as Node3D
+    if cellar!=null:
+        cellar.visible = _owns_house() and bool(_last_snapshot.get("orchard",{}).get("cellar",false))
     var hive := root.get_node_or_null("FruttetoPrivato/Beehive") as Node3D
     if hive!=null:
         hive.visible = _owns_house() and bool(_last_snapshot.get("orchard",{}).get("hive",false))
@@ -2216,6 +2230,7 @@ func _create_interface() -> void:
     _water_button = _button("Drink bottle",_consume_product.bind("water"))
     bag_row.add_child(_eat_button)
     bag_row.add_child(_water_button)
+    bag_row.add_child(_button("Drink juice",_consume_product.bind("grape-juice")))
     _eat_button.disabled = true
     _water_button.disabled = true
     _message = Label.new()
@@ -2586,6 +2601,23 @@ func _render_actions() -> void:
         "NORTH_RESIDENCES", "SOUTH_RESIDENCES":
             if _near_orchard():
                 var orchard: Dictionary = _last_snapshot.get("orchard",{})
+                if not bool(orchard.get("cellar",false)):
+                    _action_choices.add_child(_button("Install cellar · %s EUR" % orchard.get("cellarPrice",35),_garden_action.bind("orchard-build-cellar")))
+                else:
+                    var grapes := int(player.get("pantry",{}).get("grapes",0))
+                    var cellar_info := Label.new()
+                    cellar_info.text = "Cantina · Grapes in cupboard: %s" % grapes
+                    if bool(orchard.get("wineReady",false)):
+                        cellar_info.text += " | Wine ready"
+                    elif int(orchard.get("wineDueDay",0))>0:
+                        cellar_info.text += " | Wine ready day %s" % orchard.get("wineDueDay",0)
+                    _action_choices.add_child(cellar_info)
+                    if grapes>=2:
+                        _action_choices.add_child(_button("Press grape juice · 2 grapes",_garden_action.bind("orchard-press-juice")))
+                    if grapes>=3 and int(orchard.get("wineDueDay",0))==0 and not bool(orchard.get("wineReady",false)):
+                        _action_choices.add_child(_button("Start wine batch · 3 grapes",_garden_action.bind("orchard-start-wine")))
+                    if bool(orchard.get("wineReady",false)):
+                        _action_choices.add_child(_button("Collect wine into cupboard",_garden_action.bind("orchard-collect-wine")))
                 if not bool(orchard.get("hive",false)):
                     _action_choices.add_child(_button("Install beehive · 30 EUR",_garden_action.bind("orchard-build-hive")))
                 else:
@@ -2672,7 +2704,7 @@ func _render_actions() -> void:
                 var stock := Label.new()
                 stock.text = "Cupboard %s/24" % _inventory_count(pantry)
                 _action_choices.add_child(stock)
-                for item in ["bread","water","flour","eggs","pasta","vegetables","milk","rice","apples","pears","plums","grapes","honey"]:
+                for item in ["bread","water","flour","eggs","pasta","vegetables","milk","rice","apples","pears","plums","grapes","honey","grape-juice","wine"]:
                     if item not in ["bread","water"] and int(bag.get(item,0))+int(pantry.get(item,0)) == 0:
                         continue
                     var line := HBoxContainer.new()
@@ -2727,6 +2759,13 @@ func _render_actions() -> void:
                     var honey_sale := _button("Sell honey · 3 EUR / unit",_garden_action.bind("sell-honey"))
                     honey_sale.disabled = int(orchard.get("honeyMarketFree",0))<=0 or int(orchard.get("marketBudget",0))<3
                     _action_choices.add_child(honey_sale)
+                for product_id in ["grape-juice","wine"]:
+                    if int(player.get("bag",{}).get(product_id,0))>0:
+                        var price := int(orchard.get("winePrice",8) if product_id=="wine" else orchard.get("juicePrice",5))
+                        var free := int(orchard.get("wineMarketFree",0) if product_id=="wine" else orchard.get("juiceMarketFree",0))
+                        var cellar_sale := _button("Sell %s · %s EUR" % [product_id,price],_garden_action.bind("sell-"+product_id))
+                        cellar_sale.disabled = free<=0 or int(orchard.get("marketBudget",0))<price
+                        _action_choices.add_child(cellar_sale)
                 var eggs: Dictionary = _last_snapshot.get("hens",{})
                 if int(player.get("bag",{}).get("eggs",0))>0:
                     var egg_sale := _button("Sell eggs · 2 EUR / unit",_garden_action.bind("sell-eggs"))
@@ -2917,7 +2956,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (_near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey"] or action.begins_with("sell-fruit-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if (_near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:

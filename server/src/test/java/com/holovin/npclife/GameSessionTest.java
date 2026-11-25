@@ -165,6 +165,50 @@ class GameSessionTest {
     }
 
     @Test
+    void cellarConservesGrapesAndMaturesOneBatchAcrossRestart() throws Exception {
+        Path file=directory.resolve("cellar.db");
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            p.ownsHouse=true;p.place=HousingLife.HOUSE_DISTRICT;p.destination=p.place;
+            p.travelRemaining=0;p.money=100;
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"orchard-press-juice",186,720));
+            OrchardLife.act(town,"orchard-build-cellar",186,720);
+            assertEquals(65,p.money);
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"orchard-build-cellar",186,720));
+            FoodLife.change(p,"grapes",true,5);
+            OrchardLife.act(town,"orchard-press-juice",186,720);
+            assertEquals(3,FoodLife.quantity(p,"grapes",true));
+            assertEquals(1,FoodLife.quantity(p,"grape-juice",true));
+            OrchardLife.act(town,"orchard-start-wine",186,720);
+            assertEquals(0,FoodLife.quantity(p,"grapes",true));
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"orchard-start-wine",186,720));
+            OrchardLife.tick(town,192,1080);
+            assertFalse(OrchardLife.report(town,192,1080).wineReady());
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            assertTrue(OrchardLife.report(town,193,720).cellar());
+            assertEquals(193,OrchardLife.get(town,OrchardLife.WINE_DUE));
+            OrchardLife.tick(town,193,1080);OrchardLife.tick(town,193,1080);
+            OrchardLife.act(town,"orchard-collect-wine",193,1100);
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"orchard-collect-wine",193,1100));
+            assertEquals(1,FoodLife.quantity(p,"wine",true));
+            FoodLife.change(p,"wine",true,-1);FoodLife.change(p,"wine",false,1);
+            FoodLife.change(p,"grape-juice",true,-1);FoodLife.change(p,"grape-juice",false,1);
+            p.place=TownLife.Place.MARKET;p.destination=p.place;
+            int money=p.money,funds=town.employerFunds.getOrDefault("shop-assistant",0);
+            OrchardLife.act(town,"sell-wine",194,720);
+            OrchardLife.act(town,"sell-grape-juice",194,720);
+            assertEquals(money+13,p.money);
+            assertEquals(funds-13,town.employerFunds.get("shop-assistant"));
+            assertEquals(1,town.retailStock.get("wine"));
+            assertEquals(1,town.retailStock.get("grape-juice"));
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"sell-wine",194,720));
+        }
+    }
+
+    @Test
     void beekeepingProducesFiniteHoneyAndPollinatesOrchardAcrossRestart() throws Exception {
         Path file=directory.resolve("bees.db");
         try(var db=new WorldDatabase(file)) {
