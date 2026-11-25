@@ -20,6 +20,9 @@ final class PopulationLife {
     private static void lifeTick(TownLife.Town town,TownLife.Citizen c,WorldState clock,
                                  List<TownLife.Event> events,List<TownLife.Observation> observations) {
         int minute=clock.minute;
+        if(RebirthLife.linkedAdult(town,c)&&minute%60==0){
+            EducationLife.set(town,c,"dirt",Math.min(100,EducationLife.get(town,c,"dirt")+2));
+        }
         boolean child=DemographyLife.child(c),retired="Retired".equals(c.occupation);
         // Keep each resident's need cycles independent of everyone else's.
         int hungerPhase=Math.floorMod(c.generationIndex*7,12);

@@ -2739,10 +2739,11 @@ func _render_actions() -> void:
                 var home_label := Label.new()
                 home_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 home_label.text = "Home · %s · %s\nFood portions %s · Water portions %s" % [home_options.get("district",""),"at home" if home_options.get("atHome",false) else "away",home_options.get("food",0),home_options.get("water",0)]
+                home_label.text += "\nHygiene %s · Furnishings %s/2" % [home_options.get("hygiene",100),home_options.get("furnitureLevel",0)]
                 for relative in home_options.get("family",[]):
                     home_label.text += "\nAt home: "+str(relative)
                 _action_choices.add_child(home_label)
-                var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min"}
+                var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
                 for action in home_options.get("actions",[]):
                     _action_choices.add_child(_button(str(home_labels.get(action,action)),_garden_action.bind("rebirth-home-"+str(action))))
             var family_options = rebirth.get("familyOptions")
@@ -3552,6 +3553,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     ]
     var home = snapshot.get("rebirth",{}).get("homeOptions")
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
+    if _apartment_active:
+        _apartment.set_furniture_level(int(home.get("furnitureLevel",0)))
     _sync_guest_room()
     _sync_garden()
     _sync_coop()

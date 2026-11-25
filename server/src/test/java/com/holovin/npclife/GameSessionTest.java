@@ -93,7 +93,7 @@ class GameSessionTest {
             town.industryStocks.put(RebirthLife.CHILD,a.generationIndex);
             DemographyLife.set(town,a,"played-incarnation",town.player.incarnation);
             DemographyLife.set(town,a,"partner",b.generationIndex);DemographyLife.set(town,b,"partner",a.generationIndex);
-            state.day=2;state.minute=1210;
+            state.day=2;state.minute=1200;
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
         try(var game=new GameSession(file)){
@@ -106,6 +106,7 @@ class GameSessionTest {
         try(var db=new WorldDatabase(file)){
             var state=db.load();var town=db.loadTown(state);
             var a=town.get(id);a.hunger=60;a.thirst=60;a.fatigue=60;a.food=5;a.water=5;
+            EducationLife.set(town,a,"dirt",40);
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
         try(var game=new GameSession(file)){
@@ -115,8 +116,15 @@ class GameSessionTest {
             assertEquals(before.minute()+15,meal.minute());
             var drink=game.gardenAction("rebirth-home-drink").world();
             assertEquals(meal.rebirth().homeOptions().water()-1,drink.rebirth().homeOptions().water());
+            var washed=game.gardenAction("rebirth-home-wash").world();
+            assertEquals(drink.rebirth().homeOptions().water()-1,washed.rebirth().homeOptions().water());
+            assertTrue(washed.rebirth().homeOptions().hygiene()>=98);
+            var upgraded=game.gardenAction("rebirth-home-upgrade").world();
+            assertEquals(washed.player().money()-80,upgraded.player().money());
+            assertEquals(1,upgraded.rebirth().homeOptions().furnitureLevel());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-home-upgrade"));
             var rest=game.gardenAction("rebirth-home-rest").world();
-            assertEquals(drink.minute()+60,rest.minute());
+            assertEquals(upgraded.minute()+60,rest.minute());
             assertTrue(rest.rebirth().homeOptions().stayingHome());
             if(rest.rebirth().homeOptions().actions().contains("family")){
                 var family=game.gardenAction("rebirth-home-family").world();

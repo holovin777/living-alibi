@@ -877,7 +877,7 @@ func _exercise() -> void:
         return
 
     var apartment := _world("NORTH_RESIDENCES","North residences")
-    apartment["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","homeOptions":{"atHome":true,"district":"North residences","food":3,"water":3,"actions":["go","meal","rest","family"]}}
+    apartment["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","homeOptions":{"atHome":true,"district":"North residences","food":3,"water":3,"furnitureLevel":1,"actions":["go","meal","rest","family","wash"]}}
     apartment["residents"]=[{"id":"resident-0099","name":"Family member","activity":"AT_HOME"}]
     world._on_world_updated(apartment)
     if not _check(world._apartment_active and world._apartment.visible
@@ -896,6 +896,15 @@ func _exercise() -> void:
     world._follow_player()
     if not _check(world._apartment_action()=="meal" and world._camera.position.is_equal_approx(world._avatar.position+Vector3(0,world.EYE_HEIGHT,0)),
             "kitchen contextual action and first-person camera"):
+        return
+    if not _check(world._apartment.has_node("Washbasin") and world._apartment.has_node("EntranceDoor")
+            and world._apartment.get_node("WallArt").visible and not world._apartment.get_node("PremiumHeadboard").visible
+            and world._can_stand(Vector3(2.8,0,2.2),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(2.8,0,0.95),world.WALKER_RADIUS),
+            "bathroom opening, furnishings and wall collision"):
+        return
+    world._avatar.position=Vector3(4.0,0,2.2)
+    if not _check(world._apartment_action()=="wash","bathroom contextual wash"):
         return
     world._on_world_updated(_world("PARK","Park"))
     if not _check(not world._apartment_active and not world._apartment.visible and world._scenery.visible,

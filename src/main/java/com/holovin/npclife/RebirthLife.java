@@ -159,7 +159,14 @@ final class RebirthLife {
                 &&(x.generationIndex==a||x.generationIndex==b||x.generationIndex==p
                 ||DemographyLife.get(t,x,"parent-a")==c.generationIndex||DemographyLife.get(t,x,"parent-b")==c.generationIndex)).toList();
     }
-    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions){}
+    static int hygiene(TownLife.Town t,TownLife.Citizen c){
+        return 100-Math.min(100,Math.max(0,EducationLife.get(t,c,"dirt")));
+    }
+    static int furnitureLevel(TownLife.Town t,TownLife.Citizen c){
+        return Math.max(0,Math.min(2,EducationLife.get(t,c,"furniture-level")));
+    }
+    static int furniturePrice(int level){return level==0?80:level==1?180:0;}
+    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions,int hygiene,int furnitureLevel,int upgradePrice){} 
     static HomeOptions homeOptions(TownLife.Town t,int day){
         var c=child(t);
         if(!linkedAdult(t,c))return null;
@@ -170,10 +177,13 @@ final class RebirthLife {
             if(c.food>0&&c.hunger>0)actions.add("meal");
             if(c.water>0&&c.thirst>0)actions.add("drink");
             if(c.fatigue>0)actions.add("rest");
+            if(hygiene(t,c)<100&&c.water>0)actions.add("wash");
+            int price=furniturePrice(furnitureLevel(t,c));
+            if(price>0&&c.money>=price+50)actions.add("upgrade");
             if(!family.isEmpty()&&EducationLife.get(t,c,"last-family-time")<day)actions.add("family");
         }
         return new HomeOptions(c.home.label,atHome(c),stayingHome(t,c),c.food,c.water,
-                family.stream().map(p->p.name).toList(),List.copyOf(actions));
+                family.stream().map(p->p.name).toList(),List.copyOf(actions),hygiene(t,c),furnitureLevel(t,c),furniturePrice(furnitureLevel(t,c)));
     }
     record HomeAction(int minutes,String message){}
     static HomeAction homeAction(TownLife.Town t,int day,String action){
@@ -184,7 +194,15 @@ final class RebirthLife {
         return switch(action){
             case "meal" -> {c.food--;c.hunger=Math.max(0,c.hunger-50);yield new HomeAction(15,"Prepared a meal from your food supplies.");}
             case "drink" -> {c.water--;c.thirst=Math.max(0,c.thirst-52);yield new HomeAction(5,"Drank water from your supplies.");}
-            case "rest" -> {c.fatigue=Math.max(0,c.fatigue-20);yield new HomeAction(60,"Rested at home.");}
+            case "rest" -> {c.fatigue=Math.max(0,c.fatigue-20-5*furnitureLevel(t,c));yield new HomeAction(60,"Rested at home.");}
+            case "wash" -> {c.water--;EducationLife.set(t,c,"dirt",0);yield new HomeAction(10,"Washed using one unit of water.");}
+            case "upgrade" -> {
+                int level=furnitureLevel(t,c),price=furniturePrice(level);
+                int shop=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),price);
+                c.money-=price;t.employerFunds.put("shop-assistant",shop);
+                EducationLife.set(t,c,"furniture-level",level+1);
+                yield new HomeAction(30,"Purchased home furnishings for EUR "+price+".");
+            }
             case "family" -> {
                 for(var relative:homeFamily(t,c)){
                     var relation=t.peerRelationships.computeIfAbsent(SocialNetwork.key(c.id,relative.id),
