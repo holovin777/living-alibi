@@ -333,6 +333,42 @@ class GameSessionTest {
             var state=db.load();var town=db.loadTown(state);
             assertEquals(0,town.player.money,"inactive shell never duplicates the citizen wallet");
             assertFalse(town.player.alive);
+            // Exercise death while a linked adult is advancing the shared world.
+            var c=RebirthLife.child(town);
+            c.age=100;c.health=100;
+            state.day=DemographyLife.get(town,c,"born")+101*365;
+            state.minute=359;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        String deceased;
+        int deathCount;
+        try(var game=new GameSession(file)){
+            var before=game.snapshot();
+            deceased=before.rebirth().identity().residentId();
+            deathCount=before.demography().deaths();
+            var ended=game.gardenAction("rebirth-wait-adult-day").world();
+            assertEquals("CHOICE",ended.rebirth().phase());
+            assertEquals(before.day(),ended.day());assertEquals(360,ended.minute());
+            assertEquals(3,ended.player().incarnation());
+            assertEquals(0,ended.player().money());
+            assertEquals(deceased,ended.rebirth().pastLives().getFirst().residentId());
+            assertEquals(101,ended.rebirth().pastLives().getFirst().age());
+            assertEquals(2,ended.rebirth().pastLives().size());
+            // Other residents may also die at this birthday; the specific estate is checked below.
+            assertTrue(ended.demography().deaths()>deathCount);
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(3,game.snapshot().player().incarnation());
+            assertEquals(2,game.snapshot().rebirth().pastLives().size());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var dead=town.get(deceased);
+            assertFalse(dead.alive);assertEquals(0,dead.money);
+            assertEquals(1,DemographyLife.get(town,dead,"estate"));
+            int city=town.employerFunds.getOrDefault(MunicipalLife.CITY,0);
+            DemographyLife.estate(town,dead);
+            assertEquals(city,town.employerFunds.getOrDefault(MunicipalLife.CITY,0));
+            assertEquals(2,town.pastLives.size());
         }
     }
 

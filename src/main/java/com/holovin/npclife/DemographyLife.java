@@ -10,7 +10,7 @@ final class DemographyLife {
     static final String LAST="demography:last-day", BIRTHS="demography:births", DEATHS="demography:deaths",
             PENSIONS="demography:pensions", INHERITED="demography:inherited";
     static final int CHILD_DAILY_CASH=18, WEEKLY_PENSION=35;
-    static final List<String> FIELDS=List.of("parent-a","parent-b","partner","union-day","born","last-birth","children","estate");
+    static final List<String> FIELDS=List.of("parent-a","parent-b","partner","union-day","born","last-birth","children","estate","played-incarnation");
     static String key(TownLife.Citizen c,String field){return "demography:"+c.id+":"+field;}
     static int get(TownLife.Town t,String k){return t.industryStocks.getOrDefault(k,0);}
     static void set(TownLife.Town t,String k,int n){t.industryStocks.put(k,n);}

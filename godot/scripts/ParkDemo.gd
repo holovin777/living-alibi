@@ -2626,6 +2626,16 @@ func _render_actions() -> void:
             var families: Array = rebirth.get("families",[])
             info.text = "The town continues. Choose an eligible family." if not families.is_empty() else "No eligible family today. Wait or start an adult life."
             _action_choices.add_child(info)
+            var history: Array = rebirth.get("pastLives",[])
+            if not history.is_empty():
+                var recent: Dictionary = history[0]
+                var memorial := Label.new()
+                memorial.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                var life_name = recent.get("name")
+                memorial.text = "Previous life #%s · %s · day %s" % [recent.get("incarnation",0),"Unnamed visitor" if life_name == null else str(life_name),recent.get("day",0)]
+                if int(recent.get("age",-1)) >= 0:
+                    memorial.text += " · age %s" % recent.get("age",0)
+                _action_choices.add_child(memorial)
             for family in families:
                 var label_text := "%s (%s) + %s (%s) · %s" % [family.get("firstName",""),family.get("firstJob",""),family.get("secondName",""),family.get("secondJob",""),family.get("district","")]
                 _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-family-%s-%s" % [family.get("first",0),family.get("second",0)])))

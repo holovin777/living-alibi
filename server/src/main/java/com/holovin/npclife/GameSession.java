@@ -38,10 +38,14 @@ public final class GameSession implements AutoCloseable {
             db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
         }
         // Old save files might contain a deceased visitor.
+        boolean changed=RebirthLife.restoreIdentity(town);
         if(!town.player.alive&&!RebirthLife.active(town)) {
             RebirthLife.prepare(town,state.day,state.minute);
-            db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+            changed=true;
         }
+        if(RebirthLife.settleLinkedDeath(town,state.day,state.minute))changed=true;
+        RebirthLife.synchronize(town);
+        if(changed)db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
     }
 
     public record PlayerView(int incarnation,String place,String placeId,String privateName,
@@ -441,6 +445,8 @@ public final class GameSession implements AutoCloseable {
             RebirthLife.prepare(candidateTown,candidateState.day,candidateState.minute);
             message+=" Your previous life ended. Choose a family for your next life.";
         }
+        if(RebirthLife.settleLinkedDeath(candidateTown,candidateState.day,candidateState.minute))
+            message+=" Your life ended. Its history is preserved. Choose a new family.";
         RebirthLife.synchronize(candidateTown);
         db.save(candidateState,events,List.of(),candidateTown,truth,observations,interactions);
         state=candidateState;

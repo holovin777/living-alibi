@@ -41,6 +41,7 @@ final class RebirthLife {
         var newborn=DemographyLife.birth(t,a,b,day);
         if(newborn==null)throw new IllegalArgumentException("This family is no longer available.");
         t.industryStocks.put(CHILD,newborn.generationIndex);t.industryStocks.put(PHASE,CHILDHOOD);
+        DemographyLife.set(t,newborn,"played-incarnation",t.player.incarnation);
         t.industryStocks.put(FOCUS,0);t.industryStocks.put(LAST_CHAT,0);t.industryStocks.put(TRAVEL,0);
         synchronize(t);
         return "Born as "+newborn.name+". Follow family life and discover new choices as you grow.";
@@ -48,15 +49,58 @@ final class RebirthLife {
     static void synchronize(TownLife.Town t){
         if(phase(t)!=CHILDHOOD&&phase(t)!=LINKED_ADULT)return;
         var c=child(t);
-        if(c==null||!c.alive){
-            t.industryStocks.put(CHILD,0);t.industryStocks.put(PHASE,CHOICE);
-            t.player.health=0;
-            return;
-        }
+        if(c==null||!c.alive)return; // Death settlement needs the authoritative clock.
+
         // The child is the only living identity; the old visitor shell cannot
         // earn, shop, travel independently, vote or consume duplicate supplies.
         t.player.place=c.place;t.player.destination=c.place;
         t.player.health=c.health;t.player.hunger=c.hunger;t.player.thirst=c.thirst;t.player.fatigue=c.fatigue;
+    }
+    /** Bind old saves to the existing citizen; never create a replacement person. */
+    static boolean restoreIdentity(TownLife.Town t){
+        if(phase(t)!=CHILDHOOD&&phase(t)!=LINKED_ADULT)return false;
+        var c=child(t);
+        if(c==null)throw new IllegalStateException("Linked resident is missing from the save.");
+        int previous=DemographyLife.get(t,c,"played-incarnation");
+        if(previous==t.player.incarnation)return false;
+        if(previous!=0)throw new IllegalStateException("Linked resident has a different incarnation.");
+        DemographyLife.set(t,c,"played-incarnation",t.player.incarnation);
+        return true;
+    }
+    /** Settle a real resident, not the inactive visitor shell, exactly once. */
+    static boolean settleLinkedDeath(TownLife.Town t,int day,int minute){
+        if(phase(t)!=CHILDHOOD&&phase(t)!=LINKED_ADULT)return false;
+        restoreIdentity(t);
+        var c=child(t);
+        if(c.alive)return false;
+        int incarnation=t.player.incarnation;
+        if(incarnation==Integer.MAX_VALUE)throw new IllegalStateException("Maximum incarnation reached.");
+        if(t.pastLives.containsKey(incarnation))throw new IllegalStateException("Life was already archived.");
+        if(DemographyLife.get(t,c,"estate")==0){
+            ArchiveLife.record(t,"death:"+c.id,day,minute,"Population",c.name+" was recorded as deceased.");
+            DemographyLife.estate(t,c);
+        }
+        t.pastLives.put(incarnation,new PlayerLife.LifeRecord(incarnation,day,minute,c.place,c.name));
+        // Legacy assets were already settled when this family life began.
+        // Do not run visitor cleanup again or distribute the resident's wallet twice.
+        var next=new PlayerLife.Player();
+        next.incarnation=incarnation+1;next.alive=false;next.health=0;next.money=0;
+        next.place=c.place;next.destination=c.place;
+        t.player=next;
+        t.industryStocks.put(CHILD,0);t.industryStocks.put(PHASE,CHOICE);
+        t.industryStocks.put(FOCUS,0);t.industryStocks.put(LAST_CHAT,0);t.industryStocks.put(TRAVEL,0);
+        return true;
+    }
+    record PastLife(int incarnation,String name,String residentId,int day,int minute,int age,String district){}
+    static List<PastLife> history(TownLife.Town t){
+        var result=new ArrayList<PastLife>();
+        for(var record:t.pastLives.values()){
+            var person=t.people.values().stream().filter(c->DemographyLife.get(t,c,"played-incarnation")==record.incarnation()).findFirst().orElse(null);
+            result.add(new PastLife(record.incarnation(),record.privateName(),person==null?null:person.id,
+                    record.day(),record.minute(),person==null?-1:person.age,record.place().label));
+        }
+        result.sort(java.util.Comparator.comparingInt(PastLife::incarnation).reversed());
+        return List.copyOf(result);
     }
     private static final String FOCUS="rebirth:focus", LAST_CHAT="rebirth:last-chat", TRAVEL="rebirth:travel";
     static boolean linkedAdult(TownLife.Town t,TownLife.Citizen c){
@@ -193,7 +237,7 @@ final class RebirthLife {
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
                 EducationLife.get(t,c,"graduate")>0,List.copyOf(known));
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions){}
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives){}
     static Report report(TownLife.Town t,int day){
         int phase=phase(t);var c=child(t);
         var a=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-a"));
@@ -202,6 +246,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t));
     }
 }
