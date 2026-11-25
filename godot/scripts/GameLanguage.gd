@@ -309,7 +309,11 @@ const IT := {
     "Brown": "Marrone",
     "Black": "Nera",
     "Completed a Shotokan class.": "Lezione di Shotokan completata.",
-    "Passed the dojo belt examination.": "Esame di cintura superato."
+    "Passed the dojo belt examination.": "Esame di cintura superato.",
+    "Sensei": "Sensei",
+    "Student": "Allievo",
+    "Rei · Greet sensei": "Rei · Saluta il sensei",
+    "Exchanged a respectful dojo greeting.": "Saluto rispettoso nel dojo."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
