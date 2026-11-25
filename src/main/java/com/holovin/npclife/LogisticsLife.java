@@ -52,7 +52,7 @@ final class LogisticsLife {
     static java.util.List<TownLife.Citizen> candidates(TownLife.Town t,int day) {
         if(!yours(t)||!isOffice(t.player.place)||t.player.travelRemaining>0)return java.util.List.of();
         return t.people.values().stream().filter(c->c.generationIndex>0 && c.presentAt(t.player.place)
-                && !EmploymentLife.sick(c,day) && !BusinessLife.isEmployee(t,c) && !isDriver(t,c)).toList();
+                && !EmploymentLife.sick(c,day) && !BusinessLife.isEmployee(t,c) && !MarketStallLife.isEmployee(t,c) && !isDriver(t,c)).toList();
     }
     static String hire(TownLife.Town t,String residentId,int day) {
         office(t);requireOwner(t);

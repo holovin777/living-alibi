@@ -48,7 +48,7 @@ final class EmploymentLife {
                     town.business.cash<BusinessLife.HOURLY_WAGE;
             if(p.employed && ((industryAccount!=null &&
                     town.employerFunds.getOrDefault(industryAccount,0)<IndustryLife.HOURLY_WAGE) ||
-                    insolventWorkshop)) {
+                    insolventWorkshop || (MarketStallLife.isEmployee(town,p)&&MarketStallLife.get(town,MarketStallLife.RESERVE)<MarketStallLife.WAGE))) {
                 loseJob(town,clock,p);
             }
             if(!p.employed) {
