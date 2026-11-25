@@ -38,6 +38,21 @@ func _exercise() -> void:
     world._view_yaw = 0.0
     world._follow_player()
 
+    var populated_park := _world("PARK", "Park")
+    populated_park["residents"] = [
+        {"id": "marco", "name": "Marco Bianchi", "activity": "WALKING"},
+        {"id": "elena", "name": "Elena Rossi", "activity": "SHOPPING"}
+    ]
+    world._on_world_updated(populated_park)
+    if not _check(world._residents_root.get_child_count() == 2
+            and world._residents_root.get_child(0).name == "Resident_marco",
+            "only actually co-present residents appear in the park"):
+        return
+    world._on_world_updated(_world("PARK", "Park"))
+    if not _check(world._residents_root.get_child_count() == 0,
+            "residents disappear when the authoritative snapshot reports nobody"):
+        return
+
     world._on_world_updated(_world("PARK", "Park"))
     if not _check(world._current_place == "PARK",
             "first scene is the park"):
