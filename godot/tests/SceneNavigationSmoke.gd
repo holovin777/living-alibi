@@ -692,6 +692,24 @@ func _exercise() -> void:
     if not _check(world._residents_root.get_node("Resident_marco") == marco,
             "refresh retains the same resident model and animation state"):
         return
+    populated_park["residents"][0]["activity"] = "RELAXING"
+    populated_park["residents"][1]["activity"] = "FREE_TIME"
+    world._on_world_updated(populated_park)
+    world._animate_residents(0.5)
+    if not _check(int(marco.get_meta("seat_index",-1))>=0
+            and marco.get_meta("seat_index") != elena.get_meta("seat_index")
+            and is_equal_approx(marco.get_node("LegLeft").rotation.x,PI/2.0)
+            and is_equal_approx(marco.get_node("LegLeft/Knee").rotation.x,-PI/2.0),
+            "resting residents use distinct bench seats and bend knees"):
+        return
+    populated_park["residents"][0]["activity"] = "WALKING"
+    world._on_world_updated(populated_park)
+    world._animate_residents(0.5)
+    if not _check(int(marco.get_meta("seat_index",-1))==-1
+            and is_zero_approx(marco.position.y)
+            and is_zero_approx(marco.get_node("LegLeft/Knee").rotation.x),
+            "walking releases the seat and restores standing pose"):
+        return
     var rainy := _world("PARK", "Park")
     rainy["weather"] = {"sky":"RAIN","raining":true,"snowing":false}
     world._on_world_updated(rainy)
