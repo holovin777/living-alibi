@@ -441,7 +441,7 @@ final class RebirthLife {
     }
     record HouseholdMember(String id,String name,int age,boolean alive,String role,int savings){}
     record FamilyOptions(List<Conversation> proposals,HouseholdMember partner,List<HouseholdMember> children,
-                         boolean livingTogether,boolean canMoveTogether,boolean canHaveChild,boolean canSupport,int supportAmount){}
+                         boolean livingTogether,boolean canMoveTogether,boolean canHaveChild,boolean canSupport,int supportAmount,FamilyBudgetLife.View budget){}
     static List<Conversation> proposals(TownLife.Town t,TownLife.Citizen c){
         if(!linkedAdult(t,c)||!awakePresent(c))return List.of();
         return visible(t).stream().filter(p->awakePresent(p)&&DemographyLife.canPair(t,c,p))
@@ -480,7 +480,7 @@ final class RebirthLife {
                 ||DemographyLife.get(t,x,"parent-b")==c.generationIndex).map(x->householdMember(x,"Child")).toList();
         return new FamilyOptions(proposals(t,c),p==null?null:householdMember(p,"Partner"),children,
                 p!=null&&together(c,p),canMoveTogether(t,c,p),canHaveChild(t,c,p,day),
-                p!=null&&meeting(c,p)&&c.money>=60,10);
+                p!=null&&meeting(c,p)&&c.money>=60,10,FamilyBudgetLife.view(t,c,p));
     }
     static String propose(TownLife.Town t,String id,int day,int minute){
         var c=requireAdult(t);
