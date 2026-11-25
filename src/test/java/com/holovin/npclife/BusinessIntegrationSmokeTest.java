@@ -13,22 +13,28 @@ public final class BusinessIntegrationSmokeTest {
         check(residents.stream().anyMatch(c->c.occupation.equals("Mechanic") &&
                         c.workplace==TownLife.Place.WORKSHOP),
                 "first launch has a living workshop mechanic available during actual work hours");
-        var recruit=residents.getFirst();
-        recruit.place=TownLife.Place.WORKSHOP;
-        recruit.destination=TownLife.Place.WORKSHOP;
-        recruit.travelRemaining=0;
+        // A real mechanic must independently commute to work first:
+        // this smoke test does not teleport or change the candidate's job.
+        var recruit=residents.stream().filter(c->c.occupation.equals("Mechanic") &&
+                        c.workplace==TownLife.Place.WORKSHOP).findFirst().orElseThrow();
         town.player.money=200;
         town.player.place=TownLife.Place.WORKSHOP;
         town.player.destination=TownLife.Place.WORKSHOP;
+        var events=new ArrayList<TownLife.Event>();
+        var observations=new ArrayList<TownLife.Observation>();
+        LifeSimulation.advance(clock,120,
+                minute->TownLife.tick(town,minute,events,observations));
+        check(clock.minute==570 && recruit.presentAt(TownLife.Place.WORKSHOP),
+                "procedural mechanic naturally walked to the Workshop during the morning");
+        check(BusinessLife.candidates(town,clock.day).stream()
+                        .anyMatch(c->c.id.equals(recruit.id)),
+                "player can actually recruit a real co-present worker, without teleporting");
         BusinessLife.open(town);
         BusinessLife.invest(town,120);
         BusinessLife.machine(town);
         BusinessLife.hire(town,recruit.id,clock.day);
         int workerBefore=recruit.money;
-
-        var events=new ArrayList<TownLife.Event>();
-        var observations=new ArrayList<TownLife.Observation>();
-        LifeSimulation.advance(clock,390,
+        LifeSimulation.advance(clock,270,
                 minute->TownLife.tick(town,minute,events,observations));
         check(clock.minute==840 && clock.day==1,
                 "autonomous simulation reached 14:00 on the first working day");
