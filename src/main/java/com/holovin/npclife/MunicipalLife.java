@@ -45,6 +45,7 @@ final class MunicipalLife {
     static void tick(TownLife.Town t,int day,int minute){
         int week=(day-1)/7;
         if(minute!=360||week<=get(t,LAST))return;
+        int opening=balance(t,CITY);
         set(t,LAST,week);
         if(t.player.alive){
             int n=levy(t.player.money);receiveTax(t,n);t.player.money-=n;
@@ -57,6 +58,9 @@ final class MunicipalLife {
         grant(t,"school",6,EDUCATION);
         grant(t,"library",4,EDUCATION);
         grant(t,CLINIC,8,HEALTH);
+        int closing=balance(t,CITY);
+        if(opening>RESERVE&&closing<=RESERVE)ArchiveLife.record(t,"budget-low:"+week,day,minute,"Municipality","Municipal cash reached its minimum reserve; discretionary grants paused.");
+        else if(opening<=RESERVE&&closing>RESERVE)ArchiveLife.record(t,"budget-recovery:"+week,day,minute,"Municipality","Municipal cash recovered above its minimum reserve.");
     }
     record Report(int budget,int taxes,int education,int healthcare,int maintenance,int medicalAid,int schoolFunds,int libraryFunds,int clinicFunds,int minimumReserve,int protectedCash) {}
     static Report report(TownLife.Town t){

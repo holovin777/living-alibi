@@ -31,6 +31,7 @@ final class WorldDatabase implements AutoCloseable {
                         food INTEGER NOT NULL, water INTEGER NOT NULL, age INTEGER NOT NULL,
                         alive INTEGER NOT NULL)
                     """);
+            st.execute("CREATE TABLE IF NOT EXISTS historical_archive (event_id TEXT PRIMARY KEY, day INTEGER NOT NULL, minute INTEGER NOT NULL, category TEXT NOT NULL, text TEXT NOT NULL)");
             st.execute("CREATE TABLE IF NOT EXISTS town_meta (id INTEGER PRIMARY KEY CHECK(id=1), together INTEGER NOT NULL)");
             st.execute("""
                     CREATE TABLE IF NOT EXISTS town_events (
@@ -640,9 +641,12 @@ final class WorldDatabase implements AutoCloseable {
                 persistIndustry(town);
                 persistBusiness(town);
                 persistCityUtilities(town);
+                ArchiveLife.begin(town,s.day,s.minute);
+                persistArchive(town);
             }
             db.commit();
             if(town!=null) {
+                town.pendingArchive.clear();
                 town.pendingTransfers.clear();
                 town.pendingDecisions.clear();
                 town.pendingEconomy.clear();
@@ -1059,8 +1063,24 @@ final class WorldDatabase implements AutoCloseable {
                 b.lastSaleDay=Math.max(0,rs.getInt("last_sale_day"));
             }
         }
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT event_id,day,minute,category,text FROM historical_archive ORDER BY day,minute,event_id")){
+            while(rs.next()){
+                var entry=new ArchiveLife.Entry(rs.getString(1),rs.getInt(2),rs.getInt(3),rs.getString(4),rs.getString(5));
+                town.archive.put(entry.id(),entry);
+            }
+        }
         PropertyLife.ensureStarterItems(town,state);
         return town;
+    }
+
+    private void persistArchive(TownLife.Town town) throws SQLException {
+        try(PreparedStatement p=db.prepareStatement("INSERT OR IGNORE INTO historical_archive(event_id,day,minute,category,text) VALUES(?,?,?,?,?)")){
+            for(var entry:town.pendingArchive){
+                p.setString(1,entry.id());p.setInt(2,entry.day());p.setInt(3,entry.minute());
+                p.setString(4,entry.category());p.setString(5,entry.text());p.addBatch();
+            }
+            p.executeBatch();
+        }
     }
 
     private void persistLives(TownLife.Town town) throws SQLException {

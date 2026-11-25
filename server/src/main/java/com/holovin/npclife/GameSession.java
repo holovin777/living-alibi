@@ -19,6 +19,7 @@ public final class GameSession implements AutoCloseable {
     private final WorldDatabase db;
     private WorldState state;
     private TownLife.Town town;
+    private int archiveYear,archivePage=1;
 
     @Autowired
     public GameSession(@Value("${living-alibi.database:data/world.db}") String databasePath)
@@ -73,7 +74,7 @@ public final class GameSession implements AutoCloseable {
     public record RetailView(String id,String label,int price,int stock) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education) { }
+                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -101,7 +102,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null);
     }
 
     public synchronized BusinessView business() {
@@ -324,6 +325,15 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if(action!=null&&action.startsWith("archive-year-")){
+            TransportLife.ready(town.player);
+            if(town.player.place!=TownLife.Place.LIBRARY)throw new IllegalArgumentException("Visit the public library.");
+            String[] values=action.substring("archive-year-".length()).split("-");
+            if(values.length!=2)throw new IllegalArgumentException("Choose an archive year and page.");
+            var page=ArchiveLife.report(town,state.day,Integer.parseInt(values[0]),Integer.parseInt(values[1]));
+            archiveYear=page.year();archivePage=page.page();
+            return new ActionView("Opened public historical archive, year "+archiveYear+".",snapshot());
+        }
         var copy=town.copy();
         return apply(copy,"plant".equals(action)||"harvest".equals(action)||"buy-barrel".equals(action)||"build-greenhouse".equals(action)||"build-composter".equals(action)||"build-coop".equals(action)||(action!=null&&(action.startsWith("orchard-plant-")||action.startsWith("orchard-harvest-")||action.equals("orchard-build-cellar")||action.equals("orchard-press-juice")||action.equals("orchard-start-wine")))?15:5,GardenLife.act(copy,action,state.day,state.minute));
     }
@@ -374,6 +384,7 @@ public final class GameSession implements AutoCloseable {
     private ActionView apply(TownLife.Town candidateTown,int minutes,String message)
             throws SQLException {
         var candidateState=state.copy();
+        ArchiveLife.transitions(town,candidateTown,state.day,state.minute);
         var events=new ArrayList<LifeSimulation.LifeEvent>();
         var truth=new ArrayList<TownLife.Event>();
         var observations=new ArrayList<TownLife.Observation>();
