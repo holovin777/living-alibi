@@ -342,7 +342,8 @@ const IT := {
     "Your job: blue SERVICES kiosk %s. Press F for work actions during working hours.": "Il tuo lavoro: chiosco blu SERVIZI %s. Premi F per le azioni di lavoro durante l'orario.",
     "Your job: %s. Travel gate %s (E).": "Il tuo lavoro: %s. Portale VIAGGIA %s (E).",
     "Explore freely: use the blue SERVICES kiosk for local actions.": "Esplora liberamente: usa il chiosco blu SERVIZI per le azioni locali.",
-    "Travel E: %s · Services F: %s · Map M · Talk T": "Viaggia E: %s · Servizi F: %s · Mappa M · Parla T"
+    "Travel E: %s · Services F: %s · Map M · Talk T": "Viaggia E: %s · Servizi F: %s · Mappa M · Parla T",
+    "Walk forward to %s": "Prosegui verso %s"
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
