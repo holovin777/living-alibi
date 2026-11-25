@@ -3819,6 +3819,30 @@ class GameSessionTest {
     }
 
     @Test
+    void publicLeisureUsesActualRecentConversationAndFatigue() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("leisure.db"))){
+            var state=db.load();var town=db.loadTown(state);
+            var residents=PopulationGenerator.add(town,2);
+            var a=residents.get(0);var b=residents.get(1);
+            for(var c:residents){c.age=35;c.place=TownLife.Place.PARK;c.activity="FREE_TIME";c.travelRemaining=0;}
+            a.fatigue=50;b.fatigue=20;
+            assertTrue(PublicLeisureLife.wantsRest(a));
+            assertFalse(PublicLeisureLife.wantsRest(b));
+            assertTrue(PublicLeisureLife.recentPartners(town,state,residents).isEmpty());
+            var relation=new SocialLife.Relationship(a.id,b.id);
+            relation.lastInteractionTick=(long)(state.day-1)*1440+state.minute;
+            town.peerRelationships.put(SocialNetwork.key(a.id,b.id),relation);
+            var partners=PublicLeisureLife.recentPartners(town,state,residents);
+            assertEquals(b.id,partners.get(a.id));
+            assertEquals(a.id,partners.get(b.id));
+            state.minute+=8;
+            assertTrue(PublicLeisureLife.recentPartners(town,state,residents).isEmpty());
+            a.activity="WORKING";
+            assertFalse(PublicLeisureLife.wantsRest(a));
+        }
+    }
+
+    @Test
     void newWorldActionsAndRestart() throws Exception {
         Path file=directory.resolve("fresh-world.db");
         try(var game=new GameSession(file)) {
