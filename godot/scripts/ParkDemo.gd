@@ -4849,7 +4849,7 @@ func _on_action_feedback(message: String) -> void:
             _dialog_reply.text = _localized_resident_reply(message)
             _dialog_input.clear()
     if not _clock_pending:
-        _message.text = message
+        _message.text = tr(message)
 
 func _on_request_started(route: String) -> void:
     if route.begins_with("/actions/") and not _clock_pending:
