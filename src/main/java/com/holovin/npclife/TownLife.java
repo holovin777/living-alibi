@@ -15,7 +15,7 @@ final class TownLife {
         NORTH_RESIDENCES("North residences"), SOUTH_RESIDENCES("South residences"),
         OFFICE("Office"), CLINIC("Clinic"), SCHOOL("School"),
         WORKSHOP("Workshop"), LIBRARY("Library"),
-        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory");
+        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory"), CENTRO("Centro Storico");
         final String label;
         Place(String label) { this.label=label; }
     }

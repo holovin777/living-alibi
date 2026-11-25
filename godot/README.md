@@ -267,6 +267,20 @@ hunger and thirst still advance. A new visitor has no lease. Existing
 saves default to no room. The guesthouse is an abstract public kiosk
 action, not an enterable interior or shared housing market yet.
 
+## Centro Storico
+
+The fictional Lombard historic centre sits immediately west of Park,
+between Market, Clinic and Cafe. Bakery moves one cell south of Cafe;
+its existing Java identity and jobs do not change. Piazza Centrale
+uses original procedural geometry inspired by Vigevano/Pavia: warm
+facades, green shutters, covered walkable porticoes, a civic tower,
+stone paving, café tables and four lamps. All four axial road exits
+remain open. Some generated residents choose Centro for free time.
+The existing job noticeboard opens the real Java job list. The café
+and shopfronts are decorative; trading and other services remain in
+their original districts. No actual city map or third-party assets are
+included. The existing 48-unit chunk size and park start are unchanged.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

@@ -56,6 +56,7 @@ final class PopulationLife {
             else if(preference==1)desired=TownLife.Place.LIBRARY;
             else if(minute>=1080 && !UtilityLife.status(town).lightsWorking())
                 desired=TownLife.Place.CAFE;
+            else if(preference==2)desired=TownLife.Place.CENTRO;
             else desired=TownLife.Place.PARK;
         } else desired=c.home;
         if(c.travelRemaining>0 || c.place!=desired) {

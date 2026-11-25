@@ -5,15 +5,15 @@ const DISTRICTS := {
     "NORTH_RESIDENCES": Vector2i(0,0), "CLINIC": Vector2i(1,0),
     "SCHOOL": Vector2i(2,0), "OFFICE": Vector2i(3,0),
     "FACTORY": Vector2i(4,0),
-    "MARKET": Vector2i(0,1), "BAKERY": Vector2i(1,1),
+    "MARKET": Vector2i(0,1), "CENTRO": Vector2i(1,1),
     "PARK": Vector2i(2,1), "LIBRARY": Vector2i(3,1),
     "WORKSHOP": Vector2i(4,1),
     "SOUTH_RESIDENCES": Vector2i(0,2), "CAFE": Vector2i(1,2),
     "RIVER": Vector2i(2,2), "WOODS": Vector2i(3,2),
-    "QUARRY": Vector2i(4,2)
+    "QUARRY": Vector2i(4,2), "BAKERY": Vector2i(1,3)
 }
 const LABELS := {
-    "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes"
+    "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes", "CENTRO": "Centro storico"
 }
 const TILE_SPACING := 48.0
 var current_place := "PARK"
@@ -33,7 +33,7 @@ static func adjacent(first: String, second: String) -> bool:
     return absi(a.x-b.x)+absi(a.y-b.y) == 1
 
 func _ready() -> void:
-    custom_minimum_size = Vector2(570, 330)
+    custom_minimum_size = Vector2(570, 432)
     mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func update_world(place: String, locations: Array) -> void:
@@ -63,6 +63,8 @@ func _draw() -> void:
         var color := Color("#40564a")
         if id in ["PARK","WOODS"]:
             color = Color("#47784e")
+        elif id == "CENTRO":
+            color = Color("#947453")
         elif id == "RIVER":
             color = Color("#326c85")
         elif id in ["FACTORY","QUARRY","WORKSHOP"]:
@@ -74,5 +76,5 @@ func _draw() -> void:
         var detail := "YOU" if id == current_place else (
                 "%s min" % travel_minutes[id] if travel_minutes.has(id) else "—")
         draw_string(font,center+Vector2(-49,16),detail,HORIZONTAL_ALIGNMENT_CENTER,98,12,Color("#edcb75"))
-    draw_string(font,Vector2(10,315),"Walk along roads · times supplied by Java · M / Esc to close",
+    draw_string(font,Vector2(10,417),"Walk along roads · times supplied by Java · M / Esc to close",
             HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color.WHITE)

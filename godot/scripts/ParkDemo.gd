@@ -303,6 +303,8 @@ func _generate_chunk(place_id: String) -> void:
     _scenery.add_child(_residents_root)
 
     match place_id:
+        "CENTRO":
+            _build_centro()
         "PARK":
             _build_park()
         "MARKET":
@@ -462,6 +464,77 @@ func _open_anchor(preferred: Vector3) -> Vector3:
             if _can_stand(candidate, WALKER_RADIUS):
                 return candidate
     return Vector3.ZERO
+
+# Piazza Centrale: fictional Lombard piazza, reusable portico modules.
+# The four axial lanes stay clear for the district road connections.
+func _build_centro() -> void:
+    var piazza := Node3D.new()
+    piazza.name = "PiazzaCentrale"
+    _scenery.add_child(piazza)
+    var stone := Color(0.68,0.64,0.57)
+    _box(piazza,Vector3(34,0.035,34),stone,Vector3(0,0.006,0))
+    for x in [-9.0,-6.0,-3.0,3.0,6.0,9.0]:
+        _box(piazza,Vector3(0.07,0.012,32),Color(0.78,0.73,0.65),Vector3(x,0.03,0))
+    for z in [-14.0,-10.0,-6.0,6.0,10.0,14.0]:
+        _box(piazza,Vector3(23,0.012,0.07),Color(0.78,0.73,0.65),Vector3(0,0.03,z))
+    for side in [-1,1]:
+        for row in [-1,1]:
+            var wall := Color(0.79,0.61,0.40) if side<0 else Color(0.83,0.73,0.53)
+            _centro_portico(piazza,float(side),float(row)*9.0,wall)
+    # Landmark offset from the northern exit; no fictional church access.
+    var tower := Vector3(6.8,0,-14.1)
+    _add_obstacle(tower,Vector2(3.0,3.0))
+    _box(piazza,Vector3(3,10,3),Color(0.59,0.34,0.25),tower+Vector3(0,5,0))
+    _box(piazza,Vector3(3.5,0.45,3.5),Color(0.73,0.61,0.45),tower+Vector3(0,9.8,0))
+    _box(piazza,Vector3(2.7,2.3,2.7),Color(0.68,0.42,0.30),tower+Vector3(0,11.15,0))
+    _box(piazza,Vector3(3.2,0.35,3.2),Color(0.29,0.20,0.17),tower+Vector3(0,12.5,0))
+    _sign(piazza,"Torre Civica",tower+Vector3(0,8,1.6))
+    for at in [Vector3(-5,0,-9),Vector3(5,0,-6),Vector3(-5,0,8),Vector3(5,0,10)]:
+        _lamp(piazza,at)
+    _bench(piazza,Vector3(-7,0,12))
+    _bench(piazza,Vector3(7,0,12))
+    # Café furniture is scenery, with solid footprints, not yet a paid service.
+    for z in [-10.0,-6.0]:
+        var at := Vector3(-8,0,z)
+        _add_obstacle(at,Vector2(1.4,1.4))
+        _cylinder(piazza,0.08,0.9,Color(0.25,0.22,0.19),at+Vector3(0,0.45,0))
+        _cylinder(piazza,0.65,0.09,Color(0.45,0.25,0.14),at+Vector3(0,0.92,0))
+        _cylinder(piazza,1.1,0.1,Color(0.65,0.19,0.14),at+Vector3(0,2.15,0))
+        _cylinder(piazza,0.035,1.2,Color(0.35,0.27,0.2),at+Vector3(0,1.55,0))
+    _sign(piazza,"Caffè Ducale",Vector3(-11,3.55,-9))
+    _sign(piazza,"Botteghe",Vector3(11,3.55,-9))
+    _sign(piazza,"Piazza Centrale",Vector3(0,3.9,-12))
+    _sign(piazza,"Bacheca lavoro · F",KIOSK_POSITION+Vector3(0,2.4,0))
+
+func _centro_portico(parent: Node3D, side: float, z: float, wall: Color) -> void:
+    # Building rear at x=15.8; open covered arcade between rear and pillars.
+    var back := side*15.8
+    var front := side*11.7
+    var trim := Color(0.89,0.78,0.60)
+    _add_obstacle(Vector3(back,0,z),Vector2(2.2,12.0))
+    _box(parent,Vector3(2.2,7.1,12),wall,Vector3(back,3.55,z))
+    _box(parent,Vector3(5.2,3.9,12),wall,Vector3(side*14,5.15,z))
+    _box(parent,Vector3(5.5,0.32,12.2),Color(0.48,0.26,0.20),Vector3(side*14,7.25,z))
+    _box(parent,Vector3(5.2,0.16,12),trim,Vector3(side*14,3.25,z))
+    for offset in [-6.0,-2.0,2.0,6.0]:
+        var at := Vector3(front,0,z+offset)
+        _add_obstacle(at,Vector2(0.55,0.55))
+        _box(parent,Vector3(0.55,1.95,0.55),trim,at+Vector3(0,0.975,0))
+    for offset in [-4.0,0.0,4.0]:
+        # Segmented semicircular stone arches; the open space below is walkable.
+        for i in range(9):
+            var angle := float(i)*PI/8.0
+            var arch := Node3D.new()
+            arch.position = Vector3(front,1.95+sin(angle)*1.72,z+offset+cos(angle)*1.72)
+            arch.rotation.x = -angle
+            parent.add_child(arch)
+            _box(arch,Vector3(0.58,0.74,0.36),trim,Vector3.ZERO)
+        for y in [4.4,6.15]:
+            var face := side*11.36
+            _box(parent,Vector3(0.08,1.1,0.85),Color(0.19,0.28,0.30),Vector3(face,y,z+offset))
+            for shutter in [-0.64,0.64]:
+                _box(parent,Vector3(0.13,1.18,0.35),Color(0.22,0.34,0.24),Vector3(face-side*0.06,y,z+offset+shutter))
+        _box(parent,Vector3(0.12,2.05,1.6),Color(0.29,0.23,0.18),Vector3(side*14.64,1.03,z+offset))
 
 func _build_park() -> void:
     var park := Node3D.new()
@@ -996,6 +1069,8 @@ func _render_actions() -> void:
         "FACTORY":
             _action_choices.add_child(_button("Apply: factory machinist",
                     _apply_job.bind("machinist")))
+        "CENTRO":
+            _action_choices.add_child(_button("Job noticeboard",_find_jobs))
         "NORTH_RESIDENCES":
             _action_choices.add_child(_button("Rent / renew guest room · 35 EUR / 7 days",_rent_room))
             if bool(player.get("roomActive",false)):

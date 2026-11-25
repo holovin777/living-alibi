@@ -65,7 +65,7 @@ func _exercise() -> void:
     world._follow_player()
 
     var layout = world._town_map
-    if not _check(layout.DISTRICTS.size() == 15
+    if not _check(layout.DISTRICTS.size() == 16
             and layout.world_center("PARK") == Vector3.ZERO
             and layout.adjacent("PARK", "SCHOOL")
             and not layout.adjacent("PARK", "QUARRY")
@@ -83,7 +83,7 @@ func _exercise() -> void:
 
     # The nine surrounding chunks are real scenery, reused across arrivals.
     if not _check(world._chunks.size() == 9 and world._chunks.has("SCHOOL")
-            and world._chunks.has("BAKERY") and not world._chunks.has("QUARRY"),
+            and world._chunks.has("CENTRO") and not world._chunks.has("QUARRY"),
             "park streams its eight nearest neighbours only"):
         return
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
@@ -103,6 +103,22 @@ func _exercise() -> void:
     if not _check(world._scenery == park_root and world._chunks.size() == 9,
             "returning to park keeps its cached geometry"):
         return
+
+    var centro_root: Node3D = world._chunks["CENTRO"]["root"]
+    world._on_world_updated(_world("CENTRO","Centro Storico"))
+    if not _check(world._scenery == centro_root and centro_root.has_node("PiazzaCentrale")
+            and world._road_links.size() == 4 and world._park_lamps.size() == 4,
+            "historic square has cached scenery, four roads and lamps"):
+        return
+    if not _check(world._can_stand(Vector3(-13,0,-9),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(-15.8,0,-9),world.WALKER_RADIUS),
+            "portico is walkable but building back wall is solid"):
+        return
+    for at in [Vector3(0,0,-23.9),Vector3(23.9,0,0),Vector3(0,0,23.9),Vector3(-23.9,0,0)]:
+        if not _check(world._can_stand(at,world.WALKER_RADIUS,true),
+                "all four Centro exits remain walkable"):
+            return
+    world._on_world_updated(_world("PARK","Park"))
 
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
@@ -140,7 +156,7 @@ func _exercise() -> void:
     if not _check(world._road_links.size() == 4
             and world._road_destination(Vector3(0,0,-23.9),23.8) == "SCHOOL"
             and world._road_destination(Vector3(23.9,0,0),23.8) == "LIBRARY"
-            and world._road_destination(Vector3(-23.9,0,0),23.8) == "BAKERY"
+            and world._road_destination(Vector3(-23.9,0,0),23.8) == "CENTRO"
             and world._road_destination(Vector3(0,0,23.9),23.8) == "RIVER",
             "park has four walkable connections matching the town layout"):
         return
@@ -319,7 +335,7 @@ func _exercise() -> void:
 
     world._on_world_updated(_world("MARKET", "Market"))
     if not _check(world._chunks.size() == 6 and not world._chunks.has("PARK")
-            and world._chunks["BAKERY"]["root"].position == Vector3(48,0,0),
+            and world._chunks["CENTRO"]["root"].position == Vector3(48,0,0),
             "long-distance travel unloads distant chunks and rebases the grid"):
         return
     if not _check(layout.current_place == "MARKET" and layout.travel_minutes.is_empty(),

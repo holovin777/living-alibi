@@ -13,6 +13,20 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void historicCentreIsPublicAndParkRemainsFirstSpawn() throws Exception {
+        Path file=directory.resolve("centro.db");
+        try(var game=new GameSession(file)) {
+            assertEquals("PARK",game.snapshot().player().placeId());
+            assertTrue(game.destinations().stream().anyMatch(x->x.id().equals("CENTRO")));
+            assertEquals("CENTRO",game.move("centro").world().player().placeId());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals("CENTRO",game.snapshot().player().placeId());
+            assertEquals("MARKET",game.move("market").world().player().placeId());
+        }
+    }
+
+    @Test
     void prepaidRoomIsLocalAndSurvivesRestart() throws Exception {
         Path file=directory.resolve("room.db");
         long expiry;
