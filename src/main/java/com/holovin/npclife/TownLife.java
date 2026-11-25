@@ -299,6 +299,7 @@ final class TownLife {
         DemographyLife.tick(town,marco,truth,observations);
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
+        DomesticLife.tick(town,marco);
         IndustryLife.tick(town,marco,truth,observations);
         ConstructionLife.tick(town,marco.day,marco.minute);
         BusinessLife.tick(town,marco,truth,observations);
