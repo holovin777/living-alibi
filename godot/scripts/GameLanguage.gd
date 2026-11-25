@@ -236,7 +236,15 @@ const IT := {
     "You do not owe me any money.": "Non mi devi denaro.",
     "You do not have enough money to repay me.": "Non hai abbastanza denaro per restituirmi il prestito.",
     "Thank you for finally repaying me.": "Grazie per avermi finalmente restituito il prestito.",
-    "Thank you for keeping your promise.": "Grazie per aver mantenuto la promessa."
+    "Thank you for keeping your promise.": "Grazie per aver mantenuto la promessa.",
+    "Family savings: %s EUR · yours %s · partner %s": "Risparmi familiari: %s EUR · tuoi %s · partner %s",
+    "Outstanding bills: %s EUR · dependent children: %s": "Bollette da pagare: %s EUR · figli a carico: %s",
+    "Save 10 EUR for the family": "Accantona 10 EUR per la famiglia",
+    "Withdraw your 10 EUR savings": "Preleva 10 EUR dai tuoi risparmi",
+    "Pay bills from family savings": "Paga le bollette con i risparmi familiari",
+    "Set aside 10 EUR for the family.": "Accantonati 10 EUR per la famiglia.",
+    "Returned 10 EUR from your family savings to your wallet.": "Riportati 10 EUR dai tuoi risparmi familiari al portafoglio.",
+    "Paid household bills from family savings.": "Bollette domestiche pagate con i risparmi familiari."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
