@@ -1,0 +1,142 @@
+extends RefCounted
+## Local UI translations; English source strings remain the fallback.
+const IT := {
+    "Living Alibi | public park": "Living Alibi | parco pubblico",
+    "A visitor with 50 EUR and no assigned profession": "Un visitatore con 50 EUR e nessuna professione assegnata",
+    "Connecting to the local Java world...": "Connessione al mondo Java locale...",
+    "Jobs, study and travel use the real game world.": "Lavoro, studio e viaggi usano il mondo di gioco reale.",
+    "Bag: empty": "Zaino: vuoto",
+    "Housing: no room": "Alloggio: nessuna stanza",
+    "Car: none": "Auto: nessuna",
+    "Eat bread": "Mangia pane",
+    "Drink bottle": "Bevi acqua",
+    "Drink juice": "Bevi succo",
+    "No forced mission. Find your own direction.": "Nessuna missione obbligatoria. Scegli la tua strada.",
+    "Refresh": "Aggiorna",
+    "Jobs": "Lavoro",
+    "Industry": "Industria",
+    "Business": "Attività",
+    "Wait 60m": "Aspetta 60 min",
+    "Transport: walking (B)": "Trasporto: a piedi (B)",
+    "Bicycle rack (P)": "Rastrelliera (P)",
+    "Town map (M)": "Mappa (M)",
+    "World time:": "Tempo di gioco:",
+    "Paused": "In pausa",
+    "Weather FX": "Effetti meteo",
+    "Weather sound": "Suoni meteo",
+    "WASD: walk · click scene: mouse look · Esc: cursor.": "WASD: cammina · clic: visuale · Esc: cursore.",
+    "Living Alibi — public town map (schematic)": "Living Alibi — mappa schematica della città",
+    "Close map (M)": "Chiudi mappa (M)",
+    "Choose a destination (Java decides travel time):": "Scegli una destinazione (Java calcola il viaggio):",
+    "Say hello": "Saluta",
+    "Ask about occupation": "Chiedi della professione",
+    "Allow sharing my name": "Permetti di condividere il mio nome",
+    "Ask for visitor news": "Chiedi notizie sui visitatori",
+    "Press interview": "Intervista giornalistica",
+    "Apologize": "Chiedi scusa",
+    "Leave me alone!": "Lasciami in pace!",
+    "My name is ... / Say something": "Mi chiamo ... / Scrivi qualcosa",
+    "Speak": "Parla",
+    "Close conversation": "Chiudi conversazione",
+    "Approach a resident to talk.": "Avvicinati a un abitante per parlare.",
+    "You have spoken before.": "Avete già parlato.",
+    "You have not met.": "Non vi siete ancora incontrati.",
+    "They know you as %s": "Ti conosce come %s",
+    "Attitude: %s": "Atteggiamento: %s",
+    "F: life choices · WASD: local exploration": "F: scelte di vita · WASD: esplora",
+    "Childhood · follow the family schedule": "Infanzia · segui la routine familiare",
+    "Walk forward to the next district": "Cammina verso il prossimo quartiere",
+    "Waiting for Java to confirm arrival...": "In attesa della conferma di arrivo da Java...",
+    "District crossing · walk forward to travel": "Passaggio al quartiere vicino · cammina avanti",
+    "F: assigned freight truck.": "F: camion assegnato.",
+    "F: choose a driving route.": "F: scegli un percorso.",
+    "P: park or retrieve your bicycle · B: ride/walk.": "P: parcheggia o ritira la bici · B: pedala/cammina.",
+    "F: care for the fruit orchard.": "F: cura il frutteto.",
+    "F: care for chickens or collect eggs.": "F: cura le galline o raccogli le uova.",
+    "F: plant, water or harvest your garden.": "F: semina, annaffia o raccogli nell'orto.",
+    "F: use your bed, kitchen or bathroom.": "F: usa letto, cucina o bagno.",
+    "Your room is open.": "La tua stanza è aperta.",
+    "Rent a room at reception (blue kiosk).": "Affitta una stanza alla reception (chiosco blu).",
+    "T: talk to nearby resident · Esc: cursor.": "T: parla con un abitante vicino · Esc: cursore.",
+    "E: travel gate (game time). Esc: cursor.": "E: punto di viaggio (tempo di gioco). Esc: cursore.",
+    "F: local interactions. Esc: cursor.": "F: interazioni locali. Esc: cursore.",
+    "Code editor": "Editor di codice",
+    "Terminal": "Terminale",
+    "Company ledger": "Contabilità aziendale",
+    "Issue tracker": "Gestione ticket",
+    "Inbox": "Posta in arrivo",
+    "Intranet": "Intranet",
+    "Handbook": "Manuale",
+    "Leave workstation": "Lascia la postazione",
+    "Leave": "Esci",
+    "Complete onboarding · 15 min": "Completa l'inserimento · 15 min",
+    "Complete onboarding at the Java desk first.": "Completa prima l'inserimento alla postazione Java.",
+    "Java team": "Team Java",
+    "Server room": "Sala server",
+    "Meeting room": "Sala riunioni",
+    "Engineering work orders": "Ordini di lavoro tecnici",
+    "A new life · Choose your parents": "Una nuova vita · Scegli i genitori",
+    "Childhood · family life": "Infanzia · vita familiare",
+    "Coming of age · personal history": "Maggiore età · storia personale",
+    "Adult life · personal history": "Vita adulta · storia personale",
+    "The town continues. Choose an eligible family.": "La città continua a vivere. Scegli una famiglia disponibile.",
+    "No eligible family today. Wait or start an adult life.": "Nessuna famiglia disponibile oggi. Aspetta o inizia una vita adulta.",
+    "Open": "Aperto",
+    "Closed": "Chiuso",
+    "Spring": "Primavera",
+    "Summer": "Estate",
+    "Autumn": "Autunno",
+    "Winter": "Inverno",
+    "SPRING": "PRIMAVERA",
+    "SUMMER": "ESTATE",
+    "AUTUMN": "AUTUNNO",
+    "WINTER": "INVERNO",
+    "CLEAR": "SERENO",
+    "RAIN": "PIOGGIA",
+    "CLOUDY": "NUVOLOSO",
+    "SNOW": "NEVE",
+    "unemployed": "disoccupato",
+    "STRANGER": "SCONOSCIUTO",
+    "Stranger": "Sconosciuto",
+    "Visitor #%s | %s EUR | %s": "Visitatore n. %s | %s EUR | %s",
+    "Day %s  %s:%02d | %s | %s  %s °C": "Giorno %s  %s:%02d | %s | %s  %s °C",
+    "Hunger %s  Thirst %s  Fatigue %s  Health %s  Eng %s  Inv %s": "Fame %s  Sete %s  Stanchezza %s  Salute %s  Tecnica %s  Indagine %s",
+    " | Hygiene %s": " | Igiene %s",
+    "\nResidents present in this district: %s": "\nAbitanti presenti nel quartiere: %s",
+    "WHO MERGED ON A FRIDAY?!": "CHI HA FATTO IL MERGE DI VENERDÌ?!",
+    "It works on my machine. My machine is a genius!": "Sul mio computer funziona. È un genio!",
+    "Coffee first. Then we debug reality.": "Prima il caffè. Poi facciamo il debug della realtà.",
+    "I fixed one bug and adopted three more!": "Ho risolto un bug e ne ho adottati altri tre!",
+    "Attention! The build is green! Nobody move!": "Attenzione! La build è verde! Nessuno si muova!",
+    "The server needs a holiday. So do I.": "Il server ha bisogno di ferie. Anch'io.",
+    "Hey! Good to see you!": "Ehi! Che bello vederti!",
+    "Hello.": "Ciao.",
+    "One moment, let me finish this.": "Un momento, fammi finire.",
+    "We can make today a good day.": "Possiamo rendere bella questa giornata.",
+    "Something will probably go wrong.": "Probabilmente qualcosa andrà storto.",
+    "Is it break time yet?": "È già ora di pausa?",
+    "Have you heard the latest?": "Hai sentito le ultime novità?",
+    "Hello! Don't worry, I'm almost working.": "Ciao! Tranquillo, sto quasi lavorando."
+}
+const SETTINGS := "user://language.cfg"
+static func install() -> void:
+    var italian := Translation.new()
+    italian.locale="it"
+    for source in IT:
+        italian.add_message(source, IT[source])
+    TranslationServer.add_translation(italian)
+
+static func saved_locale() -> String:
+    var config := ConfigFile.new()
+    if config.load(SETTINGS)==OK and str(config.get_value("game","language","en"))=="it":
+        return "it"
+    return "en"
+
+static func select_locale(locale: String, persist: bool = true) -> void:
+    var valid := "it" if locale=="it" else "en"
+    TranslationServer.set_locale(valid)
+    if persist:
+        var config := ConfigFile.new()
+        config.set_value("game","language",valid)
+        var error := config.save(SETTINGS)
+        if error!=OK:push_warning("Could not save language preference.")
