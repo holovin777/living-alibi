@@ -1008,6 +1008,18 @@ func _exercise() -> void:
     if not _check(world._medical_station()=="first-aid" and _has_button(world._action_choices,"Basic pharmacy care · 5 EUR"),"pharmacy contextual menu"):
         return
     world._close_medical()
+    var campus := _world("SCHOOL","School")
+    campus["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","college":{"atCampus":true,"open":true,"enrolled":null,"courses":[{"id":"engineering","label":"Engineering","required":60,"completed":0,"canEnroll":true}]}}
+    world._on_world_updated(campus)
+    var campus_walk: Vector3 = world._move_on_ground(Vector3(-2,0,7),Vector3(-4.3,0,0),world.WALKER_RADIUS)
+    if not _check(campus_walk.x < -6 and world._scenery.has_node("IstitutoLeonardo/Classroom"),"college entrance and classroom"):
+        return
+    world._avatar.position=campus_walk
+    world._college_menu=true
+    world._render_actions()
+    if not _check(world._near_college() and _has_button(world._action_choices,"Enroll: Engineering"),"college registration menu"):
+        return
+    world._close_college()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

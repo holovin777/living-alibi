@@ -12,10 +12,10 @@ final class EmploymentLife {
     record Event(int day,int minute,String residentId,Kind kind,String detail) { }
 
     private static final String[] JOBS={"Teacher","Mechanic","Librarian","Barista",
-            "Office clerk","Nurse","Baker","Market vendor","Miner","Factory machinist","Transport driver",NewspaperLife.OCCUPATION,"Doctor"};
+            "Office clerk","Nurse","Baker","Market vendor","Miner","Factory machinist","Transport driver",NewspaperLife.OCCUPATION,"Doctor","Engineer","Programmer","Detective"};
     private static final TownLife.Place[] WORK={TownLife.Place.SCHOOL,TownLife.Place.WORKSHOP,
             TownLife.Place.LIBRARY,TownLife.Place.CAFE,TownLife.Place.OFFICE,
-            TownLife.Place.CLINIC,TownLife.Place.BAKERY,TownLife.Place.MARKET,TownLife.Place.QUARRY,TownLife.Place.FACTORY,TownLife.Place.QUARRY,TownLife.Place.LIBRARY,TownLife.Place.CLINIC};
+            TownLife.Place.CLINIC,TownLife.Place.BAKERY,TownLife.Place.MARKET,TownLife.Place.QUARRY,TownLife.Place.FACTORY,TownLife.Place.QUARRY,TownLife.Place.LIBRARY,TownLife.Place.CLINIC,TownLife.Place.WORKSHOP,TownLife.Place.OFFICE,TownLife.Place.OFFICE};
 
     static boolean sick(TownLife.Citizen person,int day) {
         return person.sickUntilDay>=day;

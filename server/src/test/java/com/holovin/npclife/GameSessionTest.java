@@ -199,6 +199,8 @@ class GameSessionTest {
             state.day=2;state.minute=800;
             assertFalse(EducationLife.availableRole(town,c,"Doctor"));
             EducationLife.set(town,c,"academic",70);EducationLife.set(town,c,"social",40);
+            assertFalse(EducationLife.availableRole(town,c,"Doctor"));
+            EducationLife.set(town,c,"diploma-medicine",1);
             assertTrue(EducationLife.availableRole(town,c,"Doctor"));
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
@@ -221,6 +223,49 @@ class GameSessionTest {
             assertFalse(game.snapshot().rebirth().medical().canConsult());
             assertFalse(game.snapshot().rebirth().medical().canFirstAid());
             assertTrue(game.gardenAction("rebirth-home-go").world().rebirth().homeOptions().atHome());
+        }
+    }
+    @Test
+    void collegeLessonsPersistAndUnlockQualifiedCareer() throws Exception {
+        Path file=directory.resolve("linked-college.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=25;c.money=30;c.hunger=10;c.thirst=10;c.fatigue=20;c.food=5;c.water=5;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.SCHOOL;c.destination=c.place;c.activity="FREE_TIME";
+            c.employed=false;town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            state.day=2;state.minute=800;
+            EducationLife.set(town,c,"technical",70);
+            assertFalse(EducationLife.availableRole(town,c,"Engineer"));
+            assertThrows(IllegalArgumentException.class,()->EducationLife.enroll(town,6,800,"engineering"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            game.gardenAction("rebirth-enroll-engineering");
+            var lesson=game.gardenAction("rebirth-study").world();
+            assertEquals(28,lesson.player().money());
+            assertEquals(1,lesson.rebirth().college().completed());
+            assertEquals(860,lesson.minute());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-study"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-enroll-programming"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var c=town.get(id);
+            assertEquals(1,EducationLife.get(town,c,"course-lessons"));
+            EducationLife.set(town,c,"course-lessons",59);state.day=3;state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var graduation=game.gardenAction("rebirth-study").world();
+            assertNull(graduation.rebirth().college().enrolled());
+            assertTrue(graduation.rebirth().adultOptions().jobs().contains("Engineer"));
+            assertFalse(graduation.rebirth().adultOptions().jobs().contains("Programmer"));
+            game.gardenAction("rebirth-job-Engineer");
+            assertEquals("Engineer",game.snapshot().rebirth().adultOptions().occupation());
         }
     }
     @Test

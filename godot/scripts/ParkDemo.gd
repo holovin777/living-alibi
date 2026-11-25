@@ -51,6 +51,8 @@ const CAFE_COUNTER := Vector3(-7.0,0,5.9)
 const CAFE_TABLE := Vector3(-7.0,0,9.0)
 var _cafe_menu := false
 var _medical_menu := false
+var _college_menu := false
+const COLLEGE_DESK := Vector3(-6.3,0,7)
 const CLINIC_COUNTER := Vector3(-6.3,0,7)
 const PHARMACY_COUNTER := Vector3(6.3,0,-7)
 
@@ -196,7 +198,9 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
-        if not _medical_station().is_empty():
+        if _near_college():
+            _hint.text="E: Istituto Leonardo · F: life choices"
+        elif not _medical_station().is_empty():
             _hint.text="E: "+("Farmacia" if _medical_station()=="first-aid" else "Ambulatorio")+" · F: life choices"
         elif not _cafe_station().is_empty():
             _hint.text="E: Bar Centrale · "+_cafe_station()+" · F: life choices"
@@ -269,6 +273,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_college() and not _action_panel.visible:
+                _college_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
             elif event.keycode == KEY_E and not _medical_station().is_empty() and not _action_panel.visible:
                 _medical_menu=true
                 _render_actions()
@@ -294,6 +304,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 _grocery_menu=false
                 _cafe_menu=false
                 _medical_menu=false
+                _college_menu=false
                 _render_actions()
                 _action_panel.visible = not _action_panel.visible
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
@@ -863,9 +874,7 @@ func _generate_chunk(place_id: String) -> void:
             _box(_scenery, Vector3(6.0, 0.18, 3.0), Color(0.90, 0.76, 0.31),
                     Vector3(4.0, 2.35, 8.0))
         "SCHOOL":
-            _building("Public school", Color(0.79, 0.68, 0.43))
-            _box(_scenery, Vector3(4.0, 1.3, 0.2), Color(0.14, 0.36, 0.38),
-                    Vector3(-7.0, 1.5, 5.0))
+            _build_college()
         "LIBRARY":
             _building("Public library", Color(0.59, 0.48, 0.33))
             for offset in [-10.0, -7.0, -4.0]:
@@ -1926,6 +1935,48 @@ func _sync_orchard() -> void:
         var fruit := tree.get_node("Fruit") as Node3D
         fruit.visible = bool(data.get("ready",false))
 
+func _build_college() -> void:
+    var campus := Node3D.new()
+    campus.name="IstitutoLeonardo"
+    _scenery.add_child(campus)
+    var wall := Color("#d9c9a5")
+    var wood := Color("#8f7455")
+    for part in [[Vector3(-13,0,7),Vector2(0.24,8)],
+            [Vector3(-8.5,0,3),Vector2(9,0.24)],
+            [Vector3(-8.5,0,11),Vector2(9,0.24)],
+            [Vector3(-4,0,4.45),Vector2(0.24,2.9)],
+            [Vector3(-4,0,9.55),Vector2(0.24,2.9)]]:
+        _room_wall(campus,part[0],part[1],wall)
+    _box(campus,Vector3(9,0.08,8),Color("#c3bba8"),Vector3(-8.5,0.025,7))
+    _box(campus,Vector3(9,3.3,8),wall,Vector3(-8.5,4.65,7))
+    _box(campus,Vector3(9.4,0.3,8.4),Color("#9b6045"),Vector3(-8.5,6.45,7))
+    _box(campus,Vector3(0.24,0.5,2.2),wood,Vector3(-4,2.75,7))
+    _sign(campus,"Istituto Leonardo · Scuola e formazione",Vector3(-3.6,3.4,7))
+    for z in [4.5,9.5]:
+        _box(campus,Vector3(0.16,1.35,1.65),Color("#536e75"),Vector3(-3.84,1.55,z))
+        _box(campus,Vector3(0.16,1.35,1.65),Color("#536e75"),Vector3(-3.84,4.65,z))
+    var desk := Node3D.new()
+    desk.name="CollegeDesk"
+    campus.add_child(desk)
+    _room_furniture(desk,Vector3(-8,0,7),Vector3(1.15,0.85,2.0),wood)
+    _box(desk,Vector3(0.55,0.45,0.62),Color("#42494d"),Vector3(-8,1.1,7.3))
+    _sign(desk,"Segreteria · E",Vector3(-7.15,2.0,7))
+    var classroom := Node3D.new()
+    classroom.name="Classroom"
+    campus.add_child(classroom)
+    for x in [-11.1,-9.4]:
+        for z in [4.35,9.55]:
+            _room_furniture(classroom,Vector3(x,0,z),Vector3(0.95,0.72,0.65),wood)
+            _room_furniture(classroom,Vector3(x,0,z+0.7),Vector3(0.45,0.42,0.45),Color("#65786e"))
+            _box(classroom,Vector3(0.45,0.3,0.06),Color("#3a454a"),Vector3(x,0.9,z-0.2))
+    _box(classroom,Vector3(0.12,1.25,3.1),Color("#415d53"),Vector3(-12.82,1.85,7))
+    _box(classroom,Vector3(0.17,0.1,3.2),wood,Vector3(-12.75,1.2,7))
+    var light := OmniLight3D.new()
+    light.position=Vector3(-8.5,2.6,7)
+    light.omni_range=8
+    light.light_energy=1.5
+    campus.add_child(light)
+
 func _build_medical_building(pharmacy: bool) -> void:
     var building := Node3D.new()
     building.name="FarmaciaDelBorgo" if pharmacy else "AmbulatorioCivico"
@@ -2919,6 +2970,34 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _near_college() -> bool:
+    var college = _last_snapshot.get("rebirth",{}).get("college")
+    return not _apartment_active and _current_place=="SCHOOL" and college is Dictionary and college.get("atCampus",false) and _avatar.position.distance_to(COLLEGE_DESK)<1.5
+
+func _close_college() -> void:
+    _college_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_college() -> void:
+    var college: Dictionary = _last_snapshot["rebirth"]["college"]
+    _action_title.text="Istituto Leonardo"
+    var info := Label.new()
+    info.text="Mon–Fri 08:00–18:00 · 2 EUR per lesson"
+    _action_choices.add_child(info)
+    for course in college.get("courses",[]):
+        var label := Label.new()
+        label.text="%s · %s/%s lessons%s" % [course.get("label",""),course.get("completed",0),course.get("required",0)," · Diploma" if course.get("diploma",false) else ""]
+        _action_choices.add_child(label)
+        if course.get("canEnroll",false):
+            _action_choices.add_child(_button("Enroll: "+str(course.get("label","")),_garden_action.bind("rebirth-enroll-"+str(course.get("id","")))))
+    if college.get("enrolled")!=null:
+        var lesson := _button("Attend lesson · 60 min · 2 EUR",_garden_action.bind("rebirth-study"))
+        lesson.disabled=not bool(college.get("canStudy",false))
+        _action_choices.add_child(lesson)
+    _action_choices.add_child(_button("Leave",_close_college))
+
 func _medical_station() -> String:
     var medical = _last_snapshot.get("rebirth",{}).get("medical")
     if _apartment_active or _current_place!="CLINIC" or not medical is Dictionary or not medical.get("atClinic",false):
@@ -2989,6 +3068,10 @@ func _close_grocery() -> void:
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _college_menu and _near_college():
+        _render_college()
+        return
+    _college_menu=false
     if _medical_menu and not _medical_station().is_empty():
         _render_medical()
         return
@@ -3110,6 +3193,11 @@ func _render_actions() -> void:
                 for destination in options.get("destinations",[]):
                     if str(destination) != _current_place:
                         _action_choices.add_child(_button("Walk to "+str(destination).capitalize(),_garden_action.bind("rebirth-travel-"+str(destination))))
+            var college = rebirth.get("college")
+            if college is Dictionary and college.get("enrolled")!=null:
+                var study_info := Label.new()
+                study_info.text="Education · %s · %s/%s lessons" % [college.get("enrolled",""),college.get("completed",0),college.get("required",0)]
+                _action_choices.add_child(study_info)
             var medical = rebirth.get("medical")
             if medical is Dictionary:
                 var health_label := Label.new()
@@ -3742,6 +3830,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
     if action.begins_with("rebirth-cafe-"):
         var station := _cafe_station()
@@ -3929,6 +4018,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _college_menu=false
         _medical_menu=false
         _cafe_menu=false
         _grocery_menu=false
