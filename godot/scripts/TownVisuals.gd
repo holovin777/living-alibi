@@ -37,6 +37,22 @@ static func texture(kind: String) -> ImageTexture:
                     value += 0.10
                 elif sx >= 62 or sy >= 30:
                     value -= 0.11
+            elif kind == "stucco":
+                # Fine mineral plaster, with broad uneven weathering.
+                value = 0.90 + grain*0.52 + broad*1.4 + sin(u*TAU*2.0+v*TAU*3.0)*0.025
+            elif kind == "terracotta":
+                # Repeating curved clay tiles with staggered seams.
+                var row := floori(float(y)/32.0)
+                var sx := (x + (16 if row%2 == 1 else 0))%32
+                var sy := y%32
+                value = 0.76 + 0.14*sin(float(sx)*PI/31.0) + grain*0.5
+                if sy < 2 or sx < 1:
+                    value -= 0.18
+                elif sy == 2:
+                    value += 0.08
+            elif kind == "wood":
+                var streak := sin((u*36.0+sin(v*TAU*3.0)*0.35)*TAU)
+                value = 0.81+0.07*streak+grain*0.45+broad*0.5
             value = clampf(value,0.0,1.0)
             img.set_pixel(x,y,Color(value,value,value))
     img.generate_mipmaps()
