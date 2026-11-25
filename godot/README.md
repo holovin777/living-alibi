@@ -81,8 +81,11 @@ writer (such as the console) against the same SQLite file at the same time.
   blue kiosk (**F**) you can register the company (15 EUR), invest
   10/25 EUR at a time, buy a machine (25 EUR), hire an actually nearby
   NPC for a paid contract, and withdraw actual funds. The business
-  produces/sells parts only when workers, cash and finite steel are
-  available. See [Player Business](../docs/PLAYER_BUSINESS.md).
+  machine now wears down through real manufacturing; its condition
+  is shown in the dashboard. The Workshop kiosk can service a worn
+  machine with **two finite spare parts and 10 EUR of company money**.
+  Production stops below 20/100 condition until repaired. See
+  [Player Business](../docs/PLAYER_BUSINESS.md).
 - **Jobs:** see current job offerings without applying.
 - **Wait 60m:** advance 60 game minutes in the world.
 - **Refresh:** recover the latest committed state from Java/SQLite.
