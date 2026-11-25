@@ -281,6 +281,12 @@ and shopfronts are decorative; trading and other services remain in
 their original districts. No actual city map or third-party assets are
 included. The existing 48-unit chunk size and park start are unchanged.
 
+The square now has deterministic individual stone blocks rendered as
+one MultiMesh, four distinct facade palettes, timber and glass shop
+fronts, decorative iron balconies, flower boxes, cornices and a small
+walkable garden court (Cortile dei Fiori) with collision footprints.
+Upper floors and storefront interiors are still non-enterable.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

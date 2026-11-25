@@ -473,14 +473,14 @@ func _build_centro() -> void:
     _scenery.add_child(piazza)
     var stone := Color(0.68,0.64,0.57)
     _box(piazza,Vector3(34,0.035,34),stone,Vector3(0,0.006,0))
-    for x in [-9.0,-6.0,-3.0,3.0,6.0,9.0]:
-        _box(piazza,Vector3(0.07,0.012,32),Color(0.78,0.73,0.65),Vector3(x,0.03,0))
-    for z in [-14.0,-10.0,-6.0,6.0,10.0,14.0]:
-        _box(piazza,Vector3(23,0.012,0.07),Color(0.78,0.73,0.65),Vector3(0,0.03,z))
+    _centro_paving(piazza)
+    var colors := [Color("#bf956e"),Color("#d6b185"),Color("#d4c1a0"),Color("#ba8274")]
+    var variant := 0
     for side in [-1,1]:
         for row in [-1,1]:
-            var wall := Color(0.79,0.61,0.40) if side<0 else Color(0.83,0.73,0.53)
-            _centro_portico(piazza,float(side),float(row)*9.0,wall)
+            _centro_portico(piazza,float(side),float(row)*9.0,colors[variant],variant)
+            variant += 1
+    _centro_courtyard(piazza)
     # Landmark offset from the northern exit; no fictional church access.
     var tower := Vector3(6.8,0,-14.1)
     _add_obstacle(tower,Vector2(3.0,3.0))
@@ -506,7 +506,56 @@ func _build_centro() -> void:
     _sign(piazza,"Piazza Centrale",Vector3(0,3.9,-12))
     _sign(piazza,"Bacheca lavoro · F",KIOSK_POSITION+Vector3(0,2.4,0))
 
-func _centro_portico(parent: Node3D, side: float, z: float, wall: Color) -> void:
+func _centro_paving(parent: Node3D) -> void:
+    # One batched mesh for 1,536 stone blocks, not 1,536 scene nodes.
+    var stone := BoxMesh.new()
+    stone.size = Vector3(0.96,0.025,0.65)
+    var material := StandardMaterial3D.new()
+    material.vertex_color_use_as_albedo = true
+    material.roughness = 0.96
+    stone.material = material
+    var batch := MultiMesh.new()
+    batch.transform_format = MultiMesh.TRANSFORM_3D
+    batch.use_colors = true
+    batch.mesh = stone
+    batch.instance_count = 32*48
+    var palette := [Color("#b3aa99"),Color("#c4b9a4"),Color("#a99f91"),Color("#c9c1b2"),Color("#bcb2a2")]
+    for row in range(48):
+        for col in range(32):
+            var index := row*32+col
+            var x := float(col)-15.75 + float(row%2)*0.5
+            var z := (float(row)-23.5)*0.69
+            batch.set_instance_transform(index,Transform3D(Basis.IDENTITY,Vector3(x,0.038,z)))
+            batch.set_instance_color(index,palette[(row*13+col*7+row*col)%palette.size()])
+    var paving := MultiMeshInstance3D.new()
+    paving.name = "StonePaving"
+    paving.multimesh = batch
+    parent.add_child(paving)
+
+func _centro_courtyard(parent: Node3D) -> void:
+    # A small open garden court off the piazza, entered from its south side.
+    var court := Node3D.new()
+    court.name = "CortileDeiFiori"
+    court.position = Vector3(-6.4,0,-14.3)
+    parent.add_child(court)
+    _box(court,Vector3(4.2,0.06,3.5),Color("#b99d78"),Vector3(0,0.05,0))
+    for x in [-2.0,2.0]:
+        _box(court,Vector3(0.25,1.0,3.5),Color("#c6a47f"),Vector3(x,0.5,0))
+        _add_obstacle(court.position+Vector3(x,0,0),Vector2(0.25,3.5))
+    _box(court,Vector3(4.2,1.2,0.25),Color("#c6a47f"),Vector3(0,0.6,-1.65))
+    _add_obstacle(court.position+Vector3(0,0,-1.65),Vector2(4.2,0.25))
+    for x in [-1.25,1.25]:
+        _box(court,Vector3(0.7,0.42,0.85),Color("#9f6545"),Vector3(x,0.21,-0.95))
+        _add_obstacle(court.position+Vector3(x,0,-0.95),Vector2(0.7,0.85))
+        _sphere(court,0.32,Color("#577443"),Vector3(x,0.58,-0.95))
+        for offset in [-0.17,0.0,0.17]:
+            _sphere(court,0.095,Color("#b94c51"),Vector3(x+offset,0.83,-0.95))
+    _sign(court,"Cortile dei Fiori",Vector3(0,1.7,-1.55))
+
+func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: int) -> void:
+    var parent := Node3D.new()
+    parent.name = "Facade_%s" % variant
+    root.add_child(parent)
     # Building rear at x=15.8; open covered arcade between rear and pillars.
     var back := side*15.8
     var front := side*11.7
@@ -515,7 +564,9 @@ func _centro_portico(parent: Node3D, side: float, z: float, wall: Color) -> void
     _box(parent,Vector3(2.2,7.1,12),wall,Vector3(back,3.55,z))
     _box(parent,Vector3(5.2,3.9,12),wall,Vector3(side*14,5.15,z))
     _box(parent,Vector3(5.5,0.32,12.2),Color(0.48,0.26,0.20),Vector3(side*14,7.25,z))
+    _box(parent,Vector3(5.7,0.14,12.3),trim,Vector3(side*14,7.03,z))
     _box(parent,Vector3(5.2,0.16,12),trim,Vector3(side*14,3.25,z))
+    _box(parent,Vector3(0.16,0.16,12),trim,Vector3(side*11.35,5.35,z))
     for offset in [-6.0,-2.0,2.0,6.0]:
         var at := Vector3(front,0,z+offset)
         _add_obstacle(at,Vector2(0.55,0.55))
@@ -532,9 +583,39 @@ func _centro_portico(parent: Node3D, side: float, z: float, wall: Color) -> void
         for y in [4.4,6.15]:
             var face := side*11.36
             _box(parent,Vector3(0.08,1.1,0.85),Color(0.19,0.28,0.30),Vector3(face,y,z+offset))
+            var shutters := Color("#415943") if variant%2 == 0 else Color("#64513f")
+            _box(parent,Vector3(0.15,0.12,1.6),trim,Vector3(face-side*0.06,y-0.61,z+offset))
             for shutter in [-0.64,0.64]:
-                _box(parent,Vector3(0.13,1.18,0.35),Color(0.22,0.34,0.24),Vector3(face-side*0.06,y,z+offset+shutter))
-        _box(parent,Vector3(0.12,2.05,1.6),Color(0.29,0.23,0.18),Vector3(side*14.64,1.03,z+offset))
+                _box(parent,Vector3(0.13,1.18,0.35),shutters,Vector3(face-side*0.06,y,z+offset+shutter))
+            if y < 5.0 and (variant == 1 or variant == 3) and offset == 0.0:
+                _centro_balcony(parent,side,face,y,z+offset)
+            elif y > 5.0 and variant%2 == 0:
+                _centro_flowers(parent,Vector3(face-side*0.22,y-0.60,z+offset))
+        var rear := side*14.64
+        # Recessed shop fronts have a frame, glass panes and timber door.
+        _box(parent,Vector3(0.12,2.35,2.55),Color("#6d5140"),Vector3(rear,1.175,z+offset))
+        for pane in [-0.83,0.83]:
+            _box(parent,Vector3(0.08,1.52,0.72),Color("#496064"),Vector3(rear-side*0.09,1.29,z+offset+pane))
+            _box(parent,Vector3(0.09,0.045,0.72),trim,Vector3(rear-side*0.14,1.29,z+offset+pane))
+        _box(parent,Vector3(0.09,1.94,0.65),Color("#3c3028"),Vector3(rear-side*0.1,0.97,z+offset))
+        _box(parent,Vector3(0.14,0.28,2.55),Color("#9c6b45"),Vector3(rear-side*0.11,2.45,z+offset))
+
+func _centro_balcony(parent: Node3D,side: float,face: float,y: float,z: float) -> void:
+    var edge := face-side*0.92
+    var iron := Color("#353331")
+    _box(parent,Vector3(1.1,0.18,2.1),Color("#a89c88"),Vector3(face-side*0.48,y-0.65,z))
+    _box(parent,Vector3(0.065,0.065,2.1),iron,Vector3(edge,y+0.12,z))
+    for i in range(9):
+        _box(parent,Vector3(0.045,0.72,0.045),iron,Vector3(edge,y-0.24,z-1.0+float(i)*0.25))
+    for end in [-1.0,1.0]:
+        _box(parent,Vector3(0.95,0.065,0.065),iron,Vector3(face-side*0.45,y+0.12,z+end))
+    _centro_flowers(parent,Vector3(edge,y-0.4,z))
+
+func _centro_flowers(parent: Node3D,at: Vector3) -> void:
+    _box(parent,Vector3(0.32,0.20,0.90),Color("#986647"),at)
+    _box(parent,Vector3(0.28,0.18,0.84),Color("#47633c"),at+Vector3(0,0.16,0))
+    for offset in [-0.32,-0.10,0.10,0.32]:
+        _sphere(parent,0.10,Color("#c85b67"),at+Vector3(0,0.29,offset))
 
 func _build_park() -> void:
     var park := Node3D.new()

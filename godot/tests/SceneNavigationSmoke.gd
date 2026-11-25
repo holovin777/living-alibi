@@ -114,6 +114,16 @@ func _exercise() -> void:
             and not world._can_stand(Vector3(-15.8,0,-9),world.WALKER_RADIUS),
             "portico is walkable but building back wall is solid"):
         return
+    var square := centro_root.get_node("PiazzaCentrale")
+    var paving := square.get_node("StonePaving") as MultiMeshInstance3D
+    if not _check(paving.multimesh.instance_count == 1536 and square.has_node("Facade_0")
+            and square.has_node("Facade_3") and square.has_node("CortileDeiFiori"),
+            "historic square has batched paving, distinct facades and a garden court"):
+        return
+    if not _check(world._can_stand(Vector3(-6.4,0,-14.3),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(-8.4,0,-14.3),world.WALKER_RADIUS),
+            "courtyard centre is accessible and boundary wall blocks walking"):
+        return
     for at in [Vector3(0,0,-23.9),Vector3(23.9,0,0),Vector3(0,0,23.9),Vector3(-23.9,0,0)]:
         if not _check(world._can_stand(at,world.WALKER_RADIUS,true),
                 "all four Centro exits remain walkable"):
