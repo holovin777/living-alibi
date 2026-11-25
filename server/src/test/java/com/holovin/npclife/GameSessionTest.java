@@ -165,6 +165,63 @@ class GameSessionTest {
     }
 
     @Test
+    void electionUsesResidentPreferencesPersistsMandateAndRespectsTreasury() throws Exception {
+        Path file=directory.resolve("election.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var residents=PopulationGenerator.add(town,6);
+            for(int i=0;i<residents.size();i++){
+                var c=residents.get(i);c.age=30;c.health=100;c.personalSeed=0;c.money=100;
+                EducationLife.set(town,c,"social",i<3?100:0);
+                EducationLife.set(town,c,"technical",100);
+                EducationLife.set(town,c,"academic",0);
+                OpinionLife.change(town,c,"city",-50);
+                OpinionLife.change(town,c,"stall",50);
+            }
+            var p=town.player;p.place=TownLife.Place.OFFICE;p.destination=p.place;p.travelRemaining=0;
+            ElectionLife.tick(town,2,360);
+            assertEquals(32,ElectionLife.report(town,2).nextDay());
+            assertEquals(3,ElectionLife.report(town,2).candidates().size());
+            assertThrows(IllegalArgumentException.class,()->ElectionLife.act(town,"election-policy-2",2,600));
+            ElectionLife.act(town,"election-register-3",2,600);
+            ElectionLife.act(town,"election-vote-4",2,600);
+            assertThrows(IllegalArgumentException.class,()->ElectionLife.act(town,"election-vote-1",2,600));
+            assertEquals(0,ElectionLife.report(town,2).candidates().getFirst().votes());
+            state.day=2;state.minute=600;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(ElectionLife.report(town,31).registered());
+            assertTrue(ElectionLife.report(town,31).voted());
+            ElectionLife.tick(town,32,360);ElectionLife.tick(town,32,360);
+            assertTrue(ElectionLife.playerMayor(town));
+            assertEquals(4,ElectionLife.get(town,ElectionLife.votes(4)));
+            assertEquals(32+5*365,ElectionLife.report(town,32).nextDay());
+            assertEquals(1,town.archive.values().stream().filter(e->e.id().equals("election:32")).count());
+            ElectionLife.act(town,"election-policy-2",32,600);
+            assertEquals(ElectionLife.HEALTH,ElectionLife.policy(town));
+            town.employerFunds.put(MunicipalLife.CITY,100);
+            int school=town.employerFunds.get("school"),clinic=town.employerFunds.get(MunicipalLife.CLINIC);
+            MunicipalLife.tick(town,36,360);
+            assertEquals(school+2,town.employerFunds.get("school"));
+            assertEquals(clinic+12,town.employerFunds.get(MunicipalLife.CLINIC));
+            assertTrue(town.employerFunds.get(MunicipalLife.CITY)>=40);
+            state.day=36;state.minute=600;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(ElectionLife.playerMayor(town));
+            assertEquals(ElectionLife.HEALTH,ElectionLife.policy(town));
+            town.player.alive=false;
+            assertEquals(ElectionLife.BALANCED,ElectionLife.policy(town));
+            PlayerLife.beginNewLife(town,37,600);
+            assertFalse(ElectionLife.playerMayor(town));
+        }
+    }
+
+    @Test
     void opinionsFollowPersonalExperienceAndOnlyActuallyReadEditions() throws Exception {
         Path file=directory.resolve("opinions.db");
         String id,otherId;
