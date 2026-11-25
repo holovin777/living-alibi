@@ -566,7 +566,38 @@ final class RebirthLife {
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
                 EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known));
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions){}
+    // Linked residents shop with their actual wallet and the same finite retail stock
+    // as first-life visitors. Food is represented by the existing resident portions.
+    static final List<String> GROCERY_ITEMS=List.of("bread","water","pasta","vegetables","eggs","milk","rice");
+    record GroceryItem(String id,String label,int price,int stock,boolean available){}
+    record Grocery(String name,boolean open,int food,int water,int capacity,List<GroceryItem> items){}
+    static Grocery grocery(TownLife.Town t,int day,int minute){
+        var c=child(t);
+        if(!linkedAdult(t,c)||c.place!=TownLife.Place.PORTICI||!awakePresent(c)||atHome(c))return null;
+        boolean open=minute>=480&&minute+5<=1200&&!EmploymentLife.sick(c,day);
+        int capacity=24;
+        var items=GROCERY_ITEMS.stream().map(id->{
+            var product=RetailLife.product(id);
+            int stock=t.retailStock.getOrDefault(id,0);
+            return new GroceryItem(id,product.label(),product.price(),stock,open&&stock>0&&c.money>=product.price()
+                    &&(long)c.food+c.water<capacity);
+        }).toList();
+        return new Grocery("Bottega Alimentare",open,c.food,c.water,capacity,items);
+    }
+    static String buyGrocery(TownLife.Town t,int day,int minute,String id){
+        var c=requireAdult(t);
+        var shop=grocery(t,day,minute);
+        if(shop==null||!shop.open())throw new IllegalArgumentException("Visit the grocery in Via dei Portici during opening hours (08:00–20:00).");
+        var item=shop.items().stream().filter(p->p.id().equals(id)&&p.available()).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("Product unavailable, insufficient money or carrying capacity."));
+        int funds=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),item.price());
+        t.retailStock.put(id,item.stock()-1);
+        c.money-=item.price();t.employerFunds.put("shop-assistant",funds);
+        if("water".equals(id))c.water++;else c.food++;
+        t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(TownLife.Place.PORTICI)+1);
+        return "Bought "+item.label()+" for EUR "+item.price()+".";
+    }
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
     static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
@@ -576,6 +607,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day),grocery(t,day,minute));
     }
 }

@@ -44,6 +44,8 @@ var _apartment: Node3D
 var _apartment_active := false
 var _home_entrance: Node3D
 var _home_transition := false
+var _grocery_menu := false
+const GROCERY_COUNTER := Vector3(7.3,0,3.8)
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
@@ -187,7 +189,9 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
-        if _near_family_entrance():
+        if _near_grocery_counter():
+            _hint.text="E: Bottega Alimentare · F: life choices"
+        elif _near_family_entrance():
             _hint.text="E: enter your home · F: life choices"
         elif _can_walk_roads() and not _road_destination(_avatar.position,ROAD_TRIGGER).is_empty():
             _hint.text="Walk forward to the next district"
@@ -254,10 +258,18 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_grocery_counter() and not _action_panel.visible:
+                _grocery_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
             elif event.keycode == KEY_E and _near_family_entrance() and not _action_panel.visible:
                 _request_home_transition("rebirth-home-go")
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_F:
+                _grocery_menu=false
+                _render_actions()
                 _action_panel.visible = not _action_panel.visible
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
                 get_viewport().set_input_as_handled()
@@ -1954,6 +1966,14 @@ func _portici_grocery(parent: Node3D) -> void:
         _box(shop,Vector3(0.6,1.8,1.3),Color("#765c40"),shelf+Vector3(0,0.9,0))
         for y in [0.75,1.25]:
             _box(shop,Vector3(0.25,0.24,0.9),Color("#d9bb76"),shelf+Vector3(-0.35,y,0))
+    var counter := Node3D.new()
+    counter.name="GroceryCounter"
+    shop.add_child(counter)
+    _add_obstacle(Vector3(8.7,0,3.5),Vector2(1.0,1.9))
+    _box(counter,Vector3(1.0,0.94,1.9),Color("#83674c"),Vector3(8.7,0.47,3.5))
+    _box(counter,Vector3(1.1,0.09,2.0),Color("#d3c2a5"),Vector3(8.7,0.98,3.5))
+    _box(counter,Vector3(0.32,0.25,0.38),Color("#353d42"),Vector3(8.7,1.16,3.0))
+    _sign(counter,"Cassa · E",Vector3(8.0,2.0,3.5))
     var light := OmniLight3D.new()
     light.position = Vector3(7.5,2.95,5)
     light.light_color = Color("#ffe0aa")
@@ -2718,8 +2738,32 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _near_grocery_counter() -> bool:
+    return not _apartment_active and _current_place=="PORTICI" and str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT" and _avatar.position.distance_to(GROCERY_COUNTER)<1.5 and _last_snapshot.get("rebirth",{}).get("grocery") is Dictionary
+
+func _close_grocery() -> void:
+    _grocery_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _grocery_menu and _near_grocery_counter():
+        var grocery: Dictionary = _last_snapshot["rebirth"]["grocery"]
+        _action_title.text = "Bottega Alimentare"
+        var info := Label.new()
+        info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        info.text="Open 08:00–20:00 · %s\nFood %s · Water %s · Capacity %s" % ["Open" if grocery.get("open",false) else "Closed",grocery.get("food",0),grocery.get("water",0),grocery.get("capacity",24)]
+        _action_choices.add_child(info)
+        for item in grocery.get("items",[]):
+            var caption := "%s · %s EUR · %s left" % [item.get("label",""),item.get("price",0),item.get("stock",0)]
+            var buy := _button(caption,_garden_action.bind("rebirth-grocery-"+str(item.get("id",""))))
+            buy.disabled=not bool(item.get("available",false))
+            _action_choices.add_child(buy)
+        _action_choices.add_child(_button("Leave counter",_close_grocery))
+        return
+    _grocery_menu=false
     if _rebirth_active():
         var rebirth: Dictionary = _last_snapshot.get("rebirth",{})
         var info := Label.new()
@@ -3443,6 +3487,8 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("rebirth-grocery-") and not _near_grocery_counter():
+        return
     if action.begins_with("rebirth-"):
         if _connected and not _api.is_busy():
             _api.garden_action(action)
@@ -3623,6 +3669,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _grocery_menu=false
         if _apartment_active:
             _set_apartment(false)
         _close_dialog()

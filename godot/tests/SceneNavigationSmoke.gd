@@ -944,6 +944,21 @@ func _exercise() -> void:
             "authoritative departure restores outdoor scenery"):
         return
 
+    var shopping := _world("PORTICI","Via dei Portici")
+    shopping["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","grocery":{"open":true,"food":2,"water":3,"capacity":24,"items":[{"id":"bread","label":"Bread","price":3,"stock":2,"available":true},{"id":"water","label":"Bottled water","price":1,"stock":0,"available":false}]}}
+    world._on_world_updated(shopping)
+    if not _check(world._scenery.has_node("ViaDeiPortici/BottegaAlimentare/GroceryCounter") and not world._near_grocery_counter(),
+            "grocery has an interior counter, not accessible from street"):
+        return
+    world._avatar.position=Vector3(7.3,0,3.8)
+    world._grocery_menu=true
+    world._render_actions()
+    if not _check(world._near_grocery_counter() and _has_button(world._action_choices,"Bread · 3 EUR") and _has_button(world._action_choices,"Bottled water · 1 EUR"),
+            "grocery counter displays authoritative stock and prices"):
+        return
+    world._close_grocery()
+    if not _check(not world._grocery_menu and not world._action_panel.visible,"leave shop counter and continue walking"):
+        return
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 
