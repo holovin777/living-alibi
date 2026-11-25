@@ -57,6 +57,9 @@ func business_invest(amount: int) -> void:
 func business_machine() -> void:
     _send("/actions/business/machine", HTTPClient.METHOD_POST, {})
 
+func business_service() -> void:
+    _send("/actions/business/service", HTTPClient.METHOD_POST, {})
+
 func business_hire(resident_id: String) -> void:
     _send("/actions/business/hire", HTTPClient.METHOD_POST, {"residentId": resident_id})
 
