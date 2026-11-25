@@ -13,6 +13,44 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void homeGardenUsesWaterAndWeatherAndPersistsCrop() throws Exception {
+        Path file=directory.resolve("garden.db");
+        try(var game=new GameSession(file)) {
+            game.move("south");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("plant"));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            town.player.ownsHouse=true;town.player.money=50;town.player.bottledWater=4;
+            int day=1;
+            while(GardenLife.winter(day)||WeatherLife.at(day,720).raining())day++;
+            GardenLife.act(town,"plant",day,720);
+            assertEquals(47,town.player.money);
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"harvest",1,720));
+            GardenLife.act(town,"water",day,720);
+            assertEquals(3,town.player.bottledWater);
+            final int plantedDay=day;
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"water",plantedDay,720));
+            GardenLife.tick(town,day,1080);
+            GardenLife.tick(town,day,1080);
+            assertEquals(1,GardenLife.get(town,GardenLife.GROWTH));
+            for(int n=day+1;GardenLife.get(town,GardenLife.GROWTH)<3;n++) {
+                if(GardenLife.winter(n))continue;
+                if(!WeatherLife.at(n,720).raining())GardenLife.act(town,"water",n,720);
+                GardenLife.tick(town,n,1080);
+            }
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(3,game.snapshot().garden().growth());
+            game.gardenAction("harvest");
+            assertEquals(4,game.snapshot().player().pantry().get("vegetables"));
+            assertFalse(game.snapshot().garden().planted());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("harvest"));
+        }
+    }
+
+    @Test
     void housePurchaseEndsRentalAndKeepsPantryAcrossRestart() throws Exception {
         Path file=directory.resolve("owned-home.db");
         try(var game=new GameSession(file)) {

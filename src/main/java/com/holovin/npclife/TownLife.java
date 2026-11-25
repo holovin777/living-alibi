@@ -241,6 +241,7 @@ final class TownLife {
         FarmLife.ensure(t);
         FuelLife.ensure(t);
         FreightLife.ensure(t);
+        GardenLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -253,6 +254,7 @@ final class TownLife {
                      List<SocialLife.Interaction> interactions) {
         PlayerLife.tick(town.player,marco.minute);
         HousingLife.expire(town.player,marco.day,marco.minute);
+        GardenLife.tick(town,marco.day,marco.minute);
         NatureLife.tick(town,marco.day,marco.minute);
         RetailLife.tick(town,marco.minute);
         FarmLife.tick(town,marco.day,marco.minute);

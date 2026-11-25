@@ -26,6 +26,7 @@ const ROAD_TRIGGER := 23.8
 const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
+const GARDEN_CENTER := Vector3(11,0,11)
 const ROOM_BOUNDS := Rect2(-13.0,4.0,9.0,10.0)
 const ROOM_EXIT := Vector3(-3.0,0,8.5)
 const BED_POSITION := Vector3(-11.3,0,6.1)
@@ -184,6 +185,8 @@ func _process(delta: float) -> void:
         _hint.text = "F: choose a driving route."
     elif _near_rack() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
         _hint.text = "P: park or retrieve your bicycle · B: ride/walk."
+    elif _near_garden():
+        _hint.text = "F: plant, water or harvest your garden."
     elif _near_home_station():
         _hint.text = "F: use your bed, kitchen or bathroom."
     elif _current_place == "NORTH_RESIDENCES" and _avatar.position.distance_to(ROOM_EXIT) < 2.3:
@@ -280,8 +283,11 @@ func _near_kitchen() -> bool:
 func _near_bath() -> bool:
     return _inside_guest_room() and _has_room_lease() and _avatar.position.z > 11.0 and _avatar.position.x < -8.0 and _avatar.position.distance_to(BATH_POSITION)<2.5
 
+func _near_garden() -> bool:
+    return _current_place=="SOUTH_RESIDENCES" and _owns_house() and _avatar.position.distance_to(GARDEN_CENTER)<3.3
+
 func _near_home_station() -> bool:
-    return _near_room_bed() or _near_kitchen() or _near_bath()
+    return _near_room_bed() or _near_kitchen() or _near_bath() or _near_garden()
 
 func _sync_guest_room() -> void:
     for district in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"]:
@@ -733,6 +739,7 @@ func _generate_chunk(place_id: String) -> void:
             _build_guesthouse()
         "SOUTH_RESIDENCES":
             _build_guesthouse(true)
+            _build_home_garden()
         "PORTICI":
             _build_portici()
         "CENTRO":
@@ -1472,6 +1479,40 @@ func _build_guesthouse(owned: bool = false) -> void:
         light.omni_range = 5.5
         house.add_child(light)
     _lamp(house,Vector3(-2.8,0,12))
+
+func _build_home_garden() -> void:
+    var garden := Node3D.new()
+    garden.name = "OrtoPrivato"
+    _scenery.add_child(garden)
+    _box(garden,Vector3(4,0.16,4.8),Color("#765039"),GARDEN_CENTER+Vector3(0,0.04,0))
+    _add_obstacle(GARDEN_CENTER,Vector2(4,4.8))
+    for x in [-2.05,2.05]:
+        _box(garden,Vector3(0.16,0.34,5.0),Color("#a28a66"),GARDEN_CENTER+Vector3(x,0.15,0))
+    for z in [-2.45,2.45]:
+        _box(garden,Vector3(4.2,0.34,0.16),Color("#a28a66"),GARDEN_CENTER+Vector3(0,0.15,z))
+    _sign(garden,"Orto privato · F",GARDEN_CENTER+Vector3(0,1.5,2.65))
+    for stage in range(4):
+        var crops := Node3D.new()
+        crops.name = "Stage"+str(stage)
+        garden.add_child(crops)
+        for x in [-1.25,0.0,1.25]:
+            for z in [-1.5,0.0,1.5]:
+                var height := 0.10+0.13*stage
+                var at := GARDEN_CENTER+Vector3(x,0.15+height,z)
+                _sphere(crops,0.08+0.07*stage,Color("#558849"),at)
+                if stage==3:
+                    _sphere(crops,0.10,Color("#be553d"),at+Vector3(0.15,-0.08,0))
+        crops.visible = false
+
+func _sync_garden() -> void:
+    if not _chunks.has("SOUTH_RESIDENCES"):
+        return
+    var root: Node3D = _chunks["SOUTH_RESIDENCES"]["root"]
+    var report: Dictionary = _last_snapshot.get("garden",{})
+    for stage in range(4):
+        var crops := root.get_node_or_null("OrtoPrivato/Stage"+str(stage)) as Node3D
+        if crops!=null:
+            crops.visible = _owns_house() and bool(report.get("planted",false)) and int(report.get("growth",0))==stage
 
 func _build_portici() -> void:
     var street := Node3D.new()
@@ -2350,7 +2391,19 @@ func _render_actions() -> void:
         "CENTRO":
             _action_choices.add_child(_button("Job noticeboard",_find_jobs))
         "NORTH_RESIDENCES", "SOUTH_RESIDENCES":
-            if _near_room_bed():
+            if _near_garden():
+                var garden: Dictionary = _last_snapshot.get("garden",{})
+                var info := Label.new()
+                info.text = "Garden · growth %s/3 | %s" % [garden.get("growth",0),"Winter: dormant" if bool(garden.get("winter",false)) else ("Rain today" if bool(garden.get("rainy",false)) else ("Watered today" if bool(garden.get("wateredToday",false)) else "Dry today"))]
+                _action_choices.add_child(info)
+                if not bool(garden.get("planted",false)):
+                    if not bool(garden.get("winter",false)):
+                        _action_choices.add_child(_button("Plant vegetables · 3 EUR",_garden_action.bind("plant")))
+                elif int(garden.get("growth",0))>=3:
+                    _action_choices.add_child(_button("Harvest 4 vegetables into cupboard",_garden_action.bind("harvest")))
+                elif not bool(garden.get("winter",false)) and not bool(garden.get("rainy",false)) and not bool(garden.get("wateredToday",false)) and int(_last_snapshot.get("minute",0))<1080:
+                    _action_choices.add_child(_button("Water garden · 1 water",_garden_action.bind("water")))
+            elif _near_room_bed():
                 _action_choices.add_child(_button("Sleep in your house · 2h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in your house · 8h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 8h",_sleep_room.bind(8)))
             elif _near_kitchen():
@@ -2576,6 +2629,10 @@ func _room_wash() -> void:
     if _near_bath() and _connected and not _api.is_busy():
         _api.room_wash()
 
+func _garden_action(action: String) -> void:
+    if _near_garden() and _connected and not _api.is_busy():
+        _api.garden_action(action)
+
 func _buy_house() -> void:
     if _current_place=="SOUTH_RESIDENCES" and _near_kiosk() and _connected and not _api.is_busy():
         _api.buy_house()
@@ -2722,6 +2779,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         str(snapshot.get("residents", []).size())
     ]
     _sync_guest_room()
+    _sync_garden()
     _sync_owned_car()
     _car_label.text = "Car: none" if _car_place().is_empty() else "Car: %s | Fuel %s/12 | Condition %s%%" % [_car_place().capitalize(),player.get("carFuel",0),player.get("carCondition",0)]
     _refresh_transport_buttons(false)

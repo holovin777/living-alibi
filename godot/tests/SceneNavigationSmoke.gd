@@ -463,6 +463,8 @@ func _exercise() -> void:
 
     var home := _world("SOUTH_RESIDENCES","South residences")
     world._on_world_updated(home)
+    world._avatar.position = world.KIOSK_POSITION+Vector3(0,0,1.5)
+    world._render_actions()
     var house_door := world._scenery.get_node("CasaDelGlicine/LeaseDoor") as Node3D
     if not _check(house_door.visible and not world._can_stand(Vector3(-5,0,8.5),world.WALKER_RADIUS)
             and _has_button(world._action_choices,"Buy Casa del Glicine"),"unowned house is locked and offered for sale"):
@@ -474,6 +476,15 @@ func _exercise() -> void:
     world._render_actions()
     if not _check(not house_door.visible and world._near_room_bed()
             and _has_button(world._action_choices,"Sleep in your house"),"owned house offers permanent sheltered sleep"):
+        return
+    home = home.duplicate(true)
+    home["garden"] = {"planted":true,"growth":3,"required":3}
+    world._on_world_updated(home)
+    world._avatar.position = world.GARDEN_CENTER+Vector3(-2.8,0,0)
+    world._render_actions()
+    if not _check(world._near_garden() and _has_button(world._action_choices,"Harvest 4 vegetables")
+            and world._scenery.get_node("OrtoPrivato/Stage3").visible
+            and not world._can_stand(world.GARDEN_CENTER,world.WALKER_RADIUS),"garden renders mature crop and local harvest"):
         return
     world._on_world_updated(_world("PARK","Park"))
 

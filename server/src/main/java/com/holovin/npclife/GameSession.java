@@ -73,7 +73,7 @@ public final class GameSession implements AutoCloseable {
     public record RetailView(String id,String label,int price,int stock) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics) { }
+                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -101,7 +101,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute));
     }
 
     public synchronized BusinessView business() {
@@ -323,6 +323,10 @@ public final class GameSession implements AutoCloseable {
         return apply(copy,10,HousingLife.wash(copy.player,state.day,state.minute));
     }
 
+    public synchronized ActionView gardenAction(String action) throws SQLException {
+        var copy=town.copy();
+        return apply(copy,"plant".equals(action)?15:"harvest".equals(action)?15:5,GardenLife.act(copy,action,state.day,state.minute));
+    }
     public synchronized ActionView buyHouse() throws SQLException {
         var copy=town.copy();
         return apply(copy,5,HousingLife.buyHouse(copy,state.day,state.minute));

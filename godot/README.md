@@ -601,6 +601,20 @@ returns to the public sale inventory for the new life. No sale by
 the living owner, rental income, customization, utility bills or
 separate real-estate market yet.
 
+## Private vegetable garden
+
+Casa del Glicine has one outdoor vegetable bed. Press F beside it.
+Planting costs 3 EUR (paid to the existing farm account); the seed
+purchase and planting are a single action. Watering spends one
+water unit from the bag, once per dry day before 18:00. At 18:00
+the bed gains one growth point if watered or raining; winter
+halts growth. Three growth points permit harvesting four vegetable
+units into the existing home cupboard, provided four spaces are
+free. The 3D crop models reflect the persisted growth stage.
+Growth uses game time, not real-world elapsed time. Death resets
+the private bed. No produce sales, additional crops, or separate
+seed inventory yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

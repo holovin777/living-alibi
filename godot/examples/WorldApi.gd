@@ -129,6 +129,9 @@ func room_cook(recipe_id: String = "bread-soup") -> void:
 func room_wash() -> void:
     _send("/actions/room-wash",HTTPClient.METHOD_POST,{})
 
+func garden_action(action: String) -> void:
+    _send("/actions/garden",HTTPClient.METHOD_POST,{"action":action})
+
 func buy_house() -> void:
     _send("/actions/buy-house", HTTPClient.METHOD_POST, {})
 
