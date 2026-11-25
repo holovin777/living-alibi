@@ -329,6 +329,7 @@ final class TownLife {
         SocialNetwork.tick(town,marco,truth,observations,interactions);
         MutualAidLife.tick(town,marco);
         PersonalLoanLife.tick(town,marco);
+        PhoneLife.tick(town,marco);
         PeerAidLife.tick(town,marco,truth,observations);
         for(int i=before;i<interactions.size();i++) {
             var conversation=interactions.get(i);
