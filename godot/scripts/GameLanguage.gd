@@ -244,7 +244,17 @@ const IT := {
     "Pay bills from family savings": "Paga le bollette con i risparmi familiari",
     "Set aside 10 EUR for the family.": "Accantonati 10 EUR per la famiglia.",
     "Returned 10 EUR from your family savings to your wallet.": "Riportati 10 EUR dai tuoi risparmi familiari al portafoglio.",
-    "Paid household bills from family savings.": "Bollette domestiche pagate con i risparmi familiari."
+    "Paid household bills from family savings.": "Bollette domestiche pagate con i risparmi familiari.",
+    "Property market · Office 09:00–17:00": "Mercato immobiliare · Ufficio 09:00–17:00",
+    "North residences": "Quartiere residenziale nord",
+    "South residences": "Quartiere residenziale sud",
+    "Owned": "Di proprietà",
+    "Available": "Disponibile",
+    "Unavailable": "Non disponibile",
+    "Buy home · %s EUR": "Compra casa · %s EUR",
+    "Sell home · %s EUR": "Vendi casa · %s EUR",
+    "Purchased a new home. Your household can now move there.": "Hai comprato una nuova casa. La tua famiglia può trasferirsi.",
+    "Sold the home and returned to a standard private residence.": "Hai venduto la casa e sei tornato in una residenza privata standard."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
