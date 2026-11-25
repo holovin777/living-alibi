@@ -76,6 +76,15 @@ public final class GameSession implements AutoCloseable {
                                int oreOnTruck,int scrapRemaining,boolean westDepositDiscovered,
                                int quarryPayroll,int factoryPayroll,int cityBudget) { }
     public record RetailView(String id,String label,int price,int stock) { }
+    public synchronized List<RetailView> retailCatalog(boolean lowStock){
+        if(!SoftwareLife.deployed(town,lowStock?"retail-sql":"retail-api"))
+            throw new IllegalArgumentException("This retail service has not been deployed yet.");
+        if(DevOpsLife.unavailable(town))throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"Retail service temporarily unavailable.");
+        return RetailLife.PRODUCTS.stream()
+                .map(p->new RetailView(p.id(),p.label(),p.price(),town.retailStock.getOrDefault(p.id(),0)))
+                .filter(p->!lowStock||p.stock()<3)
+                .sorted(java.util.Comparator.comparing(RetailView::id)).toList();
+    }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth) { }
@@ -336,6 +345,75 @@ public final class GameSession implements AutoCloseable {
             if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
+            }
+            if(action.startsWith("rebirth-it:")){
+                var result=ITBusinessLife.action(copy,state.day,state.minute,action.substring("rebirth-it:".length()));
+                return applyInternal(copy,result.minutes(),result.message(),true);
+            }
+            if(action.equals("rebirth-devops-train")){
+                return applyInternal(copy,30,DevOpsLife.train(copy,state.day,state.minute),true);
+            }
+            if(action.startsWith("rebirth-devops-command:")){
+                var result=DevOpsLife.command(copy,state.day,state.minute,action.substring("rebirth-devops-command:".length()));
+                return applyInternal(copy,result.minutes(),result.message(),true);
+            }
+            if(action.equals("rebirth-developer-promote")){
+                return applyInternal(copy,15,DeveloperCareerLife.promote(copy,state.day,state.minute),true);
+            }
+            if(action.startsWith("rebirth-developer-audit:")){
+                var result=DeveloperCareerLife.audit(copy,state.day,state.minute,action.substring("rebirth-developer-audit:".length()));
+                return applyInternal(copy,result.minutes(),result.message(),true);
+            }
+            if(action.startsWith("rebirth-git:")){
+                String[] parts=action.split(":",3);
+                if(parts.length!=3)throw new IllegalArgumentException("Choose a Git step and ticket.");
+                var result=SoftwareLife.git(copy,state.day,state.minute,parts[2],parts[1]);
+                return applyInternal(copy,result.minutes(),result.message(),true);
+            }
+            if(action.equals("rebirth-java-onboard")){
+                return applyInternal(copy,15,JavaTicketLife.onboard(copy,state.day,state.minute),true);
+            }
+            if(action.startsWith("rebirth-java-submit:")){
+                String[] parts=action.split(":",3);
+                if(parts.length!=3)throw new IllegalArgumentException("Provide ticket and Java return statement.");
+                var result=SoftwareLife.submit(copy,state.day,state.minute,parts[1],parts[2]);
+                return applyInternal(copy,result.minutes(),result.message(),true);
+            }
+            if(action.startsWith("rebirth-software-")){
+                var result=SoftwareLife.advance(copy,state.day,state.minute,action.substring("rebirth-software-".length()));
+                return applyInternal(copy,result.minutes(),result.message(),true);
+            }
+            if(action.startsWith("rebirth-engineer-inspect-")){
+                String result=TechnicalWorkLife.linkedInspect(copy,action.substring("rebirth-engineer-inspect-".length()),state.day,state.minute);
+                return applyInternal(copy,TechnicalWorkLife.INSPECTION_MINUTES,result,true);
+            }
+            if(action.startsWith("rebirth-engineer-repair-")){
+                String result=TechnicalWorkLife.linkedComplete(copy,action.substring("rebirth-engineer-repair-".length()),state.day,state.minute);
+                return applyInternal(copy,TechnicalWorkLife.COMPLETION_MINUTES,result,true);
+            }
+            if(action.startsWith("rebirth-enroll-")){
+                return applyInternal(copy,0,EducationLife.enroll(copy,state.day,state.minute,action.substring("rebirth-enroll-".length())),true);
+            }
+            if(action.equals("rebirth-study")){
+                String result=EducationLife.study(copy,state.day,state.minute);
+                RebirthLife.travel(copy,TownLife.Place.SCHOOL,state.day);
+                return applyInternal(copy,60,result,true);
+            }
+            if(action.equals("rebirth-medical-visit")){
+                int duration=RebirthLife.medicalVisit(copy,state.day,state.minute);
+                return applyInternal(copy,duration,"Went to the medical district.",true);
+            }
+            if(action.startsWith("rebirth-medical-")){
+                var service=RebirthLife.medicalAction(copy,state.day,state.minute,action.substring("rebirth-medical-".length()));
+                return applyInternal(copy,service.minutes(),service.message(),true);
+            }
+            if(action.startsWith("rebirth-cafe-")){
+                var visit=RebirthLife.cafeAction(copy,state.day,state.minute,action.substring("rebirth-cafe-".length()));
+                return applyInternal(copy,visit.minutes(),visit.message(),true);
+            }
+            if(action.startsWith("rebirth-grocery-")){
+                String message=RebirthLife.buyGrocery(copy,state.day,state.minute,action.substring("rebirth-grocery-".length()));
+                return applyInternal(copy,5,message,true);
             }
             if(action.equals("rebirth-home-exit")){
                 return applyInternal(copy,0,RebirthLife.leaveHome(copy,state.day),true);

@@ -44,6 +44,19 @@ var _apartment: Node3D
 var _apartment_active := false
 var _home_entrance: Node3D
 var _home_transition := false
+var _grocery_menu := false
+const GROCERY_COUNTER := Vector3(7.3,0,3.8)
+const BAKERY_COUNTER := Vector3(-6.3,0,7.0)
+const CAFE_COUNTER := Vector3(-7.0,0,5.9)
+const CAFE_TABLE := Vector3(-7.0,0,9.0)
+var _cafe_menu := false
+var _medical_menu := false
+var _college_menu := false
+var _engineering_menu := false
+var _software_menu := false
+const COLLEGE_DESK := Vector3(-6.3,0,7)
+const CLINIC_COUNTER := Vector3(-6.3,0,7)
+const PHARMACY_COUNTER := Vector3(6.3,0,-7)
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
@@ -187,7 +200,19 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
-        if _near_family_entrance():
+        if _near_software():
+            _hint.text="E: software projects · F: life choices"
+        elif _near_engineering():
+            _hint.text="E: engineering work orders · F: life choices"
+        elif _near_college():
+            _hint.text="E: Istituto Leonardo · F: life choices"
+        elif not _medical_station().is_empty():
+            _hint.text="E: "+("Farmacia" if _medical_station()=="first-aid" else "Ambulatorio")+" · F: life choices"
+        elif not _cafe_station().is_empty():
+            _hint.text="E: Bar Centrale · "+_cafe_station()+" · F: life choices"
+        elif _near_grocery_counter():
+            _hint.text="E: "+str(_last_snapshot["rebirth"]["grocery"].get("name","Shop"))+" · F: life choices"
+        elif _near_family_entrance():
             _hint.text="E: enter your home · F: life choices"
         elif _can_walk_roads() and not _road_destination(_avatar.position,ROAD_TRIGGER).is_empty():
             _hint.text="Walk forward to the next district"
@@ -254,10 +279,53 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_software() and not _action_panel.visible:
+                _software_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_engineering() and not _action_panel.visible:
+                _engineering_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_college() and not _action_panel.visible:
+                _college_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and not _medical_station().is_empty() and not _action_panel.visible:
+                _medical_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and not _cafe_station().is_empty() and not _action_panel.visible:
+                _cafe_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_grocery_counter() and not _action_panel.visible:
+                _grocery_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
             elif event.keycode == KEY_E and _near_family_entrance() and not _action_panel.visible:
                 _request_home_transition("rebirth-home-go")
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_F:
+                _grocery_menu=false
+                _cafe_menu=false
+                _medical_menu=false
+                _college_menu=false
+                _engineering_menu=false
+                _software_menu=false
+                _render_actions()
                 _action_panel.visible = not _action_panel.visible
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
                 get_viewport().set_input_as_handled()
@@ -800,6 +868,7 @@ func _generate_chunk(place_id: String) -> void:
         "NORTH_RESIDENCES":
             _build_guesthouse()
             _build_construction_site()
+            _build_lombardy_neighborhood()
         "SOUTH_RESIDENCES":
             _build_guesthouse(true)
             _build_home_garden()
@@ -811,6 +880,13 @@ func _generate_chunk(place_id: String) -> void:
             _build_centro()
         "PARK":
             _build_park()
+        "CLINIC":
+            _build_medical_building(false)
+            _build_medical_building(true)
+        "CAFE":
+            _build_cafe()
+        "BAKERY":
+            _build_bakery()
         "MARKET":
             _building("Market stalls", Color(0.68, 0.39, 0.22))
             _box(_scenery, Vector3(6.0, 0.18, 3.0), Color(0.83, 0.20, 0.18),
@@ -818,9 +894,7 @@ func _generate_chunk(place_id: String) -> void:
             _box(_scenery, Vector3(6.0, 0.18, 3.0), Color(0.90, 0.76, 0.31),
                     Vector3(4.0, 2.35, 8.0))
         "SCHOOL":
-            _building("Public school", Color(0.79, 0.68, 0.43))
-            _box(_scenery, Vector3(4.0, 1.3, 0.2), Color(0.14, 0.36, 0.38),
-                    Vector3(-7.0, 1.5, 5.0))
+            _build_college()
         "LIBRARY":
             _building("Public library", Color(0.59, 0.48, 0.33))
             for offset in [-10.0, -7.0, -4.0]:
@@ -1535,6 +1609,72 @@ func _sync_construction_site() -> void:
     site.get_node("Walls").visible = stage>=2
     site.get_node("Roof").visible = stage>=3
 
+# Fictional Lombard residential block, with a real street-facing home entrance.
+# Keep the established guesthouse, rental room, construction site and road lanes intact.
+func _build_lombardy_neighborhood() -> void:
+    var street := Node3D.new()
+    street.name="ViaDelleMagnolie"
+    _scenery.add_child(street)
+    var paving := Color("#b8b2a5")
+    _box(street,Vector3(34,0.045,3.2),Color("#777b78"),Vector3(0,0.025,-0.1))
+    for z in [-2.35,2.15]:
+        _box(street,Vector3(32,0.10,1.5),paving,Vector3(0,0.04,z))
+        for x in range(-15,16):
+            _box(street,Vector3(0.035,0.018,1.45),Color("#918e85"),Vector3(x,0.1,z))
+    _lombardy_facade(street,"CasaMagnolia",Vector3(11,0,-6.8),Color("#d3b895"),3)
+    _lombardy_facade(street,"CasaTiglio",Vector3(-10,0,-7.5),Color("#c88f7b"),2)
+    _sign(street,"Via delle Magnolie",Vector3(-3,2.5,-2.4))
+    for x in [-15.0,15.0]:
+        _lamp(street,Vector3(x,0,-2.3))
+    _box(street,Vector3(4.0,0.055,5.3),paving,Vector3(-4.6,0.025,-8.0))
+    _tree(Vector3(-4.5,0,-9.5))
+    _bench(street,Vector3(-4.5,0,-6.2))
+    _sign(street,"Piazzetta del Tiglio",Vector3(-4.5,2.2,-10.5))
+
+func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: int) -> void:
+    var building := Node3D.new()
+    building.name=id
+    parent.add_child(building)
+    var width := 7.4
+    var depth := 5.6
+    var height := 3.1*float(floors)
+    var face := at.z+depth/2.0
+    var stone := Color("#d7cbb7")
+    var shutter := Color("#4c6255")
+    var dark := Color("#394c52")
+    _add_obstacle(at,Vector2(width,depth))
+    _box(building,Vector3(width,height,depth),wall,at+Vector3(0,height/2,0))
+    _box(building,Vector3(width+0.4,0.35,depth+0.4),Color("#8e503a"),at+Vector3(0,height+0.12,0))
+    _box(building,Vector3(width+0.16,0.45,0.12),stone,Vector3(at.x,0.23,face+0.07))
+    for level in range(floors):
+        var y := 1.6+float(level)*3.1
+        if level>0:
+            _box(building,Vector3(width+0.18,0.12,0.16),stone,Vector3(at.x,y-1.35,face+0.08))
+        for offset in [-2.35,0.0,2.35]:
+            var x: float = at.x+offset
+            if level==0 and offset==0.0:
+                _box(building,Vector3(1.8,2.55,0.14),stone,Vector3(x,1.27,face+0.09))
+                _box(building,Vector3(1.38,2.2,0.16),Color("#72513a"),Vector3(x,1.10,face+0.18))
+                _box(building,Vector3(0.08,0.12,0.1),Color("#c5a45e"),Vector3(x+0.43,1.03,face+0.28))
+                continue
+            _box(building,Vector3(1.17,1.5,0.12),stone,Vector3(x,y,face+0.06))
+            _box(building,Vector3(0.85,1.24,0.14),dark,Vector3(x,y,face+0.14))
+            _box(building,Vector3(0.055,1.23,0.16),stone,Vector3(x,y,face+0.21))
+            for sx in [-0.71,0.71]:
+                _box(building,Vector3(0.32,1.35,0.15),shutter,Vector3(x+sx,y,face+0.13))
+            _box(building,Vector3(1.6,0.12,0.35),stone,Vector3(x,y-0.75,face+0.17))
+            if level>0 and offset==0.0:
+                _box(building,Vector3(1.9,0.14,0.75),stone,Vector3(x,y-0.87,face+0.42))
+                for bar in range(7):
+                    _box(building,Vector3(0.045,0.65,0.045),Color("#444442"),Vector3(x-0.84+float(bar)*0.28,y-0.48,face+0.77))
+                _box(building,Vector3(1.85,0.055,0.055),Color("#444442"),Vector3(x,y-0.14,face+0.77))
+    _sign(building,"Casa Magnolia" if id=="CasaMagnolia" else "Casa Tiglio",Vector3(at.x,2.8,face+0.35))
+    if id=="CasaMagnolia":
+        var entrance := Marker3D.new()
+        entrance.name="HomeApproach"
+        entrance.position=Vector3(at.x,0,face+1.2)
+        building.add_child(entrance)
+
 func _build_guesthouse(owned: bool = false) -> void:
     var house := Node3D.new()
     house.name = "CasaDelGlicine" if owned else "CasaOspiti"
@@ -1815,6 +1955,197 @@ func _sync_orchard() -> void:
         var fruit := tree.get_node("Fruit") as Node3D
         fruit.visible = bool(data.get("ready",false))
 
+func _build_college() -> void:
+    var campus := Node3D.new()
+    campus.name="IstitutoLeonardo"
+    _scenery.add_child(campus)
+    var wall := Color("#d9c9a5")
+    var wood := Color("#8f7455")
+    for part in [[Vector3(-13,0,7),Vector2(0.24,8)],
+            [Vector3(-8.5,0,3),Vector2(9,0.24)],
+            [Vector3(-8.5,0,11),Vector2(9,0.24)],
+            [Vector3(-4,0,4.45),Vector2(0.24,2.9)],
+            [Vector3(-4,0,9.55),Vector2(0.24,2.9)]]:
+        _room_wall(campus,part[0],part[1],wall)
+    _box(campus,Vector3(9,0.08,8),Color("#c3bba8"),Vector3(-8.5,0.025,7))
+    _box(campus,Vector3(9,3.3,8),wall,Vector3(-8.5,4.65,7))
+    _box(campus,Vector3(9.4,0.3,8.4),Color("#9b6045"),Vector3(-8.5,6.45,7))
+    _box(campus,Vector3(0.24,0.5,2.2),wood,Vector3(-4,2.75,7))
+    _sign(campus,"Istituto Leonardo · Scuola e formazione",Vector3(-3.6,3.4,7))
+    for z in [4.5,9.5]:
+        _box(campus,Vector3(0.16,1.35,1.65),Color("#536e75"),Vector3(-3.84,1.55,z))
+        _box(campus,Vector3(0.16,1.35,1.65),Color("#536e75"),Vector3(-3.84,4.65,z))
+    var desk := Node3D.new()
+    desk.name="CollegeDesk"
+    campus.add_child(desk)
+    _room_furniture(desk,Vector3(-8,0,7),Vector3(1.15,0.85,2.0),wood)
+    _box(desk,Vector3(0.55,0.45,0.62),Color("#42494d"),Vector3(-8,1.1,7.3))
+    _sign(desk,"Segreteria · E",Vector3(-7.15,2.0,7))
+    var classroom := Node3D.new()
+    classroom.name="Classroom"
+    campus.add_child(classroom)
+    for x in [-11.1,-9.4]:
+        for z in [4.35,9.55]:
+            _room_furniture(classroom,Vector3(x,0,z),Vector3(0.95,0.72,0.65),wood)
+            _room_furniture(classroom,Vector3(x,0,z+0.7),Vector3(0.45,0.42,0.45),Color("#65786e"))
+            _box(classroom,Vector3(0.45,0.3,0.06),Color("#3a454a"),Vector3(x,0.9,z-0.2))
+    _box(classroom,Vector3(0.12,1.25,3.1),Color("#415d53"),Vector3(-12.82,1.85,7))
+    _box(classroom,Vector3(0.17,0.1,3.2),wood,Vector3(-12.75,1.2,7))
+    var light := OmniLight3D.new()
+    light.position=Vector3(-8.5,2.6,7)
+    light.omni_range=8
+    light.light_energy=1.5
+    campus.add_child(light)
+
+func _build_medical_building(pharmacy: bool) -> void:
+    var building := Node3D.new()
+    building.name="FarmaciaDelBorgo" if pharmacy else "AmbulatorioCivico"
+    _scenery.add_child(building)
+    var side := 1.0 if pharmacy else -1.0
+    var z := -7.0 if pharmacy else 7.0
+    var wall := Color("#d5d6c1") if pharmacy else Color("#e1d5bf")
+    var trim := Color("#557c68") if pharmacy else Color("#618699")
+    for part in [[Vector3(side*12,0,z),Vector2(0.24,7)],
+            [Vector3(side*8,0,z-3.5),Vector2(8,0.24)],
+            [Vector3(side*8,0,z+3.5),Vector2(8,0.24)],
+            [Vector3(side*4,0,z-2.3),Vector2(0.24,2.4)],
+            [Vector3(side*4,0,z+2.3),Vector2(0.24,2.4)]]:
+        _room_wall(building,part[0],part[1],wall)
+    _box(building,Vector3(8,0.08,7),Color("#c4c7bd"),Vector3(side*8,0.025,z))
+    _box(building,Vector3(8,3.1,7),wall,Vector3(side*8,4.55,z))
+    _box(building,Vector3(8.3,0.3,7.3),Color("#93664c"),Vector3(side*8,6.25,z))
+    _box(building,Vector3(0.24,0.48,2.2),trim,Vector3(side*4,2.76,z))
+    _sign(building,"Farmacia del Borgo" if pharmacy else "Ambulatorio civico",Vector3(side*3.4,3.4,z))
+    _box(building,Vector3(2.1,0.07,3.8),Color("#c4b9a5"),Vector3(side*2.95,0.045,z))
+    for offset in [-2.2,2.2]:
+        _box(building,Vector3(0.13,1.35,1.35),Color("#71929a"),Vector3(side*3.85,1.55,z+offset))
+    _box(building,Vector3(0.12,0.68,0.22),trim,Vector3(side*3.77,3.6,z+2.2))
+    _box(building,Vector3(0.12,0.22,0.68),trim,Vector3(side*3.77,3.6,z+2.2))
+    var counter := Node3D.new()
+    counter.name="ServiceCounter"
+    building.add_child(counter)
+    _room_furniture(counter,Vector3(side*8.1,0,z),Vector3(1.05,0.94,2.6),trim)
+    _box(counter,Vector3(1.15,0.10,2.7),Color("#ece9dd"),Vector3(side*8.1,0.99,z))
+    _sign(counter,"Assistenza · E" if pharmacy else "Visita · E",Vector3(side*7.25,2.0,z))
+    if pharmacy:
+        _room_furniture(building,Vector3(side*11.3,0,z),Vector3(0.65,2.0,4.8),Color("#deded0"))
+        for y in [0.7,1.25,1.8]:
+            for offset in [-1.6,-0.8,0.0,0.8,1.6]:
+                _box(building,Vector3(0.34,0.22,0.42),Color("#809e9e") if int(y*10)%2==0 else Color("#e1c78a"),Vector3(side*11.0,y,z+offset))
+    else:
+        _room_furniture(building,Vector3(side*11.0,0,z-1.7),Vector3(1.0,0.72,2.1),Color("#a7b9b8"))
+        _box(building,Vector3(0.92,0.15,2.0),Color("#f1eee4"),Vector3(side*11.0,0.79,z-1.7))
+        _room_furniture(building,Vector3(side*10.4,0,z+2.0),Vector3(1.5,0.78,0.8),Color("#927e69"))
+        for offset in [-2.1,2.1]:
+            _room_furniture(building,Vector3(side*5.7,0,z+offset),Vector3(0.5,0.45,0.55),trim)
+    var light := OmniLight3D.new()
+    light.position=Vector3(side*7.5,2.6,z)
+    light.light_energy=1.5
+    light.omni_range=7
+    building.add_child(light)
+
+func _build_cafe() -> void:
+    var cafe := Node3D.new()
+    cafe.name="BarCentrale"
+    _scenery.add_child(cafe)
+    var wall := Color("#d9c2a2")
+    var stone := Color("#d6cbb8")
+    var wood := Color("#715342")
+    for part in [[Vector3(-13,0,7),Vector2(0.24,8.0)],
+            [Vector3(-8.5,0,3),Vector2(9.0,0.24)],
+            [Vector3(-8.5,0,11),Vector2(9.0,0.24)],
+            [Vector3(-4,0,4.45),Vector2(0.24,2.9)],
+            [Vector3(-4,0,9.55),Vector2(0.24,2.9)]]:
+        _room_wall(cafe,part[0],part[1],wall)
+    _box(cafe,Vector3(9,0.07,8),Color("#bca994"),Vector3(-8.5,0.025,7))
+    _box(cafe,Vector3(9,3.2,8),wall,Vector3(-8.5,4.6,7))
+    _box(cafe,Vector3(9.35,0.3,8.35),Color("#91563e"),Vector3(-8.5,6.35,7))
+    _box(cafe,Vector3(0.22,0.50,2.1),wood,Vector3(-4,2.75,7))
+    _box(cafe,Vector3(1.45,0.14,2.4),Color("#537569"),Vector3(-3.4,3.0,7))
+    _sign(cafe,"Bar Centrale",Vector3(-3.0,3.4,7))
+    for z in [4.5,9.5]:
+        _box(cafe,Vector3(0.12,1.55,1.85),Color("#536e75"),Vector3(-3.82,1.45,z))
+        _box(cafe,Vector3(0.16,1.3,1.1),Color("#4e6352"),Vector3(-3.84,4.6,z))
+    var bar := Node3D.new()
+    bar.name="CafeCounter"
+    cafe.add_child(bar)
+    _room_furniture(bar,Vector3(-8.6,0,5.4),Vector3(1.2,0.98,3.4),wood)
+    _box(bar,Vector3(1.32,0.10,3.5),stone,Vector3(-8.6,1.02,5.4))
+    _box(bar,Vector3(0.65,0.55,0.95),Color("#676f70"),Vector3(-8.6,1.36,4.5))
+    _box(bar,Vector3(0.07,0.22,0.85),Color("#282f32"),Vector3(-8.24,1.31,4.5))
+    for z in [4.25,4.75,5.6]:
+        _cylinder(bar,0.085,0.13,Color("#f3efe4"),Vector3(-8.0,1.14,z))
+    _sign(bar,"Caffè · E",Vector3(-7.9,2.0,5.4))
+    var tables := Node3D.new()
+    tables.name="CafeTables"
+    cafe.add_child(tables)
+    for x in [-10.8,-5.8]:
+        _room_furniture(tables,Vector3(x,0,9.0),Vector3(0.94,0.76,0.94),wood)
+        for z in [7.95,10.05]:
+            _room_furniture(tables,Vector3(x,0,z),Vector3(0.48,0.45,0.48),Color("#698379"))
+            _box(tables,Vector3(0.48,0.43,0.07),wood,Vector3(x,0.66,z+0.20*signf(z-9.0)))
+    _sign(tables,"Take a break · E",Vector3(-7,2.1,9))
+    for at in [Vector3(-7,2.6,5.4),Vector3(-8.3,2.6,9)]:
+        var light := OmniLight3D.new()
+        light.position=at
+        light.light_color=Color("#ffe1b5")
+        light.light_energy=1.4
+        light.omni_range=6
+        cafe.add_child(light)
+
+func _build_bakery() -> void:
+    var bakery := Node3D.new()
+    bakery.name="PanetteriaDelBorgo"
+    _scenery.add_child(bakery)
+    var plaster := Color("#d4b598")
+    var wood := Color("#845f42")
+    var stone := Color("#ded1ba")
+    # 8 x 7 m shop; east-facing doorway at z=7.0 remains unobstructed.
+    for part in [[Vector3(-12,0,7),Vector2(0.24,7.0)],
+            [Vector3(-8,0,3.5),Vector2(8.0,0.24)],
+            [Vector3(-8,0,10.5),Vector2(8.0,0.24)],
+            [Vector3(-4,0,4.7),Vector2(0.24,2.4)],
+            [Vector3(-4,0,9.3),Vector2(0.24,2.4)]]:
+        _room_wall(bakery,part[0],part[1],plaster)
+    _box(bakery,Vector3(8,0.08,7),Color("#b69c7a"),Vector3(-8,0.025,7))
+    _box(bakery,Vector3(8,3.15,7),plaster,Vector3(-8,4.57,7))
+    _box(bakery,Vector3(8.3,0.28,7.3),Color("#92543c"),Vector3(-8,6.28,7))
+    _box(bakery,Vector3(0.25,0.48,2.25),wood,Vector3(-4,2.76,7))
+    _box(bakery,Vector3(1.35,0.12,2.45),Color("#b45b43"),Vector3(-3.4,2.98,7))
+    for z in [4.85,9.15]:
+        _box(bakery,Vector3(0.12,1.25,1.15),Color("#5b7278"),Vector3(-3.82,1.55,z))
+        _box(bakery,Vector3(0.24,0.12,1.4),stone,Vector3(-3.72,0.88,z))
+        _box(bakery,Vector3(0.16,1.25,1.10),Color("#526554"),Vector3(-3.85,4.55,z))
+    _sign(bakery,"Panetteria del Borgo",Vector3(-3.1,3.36,7))
+    _box(bakery,Vector3(2.1,0.07,4.0),stone,Vector3(-2.95,0.045,7))
+    var counter := Node3D.new()
+    counter.name="BakeryCounter"
+    bakery.add_child(counter)
+    _room_furniture(counter,Vector3(-8.1,0,7.1),Vector3(1.05,0.95,3.0),wood)
+    _box(counter,Vector3(1.12,0.1,3.1),stone,Vector3(-8.1,1.0,7.1))
+    _box(counter,Vector3(0.06,0.46,2.1),Color("#a4b7bd"),Vector3(-7.53,1.24,7.0))
+    for z in [6.35,6.75,7.15,7.55]:
+        _box(counter,Vector3(0.53,0.16,0.24),Color("#bc8a4d"),Vector3(-8.08,1.13,z))
+    _box(counter,Vector3(0.33,0.28,0.42),Color("#444b4c"),Vector3(-8.1,1.18,8.25))
+    _sign(counter,"Pane fresco · E",Vector3(-7.3,2.0,7))
+    var oven := Node3D.new()
+    oven.name="BreadOven"
+    bakery.add_child(oven)
+    _room_furniture(oven,Vector3(-10.75,0,5.1),Vector3(1.85,1.9,1.9),Color("#9a7256"))
+    _box(oven,Vector3(0.08,0.64,1.1),Color("#36302c"),Vector3(-9.78,1.03,5.1))
+    _box(oven,Vector3(0.1,0.08,0.63),Color("#b0a598"),Vector3(-9.71,1.38,5.1))
+    _room_furniture(bakery,Vector3(-11.3,0,8.6),Vector3(0.65,2.0,2.4),wood)
+    for y in [0.75,1.3,1.85]:
+        _box(bakery,Vector3(0.72,0.08,2.4),stone,Vector3(-11.3,y,8.6))
+        for z in [7.9,8.5,9.1]:
+            _box(bakery,Vector3(0.38,0.15,0.36),Color("#c79b59"),Vector3(-11.1,y+0.14,z))
+    var light := OmniLight3D.new()
+    light.position=Vector3(-7,2.65,7)
+    light.light_color=Color("#ffe1b4")
+    light.light_energy=1.5
+    light.omni_range=7
+    bakery.add_child(light)
+
 func _build_portici() -> void:
     var street := Node3D.new()
     street.name = "ViaDeiPortici"
@@ -1887,6 +2218,14 @@ func _portici_grocery(parent: Node3D) -> void:
         _box(shop,Vector3(0.6,1.8,1.3),Color("#765c40"),shelf+Vector3(0,0.9,0))
         for y in [0.75,1.25]:
             _box(shop,Vector3(0.25,0.24,0.9),Color("#d9bb76"),shelf+Vector3(-0.35,y,0))
+    var counter := Node3D.new()
+    counter.name="GroceryCounter"
+    shop.add_child(counter)
+    _add_obstacle(Vector3(8.7,0,3.5),Vector2(1.0,1.9))
+    _box(counter,Vector3(1.0,0.94,1.9),Color("#83674c"),Vector3(8.7,0.47,3.5))
+    _box(counter,Vector3(1.1,0.09,2.0),Color("#d3c2a5"),Vector3(8.7,0.98,3.5))
+    _box(counter,Vector3(0.32,0.25,0.38),Color("#353d42"),Vector3(8.7,1.16,3.0))
+    _sign(counter,"Cassa · E",Vector3(8.0,2.0,3.5))
     var light := OmniLight3D.new()
     light.position = Vector3(7.5,2.95,5)
     light.light_color = Color("#ffe0aa")
@@ -2651,8 +2990,339 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _near_software() -> bool:
+    return not _apartment_active and _current_place=="OFFICE" and _near_kiosk() and not _last_snapshot.get("rebirth",{}).get("softwareProjects",[]).is_empty()
+
+func _close_software() -> void:
+    _software_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_software() -> void:
+    _action_title.text="Borgo Digital · Java team"
+    var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
+    if workspace is Dictionary:
+        var intro := Label.new()
+        intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        intro.text=str(workspace.get("intro",""))
+        _action_choices.add_child(intro)
+        if not workspace.get("onboarded",false):
+            var start := _button("Complete onboarding · 15 min",_garden_action.bind("rebirth-java-onboard"))
+            start.disabled=not bool(workspace.get("canOnboard",false))
+            _action_choices.add_child(start)
+            _action_choices.add_child(_button("Leave",_close_software))
+            return
+    if workspace is Dictionary and workspace.get("career") is Dictionary:
+        var career: Dictionary = workspace["career"]
+        var profile := Label.new()
+        profile.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        profile.text="%s · XP %s · Technical %s/100\nReleases %s · Audits %s" % [career.get("rank","Junior"),career.get("xp",0),career.get("technical",0),career.get("releases",0),career.get("audits",0)]
+        _action_choices.add_child(profile)
+        if career.get("nextRank")!=null:
+            var promotion := _button("Promotion: %s · XP %s · Skill %s · Audits %s" % [career.get("nextRank",""),career.get("requiredXp",0),career.get("requiredTechnical",0),career.get("requiredAudits",0)],_garden_action.bind("rebirth-developer-promote"))
+            promotion.disabled=not bool(career.get("canPromote",false))
+            _action_choices.add_child(promotion)
+        var audit: Dictionary = career.get("audit",{})
+        var assignment := Label.new()
+        assignment.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        assignment.text="%s · %s EUR · 60 min\n%s" % [audit.get("title","Daily operations"),audit.get("wage",0),audit.get("prompt","")]
+        _action_choices.add_child(assignment)
+        var answer := LineEdit.new()
+        answer.name="DeveloperAuditAnswer"
+        answer.placeholder_text="Enter numeric result"
+        answer.max_length=10
+        answer.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+        _action_choices.add_child(answer)
+        var submit_audit := _button("Submit daily audit",_submit_developer_audit.bind(answer))
+        submit_audit.disabled=not bool(audit.get("available",false))
+        _action_choices.add_child(submit_audit)
+    if workspace is Dictionary and workspace.get("devops") is Dictionary:
+        var ops: Dictionary = workspace["devops"]
+        var ops_info := Label.new()
+        ops_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        ops_info.text="DevOps · %s · Resolved %s\n%s\n%s" % [ops.get("status",""),ops.get("resolved",0),ops.get("guide",""),ops.get("output","")]
+        _action_choices.add_child(ops_info)
+        if not ops.get("trained",false):
+            var training := _button("DevOps onboarding · 30 min",_garden_action.bind("rebirth-devops-train"))
+            training.disabled=not bool(ops.get("canTrain",false))
+            _action_choices.add_child(training)
+        elif ops.get("active",false):
+            var terminal := LineEdit.new()
+            terminal.name="DevOpsCommand"
+            terminal.placeholder_text="Enter simulated shell command"
+            terminal.max_length=120
+            terminal.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+            _action_choices.add_child(terminal)
+            var run := _button("Run command · 5 min",_submit_devops.bind(terminal))
+            run.disabled=not bool(ops.get("canRun",false))
+            _action_choices.add_child(run)
+    if workspace is Dictionary and workspace.get("companyStatus") is Dictionary:
+        var firm: Dictionary = workspace["companyStatus"]
+        var details := Label.new()
+        details.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        details.text="Your IT consultancy · %s\nCompany cash %s EUR · Rent through day %s · Contracts %s · Tax paid %s EUR\n%s" % ["Registered" if firm.get("registered",false) else "Not registered",firm.get("cash",0),firm.get("rentUntil",0),firm.get("contracts",0),firm.get("taxPaid",0),firm.get("guide","")]
+        _action_choices.add_child(details)
+        if not firm.get("registered",false):
+            var register := _button("Register IT company · 50 EUR",_garden_action.bind("rebirth-it:register"))
+            register.disabled=not bool(firm.get("canRegister",false))
+            _action_choices.add_child(register)
+        else:
+            for choice in [{"label":"Invest 20 EUR","id":"invest","enabled":firm.get("canInvest",false)},{"label":"Withdraw 20 EUR","id":"withdraw","enabled":firm.get("canWithdraw",false)},{"label":"Rent office · 20 EUR / 7 days","id":"rent","enabled":firm.get("canRent",false)}]:
+                var operation := _button(str(choice["label"]),_garden_action.bind("rebirth-it:"+str(choice["id"])))
+                operation.disabled=not bool(choice["enabled"])
+                _action_choices.add_child(operation)
+            var staff = firm.get("staff")
+            if staff is Dictionary:
+                var staffing := Label.new()
+                staffing.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                staffing.text="IT assistant · 10 EUR signing bonus · 12 EUR per delegated report · No idle wages"
+                _action_choices.add_child(staffing)
+                var employee = staff.get("employee")
+                if employee is Dictionary:
+                    var cv := Label.new()
+                    cv.text="%s · Technical %s/100 · %s · Delegated %s" % [employee.get("name",""),employee.get("technical",0),"Sick leave" if employee.get("sick",false) else employee.get("activity",""),staff.get("delegated",0)]
+                    cv.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                    _action_choices.add_child(cv)
+                    var dismiss := _button("End support contract",_garden_action.bind("rebirth-it:dismiss"))
+                    dismiss.disabled=not bool(staff.get("canDismiss",false))
+                    _action_choices.add_child(dismiss)
+                else:
+                    for candidate in staff.get("candidates",[]):
+                        var resume := Label.new()
+                        resume.text="%s · Age %s · Technical %s/100%s" % [candidate.get("name",""),candidate.get("age",0),candidate.get("technical",0)," · programming diploma" if candidate.get("diploma",false) else ""]
+                        resume.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                        _action_choices.add_child(resume)
+                        _action_choices.add_child(_button("Hire "+str(candidate.get("name","")),_garden_action.bind("rebirth-it:hire:"+str(candidate.get("id","")))))
+            for contract in firm.get("offers",[]):
+                var terms := Label.new()
+                terms.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                terms.text="%s · %s EUR gross · %s EUR tax\n%s" % [contract.get("title",""),contract.get("gross",0),contract.get("tax",0),contract.get("prompt","")]
+                _action_choices.add_child(terms)
+                var response := LineEdit.new()
+                response.name="IT_"+str(contract.get("id",""))
+                response.placeholder_text="Enter verified numeric result"
+                response.max_length=10
+                _action_choices.add_child(response)
+                var deliver := _button("Deliver contract · 60 min",_submit_it_contract.bind(str(contract.get("id","")),response))
+                deliver.disabled=not bool(contract.get("available",false))
+                _action_choices.add_child(deliver)
+                if staff is Dictionary and staff.get("employee") is Dictionary:
+                    var delegate := _button("Delegate · 12 EUR wage",_garden_action.bind("rebirth-it:delegate:"+str(contract.get("id",""))))
+                    delegate.disabled=not str(contract.get("id","")) in staff.get("delegatable",[])
+                    _action_choices.add_child(delegate)
+    for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
+        var info := Label.new()
+        info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        info.text="%s · %s\n%s · Contract %s EUR" % [project.get("title",""),project.get("phase",""),project.get("effect",""),project.get("wage",0)]
+        _action_choices.add_child(info)
+        var command := str(project.get("command","code" if str(project.get("phase",""))=="OPEN" else ""))
+        if project.has("explanation"):
+            var guide := Label.new()
+            guide.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            guide.text=str(project.get("explanation",""))
+            _action_choices.add_child(guide)
+        if command=="code" and workspace is Dictionary:
+            for ticket in workspace.get("tickets",[]):
+                if str(ticket.get("id",""))!=str(project.get("id","")):continue
+                var spec := Label.new()
+                spec.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                spec.text="%s · %s\n%s\n%s\n%s" % [ticket.get("number",""),ticket.get("language","Java"),ticket.get("requirement",""),ticket.get("signature",""),ticket.get("examples","")]
+                _action_choices.add_child(spec)
+                var editor := LineEdit.new()
+                editor.name="Java_"+str(ticket.get("id",""))
+                editor.placeholder_text=str(ticket.get("language","Java"))+" solution"
+                editor.text=str(ticket.get("starter","return 0;"))
+                editor.max_length=180
+                editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+                _action_choices.add_child(editor)
+                var submit := _button("Run tests and submit · 60 min",_submit_java.bind(str(ticket.get("id","")),editor))
+                submit.disabled=not bool(project.get("canAdvance",false))
+                _action_choices.add_child(submit)
+        elif not project.get("deployed",false):
+            var request := "rebirth-git:"+command+":"+str(project.get("id","")) if command in ["branch","commit","pr","merge"] else "rebirth-software-"+str(project.get("id",""))
+            var advance := _button("%s · %s min" % [project.get("nextAction",""),project.get("minutes",0)],_garden_action.bind(request))
+            advance.disabled=not bool(project.get("canAdvance",false))
+            _action_choices.add_child(advance)
+    _action_choices.add_child(_button("Leave",_close_software))
+
+func _submit_it_contract(contract: String,editor: LineEdit) -> void:
+    if is_instance_valid(editor):
+        _garden_action("rebirth-it:deliver:"+contract+":"+editor.text)
+
+func _submit_devops(editor: LineEdit) -> void:
+    if is_instance_valid(editor):
+        _garden_action("rebirth-devops-command:"+editor.text)
+
+func _submit_developer_audit(editor: LineEdit) -> void:
+    if is_instance_valid(editor):
+        _garden_action("rebirth-developer-audit:"+editor.text)
+
+func _submit_java(ticket: String,editor: LineEdit) -> void:
+    if is_instance_valid(editor):
+        _garden_action("rebirth-java-submit:"+ticket+":"+editor.text)
+
+func _near_engineering() -> bool:
+    if _apartment_active or not _near_kiosk():return false
+    for order in _last_snapshot.get("rebirth",{}).get("engineeringOrders",[]):
+        if str(order.get("district",""))==_current_place:return true
+    return false
+
+func _close_engineering() -> void:
+    _engineering_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_engineering() -> void:
+    _action_title.text="Engineering work orders"
+    for order in _last_snapshot.get("rebirth",{}).get("engineeringOrders",[]):
+        if str(order.get("district",""))!=_current_place:continue
+        var info := Label.new()
+        info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        info.text="%s · %s · Condition %s/100\n%s · Wage %s EUR" % [order.get("title",""),order.get("phase",""),order.get("condition",0),order.get("materials",""),order.get("wage",0)]
+        _action_choices.add_child(info)
+        var inspect := _button("Inspect · 30 min",_garden_action.bind("rebirth-engineer-inspect-"+str(order.get("id",""))))
+        inspect.disabled=not bool(order.get("canInspect",false))
+        _action_choices.add_child(inspect)
+        var repair := _button("Repair · 90 min",_garden_action.bind("rebirth-engineer-repair-"+str(order.get("id",""))))
+        repair.disabled=not bool(order.get("canComplete",false))
+        _action_choices.add_child(repair)
+    _action_choices.add_child(_button("Leave",_close_engineering))
+
+func _near_college() -> bool:
+    var college = _last_snapshot.get("rebirth",{}).get("college")
+    return not _apartment_active and _current_place=="SCHOOL" and college is Dictionary and college.get("atCampus",false) and _avatar.position.distance_to(COLLEGE_DESK)<1.5
+
+func _close_college() -> void:
+    _college_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_college() -> void:
+    var college: Dictionary = _last_snapshot["rebirth"]["college"]
+    _action_title.text="Istituto Leonardo"
+    var info := Label.new()
+    info.text="Mon–Fri 08:00–18:00 · 2 EUR per lesson"
+    _action_choices.add_child(info)
+    for course in college.get("courses",[]):
+        var label := Label.new()
+        label.text="%s · %s/%s lessons%s" % [course.get("label",""),course.get("completed",0),course.get("required",0)," · Diploma" if course.get("diploma",false) else ""]
+        _action_choices.add_child(label)
+        if course.get("canEnroll",false):
+            _action_choices.add_child(_button("Enroll: "+str(course.get("label","")),_garden_action.bind("rebirth-enroll-"+str(course.get("id","")))))
+    if college.get("enrolled")!=null:
+        var lesson := _button("Attend lesson · 60 min · 2 EUR",_garden_action.bind("rebirth-study"))
+        lesson.disabled=not bool(college.get("canStudy",false))
+        _action_choices.add_child(lesson)
+    _action_choices.add_child(_button("Leave",_close_college))
+
+func _medical_station() -> String:
+    var medical = _last_snapshot.get("rebirth",{}).get("medical")
+    if _apartment_active or _current_place!="CLINIC" or not medical is Dictionary or not medical.get("atClinic",false):
+        return ""
+    if _avatar.position.distance_to(CLINIC_COUNTER)<1.4:return "consult"
+    if _avatar.position.distance_to(PHARMACY_COUNTER)<1.4:return "first-aid"
+    return ""
+
+func _close_medical() -> void:
+    _medical_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_medical() -> void:
+    var medical: Dictionary = _last_snapshot["rebirth"]["medical"]
+    var clinic := _medical_station()=="consult"
+    _action_title.text="Ambulatorio civico" if clinic else "Farmacia del Borgo"
+    var info := Label.new()
+    info.text="08:00–19:00 · Health %s/100 · %s" % [medical.get("health",100),"Ill" if medical.get("ill",false) else "Not ill"]
+    _action_choices.add_child(info)
+    var service := _button("Consultation · 15 EUR · 30 min" if clinic else "Basic pharmacy care · 5 EUR · 10 min",_garden_action.bind("rebirth-medical-"+_medical_station()))
+    service.disabled=not bool(medical.get("canConsult" if clinic else "canFirstAid",false))
+    _action_choices.add_child(service)
+    _action_choices.add_child(_button("Leave",_close_medical))
+
+func _cafe_station() -> String:
+    if _apartment_active or _current_place!="CAFE" or str(_last_snapshot.get("rebirth",{}).get("phase",""))!="LINKED_ADULT" or not _last_snapshot.get("rebirth",{}).get("cafe") is Dictionary:
+        return ""
+    if _avatar.position.distance_to(CAFE_COUNTER)<1.4:return "counter"
+    if _avatar.position.distance_to(CAFE_TABLE)<1.4:return "table"
+    return ""
+
+func _close_cafe() -> void:
+    _cafe_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_cafe() -> void:
+    var cafe: Dictionary = _last_snapshot["rebirth"]["cafe"]
+    _action_title.text=str(cafe.get("name","Bar Centrale"))
+    var info := Label.new()
+    info.text="%s · %s" % [cafe.get("hours","07:00–21:00"),"Open" if cafe.get("open",false) else "Closed"]
+    _action_choices.add_child(info)
+    if _cafe_station()=="counter":
+        for order in cafe.get("orders",[]):
+            var button := _button("%s · %s EUR" % [order.get("label",""),order.get("price",0)],_garden_action.bind("rebirth-cafe-"+str(order.get("id",""))))
+            button.disabled=not bool(order.get("available",false))
+            _action_choices.add_child(button)
+    else:
+        var rest := _button("Rest at table · 20 min",_garden_action.bind("rebirth-cafe-rest"))
+        rest.disabled=not bool(cafe.get("canRest",false))
+        _action_choices.add_child(rest)
+        for guest in cafe.get("guests",[]):
+            _action_choices.add_child(_button("Talk with "+str(guest.get("name","")),_garden_action.bind("rebirth-cafe-chat-"+str(guest.get("id","")))))
+    _action_choices.add_child(_button("Leave",_close_cafe))
+
+func _near_grocery_counter() -> bool:
+    var counter := BAKERY_COUNTER if _current_place=="BAKERY" else GROCERY_COUNTER
+    return not _apartment_active and _current_place in ["PORTICI","BAKERY"] and str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT" and _avatar.position.distance_to(counter)<1.5 and _last_snapshot.get("rebirth",{}).get("grocery") is Dictionary
+
+func _close_grocery() -> void:
+    _grocery_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _software_menu and _near_software():
+        _render_software()
+        return
+    _software_menu=false
+    if _engineering_menu and _near_engineering():
+        _render_engineering()
+        return
+    _engineering_menu=false
+    if _college_menu and _near_college():
+        _render_college()
+        return
+    _college_menu=false
+    if _medical_menu and not _medical_station().is_empty():
+        _render_medical()
+        return
+    _medical_menu=false
+    if _cafe_menu and not _cafe_station().is_empty():
+        _render_cafe()
+        return
+    _cafe_menu=false
+    if _grocery_menu and _near_grocery_counter():
+        var grocery: Dictionary = _last_snapshot["rebirth"]["grocery"]
+        _action_title.text = str(grocery.get("name","Bottega Alimentare"))
+        var info := Label.new()
+        info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        info.text="%s · %s\nFood %s · Water %s · Capacity %s" % [grocery.get("hours","08:00–20:00"),"Open" if grocery.get("open",false) else "Closed",grocery.get("food",0),grocery.get("water",0),grocery.get("capacity",24)]
+        _action_choices.add_child(info)
+        for item in grocery.get("items",[]):
+            var caption := "%s · %s EUR · %s left" % [item.get("label",""),item.get("price",0),item.get("stock",0)]
+            var buy := _button(caption,_garden_action.bind("rebirth-grocery-"+str(item.get("id",""))))
+            buy.disabled=not bool(item.get("available",false))
+            _action_choices.add_child(buy)
+        _action_choices.add_child(_button("Leave counter",_close_grocery))
+        return
+    _grocery_menu=false
     if _rebirth_active():
         var rebirth: Dictionary = _last_snapshot.get("rebirth",{})
         var info := Label.new()
@@ -2751,6 +3421,23 @@ func _render_actions() -> void:
                 for destination in options.get("destinations",[]):
                     if str(destination) != _current_place:
                         _action_choices.add_child(_button("Walk to "+str(destination).capitalize(),_garden_action.bind("rebirth-travel-"+str(destination))))
+            for order in rebirth.get("engineeringOrders",[]):
+                var task := Label.new()
+                task.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                task.text="Engineering · %s · %s · %s/100" % [order.get("title",""),order.get("district",""),order.get("condition",0)]
+                _action_choices.add_child(task)
+            var college = rebirth.get("college")
+            if college is Dictionary and college.get("enrolled")!=null:
+                var study_info := Label.new()
+                study_info.text="Education · %s · %s/%s lessons" % [college.get("enrolled",""),college.get("completed",0),college.get("required",0)]
+                _action_choices.add_child(study_info)
+            var medical = rebirth.get("medical")
+            if medical is Dictionary:
+                var health_label := Label.new()
+                health_label.text="Health %s/100 · %s" % [medical.get("health",100),"Ill until day "+str(medical.get("sickUntilDay",0)) if medical.get("ill",false) else "Not ill"]
+                _action_choices.add_child(health_label)
+                if medical.get("canVisit",false):
+                    _action_choices.add_child(_button("Visit medical district",_garden_action.bind("rebirth-medical-visit")))
             var home_options = rebirth.get("homeOptions")
             if home_options is Dictionary:
                 var home_label := Label.new()
@@ -3376,6 +4063,16 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-") or action.begins_with("rebirth-devops-") or action.begins_with("rebirth-it:")) and not _near_software():return
+    if action.begins_with("rebirth-engineer-") and not _near_engineering():return
+    if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
+    if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
+    if action.begins_with("rebirth-cafe-"):
+        var station := _cafe_station()
+        var table_action := action=="rebirth-cafe-rest" or action.begins_with("rebirth-cafe-chat-")
+        if station!=("table" if table_action else "counter"):return
+    if action.begins_with("rebirth-grocery-") and not _near_grocery_counter():
+        return
     if action.begins_with("rebirth-"):
         if _connected and not _api.is_busy():
             _api.garden_action(action)
@@ -3489,9 +4186,14 @@ func _sync_family_entrance(home) -> void:
     _home_entrance=Node3D.new()
     _home_entrance.name="FamilyHomeEntrance"
     add_child(_home_entrance)
-    _home_entrance.position=_open_anchor(Vector3(0,0,6))
-    _box(_home_entrance,Vector3(1.25,2.25,0.16),Color("#987653"),Vector3(0,1.125,-0.65))
-    _sign(_home_entrance,"Your home",Vector3(0,2.45,-0.65))
+    var approach := _scenery.get_node_or_null("ViaDelleMagnolie/CasaMagnolia/HomeApproach") as Marker3D
+    if approach != null:
+        _home_entrance.position=approach.global_position
+        _sign(_home_entrance,"Your home · E",Vector3(0,2.3,-0.6))
+    else:
+        _home_entrance.position=_open_anchor(Vector3(0,0,6))
+        _box(_home_entrance,Vector3(1.25,2.25,0.16),Color("#987653"),Vector3(0,1.125,-0.65))
+        _sign(_home_entrance,"Your home",Vector3(0,2.45,-0.65))
 
 func _apartment_action() -> String:
     if not _apartment_active:
@@ -3551,6 +4253,12 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _software_menu=false
+        _engineering_menu=false
+        _college_menu=false
+        _medical_menu=false
+        _cafe_menu=false
+        _grocery_menu=false
         if _apartment_active:
             _set_apartment(false)
         _close_dialog()

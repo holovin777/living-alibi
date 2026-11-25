@@ -38,6 +38,16 @@ public class GameController {
         return session.snapshot();
     }
 
+    @GetMapping("/retail/catalog")
+    public List<GameSession.RetailView> retailCatalog(){
+        return session.retailCatalog(false);
+    }
+
+    @GetMapping("/retail/low-stock")
+    public List<GameSession.RetailView> retailLowStock(){
+        return session.retailCatalog(true);
+    }
+
     @GetMapping("/business")
     public GameSession.BusinessView business() {
         return session.business();

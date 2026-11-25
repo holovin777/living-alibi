@@ -148,6 +148,12 @@ func _exercise() -> void:
 
     var guest := _world("NORTH_RESIDENCES","North residences")
     world._on_world_updated(guest)
+    if not _check(world._scenery.has_node("ViaDelleMagnolie/CasaMagnolia/HomeApproach")
+            and world._scenery.has_node("ViaDelleMagnolie/CasaTiglio")
+            and world._can_stand(Vector3(11,0,-2.8),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(11,0,-6.8),world.WALKER_RADIUS),
+            "Lombard neighborhood has walkable sidewalk, distinct buildings and solid facades"):
+        return
     if not _check(world._scenery.has_node("CasaOspiti/LeaseDoor")
             and not world._can_stand(Vector3(-5,0,8.5),world.WALKER_RADIUS),
             "unrented guest room is locked"):
@@ -921,7 +927,8 @@ func _exercise() -> void:
     outside["residents"]=[]
     world._home_transition=true
     world._on_world_updated(outside)
-    if not _check(not world._apartment_active and world._near_family_entrance() and world._can_walk_roads() and not world._action_panel.visible,
+    if not _check(not world._apartment_active and world._near_family_entrance() and world._can_walk_roads() and not world._action_panel.visible
+            and world._home_entrance.position.is_equal_approx(Vector3(11,0,-2.8)),
             "confirmed exit opens public street and continuous walking without menu"):
         return
     world._road_pending="CLINIC"
@@ -937,6 +944,164 @@ func _exercise() -> void:
             "authoritative departure restores outdoor scenery"):
         return
 
+    var shopping := _world("PORTICI","Via dei Portici")
+    shopping["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","grocery":{"open":true,"food":2,"water":3,"capacity":24,"items":[{"id":"bread","label":"Bread","price":3,"stock":2,"available":true},{"id":"water","label":"Bottled water","price":1,"stock":0,"available":false}]}}
+    world._on_world_updated(shopping)
+    if not _check(world._scenery.has_node("ViaDeiPortici/BottegaAlimentare/GroceryCounter") and not world._near_grocery_counter(),
+            "grocery has an interior counter, not accessible from street"):
+        return
+    world._avatar.position=Vector3(7.3,0,3.8)
+    world._grocery_menu=true
+    world._render_actions()
+    if not _check(world._near_grocery_counter() and _has_button(world._action_choices,"Bread · 3 EUR") and _has_button(world._action_choices,"Bottled water · 1 EUR"),
+            "grocery counter displays authoritative stock and prices"):
+        return
+    world._close_grocery()
+    if not _check(not world._grocery_menu and not world._action_panel.visible,"leave shop counter and continue walking"):
+        return
+    var bakery := _world("BAKERY","Bakery")
+    bakery["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","grocery":{"name":"Panetteria del Borgo","hours":"07:00–18:00","open":true,"food":4,"water":2,"capacity":24,"items":[{"id":"bread","label":"Bread","price":3,"stock":2,"available":true}]}}
+    world._on_world_updated(bakery)
+    if not _check(world._scenery.has_node("PanetteriaDelBorgo/BreadOven") and world._scenery.has_node("PanetteriaDelBorgo/BakeryCounter") and not world._near_grocery_counter(),"bakery interior and checkout"):
+        return
+    var bakery_walk: Vector3 = world._move_on_ground(Vector3(-2,0,7),Vector3(-4.3,0,0),world.WALKER_RADIUS)
+    if not _check(bakery_walk.x < -6 and not world._can_stand(Vector3(-4,0,4.7),world.WALKER_RADIUS),"bakery doorway passable and facade solid"):
+        return
+    world._avatar.position=bakery_walk
+    world._grocery_menu=true
+    world._render_actions()
+    if not _check(world._near_grocery_counter() and world._action_title.text=="Panetteria del Borgo" and _has_button(world._action_choices,"Bread · 3 EUR"),"bakery has distinct name and live stock"):
+        return
+    world._close_grocery()
+    var cafe := _world("CAFE","Cafe")
+    cafe["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","cafe":{"name":"Bar Centrale","hours":"07:00–21:00","open":true,"orders":[{"id":"espresso","label":"Espresso","price":1,"available":true}],"canRest":true,"guests":[{"id":"resident-0002","name":"Marco"}]}}
+    world._on_world_updated(cafe)
+    var cafe_walk: Vector3 = world._move_on_ground(Vector3(-2,0,7),Vector3(-5,0,0),world.WALKER_RADIUS)
+    if not _check(cafe_walk.x < -6.9 and world._scenery.has_node("BarCentrale/CafeTables") and not world._can_stand(Vector3(-4,0,4.45),world.WALKER_RADIUS),"cafe walkable doorway, tables and solid facade"):
+        return
+    world._avatar.position=Vector3(-7,0,5.9)
+    world._cafe_menu=true
+    world._render_actions()
+    if not _check(world._cafe_station()=="counter" and _has_button(world._action_choices,"Espresso · 1 EUR"),"cafe order menu at counter"):
+        return
+    world._avatar.position=Vector3(-7,0,9)
+    world._render_actions()
+    if not _check(world._cafe_station()=="table" and _has_button(world._action_choices,"Rest at table") and _has_button(world._action_choices,"Talk with Marco"),"cafe table rest and actual guests"):
+        return
+    world._close_cafe()
+    var medical := _world("CLINIC","Clinic")
+    medical["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","medical":{"atClinic":true,"health":75,"ill":true,"canConsult":true,"canFirstAid":true}}
+    world._on_world_updated(medical)
+    if not _check(world._scenery.has_node("AmbulatorioCivico/ServiceCounter") and world._scenery.has_node("FarmaciaDelBorgo/ServiceCounter"),"clinic and pharmacy have distinct interiors"):
+        return
+    var clinic_walk: Vector3 = world._move_on_ground(Vector3(-2,0,7),Vector3(-4.3,0,0),world.WALKER_RADIUS)
+    var pharmacy_walk: Vector3 = world._move_on_ground(Vector3(2,0,-7),Vector3(4.3,0,0),world.WALKER_RADIUS)
+    if not _check(clinic_walk.x < -6 and pharmacy_walk.x > 6,"both medical entrances are walkable"):
+        return
+    world._avatar.position=clinic_walk
+    world._medical_menu=true
+    world._render_actions()
+    if not _check(world._medical_station()=="consult" and _has_button(world._action_choices,"Consultation · 15 EUR"),"clinic contextual menu"):
+        return
+    world._avatar.position=pharmacy_walk
+    world._render_actions()
+    if not _check(world._medical_station()=="first-aid" and _has_button(world._action_choices,"Basic pharmacy care · 5 EUR"),"pharmacy contextual menu"):
+        return
+    world._close_medical()
+    var campus := _world("SCHOOL","School")
+    campus["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","college":{"atCampus":true,"open":true,"enrolled":null,"courses":[{"id":"engineering","label":"Engineering","required":60,"completed":0,"canEnroll":true}]}}
+    world._on_world_updated(campus)
+    var campus_walk: Vector3 = world._move_on_ground(Vector3(-2,0,7),Vector3(-4.3,0,0),world.WALKER_RADIUS)
+    if not _check(campus_walk.x < -6 and world._scenery.has_node("IstitutoLeonardo/Classroom"),"college entrance and classroom"):
+        return
+    world._avatar.position=campus_walk
+    world._college_menu=true
+    world._render_actions()
+    if not _check(world._near_college() and _has_button(world._action_choices,"Enroll: Engineering"),"college registration menu"):
+        return
+    world._close_college()
+    var workshop := _world("WORKSHOP","Workshop")
+    workshop["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","engineeringOrders":[{"id":"water-pump","title":"Park pump","district":"WORKSHOP","phase":"OPEN","condition":45,"materials":"2 spare-parts","wage":38,"canInspect":true,"canComplete":false}]}
+    world._on_world_updated(workshop)
+    world._avatar.position=world.KIOSK_POSITION
+    world._engineering_menu=true
+    world._render_actions()
+    if not _check(world._near_engineering() and _has_button(world._action_choices,"Inspect · 30 min") and _has_button(world._action_choices,"Repair · 90 min"),"linked engineering work orders"):
+        return
+    world._close_engineering()
+    var office := _world("OFFICE","Office")
+    office["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","softwareProjects":[{"id":"water-control","title":"Water control","phase":"OPEN","effect":"Water capacity +2","wage":45,"nextAction":"Develop","minutes":60,"canAdvance":true,"deployed":false}]}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(world._near_software() and _has_button(world._action_choices,"Develop · 60 min"),"software project menu"):
+        return
+    world._close_software()
+    office["rebirth"]["javaWorkspace"]={"intro":"Welcome to the Java team.","onboarded":false,"canOnboard":true,"tickets":[{"id":"water-control","number":"BD-101","requirement":"Respect available stock and free capacity","signature":"int waterUnits(int requested, int stock, int freeCapacity)","examples":"(6,2,9) -> 2"}]}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Complete onboarding"),"java team onboarding"):
+        return
+    office["rebirth"]["javaWorkspace"]["onboarded"]=true
+    world._on_world_updated(office)
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Run tests and submit") and world._action_choices.has_node("Java_water-control"),"Java ticket editor and test submission"):
+        return
+    world._close_software()
+    office["rebirth"]["softwareProjects"][0]["command"]="branch"
+    office["rebirth"]["softwareProjects"][0]["nextAction"]="Create branch"
+    office["rebirth"]["softwareProjects"][0]["minutes"]=5
+    world._on_world_updated(office)
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Create branch") and not world._action_choices.has_node("Java_water-control"),"Git branch precedes code editor"):
+        return
+    world._close_software()
+    office["rebirth"]["softwareProjects"]=[{"id":"retail-sql","title":"Low-stock report","phase":"OPEN","command":"code","canAdvance":true}]
+    office["rebirth"]["javaWorkspace"]["tickets"]=[{"id":"retail-sql","number":"BD-104","language":"SQL","signature":"products(id,stock,price)","requirement":"Find low stock","examples":"bread=0","starter":"SELECT id FROM products"}]
+    world._on_world_updated(office)
+    world._software_menu=true
+    world._render_actions()
+    var sql_editor = world._action_choices.get_node_or_null("Java_retail-sql")
+    if not _check(sql_editor is LineEdit and sql_editor.text=="SELECT id FROM products","SQL ticket uses language-specific starter"):
+        return
+    world._close_software()
+    office["rebirth"]["javaWorkspace"]["career"]={"rank":"Junior","xp":0,"technical":55,"releases":0,"audits":0,"nextRank":"Middle","requiredXp":4,"requiredTechnical":55,"requiredAudits":2,"canPromote":false,"audit":{"title":"Inventory audit","wage":18,"prompt":"Bread 3 · Water 2","available":true}}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Promotion: Middle") and _has_button(world._action_choices,"Submit daily audit") and world._action_choices.has_node("DeveloperAuditAnswer"),"developer career and daily audit menu"):
+        return
+    world._close_software()
+    office["rebirth"]["javaWorkspace"]["devops"]={"status":"OUTAGE","resolved":0,"guide":"Inspect the service","output":"HTTP 503","trained":true,"active":true,"canRun":true}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Run command") and world._action_choices.has_node("DevOpsCommand"),"DevOps training terminal"):
+        return
+    world._close_software()
+    office["rebirth"]["javaWorkspace"]["companyStatus"]={"registered":true,"cash":40,"rentUntil":8,"contracts":0,"taxPaid":0,"canInvest":true,"canWithdraw":true,"canRent":false,"offers":[{"id":"retail","title":"Retail support","gross":40,"tax":8,"prompt":"Count stock","available":true}]}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Invest 20 EUR") and _has_button(world._action_choices,"Deliver contract") and world._action_choices.has_node("IT_retail"),"IT company account and contract UI"):
+        return
+    world._close_software()
+    office["rebirth"]["javaWorkspace"]["companyStatus"]["staff"]={"employee":{"id":"resident-0002","name":"Marco","technical":35,"activity":"WORKING","sick":false},"canDismiss":true,"delegated":0,"delegatable":["retail"]}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Delegate · 12 EUR wage") and _has_button(world._action_choices,"End support contract"),"IT staff delegation controls"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

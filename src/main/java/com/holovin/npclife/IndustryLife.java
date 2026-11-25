@@ -112,7 +112,7 @@ final class IndustryLife {
 
     /** Counts units at each physical stage; a zero-valued source stays zero. */
     private static int move(TownLife.Town town,String from,String to,int limit) {
-        int moved=Math.min(Math.max(0,limit),stock(town,from));
+        int moved=JavaTicketLife.factoryUnits(stock(town,from),limit);
         if(moved==0)return 0;
         town.industryStocks.put(from,stock(town,from)-moved);
         town.industryStocks.put(to,Math.addExact(stock(town,to),moved));
@@ -289,7 +289,7 @@ final class IndustryLife {
             town.lastIndustryRefineDay=day;
             var machinist=attending(town,TownLife.Place.FACTORY,"Factory machinist");
             if(machinist!=null && funded(town,"machinist")) {
-                int steel=move(town,FACTORY_IRON,FACTORY_STEEL,2);
+                int steel=move(town,FACTORY_IRON,FACTORY_STEEL,SoftwareLife.deployed(town,"factory-planning")?3:2);
                 int copper=move(town,FACTORY_COPPER_ORE,FACTORY_COPPER,1);
                 if(steel+copper>0)
                     TownLife.publish(town,clock,machinist.id,TownLife.Place.FACTORY,

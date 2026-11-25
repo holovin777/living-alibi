@@ -6,7 +6,7 @@ final class EducationLife {
     private EducationLife(){}
     static final String LESSONS="education:lessons", GRADUATES="education:graduates", EXPERIENCE="education:experience", SCHOOL_SERVICE="school-services";
     static final List<String> SUBJECTS=List.of("technical","social","academic","commerce");
-    static final List<String> FIELDS=List.of("technical","social","academic","commerce","school-days","last-school","last-work","graduate","fitness","hobby-days","last-hobby","allowance-week","allowance-total","last-family-time","dirt","furniture-level");
+    static final List<String> FIELDS=List.of("technical","social","academic","commerce","school-days","last-school","last-work","graduate","fitness","hobby-days","last-hobby","allowance-week","allowance-total","last-family-time","dirt","furniture-level","last-cafe-rest","last-consult","last-first-aid","course","course-lessons","last-course","diploma-engineering","diploma-programming","diploma-medicine","diploma-investigation","last-engineering-order","java-onboarded","developer-rank","developer-xp","developer-releases","developer-audits","last-developer-audit","devops-trained","devops-resolved","it-registered","it-cash","it-rent-until","it-last-retail","it-last-utility","it-contracts","it-tax-paid","it-employee","it-employer","it-delegated","it-last-assignment");
     static String key(TownLife.Citizen c,String f){return "education:"+c.id+":"+f;}
     static int get(TownLife.Town t,String k){return t.industryStocks.getOrDefault(k,0);}
     static void set(TownLife.Town t,String k,int n){t.industryStocks.put(k,n);}
@@ -18,9 +18,9 @@ final class EducationLife {
     }
     static String subject(String job){
         return switch(job){
-            case "Mechanic","Miner","Factory machinist","Transport driver","Independent fabricator","Company freight driver" -> "technical";
+            case "Engineer","Programmer","Mechanic","Miner","Factory machinist","Transport driver","Independent fabricator","Company freight driver" -> "technical";
             case "Nurse","Barista" -> "social";
-            case "Teacher","Librarian" -> "academic";
+            case "Teacher","Librarian","Doctor","Detective" -> "academic";
             case "Market vendor","Private stall seller","Office clerk","Baker" -> "commerce";
             default -> "academic";
         };
@@ -69,8 +69,11 @@ final class EducationLife {
     }
     static boolean availableRole(TownLife.Town t,TownLife.Citizen c,String job){
         String f=subject(job);
-        int minimum=switch(job){case "Teacher","Nurse","Journalist" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
+        int minimum=switch(job){case "Doctor" -> 65;case "Engineer","Programmer","Detective" -> 45;case "Teacher","Nurse","Journalist" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
         if(get(t,c,f)<minimum)return false;
+        String diploma=switch(job){case "Engineer" -> "engineering";case "Programmer" -> "programming";case "Doctor" -> "medicine";case "Detective" -> "investigation";default -> null;};
+        if(diploma!=null&&get(t,c,"diploma-"+diploma)==0)return false;
+        if("Doctor".equals(job)&&(c.age<25||get(t,c,"social")<35))return false;
         if(NewspaperLife.OCCUPATION.equals(job)&&(t.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY*30||c.money<200))return false;
         String employer=IndustryLife.companyFor(job);
         if(employer!=null&&t.employerFunds.getOrDefault(employer,0)<IndustryLife.HOURLY_WAGE)return false;
@@ -92,6 +95,55 @@ final class EducationLife {
             if(score>bestScore){bestScore=score;best=i;}
         }
         return best;
+    }
+    record Course(String id,String label,String subject,int lessons,String career){}
+    static final List<Course> COURSES=List.of(
+            new Course("engineering","Engineering","technical",60,"Engineer"),
+            new Course("programming","Computer science","technical",60,"Programmer"),
+            new Course("medicine","Medicine","academic",120,"Doctor"),
+            new Course("investigation","Investigation","academic",60,"Detective"));
+    record CourseView(String id,String label,int required,int completed,boolean diploma,boolean canEnroll,String career){}
+    record College(boolean atCampus,boolean open,String enrolled,int completed,int required,int fee,boolean canStudy,List<CourseView> courses){}
+    static Course enrolled(TownLife.Town t,TownLife.Citizen c){
+        int i=get(t,c,"course");return i>0&&i<=COURSES.size()?COURSES.get(i-1):null;
+    }
+    static College college(TownLife.Town t,int day,int minute){
+        var c=RebirthLife.child(t);
+        if(!RebirthLife.linkedAdult(t,c))return null;
+        boolean at=RebirthLife.awakePresent(c)&&c.place==TownLife.Place.SCHOOL&&!RebirthLife.atHome(c);
+        boolean open=minute>=480&&minute<1080&&(day-1)%7<5&&!EmploymentLife.sick(c,day);
+        var active=enrolled(t,c);int progress=get(t,c,"course-lessons");
+        var courses=COURSES.stream().map(p->new CourseView(p.id(),p.label(),p.lessons(),
+                p.equals(active)?progress:get(t,c,"diploma-"+p.id())>0?p.lessons():0,
+                get(t,c,"diploma-"+p.id())>0,at&&open&&active==null&&get(t,c,"diploma-"+p.id())==0,p.career())).toList();
+        return new College(at,open,active==null?null:active.id(),progress,active==null?0:active.lessons(),2,
+                at&&open&&minute+60<=1080&&active!=null&&get(t,c,"last-course")<day&&c.money>=2&&c.fatigue<85,courses);
+    }
+    static String enroll(TownLife.Town t,int day,int minute,String id){
+        var c=RebirthLife.requireAdult(t);var college=college(t,day,minute);
+        if(college.courses().stream().noneMatch(p->p.id().equals(id)&&p.canEnroll()))
+            throw new IllegalArgumentException("Enroll at the college during opening hours; finish your current course first.");
+        int index=0;for(int i=0;i<COURSES.size();i++)if(COURSES.get(i).id().equals(id))index=i+1;
+        set(t,c,"course",index);set(t,c,"course-lessons",0);
+        return "Enrolled in "+COURSES.get(index-1).label()+".";
+    }
+    static String study(TownLife.Town t,int day,int minute){
+        var c=RebirthLife.requireAdult(t);var college=college(t,day,minute);
+        if(!college.canStudy())throw new IllegalArgumentException("Attend class on campus during opening hours, once per weekday.");
+        var course=enrolled(t,c);
+        int funds=Math.addExact(t.employerFunds.getOrDefault("school",0),2);
+        c.money-=2;t.employerFunds.put("school",funds);
+        learn(t,c,course.subject(),2);
+        if("medicine".equals(course.id())||"investigation".equals(course.id()))learn(t,c,"social",1);
+        c.fatigue=Math.min(100,c.fatigue+5);
+        set(t,c,"last-course",day);
+        int progress=get(t,c,"course-lessons")+1;
+        if(progress>=course.lessons()){
+            set(t,c,"diploma-"+course.id(),1);set(t,c,"course",0);set(t,c,"course-lessons",0);
+            return "Graduated in "+course.label()+".";
+        }
+        set(t,c,"course-lessons",progress);
+        return "Completed lesson "+progress+" of "+course.lessons()+".";
     }
     record Report(int lessons,int graduates,int workDays,int pupils,int schoolFunds){}
     static Report report(TownLife.Town t){

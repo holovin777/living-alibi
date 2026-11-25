@@ -127,7 +127,7 @@ final class RebirthLife {
     }
     static int travel(TownLife.Town t,TownLife.Place destination,int day){
         var c=requireAdult(t);
-        if(c.travelRemaining>0||EmploymentLife.sick(c,day))throw new IllegalArgumentException("Finish traveling or recover first.");
+        if(c.travelRemaining>0||(EmploymentLife.sick(c,day)&&destination!=TownLife.Place.CLINIC))throw new IllegalArgumentException("Finish traveling or visit the clinic while ill.");
         int index=PlayerLife.publicPlaces().indexOf(destination);
         if(index<0)throw new IllegalArgumentException("Choose a public destination.");
         t.industryStocks.put(TRAVEL,index+1);
@@ -566,7 +566,119 @@ final class RebirthLife {
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
                 EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known));
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions){}
+    // Linked residents shop with their actual wallet and the same finite retail stock
+    // as first-life visitors. Food is represented by the existing resident portions.
+    static final List<String> GROCERY_ITEMS=List.of("bread","water","pasta","vegetables","eggs","milk","rice");
+    record GroceryItem(String id,String label,int price,int stock,boolean available){}
+    record Grocery(String name,boolean open,int food,int water,int capacity,List<GroceryItem> items,String hours){}
+    static Grocery grocery(TownLife.Town t,int day,int minute){
+        var c=child(t);
+        if(!linkedAdult(t,c)||!awakePresent(c)||atHome(c))return null;
+        boolean bakery=c.place==TownLife.Place.BAKERY;
+        if(!bakery&&c.place!=TownLife.Place.PORTICI)return null;
+        boolean open=minute>=(bakery?420:480)&&minute+5<=(bakery?1080:1200)&&!EmploymentLife.sick(c,day);
+        int capacity=24;
+        var items=(bakery?List.of("bread","water"):GROCERY_ITEMS).stream().map(id->{
+            var product=RetailLife.product(id);
+            int stock=t.retailStock.getOrDefault(id,0);
+            return new GroceryItem(id,product.label(),product.price(),stock,open&&stock>0&&c.money>=product.price()
+                    &&(long)c.food+c.water<capacity);
+        }).toList();
+        return new Grocery(bakery?"Panetteria del Borgo":"Bottega Alimentare",open,c.food,c.water,capacity,items,bakery?"07:00–18:00":"08:00–20:00");
+    }
+    static String buyGrocery(TownLife.Town t,int day,int minute,String id){
+        var c=requireAdult(t);
+        var shop=grocery(t,day,minute);
+        if(shop==null||!shop.open())throw new IllegalArgumentException("Visit an open grocery or bakery counter.");
+        var item=shop.items().stream().filter(p->p.id().equals(id)&&p.available()).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("Product unavailable, insufficient money or carrying capacity."));
+        int funds=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),item.price());
+        t.retailStock.put(id,item.stock()-1);
+        c.money-=item.price();t.employerFunds.put("shop-assistant",funds);
+        if("water".equals(id))c.water++;else c.food++;
+        t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(c.place)+1);
+        return "Bought "+item.label()+" for EUR "+item.price()+".";
+    }
+    record CafeOption(String id,String label,int price,int minutes,boolean available){}
+    record Cafe(String name,String hours,boolean open,List<CafeOption> orders,boolean canRest,List<Conversation> guests){}
+    static Cafe cafe(TownLife.Town t,int day,int minute){
+        var c=child(t);
+        if(!linkedAdult(t,c)||c.place!=TownLife.Place.CAFE||!awakePresent(c)||atHome(c))return null;
+        boolean open=minute>=420&&minute<1260&&!EmploymentLife.sick(c,day);
+        var orders=List.of(
+                new CafeOption("espresso","Espresso",1,5,open&&minute+5<=1260&&c.money>=1&&c.fatigue>0),
+                new CafeOption("water","Bottled water",1,5,open&&minute+5<=1260&&c.money>=1&&c.thirst>0&&t.retailStock.getOrDefault("water",0)>0),
+                new CafeOption("bread","Bread snack",3,5,open&&minute+5<=1260&&c.money>=3&&c.hunger>0&&t.retailStock.getOrDefault("bread",0)>0));
+        return new Cafe("Bar Centrale","07:00–21:00",open,orders,
+                open&&minute+20<=1260&&c.fatigue>0&&EducationLife.get(t,c,"last-cafe-rest")<day,
+                open&&minute+10<=1260?conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList():List.of());
+    }
+    static HomeAction cafeAction(TownLife.Town t,int day,int minute,String action){
+        var c=requireAdult(t);var cafe=cafe(t,day,minute);
+        if(cafe==null||!cafe.open())throw new IllegalArgumentException("Visit Bar Centrale during opening hours.");
+        t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(TownLife.Place.CAFE)+1);
+        if("rest".equals(action)){
+            if(!cafe.canRest())throw new IllegalArgumentException("Rest is available once a day while the cafe is open.");
+            c.fatigue=Math.max(0,c.fatigue-8);
+            EducationLife.set(t,c,"last-cafe-rest",day);
+            return new HomeAction(20,"Rested at a cafe table.");
+        }
+        if(action.startsWith("chat-")){
+            String id=action.substring(5);
+            if(cafe.guests().stream().noneMatch(p->p.id().equals(id)))throw new IllegalArgumentException("This guest is not available.");
+            return new HomeAction(10,chat(t,day,id));
+        }
+        var order=cafe.orders().stream().filter(p->p.id().equals(action)&&p.available()).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("This order is not available."));
+        int funds=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),order.price());
+        c.money-=order.price();t.employerFunds.put("shop-assistant",funds);
+        switch(action){
+            case "espresso" -> c.fatigue=Math.max(0,c.fatigue-5);
+            case "water" -> {t.retailStock.merge("water",-1,Integer::sum);c.thirst=Math.max(0,c.thirst-40);}
+            case "bread" -> {t.retailStock.merge("bread",-1,Integer::sum);c.hunger=Math.max(0,c.hunger-35);}
+            default -> throw new IllegalArgumentException("Unknown order.");
+        }
+        return new HomeAction(order.minutes(),"Enjoyed "+order.label()+" for EUR "+order.price()+".");
+    }
+    record Medical(int health,boolean ill,int sickUntilDay,boolean canVisit,boolean atClinic,boolean open,
+                   boolean canConsult,boolean canFirstAid,int consultPrice,int firstAidPrice){}
+    static Medical medical(TownLife.Town t,int day,int minute){
+        var c=child(t);
+        if(!linkedAdult(t,c))return null;
+        boolean ill=EmploymentLife.sick(c,day),awake=awakePresent(c);
+        boolean present=awake&&c.place==TownLife.Place.CLINIC&&!atHome(c);
+        boolean open=minute>=480&&minute<1140;
+        return new Medical(c.health,ill,c.sickUntilDay,awake&&!present&&open&&(ill||c.health<100),present,open,
+                present&&open&&minute+30<=1140&&(ill||c.health<100)&&c.money>=15&&EducationLife.get(t,c,"last-consult")<day,
+                present&&open&&minute+10<=1140&&c.health<100&&c.money>=5&&EducationLife.get(t,c,"last-first-aid")<day,15,5);
+    }
+    static int medicalVisit(TownLife.Town t,int day,int minute){
+        var m=medical(t,day,minute);
+        if(m==null||!m.canVisit())throw new IllegalArgumentException("No medical visit available.");
+        return travel(t,TownLife.Place.CLINIC,day);
+    }
+    static HomeAction medicalAction(TownLife.Town t,int day,int minute,String action){
+        var c=requireAdult(t);var m=medical(t,day,minute);
+        if("consult".equals(action)&&m.canConsult()){
+            int funds=Math.addExact(t.employerFunds.getOrDefault("city-maintenance",0),15);
+            c.money-=15;t.employerFunds.put("city-maintenance",funds);
+            c.health=Math.min(100,c.health+10);
+            if(m.ill()&&c.sickUntilDay>day)c.sickUntilDay--;
+            EducationLife.set(t,c,"last-consult",day);
+            t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(TownLife.Place.CLINIC)+1);
+            return new HomeAction(30,"Completed a medical consultation.");
+        }
+        if("first-aid".equals(action)&&m.canFirstAid()){
+            int funds=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),5);
+            c.money-=5;t.employerFunds.put("shop-assistant",funds);
+            c.health=Math.min(100,c.health+4);
+            EducationLife.set(t,c,"last-first-aid",day);
+            t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(TownLife.Place.CLINIC)+1);
+            return new HomeAction(10,"Received basic pharmacy care.");
+        }
+        throw new IllegalArgumentException("This medical service is unavailable.");
+    }
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery,Cafe cafe,Medical medical,EducationLife.College college,List<TechnicalWorkLife.LinkedOrder> engineeringOrders,List<SoftwareLife.ProjectView> softwareProjects,JavaTicketLife.Workspace javaWorkspace){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
     static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
@@ -576,6 +688,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute),EducationLife.college(t,day,minute),TechnicalWorkLife.linkedOrders(t,day,minute),SoftwareLife.projects(t,day,minute),JavaTicketLife.workspace(t,day,minute));
     }
 }

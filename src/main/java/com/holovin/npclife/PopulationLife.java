@@ -36,13 +36,14 @@ final class PopulationLife {
         // Independent workshops use short real two-hour shifts, not fictitious
         // wages for eight hours to fabricate one small batch of parts.
         boolean shopEmployee=BusinessLife.isEmployee(town,c);
+        boolean itEmployee=ITStaffLife.isEmployee(town,c);
         boolean stallEmployee=MarketStallLife.isEmployee(town,c);
         boolean carrier=LogisticsLife.isDriver(town,c);
         TownLife.Place freightDestination=LogisticsLife.activeDriverDestination(town,c);
         boolean freightRun=carrier && freightDestination!=null && !sick;
         boolean journalist=NewspaperLife.reporter(c);
         boolean working=!child&&!retired&&c.employed && !sick && workday &&
-                (journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):
+                (itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,clock.day,minute)!=null);
@@ -56,11 +57,12 @@ final class PopulationLife {
         if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
             RebirthLife.resumeRoutine(town);manual=null;
         }
-        if(sick)desired=c.home;
+        if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;
         else if(freightRun)desired=freightDestination;
         else if(sleeping)desired=c.home;
         else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:c.home;
+        else if(itEmployee && working)desired=TownLife.Place.OFFICE;
         else if(carrier && working)desired=c.workplace;
         else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
         else if(stallEmployee && working)desired=TownLife.Place.MARKET;
@@ -130,7 +132,7 @@ final class PopulationLife {
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){
-                if(!journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
+                if(!ITStaffLife.OCCUPATION.equals(c.occupation) && !TechnicalWorkLife.linkedEngineer(town,c) && !SoftwareLife.linkedProgrammer(town,c) && !journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
                         !IndustryLife.payHourly(town,c,clock,events,observations)) {
                     // Existing unrelated occupations retain their original
                     // placeholder wage model until their companies are modeled.
