@@ -327,11 +327,13 @@ public final class GameSession implements AutoCloseable {
     public synchronized ActionView gardenAction(String action) throws SQLException {
         if(action!=null&&action.startsWith("rebirth-")){
             var copy=town.copy();
-            if(action.equals("rebirth-wait")){
-                if(!RebirthLife.active(town))throw new IllegalArgumentException("No rebirth in progress.");
-                var child=RebirthLife.child(town);
-                if(child!=null&&child.age>=18)throw new IllegalArgumentException("Adult transition requires the next childhood implementation.");
-                return applyInternal(copy,1440,"Advanced one shared game day.",true);
+            if(action.equals("rebirth-wait")||action.equals("rebirth-wait-fast")){
+                int maxDays=RebirthLife.maxWaitDays(town);
+                if(maxDays==0)throw new IllegalArgumentException("No childhood waiting is available.");
+                if(action.equals("rebirth-wait-fast")&&maxDays<=1)
+                    throw new IllegalArgumentException("Fast waiting is not available at this age or phase.");
+                int days=action.equals("rebirth-wait-fast")?maxDays:1;
+                return applyInternal(copy,days*1440,"Advanced the shared world.",true);
             }
             String message;
             if(action.equals("rebirth-adult"))message=RebirthLife.adultFallback(copy);
@@ -410,8 +412,15 @@ public final class GameSession implements AutoCloseable {
         var truth=new ArrayList<TownLife.Event>();
         var observations=new ArrayList<TownLife.Observation>();
         var interactions=new ArrayList<SocialLife.Interaction>();
+        int initialPhase=RebirthLife.phase(candidateTown);
+        int initialMaxDays=RebirthLife.maxWaitDays(candidateTown);
         events.addAll(LifeSimulation.advance(candidateState,minutes,
-                current->TownLife.tick(candidateTown,current,truth,observations,interactions)));
+                current->TownLife.tick(candidateTown,current,truth,observations,interactions),
+                ()->!rebirthAction||minutes==0||RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays)));
+        if(rebirthAction&&minutes>0){
+            long elapsed=(candidateState.day-(long)state.day)*1440+candidateState.minute-state.minute;
+            message+=" Elapsed: "+elapsed/1440+" day(s), "+elapsed%1440+" minute(s).";
+        }
         if(!candidateTown.player.alive&&!RebirthLife.active(candidateTown)) {
             RebirthLife.prepare(candidateTown,candidateState.day,candidateState.minute);
             message+=" Your previous life ended. Choose a family for your next life.";

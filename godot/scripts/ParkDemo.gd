@@ -2612,8 +2612,11 @@ func _render_actions() -> void:
             _action_title.text = "Childhood · preview"
             info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nYour child lives in the simulated family; independent controls are not implemented yet." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
             _action_choices.add_child(info)
-        if int(rebirth.get("age",0))<18:
+        var max_days := int(rebirth.get("maxWaitDays",0))
+        if max_days > 0:
             _action_choices.add_child(_button("Advance one shared day",_garden_action.bind("rebirth-wait")))
+        if max_days > 1:
+            _action_choices.add_child(_button("Advance up to %s shared days" % max_days,_garden_action.bind("rebirth-wait-fast")))
         return
     _action_title.text = "Local actions — " + _current_place.capitalize()
     var player: Dictionary = _last_snapshot.get("player", {})

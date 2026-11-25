@@ -53,18 +53,28 @@ final class RebirthLife {
         t.player.place=c.place;t.player.destination=c.place;
         t.player.health=c.health;t.player.hunger=c.hunger;t.player.thirst=c.thirst;t.player.fatigue=c.fatigue;
     }
+    // Bound each request: early childhood is faster, adolescence is slower.
+    static int maxWaitDays(TownLife.Town t){
+        if(phase(t)==CHOICE)return 1;
+        var c=child(t);
+        if(phase(t)!=CHILDHOOD||c==null||!c.alive||c.age>=18)return 0;
+        return c.age<6?7:c.age<13?3:1;
+    }
+    static boolean canContinueWaiting(TownLife.Town t,int initialPhase,int initialMaxDays){
+        return phase(t)==initialPhase&&maxWaitDays(t)>0&&maxWaitDays(t)==initialMaxDays;
+    }
     static String adultFallback(TownLife.Town t){
         if(phase(t)!=CHOICE)throw new IllegalArgumentException("Only available before choosing a family.");
         var p=new PlayerLife.Player();p.incarnation=t.player.incarnation;t.player=p;
         t.industryStocks.put(PHASE,ADULT);t.industryStocks.put(CHILD,0);
         return "Started an adult life in the park.";
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview){}
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays){}
     static Report report(TownLife.Town t,int day){
         int phase=phase(t);var c=child(t);
         var a=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-a"));
         var b=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-b"));
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD);
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t));
     }
 }

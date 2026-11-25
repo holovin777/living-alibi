@@ -20,11 +20,15 @@ final class LifeSimulation {
         return advance(s,minutes,ignored -> { });
     }
     static List<LifeEvent> advance(WorldState s, long minutes, Consumer<WorldState> afterTick) {
+        return advance(s,minutes,afterTick,()->true);
+    }
+    static List<LifeEvent> advance(WorldState s, long minutes, Consumer<WorldState> afterTick,
+                                   java.util.function.BooleanSupplier keepGoing) {
         if (minutes < 0 || minutes > 525_600L) {
             throw new IllegalArgumentException("Advance must be between 0 and 525600 minutes (one game year).");
         }
         List<LifeEvent> changes = new ArrayList<>();
-        for (long i = 0; i < minutes; i++) {
+        for (long i = 0; i < minutes && keepGoing.getAsBoolean(); i++) {
             tick(s, changes);
             afterTick.accept(s);
         }

@@ -191,12 +191,14 @@ class GameSessionTest {
             assertEquals(1,view.rebirth().families().size());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-family-9999-9998"));
             assertThrows(IllegalArgumentException.class,()->game.waitMinutes(1));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait-fast"));
         }
         try(var game=new GameSession(file)){
             assertEquals("CHOICE",game.snapshot().rebirth().phase());
             var born=game.gardenAction("rebirth-family-"+first+"-"+second).world();
             assertEquals("CHILDHOOD",born.rebirth().phase());
             assertEquals(0,born.rebirth().age());
+            assertEquals(7,born.rebirth().maxWaitDays());
             assertEquals(1,born.demography().births());
             assertEquals(271,born.day());assertEquals(600,born.minute());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-family-"+first+"-"+second));
@@ -219,6 +221,29 @@ class GameSessionTest {
             assertEquals(272,next.day());
             assertEquals(1,next.demography().births());
             assertEquals(2,next.player().incarnation());
+            assertEquals(7,next.rebirth().maxWaitDays());
+            var fast=game.gardenAction("rebirth-wait-fast").world();
+            assertEquals(279,fast.day());
+            assertEquals(600,fast.minute());
+        }
+        // Move the existing child to the evening before its eighteenth birthday.
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var child=RebirthLife.child(town);
+            assertNotNull(child);
+            child.age=17;
+            state.day=DemographyLife.get(town,child,"born")+365-1;
+            state.minute=600;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(1,game.snapshot().rebirth().maxWaitDays());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait-fast"));
+            var adult=game.gardenAction("rebirth-wait").world();
+            assertEquals(18,adult.rebirth().age());
+            assertEquals(360,adult.minute());
+            assertEquals(0,adult.rebirth().maxWaitDays());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait"));
         }
     }
 
