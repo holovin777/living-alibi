@@ -34,7 +34,14 @@ static func adjacent(first: String, second: String) -> bool:
     return absi(a.x-b.x)+absi(a.y-b.y) == 1
 
 static func motor_road(first: String, second: String) -> bool:
-    return adjacent(first,second) and first in MOTOR_DISTRICTS and second in MOTOR_DISTRICTS
+    if not adjacent(first,second):
+        return false
+    if first in MOTOR_DISTRICTS and second in MOTOR_DISTRICTS:
+        return true
+    var farm_route := ["FARM","BAKERY","CAFE","SOUTH_RESIDENCES","MARKET"]
+    var a := farm_route.find(first)
+    var b := farm_route.find(second)
+    return a>=0 and b>=0 and absi(a-b)==1
 
 func _ready() -> void:
     custom_minimum_size = Vector2(570, 432)

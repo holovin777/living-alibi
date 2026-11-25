@@ -27,7 +27,7 @@ final class FarmLife {
     static int harvest(TownLife.Town t,int perCrop) {
         int total=0;
         for(String crop:CROPS) {
-            int n=Math.min(perCrop,Math.min(stock(t,field(crop)),24-stock(t,barn(crop))));
+            int n=Math.min(perCrop,Math.min(stock(t,field(crop)),24-stock(t,barn(crop))-FreightLife.reservedCrop(t,crop)));
             if(n<=0)continue;
             set(t,field(crop),stock(t,field(crop))-n);
             set(t,barn(crop),stock(t,barn(crop))+n);
@@ -47,7 +47,7 @@ final class FarmLife {
             int cost=product.price()-1;
             int budget=t.employerFunds.getOrDefault("shop-assistant",0);
             int n=Math.min(6-moved,Math.min(stock(t,barn(crop)),
-                    Math.min(product.capacity()-t.retailStock.getOrDefault(crop,0),budget/cost)));
+                    Math.min(product.capacity()-t.retailStock.getOrDefault(crop,0)-FreightLife.reservedCrop(t,crop),budget/cost)));
             if(n<=0)continue;
             set(t,barn(crop),stock(t,barn(crop))-n);
             t.retailStock.merge(crop,n,Integer::sum);

@@ -33,9 +33,9 @@ final class IndustryLife {
     private static final String TRUCK_COPPER="truck:copper-ore";
     static final String FACTORY_IRON="factory:iron-ore";
     static final String FACTORY_COPPER_ORE="factory:copper-ore";
-    private static final String FACTORY_STEEL="factory:steel";
+    static final String FACTORY_STEEL="factory:steel";
     private static final String FACTORY_COPPER="factory:copper";
-    private static final String FACTORY_PARTS="factory:spare-parts";
+    static final String FACTORY_PARTS="factory:spare-parts";
     private static final String SALVAGE="factory:scrap-metal";
 
     static final int TRUCK_CAPACITY=3;

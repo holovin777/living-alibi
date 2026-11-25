@@ -14,7 +14,7 @@ const CAR_PARK := Vector3(11.0,0,-10.0)
 const CAR_ARRIVAL := Vector3(11.0,0,-7.5)
 const TRUCK_PARK := Vector3(14.5,0,-10.0)
 const TRUCK_EXIT := Vector3(14.5,0,-7.0)
-const FREIGHT_DISTRICTS := ["QUARRY","WORKSHOP","FACTORY"]
+const FREIGHT_DISTRICTS := ["QUARRY","WORKSHOP","FACTORY","FARM","BAKERY","CAFE","SOUTH_RESIDENCES","MARKET"]
 const RACK_DISTRICTS := ["PARK","WORKSHOP","NORTH_RESIDENCES"]
 const WALKER_RADIUS := 0.32
 const COLLISION_STEP := 0.12
@@ -304,13 +304,19 @@ func _truck_place() -> String:
     var value = _last_snapshot.get("freight",{}).get("truckPlace")
     return "" if value==null else str(value)
 
+func _truck_parking(id: String) -> Vector3:
+    return Vector3(15,0,2.5) if id=="FARM" else TRUCK_PARK
+
+func _truck_exit(id: String) -> Vector3:
+    return _truck_parking(id)+Vector3(0,0,3.0)
+
 func _near_truck() -> bool:
-    return _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS and _avatar.position.distance_to(TRUCK_PARK)<3.5
+    return _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS and _avatar.position.distance_to(_truck_parking(_current_place))<3.5
 
 func _freight_action(action: String) -> void:
     if not _connected or _api.is_busy():
         return
-    if (action=="load" and _current_place=="QUARRY" and _near_kiosk()) or (action=="unload" and _near_truck()):
+    if (action=="load" and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()):
         _api.freight_action(action)
 
 func _drive_truck(destination: String) -> void:
@@ -394,11 +400,14 @@ func _begin_driving(destination: String,freight: bool = false) -> bool:
     _update_drive_hud()
     return true
 
+func _cargo_caption(cargo: Dictionary) -> String:
+    return "%s %s · %s %s" % [cargo.get("firstLabel","Iron"),cargo.get("firstUnits",cargo.get("iron",0)),cargo.get("secondLabel","Copper"),cargo.get("secondUnits",cargo.get("copper",0))]
+
 func _update_drive_hud() -> void:
     var player: Dictionary = _last_snapshot.get("player",{})
     if _drive_freight:
         var cargo: Dictionary = _last_snapshot.get("freight",{})
-        _drive_hud.text = "FREIGHT | %s km/h | Iron %s · Copper %s\nTo %s · W/S gas/reverse · A/D steer · Space brake\n%s" % [roundi(absf(_drive.speed)*3.6),cargo.get("iron",0),cargo.get("copper",0),_drive_target.capitalize(),"Awaiting arrival..." if _drive_pending else "Esc: cancel this leg"]
+        _drive_hud.text = "FREIGHT | %s km/h | %s\nTo %s · W/S gas/reverse · A/D steer · Space brake\n%s" % [roundi(absf(_drive.speed)*3.6),_cargo_caption(cargo),_drive_target.capitalize(),"Awaiting arrival..." if _drive_pending else "Esc: cancel this leg"]
         return
     if _drive_parked:
         var lines := PackedStringArray()
@@ -448,7 +457,7 @@ func _end_driving(return_to_car: bool) -> void:
     _drive_hud.visible = false
     _main_panel.visible = true
     if return_to_car:
-        _avatar.position = TRUCK_EXIT if was_freight else CAR_ARRIVAL
+        _avatar.position = _truck_exit(_current_place) if was_freight else CAR_ARRIVAL
     _sync_owned_car()
     _follow_player()
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -477,6 +486,10 @@ func _sync_owned_car() -> void:
         var car := root.get_node_or_null("PublicCarPark/OwnedCar") as Node3D
         if car!=null:
             car.visible = _car_place()==id and (not _drive_active() or _drive_freight or id!=_current_place)
+    for id in FREIGHT_DISTRICTS:
+        if not _chunks.has(id):
+            continue
+        var root: Node3D = _chunks[id]["root"]
         var truck := root.get_node_or_null("FreightParking/AssignedTruck") as Node3D
         if truck!=null:
             truck.visible = _truck_place()==id and (not _drive_freight or not _drive_active())
@@ -762,7 +775,7 @@ func _generate_chunk(place_id: String) -> void:
     if place_id in TownLayout.MOTOR_DISTRICTS:
         _build_public_car_park()
     if place_id in FREIGHT_DISTRICTS:
-        _build_freight_parking()
+        _build_freight_parking(place_id)
     _build_road_links(place_id)
     _chunks[place_id] = {
         "root": _scenery, "residents": _residents_root,
@@ -1009,7 +1022,8 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         if p.distance_squared_to(nearest) < radius * radius:
             return false
     if _truck_place()==_current_place and _current_place in FREIGHT_DISTRICTS:
-        if Rect2(Vector2(TRUCK_PARK.x-1.1,TRUCK_PARK.z-2.4),Vector2(2.2,4.8)).grow(radius).has_point(p):
+        var truck_at := _truck_parking(_current_place)
+        if Rect2(Vector2(truck_at.x-1.1,truck_at.z-2.4),Vector2(2.2,4.8)).grow(radius).has_point(p):
             return false
     if _car_place()==_current_place and _current_place in TownLayout.MOTOR_DISTRICTS:
         if Rect2(Vector2(CAR_PARK.x-0.94,CAR_PARK.z-1.81),Vector2(1.88,3.62)).grow(radius).has_point(p):
@@ -1121,10 +1135,10 @@ func _build_bicycle_rack() -> void:
     parked.visible = false
     _sign(rack,"Bici · P",Vector3(0,1.5,0))
 
-func _build_freight_parking() -> void:
+func _build_freight_parking(place_id: String) -> void:
     var lot := Node3D.new()
     lot.name = "FreightParking"
-    lot.position = TRUCK_PARK
+    lot.position = _truck_parking(place_id)
     _scenery.add_child(lot)
     _box(lot,Vector3(3,0.045,5.8),Color("#505659"),Vector3.ZERO)
     _sign(lot,"Merci · F",Vector3(0,2.7,-2.8))
@@ -2138,12 +2152,12 @@ func _render_actions() -> void:
     var employed := str(player.get("jobId", ""))
     if _near_truck():
         var cargo: Dictionary = _last_snapshot.get("freight",{})
-        _action_title.text = "Freight truck · iron %s / copper %s" % [cargo.get("iron",0),cargo.get("copper",0)]
+        _action_title.text = "Freight truck · "+_cargo_caption(cargo)
         var next = cargo.get("nextDestination")
         if next!=null:
             _action_choices.add_child(_button("Drive truck to "+str(next).capitalize(),_drive_truck.bind(str(next))))
         else:
-            _action_choices.add_child(_button("Unload ore · earn 32 EUR",_freight_action.bind("unload")))
+            _action_choices.add_child(_button("Unload cargo · earn 32 EUR",_freight_action.bind("unload")))
         return
     if _near_car():
         _action_title.text = "Your car · choose adjacent destination"
@@ -2152,6 +2166,8 @@ func _render_actions() -> void:
         return
     match _current_place:
         "FARM":
+            if employed=="freight-driver" and not bool(_last_snapshot.get("freight",{}).get("active",false)):
+                _action_choices.add_child(_button("Load produce truck · paid delivery",_freight_action.bind("load")))
             var report: Dictionary = _last_snapshot.get("farm",{})
             var label := Label.new()
             label.text = "Fields: vegetables %s · rice %s\nBarn: vegetables %s · rice %s\nFarm funds: %s EUR" % [
@@ -2169,6 +2185,8 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Survey western mineral deposit · 2h",
                         _prospect))
         "FACTORY":
+            if employed=="freight-driver" and not bool(_last_snapshot.get("freight",{}).get("active",false)):
+                _action_choices.add_child(_button("Load parts truck · paid delivery",_freight_action.bind("load")))
             _action_choices.add_child(_button("Apply: factory machinist",
                     _apply_job.bind("machinist")))
         "CENTRO":
@@ -2498,7 +2516,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _current_place = new_place
         _render_place(new_place)
         var car_arrival := not old_car_place.is_empty() and old_car_place!=_car_place() and _car_place()==new_place
-        _avatar.position = TRUCK_EXIT if truck_arrival else (CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO))
+        _avatar.position = _truck_exit(new_place) if truck_arrival else (CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO))
         if not _can_stand(_avatar.position, WALKER_RADIUS, true):
             _avatar.position = Vector3.ZERO
         _locations.clear() # Previous-origin travel estimates are now stale.

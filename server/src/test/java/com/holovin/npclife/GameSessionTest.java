@@ -13,6 +13,71 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void farmFreightReservesMarketCapacityAndDeliversOnlyAtEnd() throws Exception {
+        Path file=directory.resolve("farm-freight.db");
+        try(var game=new GameSession(file)) {
+            game.move("quarry");game.waitMinutes(60);game.applyJob("freight-driver");game.move("farm");
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            FarmLife.set(town,FarmLife.barn("vegetables"),8);
+            FarmLife.set(town,FarmLife.barn("rice"),8);
+            town.retailStock.put("vegetables",16);town.retailStock.put("rice",19);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            game.freightAction("load",null);
+            assertEquals("Farm produce",game.snapshot().freight().cargoLabel());
+            assertEquals(2,game.snapshot().freight().firstUnits());
+            assertEquals(1,game.snapshot().freight().secondUnits());
+            game.freightAction("drive","bakery");
+            game.freightAction("drive","cafe");
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(0,FarmLife.deliver(town),"reserved retail spaces cannot be filled by scheduled deliveries");
+            assertEquals(16,town.retailStock.get("vegetables"));
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals("SOUTH_RESIDENCES",game.snapshot().freight().nextDestination());
+            game.freightAction("drive","south_residences");
+            game.freightAction("drive","market");
+            game.freightAction("unload",null);
+            assertEquals(82,game.snapshot().player().money());
+            assertEquals(18,game.snapshot().farm().marketVegetables());
+            assertEquals(20,game.snapshot().farm().marketRice());
+        }
+    }
+
+    @Test
+    void industrialFreightSuppliesWorkshopWithoutDuplicatingParts() throws Exception {
+        Path file=directory.resolve("parts-freight.db");
+        try(var game=new GameSession(file)) {
+            game.move("quarry");game.waitMinutes(60);game.applyJob("freight-driver");game.move("factory");
+        }
+        int parts,steel;
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            town.industryStocks.put(IndustryLife.FACTORY_PARTS,2);
+            town.industryStocks.put(IndustryLife.FACTORY_STEEL,1);
+            parts=town.technicalMaterials.getOrDefault("spare-parts",0);
+            steel=town.technicalMaterials.getOrDefault("steel",0);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            game.freightAction("load",null);
+            assertEquals("Industrial materials",game.snapshot().freight().cargoLabel());
+            game.freightAction("drive","workshop");game.freightAction("unload",null);
+            assertEquals(82,game.snapshot().player().money());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var town=db.loadTown(db.load());
+            assertEquals(parts+2,town.technicalMaterials.get("spare-parts"));
+            assertEquals(steel+1,town.technicalMaterials.get("steel"));
+        }
+    }
+
+    @Test
     void freightCargoAndReservedPayPersistUntilActualDelivery() throws Exception {
         Path file=directory.resolve("freight.db");
         try(var game=new GameSession(file)) {

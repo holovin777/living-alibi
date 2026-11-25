@@ -479,6 +479,23 @@ reuses the compact car cabin and lane physics; no cargo weight
 or custom gearbox yet. Farm and station supplier deliveries are
 still scheduled abstractly.
 
+## Additional freight routes
+
+Freight drivers can load ore at Quarry, parts/steel at Factory,
+or vegetables/rice at Farm. The parts route ends at Workshop and
+supplies existing technical work materials. The farm route uses
+a separate southern motor corridor (Farm → Bakery → Cafe → South
+homes → Market); these links are currently freight-only for the
+player, not connected to private car travel. The farm truck parking
+space avoids the rice paddy. The load reserves destination shelf
+space and source barn space until unload/recovery, preventing
+scheduled deliveries or harvesting from overfilling storage.
+All routes pay 32 EUR from finite freight employer funds; fuel
+is purchased once at loading, one unit per planned leg. NPC
+scheduled deliveries still operate using unreserved stock. Fuel
+supplier freight, a self-financing player logistics company and
+distinct truck physics remain future features.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world
