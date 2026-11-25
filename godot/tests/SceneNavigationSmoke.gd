@@ -296,6 +296,11 @@ func _exercise() -> void:
             "car yields to pedestrian ahead and has a collision footprint"):
         return
     world._avatar.position = Vector3.ZERO
+    if not _check(world._road_destination(Vector3(4.0,0,-23.9),23.8)=="FACTORY"
+            and world._road_destination(Vector3(5.2,0,-23.9),23.8).is_empty()
+            and world._road_destination(Vector3(-4.0,0,-23.9),23.8)=="FACTORY",
+            "both motor-road sidewalks reach the neighboring district but off-road areas do not"):
+        return
     var garage_entry: Vector3 = world._move_on_ground(Vector3(7.5,0,5),Vector3(0,0,7),world.WALKER_RADIUS)
     if not _check(garage_entry.z > 11.9
             and not world._can_stand(Vector3(10,0,12),world.WALKER_RADIUS)
