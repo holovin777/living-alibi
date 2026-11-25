@@ -30,9 +30,10 @@ uses a separate real company account.
    two-hour job shifts. They normally come to work from 11:00 and
    receive two hourly wages at 12:00 and 13:00, 11 EUR each. If they
    are absent, ill or the company cannot pay them, production stops.
-7. **13:15:** A working, paid employee uses the owned machine and buys
-   one physical steel unit already stored in the city maintenance
-   warehouse for 4 EUR, transforming it into two spare parts.
+7. **13:15:** A working, paid employee uses the owned machine (at least
+   **20/100 condition**) and buys one physical steel unit from the city
+   maintenance warehouse for 4 EUR, making two spare parts. Production
+   wears the machine by **15 points per batch**. Below 20/100 it stops.
 8. **13:45:** If the worker remains on site, and city maintenance can
    afford a purchase, the shop sells two parts to the municipality
    for 15 EUR each. Those parts move to the **same finite repair
@@ -40,12 +41,20 @@ uses a separate real company account.
    Company cash changes by actual sales and purchases. No imaginary
    components or wages.
 
-If there are no parts, steel, buyers, workers or corporate funds,
-the corresponding step does not take place. Business earnings are
+If there are no parts, steel, buyers, workers, usable machinery or
+corporate funds, the corresponding step does not take place. Business earnings are
 **not** automatically added to the player's pocket. You can choose to
 withdraw a bounded amount of your company's actual cash using
 `business withdraw 10` or a custom amount at the Workshop, but
 doing so may leave the firm unable to pay wages or buy supplies.
+
+A worn machine can be serviced at the Workshop for **45 game minutes**,
+spending **10 EUR of company money** and **two real municipal spare parts**.
+This restores 60 condition points, up to 100/100. A perfect machine cannot
+be serviced; an empty parts warehouse cannot supply repairs. Workers
+prioritize paid shifts over routine shopping, but illness still disrupts
+production. Hourly wage receipts record the exact paid minute, preventing
+repeat payments if a world is reopened at the same clock time.
 
 You cannot open a productive workshop instantly with only the
 initial 50 EUR: the game encourages you to find employment first,
@@ -61,6 +70,8 @@ then build capital. Startup progress is optional, not a scripted quest.
   prior-owner workshop after the former visitor's death).
 - `business invest <EUR>` — add your personal savings to company cash.
 - `business machine` — buy the company's actual production equipment.
+- `business service` — repair worn machinery using two finite city spare
+  parts and 10 EUR over 45 game minutes.
 - `business hire <resident-id>` — offer a real co-present citizen a
   contract and pay a signing bonus.
 - `business withdraw <EUR>` — move company cash back to your wallet.
@@ -73,6 +84,7 @@ Spring exposes `GET /api/v1/business`,
 `POST /api/v1/actions/business/open`,
 `POST /api/v1/actions/business/invest` with `{"amount":25}`,
 `POST /api/v1/actions/business/machine`,
+`POST /api/v1/actions/business/service`,
 `POST /api/v1/actions/business/hire` with
 `{"residentId":"resident-0002"}`,
 and `POST /api/v1/actions/business/withdraw` with `{"amount":10}`.
@@ -96,12 +108,13 @@ companies and legal inheritance are future tasks.
 ## Persistence, safety and tests
 
 SQLite table `player_business` persists registration, owner incarnation,
-cash, machine ownership, employee ID, real finished parts, hourly pay,
-production and sale day stamps. It is committed in the **same
+cash, machine ownership **and condition**, employee ID, real finished
+parts, last paid **clock minute**, production and sale day stamps. It is committed in the **same
 transaction** as personal cash, city payrolls, NPC jobs and municipal
-materials. Loading an existing save without this table simply creates
-an empty business registry, without deleting former residents or
-resources. The launcher `bash play.sh` remains unchanged.
+materials. Existing saves migrate additively to include the machine
+condition and paid-minute receipt. Previously owned machines begin at
+100/100 and existing paid hours are respected. Saves without any company
+start with an empty registry; residents and history remain unchanged. The launcher `bash play.sh` remains unchanged.
 
 - `BusinessSmokeTest` verifies separate wallets, supplier payment,
   co-present hiring, wages, component conservation, municipality
@@ -109,7 +122,12 @@ resources. The launcher `bash play.sh` remains unchanged.
 - `BusinessDatabaseSmokeTest` starts with an empty database, saves
   mid-employment and mid-production, reloads business and worker state,
   checks no duplicate sales, and transfers ownership across generations.
-- Spring `GameSessionTest` validates opening, investments, equipment,
+- `BusinessIntegrationSmokeTest` proves a real NPC follows a workday,
+  receives wages, manufactures parts and completes a municipal sale.
+- `BusinessMachineSmokeTest` validates breakdown, finite repairs and no
+  repeated hourly wages; `BusinessMachineDatabaseSmokeTest` verifies
+  old-save migrations, restored machine status and wage replay protection.
+- Spring `GameSessionTest` validates opening, investment, service costs,
   rejecting unaffordable contracts and restart persistence.
 - Godot scene tests cover registration, investment, hiring and
   withdrawal UI states.
@@ -117,6 +135,6 @@ resources. The launcher `bash play.sh` remains unchanged.
 The revenue model is a fictional starter economy, **not a realistic
 market-clearing financial simulation**. Municipal demand is a simple
 fixed procurement rule. Business loans, custom product design,
-shops at other locations, equipment degradation, company debts,
+shops at other locations, detailed equipment failure modes, company debts,
 multiple competing owners, estate and inheritance law, labor contracts
 with explicit NPC negotiations and full accounting need future work.
