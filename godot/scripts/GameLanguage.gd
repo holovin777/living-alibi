@@ -254,7 +254,15 @@ const IT := {
     "Buy home · %s EUR": "Compra casa · %s EUR",
     "Sell home · %s EUR": "Vendi casa · %s EUR",
     "Purchased a new home. Your household can now move there.": "Hai comprato una nuova casa. La tua famiglia può trasferirsi.",
-    "Sold the home and returned to a standard private residence.": "Hai venduto la casa e sei tornato in una residenza privata standard."
+    "Sold the home and returned to a standard private residence.": "Hai venduto la casa e sei tornato in una residenza privata standard.",
+    "Kitchen furnishings": "Arredi per la cucina",
+    "Bedroom furnishings": "Arredi per la camera da letto",
+    "Children’s furnishings": "Arredi per i bambini",
+    "%s · installed": "%s · installati",
+    "%s · %s EUR": "%s · %s EUR",
+    "Purchased kitchen furnishings.": "Acquistati arredi per la cucina.",
+    "Purchased bedroom furnishings.": "Acquistati arredi per la camera da letto.",
+    "Purchased children's furnishings.": "Acquistati arredi per i bambini."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
