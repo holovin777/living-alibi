@@ -184,6 +184,14 @@ jobs:
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.TechnicalWorkSmokeTest
       - name: Test real company registration, equipment, work wages, production and sale
         run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.BusinessSmokeTest
+      - name: Test full autonomous workday for a hired fabrication employee
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.BusinessIntegrationSmokeTest
+      - name: Test factory machine breakdown, repair and zero double-wage exploit
+        run: java -ea -cp target/classes:target/test-classes com.holovin.npclife.BusinessMachineSmokeTest
+      - name: Test old-save business migration, machinery wear and payroll across restarts
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
+          '-Dexec.args=-ea -cp %classpath com.holovin.npclife.BusinessMachineDatabaseSmokeTest' exec:exec
       - name: Test workshop owner's capital, employee and parts across SQLite restarts
         run: >-
           mvn --batch-mode --no-transfer-progress -Dexec.executable=java -Dexec.classpathScope=test
