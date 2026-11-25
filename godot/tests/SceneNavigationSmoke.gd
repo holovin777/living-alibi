@@ -16,6 +16,32 @@ func _exercise() -> void:
     root.add_child(world)
     await process_frame
 
+    var clock = preload("res://scripts/LiveClock.gd").new()
+    for i in range(5):
+        if not _check(not clock.advance(1.0,true), "1:10 waits six real seconds"):
+            return
+    if not _check(clock.advance(1.0,true), "1:10 advances one game minute"):
+        return
+    if not _check(not clock.advance(1.0,false) and is_zero_approx(clock.elapsed),
+            "busy or menu time does not accumulate"):
+        return
+    clock.set_speed(60)
+    if not _check(clock.advance(1.0,true), "1:60 advances every real second"):
+        return
+    clock.set_speed(0)
+    if not _check(not clock.advance(1.0,true), "paused clock sends no request"):
+        return
+    world._clock_pending = true
+    world._on_request_failed("uncertain response")
+    if not _check(not world._clock_pending and world._clock.speed == 0
+            and world._clock_selector.get_selected_id() == 0,
+            "automatic time pauses after uncertain server response"):
+        return
+    world._clock_selector.select(3)
+    world._on_clock_speed_selected(3)
+    if not _check(world._clock.speed == 10, "speed selection restores default"):
+        return
+
     # The initial presentation is eye-level first person; V can show the
     # placeholder avatar without moving the authoritative player in Java.
     if not _check(world._first_person and not world._avatar.visible
@@ -179,6 +205,16 @@ func _exercise() -> void:
         return
     if not _check(world._residents_root.get_node("Resident_marco") == marco,
             "refresh retains the same resident model and animation state"):
+        return
+    var noon := _world("PARK", "Park")
+    noon["minute"] = 720
+    world._on_world_updated(noon)
+    var noon_light: float = world._sun.light_energy
+    var dawn := _world("PARK", "Park")
+    dawn["minute"] = 360
+    world._on_world_updated(dawn)
+    if not _check(noon_light > world._sun.light_energy,
+            "solar lighting follows committed world minutes"):
         return
     var night := _world("PARK", "Park")
     night["minute"] = 1260

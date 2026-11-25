@@ -171,8 +171,26 @@ current district, not fabricated in adjacent chunks.
 
 Java's travel durations are unchanged. The player still pauses for
 server confirmation at a boundary, and collision checks and NPC data
-are local to the active district. Continuous time and persistent
-fine-grained coordinates remain future work.
+are local to the active district. A client-paced live clock is available; persistent fine-grained coordinates
+remain future work.
+
+## Live world clock
+
+The default pace is 1:10: one committed game minute per approximately six
+real seconds of idle gameplay. The World time selector offers pause,
+1:1, 1:5, 1:10, 1:24 and 1:60. Godot uses the existing atomic
+`POST /api/v1/actions/wait` action with one minute; only Java advances
+the world and saves it. The displayed time, resident list, daylight and
+municipal services follow committed snapshots.
+
+Automatic time does not accumulate while the API is busy, a map or
+interaction menu is open, or a road crossing is pending. Explicit work,
+travel, study and waiting retain their existing time costs and reset the
+automatic pacing interval. No background backlog is replayed. If an
+automatic write fails, the clock pauses rather than retrying an uncertain
+commit; refresh the world and select a speed again. Speed is a session
+setting, not a new database field. This is active-client time, not a
+server-side clock that keeps running when the game is closed.
 
 ## Boundaries
 

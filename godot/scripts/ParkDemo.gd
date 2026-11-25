@@ -16,6 +16,7 @@ const ROAD_TRIGGER := 23.8
 const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
+const LiveClock = preload("res://scripts/LiveClock.gd")
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _first_person := true
@@ -41,6 +42,9 @@ var _road_arrival := Vector3.ZERO
 var _road_blocked := ""
 var _last_snapshot: Dictionary = {}
 var _connected := false
+var _clock := LiveClock.new()
+var _clock_pending := false
+var _clock_selector: OptionButton
 var _locations: Array = []
 var _job_offers: Array = []
 var _work_orders: Array = []
@@ -102,6 +106,7 @@ func _process(delta: float) -> void:
         _try_road_crossing(relative_motion)
 
     _animate_residents(delta)
+    _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
     if not _near_kiosk():
@@ -701,6 +706,18 @@ func _create_interface() -> void:
     map_button.text = "Town map (M)"
     map_button.pressed.connect(_toggle_map)
     column.add_child(map_button)
+    var clock_row := HBoxContainer.new()
+    column.add_child(clock_row)
+    var clock_label := Label.new()
+    clock_label.text = "World time:"
+    clock_row.add_child(clock_label)
+    _clock_selector = OptionButton.new()
+    for rate in LiveClock.SPEEDS:
+        var caption := "Paused" if rate == 0 else "1:%s" % rate
+        _clock_selector.add_item(caption, rate)
+    _clock_selector.select(3)
+    _clock_selector.item_selected.connect(_on_clock_speed_selected)
+    clock_row.add_child(_clock_selector)
     _hint = Label.new()
     _hint.text = "WASD: walk · click scene: mouse look · V: camera · Esc: cursor."
     column.add_child(_hint)
@@ -1010,11 +1027,27 @@ func _view_business() -> void:
     if not _api.is_busy():
         _api.view_business()
 
+func _on_clock_speed_selected(index: int) -> void:
+    _clock.set_speed(_clock_selector.get_item_id(index))
+
+func _tick_live_clock(delta: float) -> void:
+    if _api == null:
+        return
+    var eligible: bool = _connected and not _api.is_busy() and not _clock_pending \
+            and _road_pending.is_empty() and not _travel_panel.visible \
+            and not _action_panel.visible and not _map_panel.visible
+    if _clock.advance(delta, eligible):
+        _clock_pending = true
+        # The existing atomic Java action advances needs, NPCs and SQLite.
+        _api.wait_for(1)
+
 func _wait_one_hour() -> void:
     if not _api.is_busy():
         _api.wait_for(60)
 
 func _on_world_updated(snapshot: Dictionary) -> void:
+    var clock_update := _clock_pending
+    _clock_pending = false
     _connected = true
     _last_snapshot = snapshot
     var player: Dictionary = snapshot.get("player", {})
@@ -1064,7 +1097,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _render_residents()
     _apply_weather()
     _render_actions()
-    if _api != null and not _api.is_busy():
+    if _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 
 func _apply_weather() -> void:
@@ -1082,10 +1115,15 @@ func _apply_weather() -> void:
         _environment.background_color = Color(0.63, 0.80, 0.96)
     var minute := int(_last_snapshot.get("minute", 450))
     var night := minute < 360 or minute >= 1200
-    _sun.light_energy = 0.12 if night else 1.1
-    _environment.ambient_light_energy = 0.25 if night else 1.0
-    if night:
-        _environment.background_color = Color(0.07,0.10,0.18)
+    # Approximate solar arc from the committed world minute, never wall time.
+    var day_progress := clampf((float(minute)-360.0)/840.0,0.0,1.0)
+    var daylight := sin(day_progress * PI)
+    _sun.rotation_degrees = Vector3(-8.0-65.0*daylight,
+            -90.0+180.0*day_progress,0.0)
+    _sun.light_energy = lerpf(0.12,1.1,daylight)
+    _environment.ambient_light_energy = lerpf(0.25,1.0,daylight)
+    _environment.background_color = Color(0.07,0.10,0.18).lerp(
+            _environment.background_color, smoothstep(0.0,0.35,daylight))
     var services: Dictionary = _last_snapshot.get("services", {})
     # Weather and city services affect every loaded chunk, not just the
     # one containing the visitor. Only the active chunk gets NPC data.
@@ -1170,9 +1208,12 @@ func _on_work_orders_updated(orders: Array) -> void:
         _render_actions()
 
 func _on_action_feedback(message: String) -> void:
-    _message.text = message
+    if not _clock_pending:
+        _message.text = message
 
-func _on_request_started(_route: String) -> void:
+func _on_request_started(route: String) -> void:
+    if route.begins_with("/actions/") and not _clock_pending:
+        _clock.reset()
     _set_request_busy(true)
 
 func _on_request_finished(_route: String) -> void:
@@ -1186,6 +1227,14 @@ func _set_request_busy(busy: bool) -> void:
             node.disabled = busy or same_place
 
 func _on_request_failed(message: String) -> void:
+    if _clock_pending:
+        # The server might have committed before a connection failure.
+        # Pause rather than automatically retry a potentially committed write.
+        _clock_pending = false
+        _clock.set_speed(0)
+        _clock_selector.select(0)
+        _message.text = "Live time paused. Refresh world before resuming: " + message
+        return
     if not _road_pending.is_empty():
         _road_blocked = _road_pending
         _road_pending = ""
