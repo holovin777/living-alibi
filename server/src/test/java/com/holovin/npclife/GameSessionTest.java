@@ -13,6 +13,42 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void dojoCommunityUsesRealResidentsAndPersistentAttendance() throws Exception {
+        Path file=directory.resolve("dojo-community.db");
+        String teacherId,studentId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var teacher=people.get(0);var student=people.get(1);
+            teacherId=teacher.id;studentId=student.id;
+            teacher.age=35;teacher.carefulness=80;student.age=25;student.carefulness=30;
+            student.goal="STAY_HEALTHY";student.money=100;
+            for(var c:people){c.health=100;c.place=TownLife.Place.SCHOOL;c.travelRemaining=0;c.activity="FREE_TIME";c.fatigue=10;c.hunger=10;c.thirst=10;}
+            assertFalse(DojoCommunityLife.scheduled(town,student,1,1080));
+            DojoCommunityLife.found(town,1);
+            assertEquals(teacher,DojoCommunityLife.instructor(town,1));
+            assertTrue(DojoCommunityLife.scheduled(town,student,1,1080));
+            assertFalse(DojoCommunityLife.scheduled(town,student,2,1080));
+            state.day=1;state.minute=1110;
+            teacher.place=TownLife.Place.PARK;
+            DojoCommunityLife.tick(town,state);assertEquals(100,student.money);
+            teacher.place=TownLife.Place.SCHOOL;
+            assertTrue(DojoCommunityLife.view(town,1,1110).instructorPresent());
+            DojoCommunityLife.tick(town,state);DojoCommunityLife.tick(town,state);
+            assertEquals(95,student.money);assertEquals(1,DojoLife.get(town,student,"sessions"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertTrue(DojoCommunityLife.founded(town));
+            assertEquals(teacherId,DojoCommunityLife.instructor(town,1).id);
+            assertEquals(1,DojoLife.get(town,town.get(studentId),"sessions"));
+            DojoCommunityLife.tick(town,state);
+            assertEquals(95,town.get(studentId).money);
+        }
+    }
+
+    @Test
     void dojoGradesRequireAllThreeDisciplinesAndPersist() throws Exception {
         Path file=directory.resolve("dojo.db");
         String id;
