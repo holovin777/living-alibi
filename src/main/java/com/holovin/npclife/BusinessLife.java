@@ -23,15 +23,23 @@ final class BusinessLife {
     static final int LAST_HOUR=840;  // 14:00
     static final int FABRICATE_MINUTE=795; // 13:15
     static final int SELL_MINUTE=825; // 13:45, while the worker is still present
+    static final int MACHINE_WEAR_PER_BATCH=15;
+    static final int MIN_WORKABLE_MACHINE_CONDITION=20;
+    static final int SERVICE_PARTS=2;
+    static final int SERVICE_PRICE=10;
+    static final int SERVICE_MINUTES=45;
+    static final int SERVICE_RESTORE=60;
 
     static final class Shop {
         boolean registered;
         int ownerIncarnation;
         int cash;
         boolean machine;
+        int machineCondition;
         String employeeId;
         int parts;
         int lastPayDay;
+        int lastPayMinute=-1;
         int paidHours;
         int lastProductionDay;
         int lastSaleDay;
@@ -42,9 +50,11 @@ final class BusinessLife {
             x.ownerIncarnation=ownerIncarnation;
             x.cash=cash;
             x.machine=machine;
+            x.machineCondition=machineCondition;
             x.employeeId=employeeId;
             x.parts=parts;
             x.lastPayDay=lastPayDay;
+            x.lastPayMinute=lastPayMinute;
             x.paidHours=paidHours;
             x.lastProductionDay=lastProductionDay;
             x.lastSaleDay=lastSaleDay;
@@ -57,7 +67,7 @@ final class BusinessLife {
     }
 
     record Status(boolean registered,boolean yours,int ownerIncarnation,
-                  boolean machine,int cash,String employeeId,
+                  boolean machine,int machineCondition,int cash,String employeeId,
                   String employeeName,int spareParts,int paidHoursToday,
                   int lastProductionDay,int lastSaleDay) { }
 
@@ -68,7 +78,7 @@ final class BusinessLife {
                 "Independent fabricator".equals(worker.occupation);
         return new Status(b.registered,b.registered &&
                 b.ownerIncarnation==town.player.incarnation,
-                b.ownerIncarnation,b.machine,b.cash,
+                b.ownerIncarnation,b.machine,b.machine?b.machineCondition:0,b.cash,
                 employed?worker.id:null,employed?worker.name:null,
                 b.parts,b.lastPayDay==day?b.paidHours:0,
                 b.lastProductionDay,b.lastSaleDay);
@@ -148,7 +158,31 @@ final class BusinessLife {
         town.employerFunds.put("equipment-supplier",
                 Math.addExact(town.employerFunds.get("equipment-supplier"),MACHINE_PRICE));
         b.machine=true;
-        return "Company bought a fabrication machine for 25 EUR from the equipment supplier.";
+        b.machineCondition=100;
+        return "Company bought a new fabrication machine at condition 100/100 for 25 EUR.";
+    }
+
+    /** Pay for real stocked spare parts; servicing is optional but breakdowns are not. */
+    static String service(TownLife.Town town) {
+        requireOwner(town);
+        Shop b=town.business;
+        if(!b.machine)
+            throw new IllegalArgumentException("Purchase fabrication equipment before servicing it.");
+        if(b.machineCondition>=100)
+            throw new IllegalArgumentException("Equipment is already in perfect condition.");
+        if(b.cash<SERVICE_PRICE)
+            throw new IllegalArgumentException("Business needs 10 EUR to buy machine service parts.");
+        if(town.technicalMaterials.getOrDefault("spare-parts",0)<SERVICE_PARTS)
+            throw new IllegalArgumentException("City warehouse lacks the two required spare parts.");
+        b.cash-=SERVICE_PRICE;
+        town.employerFunds.put("city-maintenance",
+                Math.addExact(town.employerFunds.getOrDefault("city-maintenance",0),SERVICE_PRICE));
+        town.technicalMaterials.put("spare-parts",
+                town.technicalMaterials.get("spare-parts")-SERVICE_PARTS);
+        int old=b.machineCondition;
+        b.machineCondition=Math.min(100,b.machineCondition+SERVICE_RESTORE);
+        return "Serviced machine from "+old+" to "+b.machineCondition+
+                "/100 using two finite parts and 10 EUR of company cash.";
     }
 
     static String hire(TownLife.Town town,String residentId,int day) {
@@ -200,14 +234,20 @@ final class BusinessLife {
                              List<TownLife.Observation> observations) {
         if(!"Independent fabricator".equals(person.occupation))return false;
         var b=town.business;
-        if(!workingHours(clock.minute) || !isEmployee(town,person) ||
-                b.cash<HOURLY_WAGE)return true;
+        if(!workingHours(clock.minute) || clock.minute%60!=0 ||
+                !isEmployee(town,person) || b.cash<HOURLY_WAGE)return true;
+        // A repeated tick at the exact saved clock minute must not pay
+        // the same hourly wage again (even after a SQLite restart).
+        if(b.lastPayDay==clock.day && (b.lastPayMinute>=clock.minute ||
+                b.paidHours>=2))return true;
         b.cash-=HOURLY_WAGE;
         person.money=Math.addExact(person.money,HOURLY_WAGE);
         if(b.lastPayDay!=clock.day) {
             b.lastPayDay=clock.day;
+            b.lastPayMinute=-1;
             b.paidHours=0;
         }
+        b.lastPayMinute=clock.minute;
         b.paidHours++;
         TownLife.publish(town,clock,person.id,person.place,
                 person.name+" received EUR 11 from the independent workshop's account.",
@@ -225,7 +265,8 @@ final class BusinessLife {
         if(minute==FABRICATE_MINUTE && b.lastProductionDay<day) {
             b.lastProductionDay=day;
             var worker=town.people.get(b.employeeId);
-            if(b.machine && worker!=null && isEmployee(town,worker) &&
+            if(b.machine && b.machineCondition>=MIN_WORKABLE_MACHINE_CONDITION &&
+                    worker!=null && isEmployee(town,worker) &&
                     worker.presentAt(TownLife.Place.WORKSHOP) &&
                     worker.activity.equals("WORKING") &&
                     b.lastPayDay==day && b.paidHours>=2 &&
@@ -239,8 +280,10 @@ final class BusinessLife {
                 town.technicalMaterials.put("steel",
                         town.technicalMaterials.get("steel")-1);
                 b.parts=Math.addExact(b.parts,2);
+                b.machineCondition=Math.max(0,b.machineCondition-MACHINE_WEAR_PER_BATCH);
                 TownLife.publish(town,clock,worker.id,TownLife.Place.WORKSHOP,
-                        worker.name+" fabricated 2 spare parts from one purchased steel unit.",
+                        worker.name+" fabricated 2 spare parts from one purchased steel unit. "+
+                        "Machine condition "+b.machineCondition+"/100.",
                         events,observations);
             }
         }
