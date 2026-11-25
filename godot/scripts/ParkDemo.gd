@@ -3804,6 +3804,19 @@ func _render_actions() -> void:
                 for kid in family_options.get("children",[]):
                     household.text += "\nChild: %s · age %s%s" % [kid.get("name",""),kid.get("age",0)," (deceased)" if not kid.get("alive",true) else ""]
                 _action_choices.add_child(household)
+                var budget = family_options.get("budget")
+                if budget is Dictionary:
+                    var budget_label := Label.new()
+                    budget_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    budget_label.text = tr("Family savings: %s EUR · yours %s · partner %s") % [budget.get("total",0),budget.get("personalSavings",0),budget.get("partnerSavings",0)]
+                    budget_label.text += "\n"+(tr("Outstanding bills: %s EUR · dependent children: %s") % [budget.get("unpaidBills",0),budget.get("children",0)])
+                    _action_choices.add_child(budget_label)
+                    if budget.get("canDeposit",false):
+                        _action_choices.add_child(_button("Save 10 EUR for the family",_garden_action.bind("rebirth-budget-deposit")))
+                    if budget.get("canWithdraw",false):
+                        _action_choices.add_child(_button("Withdraw your 10 EUR savings",_garden_action.bind("rebirth-budget-withdraw")))
+                    if budget.get("canPayBills",false):
+                        _action_choices.add_child(_button("Pay bills from family savings",_garden_action.bind("rebirth-budget-bills")))
                 for candidate in family_options.get("proposals",[]):
                     _action_choices.add_child(_button("Propose partnership to "+str(candidate.get("name","")),_garden_action.bind("rebirth-propose-"+str(candidate.get("id","")))))
                 if family_options.get("canMoveTogether",false):
