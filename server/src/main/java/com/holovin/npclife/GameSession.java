@@ -46,7 +46,7 @@ public final class GameSession implements AutoCloseable {
     public record PlayerView(int incarnation,String place,String placeId,String privateName,
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
-                             int bread,int bottledWater) { }
+                             int bread,int bottledWater,long roomUntil,boolean roomActive) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -79,7 +79,8 @@ public final class GameSession implements AutoCloseable {
         var p=town.player;
         var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.place.name(),p.privateName,
                 p.hunger,p.thirst,p.fatigue,p.health,p.alive,
-                p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater);
+                p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
+                HousingLife.active(p,state.day,state.minute));
         var residents=PlayerLife.visible(town).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
@@ -253,6 +254,16 @@ public final class GameSession implements AutoCloseable {
         int recovered=PlayerLife.rest(copy.player,minutes);
         return apply(copy,minutes,"Rested for "+minutes+" minute(s); recovered up to "+
                 recovered+" fatigue.");
+    }
+
+    public synchronized ActionView rentRoom() throws SQLException {
+        var copy=town.copy();
+        return apply(copy,5,HousingLife.rent(copy,state.day,state.minute));
+    }
+    public synchronized ActionView sleepInRoom(int hours) throws SQLException {
+        var copy=town.copy();
+        var result=HousingLife.sleep(copy.player,hours,state.day,state.minute);
+        return apply(copy,result.minutes(),"Slept in your guest room for "+hours+" hours.");
     }
 
     public synchronized ActionView sleep(int hours) throws SQLException {

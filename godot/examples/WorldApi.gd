@@ -105,6 +105,12 @@ func forage(source_id: String) -> void:
 func wait_for(minutes: int) -> void:
     _send("/actions/wait", HTTPClient.METHOD_POST, {"minutes": minutes})
 
+func rent_room() -> void:
+    _send("/actions/rent-room", HTTPClient.METHOD_POST, {})
+
+func sleep_in_room(hours: int) -> void:
+    _send("/actions/sleep-room", HTTPClient.METHOD_POST, {"hours":hours})
+
 func sleep_for(hours: int) -> void:
     _send("/actions/sleep", HTTPClient.METHOD_POST, {"hours": hours})
 

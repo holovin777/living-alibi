@@ -255,6 +255,18 @@ a capped counter at 06:00. This initial retail counter is separate from
 NPC shopping and uses abstract external deliveries, not a simulated
 food supply chain. Old saves receive empty bags and initial stock.
 
+## First rented room
+
+At the north residences kiosk, prepay 35 EUR for seven game days in
+a guesthouse. The payment reaches a persistent guesthouse account.
+Rent is never deducted automatically; renew during the last 24 hours.
+The HUD displays remaining hours. Sleep for two or eight hours in the
+room only at that kiosk and only with a valid lease for the entire
+sleep. Sheltered sleep avoids outdoor exposure and weather penalties;
+hunger and thirst still advance. A new visitor has no lease. Existing
+saves default to no room. The guesthouse is an abstract public kiosk
+action, not an enterable interior or shared housing market yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

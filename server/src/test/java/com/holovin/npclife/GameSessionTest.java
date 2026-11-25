@@ -13,6 +13,40 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void prepaidRoomIsLocalAndSurvivesRestart() throws Exception {
+        Path file=directory.resolve("room.db");
+        long expiry;
+        try(var game=new GameSession(file)) {
+            assertFalse(game.snapshot().player().roomActive());
+            assertThrows(IllegalArgumentException.class,game::rentRoom);
+            game.move("north");
+            assertThrows(IllegalArgumentException.class,()->game.sleepInRoom(1));
+            game.rentRoom();
+            assertEquals(15,game.snapshot().player().money());
+            assertTrue(game.snapshot().player().roomActive());
+            expiry=game.snapshot().player().roomUntil();
+            assertThrows(IllegalArgumentException.class,game::rentRoom);
+            int health=game.snapshot().player().health();
+            game.sleepInRoom(2);
+            assertTrue(game.snapshot().player().health()>=health);
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(expiry,game.snapshot().player().roomUntil());
+            game.move("park");
+            assertThrows(IllegalArgumentException.class,()->game.sleepInRoom(1));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            assertEquals(35,town.employerFunds.get("guesthouse"));
+            town.player.place=HousingLife.DISTRICT;
+            town.player.roomUntil=HousingLife.now(state.day,state.minute)+30;
+            assertThrows(IllegalArgumentException.class,()->HousingLife.sleep(town.player,1,state.day,state.minute));
+            assertFalse(HousingLife.active(town.player,state.day+1,state.minute));
+        }
+    }
+
+    @Test
     void marketPurchaseConservesCashAndSuppliesAcrossRestart() throws Exception {
         Path file=directory.resolve("retail.db");
         try(var game=new GameSession(file)) {

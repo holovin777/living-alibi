@@ -62,6 +62,7 @@ var _hint: Label
 var _view_button: Button
 var _jobs: Label
 var _bag_label: Label
+var _housing_label: Label
 var _eat_button: Button
 var _water_button: Button
 var _map_panel: PanelContainer
@@ -718,6 +719,9 @@ func _create_interface() -> void:
     _bag_label = Label.new()
     _bag_label.text = "Bag: empty"
     column.add_child(_bag_label)
+    _housing_label = Label.new()
+    _housing_label.text = "Housing: no room"
+    column.add_child(_housing_label)
     var bag_row := HBoxContainer.new()
     column.add_child(bag_row)
     _eat_button = _button("Eat bread",_consume_product.bind("bread"))
@@ -992,6 +996,11 @@ func _render_actions() -> void:
         "FACTORY":
             _action_choices.add_child(_button("Apply: factory machinist",
                     _apply_job.bind("machinist")))
+        "NORTH_RESIDENCES":
+            _action_choices.add_child(_button("Rent / renew guest room · 35 EUR / 7 days",_rent_room))
+            if bool(player.get("roomActive",false)):
+                _action_choices.add_child(_button("Sleep in guest room · 2h",_sleep_room.bind(2)))
+                _action_choices.add_child(_button("Sleep in guest room · 8h",_sleep_room.bind(8)))
         "MARKET":
             for item in _last_snapshot.get("shop",[]):
                 var id := str(item.get("id",""))
@@ -1151,6 +1160,14 @@ func _work() -> void:
         _action_panel.visible = false
         _api.work_shift()
 
+func _rent_room() -> void:
+    if _near_kiosk() and _connected and not _api.is_busy():
+        _api.rent_room()
+
+func _sleep_room(hours: int) -> void:
+    if _near_kiosk() and _connected and not _api.is_busy():
+        _api.sleep_in_room(hours)
+
 func _buy_product(id: String) -> void:
     if _near_kiosk() and not _api.is_busy() and _connected:
         _api.buy_product(id)
@@ -1164,6 +1181,8 @@ func _update_bag() -> void:
     var bread := int(player.get("bread",0))
     var water := int(player.get("bottledWater",0))
     _bag_label.text = "Bag %s/12 | Bread %s | Water %s" % [bread+water,bread,water]
+    var remaining := maxi(0,int(player.get("roomUntil",0)) - ((int(_last_snapshot.get("day",1))-1)*1440+int(_last_snapshot.get("minute",0))))
+    _housing_label.text = "Housing: North guesthouse · %s h left" % ceili(remaining/60.0) if bool(player.get("roomActive",false)) else "Housing: no room"
     _eat_button.disabled = bread == 0 or int(player.get("hunger",0)) == 0
     _water_button.disabled = water == 0 or int(player.get("thirst",0)) == 0
 

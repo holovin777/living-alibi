@@ -25,6 +25,7 @@ final class PlayerLife {
         int incarnation = 1; // A fresh visitor receives the next generation.
         int bread;
         int bottledWater;
+        long roomUntil;
         int money=50; // Modest personal cash on first entry; no preset profession.
         String jobId; // Null until the player voluntarily applies.
         int engineeringSkill;
@@ -43,7 +44,7 @@ final class PlayerLife {
             p.alive=alive;
             p.incarnation=incarnation;
             p.money=money;
-            p.bread=bread;p.bottledWater=bottledWater;
+            p.bread=bread;p.bottledWater=bottledWater;p.roomUntil=roomUntil;
             p.jobId=jobId;
             p.engineeringSkill=engineeringSkill;
             p.investigationSkill=investigationSkill;
@@ -176,6 +177,12 @@ final class PlayerLife {
     /** Sleeping is possible in every public scene without owning a bed or dwelling.
      *  Exposure is a fictional deterministic model; weather is not implemented yet. */
     static SleepResult sleep(Player player,int hours) {
+        return sleepWithExposure(player,hours,exposure(player.place));
+    }
+    static SleepResult sleepSheltered(Player player,int hours) {
+        return sleepWithExposure(player,hours,0);
+    }
+    private static SleepResult sleepWithExposure(Player player,int hours,int exposure) {
         requireAlive(player);
         if(hours<1||hours>12)
             throw new IllegalArgumentException("Sleep between 1 and 12 game hours.");
@@ -185,7 +192,7 @@ final class PlayerLife {
         int beforeHealth=player.health;
         int recovered=Math.min(player.fatigue,hours*11);
         player.fatigue-=recovered;
-        int exposureLoss=exposure(player.place)*hours/2;
+        int exposureLoss=exposure*hours/2;
         int deprivation=0;
         if(player.thirst>=85)deprivation+=hours/2;
         if(player.hunger>=90)deprivation+=hours/3;

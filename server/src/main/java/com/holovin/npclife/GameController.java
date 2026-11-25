@@ -163,6 +163,15 @@ public class GameController {
         return session.rest(request.minutes());
     }
 
+    @PostMapping("/actions/rent-room")
+    public GameSession.ActionView rentRoom() throws SQLException {
+        return session.rentRoom();
+    }
+    @PostMapping("/actions/sleep-room")
+    public GameSession.ActionView sleepRoom(@RequestBody HoursRequest request) throws SQLException {
+        return session.sleepInRoom(request.hours());
+    }
+
     @PostMapping("/actions/sleep")
     public GameSession.ActionView sleep(@RequestBody HoursRequest request)
             throws SQLException {

@@ -44,6 +44,7 @@ final class CareerLife {
         // Enterprise workers share real company funds with player industrial wages.
         town.employerFunds.putIfAbsent("city-maintenance",500);
         town.employerFunds.putIfAbsent("survey-office",0);
+        town.employerFunds.putIfAbsent("guesthouse",0);
     }
 
     private static Offer offer(String id) {
