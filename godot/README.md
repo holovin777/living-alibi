@@ -243,6 +243,18 @@ not automatically identify the player or create a personal contact.
 No private name, arbitrary chat transcript or global reputation score
 is propagated. This is a first narrow topic, not general gossip.
 
+## Market and personal bag
+
+The market kiosk sells bread (3 EUR) and bottled water (1 EUR) between
+08:00 and 20:00. Each purchase transfers cash to the market payroll,
+subtracts a finite retail unit and adds it to the visitor's 12-unit bag.
+The bag is saved in SQLite and resets for a new incarnation. Eat or
+drink from the HUD in any district; bread reduces hunger by up to 35,
+bottled water reduces thirst by up to 40. Retail deliveries replenish
+a capped counter at 06:00. This initial retail counter is separate from
+NPC shopping and uses abstract external deliveries, not a simulated
+food supply chain. Old saves receive empty bags and initial stock.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

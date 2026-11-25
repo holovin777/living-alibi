@@ -45,7 +45,8 @@ public final class GameSession implements AutoCloseable {
 
     public record PlayerView(int incarnation,String place,String placeId,String privateName,
                              int hunger,int thirst,int fatigue,int health,boolean alive,
-                             int money,String jobId,int engineeringSkill,int investigationSkill) { }
+                             int money,String jobId,int engineeringSkill,int investigationSkill,
+                             int bread,int bottledWater) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -68,16 +69,17 @@ public final class GameSession implements AutoCloseable {
                                int workshopParts,int minersAtWork,int factoryWorkersAtWork,
                                int oreOnTruck,int scrapRemaining,boolean westDepositDiscovered,
                                int quarryPayroll,int factoryPayroll,int cityBudget) { }
+    public record RetailView(String id,String label,int price,int stock) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,ServicesView services) { }
+                            List<SourceView> sources,ServicesView services,List<RetailView> shop) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
         var p=town.player;
         var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.place.name(),p.privateName,
                 p.hunger,p.thirst,p.fatigue,p.health,p.alive,
-                p.money,p.jobId,p.engineeringSkill,p.investigationSkill);
+                p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater);
         var residents=PlayerLife.visible(town).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
@@ -92,7 +94,9 @@ public final class GameSession implements AutoCloseable {
                 CalendarLife.dayOfYear(state.day),weather.season().name(),
                 new WeatherView(weather.sky().name(),weather.temperatureC(),
                         weather.raining(),weather.snowing()),
-                player,residents,resources,services());
+                player,residents,resources,services(),p.place==TownLife.Place.MARKET
+                        ? RetailLife.PRODUCTS.stream().map(item->new RetailView(item.id(),item.label(),item.price(),
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of());
     }
 
     public synchronized BusinessView business() {
@@ -256,6 +260,15 @@ public final class GameSession implements AutoCloseable {
         var result=PlayerLife.sleep(copy.player,hours,state.day,state.minute);
         return apply(copy,result.minutes(),
                 "Slept "+hours+" hour(s). Health changed by "+result.healthChange()+".");
+    }
+
+    public synchronized ActionView buy(String productId) throws SQLException {
+        var copy=town.copy();
+        return apply(copy,2,RetailLife.buy(copy,productId,state.minute));
+    }
+    public synchronized ActionView consume(String productId) throws SQLException {
+        var copy=town.copy();
+        return apply(copy,5,RetailLife.consume(copy.player,productId));
     }
 
     public synchronized ActionView drink(String sourceId) throws SQLException {

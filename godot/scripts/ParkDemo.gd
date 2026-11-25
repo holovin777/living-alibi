@@ -61,6 +61,9 @@ var _message: Label
 var _hint: Label
 var _view_button: Button
 var _jobs: Label
+var _bag_label: Label
+var _eat_button: Button
+var _water_button: Button
 var _map_panel: PanelContainer
 var _town_map
 var _travel_panel: PanelContainer
@@ -712,6 +715,17 @@ func _create_interface() -> void:
     _needs = Label.new()
     _needs.text = "Jobs, study and travel use the real game world."
     column.add_child(_needs)
+    _bag_label = Label.new()
+    _bag_label.text = "Bag: empty"
+    column.add_child(_bag_label)
+    var bag_row := HBoxContainer.new()
+    column.add_child(bag_row)
+    _eat_button = _button("Eat bread",_consume_product.bind("bread"))
+    _water_button = _button("Drink bottle",_consume_product.bind("water"))
+    bag_row.add_child(_eat_button)
+    bag_row.add_child(_water_button)
+    _eat_button.disabled = true
+    _water_button.disabled = true
     _message = Label.new()
     _message.text = "No forced mission. Find your own direction."
     _message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -979,6 +993,14 @@ func _render_actions() -> void:
             _action_choices.add_child(_button("Apply: factory machinist",
                     _apply_job.bind("machinist")))
         "MARKET":
+            for item in _last_snapshot.get("shop",[]):
+                var id := str(item.get("id",""))
+                var stock := int(item.get("stock",0))
+                var choice := _button("Buy %s · %s EUR (%s left)" % [
+                    str(item.get("label",id)),str(item.get("price",0)),stock],_buy_product.bind(id))
+                choice.disabled = stock <= 0
+                choice.set_meta("sold_out",stock <= 0)
+                _action_choices.add_child(choice)
             _action_choices.add_child(_button("Apply: market assistant",
                     _apply_job.bind("shop-assistant")))
         "WORKSHOP":
@@ -1129,6 +1151,22 @@ func _work() -> void:
         _action_panel.visible = false
         _api.work_shift()
 
+func _buy_product(id: String) -> void:
+    if _near_kiosk() and not _api.is_busy() and _connected:
+        _api.buy_product(id)
+
+func _consume_product(id: String) -> void:
+    if _connected and not _api.is_busy():
+        _api.consume_product(id)
+
+func _update_bag() -> void:
+    var player: Dictionary = _last_snapshot.get("player",{})
+    var bread := int(player.get("bread",0))
+    var water := int(player.get("bottledWater",0))
+    _bag_label.text = "Bag %s/12 | Bread %s | Water %s" % [bread+water,bread,water]
+    _eat_button.disabled = bread == 0 or int(player.get("hunger",0)) == 0
+    _water_button.disabled = water == 0 or int(player.get("thirst",0)) == 0
+
 func _drink(source_id: String) -> void:
     if _near_kiosk() and not _api.is_busy():
         _action_panel.visible = false
@@ -1222,6 +1260,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _needs.text += "\nResidents present in this district: %s" % [
         str(snapshot.get("residents", []).size())
     ]
+    _update_bag()
     _town_map.update_world(_current_place, _locations)
     _render_residents()
     if _dialog_panel.visible:
@@ -1379,7 +1418,9 @@ func _set_request_busy(busy: bool) -> void:
         if node is Button:
             var same_place := node.has_meta("destination") and (
                     str(node.get_meta("destination")) == _current_place)
-            node.disabled = busy or same_place
+            node.disabled = busy or same_place or bool(node.get_meta("sold_out",false))
+    if not busy:
+        _update_bag()
 
 func _on_request_failed(message: String) -> void:
     if _dialog_pending:

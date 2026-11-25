@@ -23,6 +23,8 @@ final class PlayerLife {
         int health = 100;
         boolean alive = true;
         int incarnation = 1; // A fresh visitor receives the next generation.
+        int bread;
+        int bottledWater;
         int money=50; // Modest personal cash on first entry; no preset profession.
         String jobId; // Null until the player voluntarily applies.
         int engineeringSkill;
@@ -41,6 +43,7 @@ final class PlayerLife {
             p.alive=alive;
             p.incarnation=incarnation;
             p.money=money;
+            p.bread=bread;p.bottledWater=bottledWater;
             p.jobId=jobId;
             p.engineeringSkill=engineeringSkill;
             p.investigationSkill=investigationSkill;

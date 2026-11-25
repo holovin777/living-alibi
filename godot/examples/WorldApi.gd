@@ -90,6 +90,12 @@ func speak_to(resident_id: String, message: String) -> void:
 func go_to(destination: String) -> void:
     _send("/actions/go", HTTPClient.METHOD_POST, {"destination": destination})
 
+func buy_product(id: String) -> void:
+    _send("/actions/buy", HTTPClient.METHOD_POST, {"productId": id})
+
+func consume_product(id: String) -> void:
+    _send("/actions/consume", HTTPClient.METHOD_POST, {"productId": id})
+
 func drink_from(source_id: String) -> void:
     _send("/actions/drink", HTTPClient.METHOD_POST, {"sourceId": source_id})
 

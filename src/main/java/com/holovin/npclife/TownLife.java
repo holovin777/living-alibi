@@ -95,6 +95,7 @@ final class TownLife {
         final Map<Integer,PlayerLife.LifeRecord> pastLives=new LinkedHashMap<>();
         final Map<String,NatureLife.Source> naturalResources=new LinkedHashMap<>();
         final Map<String,Integer> employerFunds=new LinkedHashMap<>();
+        final Map<String,Integer> retailStock=new LinkedHashMap<>();
         final Map<String,Integer> technicalMaterials=new LinkedHashMap<>();
         final Map<String,TechnicalWorkLife.Order> technicalOrders=new LinkedHashMap<>();
         final Map<String,Integer> industryStocks=new LinkedHashMap<>();
@@ -140,6 +141,7 @@ final class TownLife {
                 t.naturalResources.put(e.getKey(),e.getValue().copy());
             t.pastLives.putAll(pastLives); // Immutable history records.
             t.employerFunds.putAll(employerFunds);
+            t.retailStock.putAll(retailStock);
             t.technicalMaterials.putAll(technicalMaterials);
             for(var e:technicalOrders.entrySet())
                 t.technicalOrders.put(e.getKey(),e.getValue().copy());
@@ -172,6 +174,7 @@ final class TownLife {
             pastLives.putAll(other.pastLives);
             employerFunds.clear();
             employerFunds.putAll(other.employerFunds);
+            retailStock.clear();retailStock.putAll(other.retailStock);
             technicalMaterials.clear();
             technicalMaterials.putAll(other.technicalMaterials);
             technicalOrders.clear();
@@ -231,6 +234,7 @@ final class TownLife {
         t.get("elena").activity="WORKING";
         NatureLife.ensureSources(t);
         CareerLife.ensureEmployers(t);
+        RetailLife.ensure(t);
         BusinessLife.ensure(t);
         TechnicalWorkLife.ensure(t);
         IndustryLife.ensure(t);
@@ -246,6 +250,7 @@ final class TownLife {
                      List<SocialLife.Interaction> interactions) {
         PlayerLife.tick(town.player,marco.minute);
         NatureLife.tick(town,marco.day,marco.minute);
+        RetailLife.tick(town,marco.minute);
         TechnicalWorkLife.tick(town,marco.day,marco.minute);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");

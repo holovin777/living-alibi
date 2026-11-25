@@ -103,6 +103,7 @@ final class WorldDatabase implements AutoCloseable {
                         died_minute INTEGER NOT NULL, died_place TEXT NOT NULL,
                         private_name TEXT)
                     """);
+            st.execute("CREATE TABLE IF NOT EXISTS retail_stock (product_id TEXT PRIMARY KEY, quantity INTEGER NOT NULL CHECK(quantity>=0))");
             st.execute("""
                     CREATE TABLE IF NOT EXISTS career_accounts (
                         account_id TEXT PRIMARY KEY,
@@ -211,6 +212,8 @@ final class WorldDatabase implements AutoCloseable {
         playerColumns.put("alive","INTEGER NOT NULL DEFAULT 1");
         playerColumns.put("incarnation","INTEGER NOT NULL DEFAULT 1");
         playerColumns.put("money","INTEGER NOT NULL DEFAULT 50");
+        playerColumns.put("bread","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("bottled_water","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("job_id","TEXT");
         playerColumns.put("engineering_skill","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("investigation_skill","INTEGER NOT NULL DEFAULT 0");
@@ -605,6 +608,12 @@ final class WorldDatabase implements AutoCloseable {
                 persistLives(town);
                 persistNature(town);
                 persistCareerAccounts(town);
+                try(PreparedStatement p=db.prepareStatement("INSERT INTO retail_stock(product_id,quantity) VALUES(?,?) ON CONFLICT(product_id) DO UPDATE SET quantity=excluded.quantity")) {
+                    for(var item:town.retailStock.entrySet()) {
+                        p.setString(1,item.getKey());p.setInt(2,item.getValue());p.addBatch();
+                    }
+                    p.executeBatch();
+                }
                 persistTechnicalWork(town);
                 persistIndustry(town);
                 persistBusiness(town);
@@ -866,6 +875,11 @@ final class WorldDatabase implements AutoCloseable {
                             Math.max(0,rs.getInt("balance")));
             }
         }
+        RetailLife.ensure(town);
+        try(Statement st=db.createStatement();ResultSet rs=st.executeQuery("SELECT * FROM retail_stock")) {
+            while(rs.next())if(town.retailStock.containsKey(rs.getString("product_id")))
+                town.retailStock.put(rs.getString("product_id"),rs.getInt("quantity"));
+        }
         // Physical infrastructure and materials survive the same atomic town save.
         TechnicalWorkLife.ensure(town);
         try(Statement st=db.createStatement();
@@ -929,6 +943,8 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.alive=rs.getInt("alive")!=0;
                 town.player.incarnation=Math.max(1,rs.getInt("incarnation"));
                 town.player.money=rs.getInt("money");
+                town.player.bread=rs.getInt("bread");
+                town.player.bottledWater=rs.getInt("bottled_water");
                 town.player.jobId=rs.getString("job_id");
                 town.player.engineeringSkill=rs.getInt("engineering_skill");
                 town.player.investigationSkill=rs.getInt("investigation_skill");
@@ -1157,8 +1173,8 @@ final class WorldDatabase implements AutoCloseable {
                 INSERT INTO player_state(id,place,destination,travel_remaining,private_name,
                                          hunger,thirst,fatigue,health,alive,incarnation,
                                          money,job_id,engineering_skill,investigation_skill,last_work_day,
-                                         last_technical_day)
-                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                                         last_technical_day,bread,bottled_water)
+                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,private_name=excluded.private_name,
                 hunger=excluded.hunger,thirst=excluded.thirst,
@@ -1168,7 +1184,8 @@ final class WorldDatabase implements AutoCloseable {
                 engineering_skill=excluded.engineering_skill,
                 investigation_skill=excluded.investigation_skill,
                 last_work_day=excluded.last_work_day,
-                last_technical_day=excluded.last_technical_day
+                last_technical_day=excluded.last_technical_day,
+                bread=excluded.bread,bottled_water=excluded.bottled_water
                 """)) {
             p.setString(1,player.place.name());
             p.setString(2,player.destination.name());
@@ -1186,6 +1203,7 @@ final class WorldDatabase implements AutoCloseable {
             p.setInt(14,player.investigationSkill);
             p.setInt(15,player.lastWorkDay);
             p.setInt(16,player.lastTechnicalDay);
+            p.setInt(17,player.bread);p.setInt(18,player.bottledWater);
             p.executeUpdate();
         }
         String contactSql=player.incarnation==1 ? """

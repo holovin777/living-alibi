@@ -26,6 +26,7 @@ public class GameController {
     public record HoursRequest(int hours) { }
     public record DestinationRequest(String destination) { }
     public record SourceRequest(String sourceId) { }
+    public record ProductRequest(String productId) { }
     public record JobRequest(String jobId) { }
     public record StudyRequest(String subject) { }
     public record OrderRequest(String orderId) { }
@@ -166,6 +167,15 @@ public class GameController {
     public GameSession.ActionView sleep(@RequestBody HoursRequest request)
             throws SQLException {
         return session.sleep(request.hours());
+    }
+
+    @PostMapping("/actions/buy")
+    public GameSession.ActionView buy(@RequestBody ProductRequest request) throws SQLException {
+        return session.buy(request.productId());
+    }
+    @PostMapping("/actions/consume")
+    public GameSession.ActionView consume(@RequestBody ProductRequest request) throws SQLException {
+        return session.consume(request.productId());
     }
 
     @PostMapping("/actions/drink")

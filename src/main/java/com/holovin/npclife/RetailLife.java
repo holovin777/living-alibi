@@ -1,0 +1,58 @@
+package com.holovin.npclife;
+
+import java.util.List;
+
+/** Finite retail counter; cash is transferred to the existing market payroll account. */
+final class RetailLife {
+    private RetailLife() { }
+    record Product(String id,String label,int price,int capacity,int dailyDelivery) { }
+    static final List<Product> PRODUCTS=List.of(
+            new Product("bread","Bread",3,20,8),
+            new Product("water","Bottled water",1,30,12));
+    static void ensure(TownLife.Town t) {
+        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),p.capacity());
+    }
+    static void tick(TownLife.Town t,int minute) {
+        if(minute!=360)return;
+        for(var p:PRODUCTS)t.retailStock.compute(p.id(),
+                (id,stock)->Math.min(p.capacity(),(stock==null?0:stock)+p.dailyDelivery()));
+    }
+    static Product product(String id) {
+        return PRODUCTS.stream().filter(p->p.id().equals(id)).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("Unknown retail product."));
+    }
+    static String buy(TownLife.Town t,String id,int minute) {
+        var player=t.player;
+        PlayerLife.requireAlive(player);
+        var product=product(id);
+        if(player.place!=TownLife.Place.MARKET || player.travelRemaining>0)
+            throw new IllegalArgumentException("Visit the market to buy supplies.");
+        if(minute<480 || minute>=1200)
+            throw new IllegalArgumentException("Market opens 08:00–20:00.");
+        if(t.retailStock.getOrDefault(id,0)<1)
+            throw new IllegalArgumentException("This product is sold out.");
+        if(player.money<product.price())throw new IllegalArgumentException("Not enough money.");
+        if(player.bread+player.bottledWater>=12)
+            throw new IllegalArgumentException("Your bag is full (12 units).");
+        player.money-=product.price();
+        t.employerFunds.merge("shop-assistant",product.price(),Math::addExact);
+        t.retailStock.merge(id,-1,Integer::sum);
+        if(id.equals("bread"))player.bread++;else player.bottledWater++;
+        return "Bought "+product.label()+" for "+product.price()+" EUR.";
+    }
+    static String consume(PlayerLife.Player p,String id) {
+        PlayerLife.requireAlive(p);
+        if(p.travelRemaining>0)throw new IllegalArgumentException("Finish traveling first.");
+        product(id);
+        if(id.equals("bread")) {
+            if(p.bread<1)throw new IllegalArgumentException("No bread in your bag.");
+            if(p.hunger==0)throw new IllegalArgumentException("You are not hungry.");
+            p.bread--;p.hunger=Math.max(0,p.hunger-35);
+            return "Ate bread.";
+        }
+        if(p.bottledWater<1)throw new IllegalArgumentException("No bottled water in your bag.");
+        if(p.thirst==0)throw new IllegalArgumentException("You are not thirsty.");
+        p.bottledWater--;p.thirst=Math.max(0,p.thirst-40);
+        return "Drank bottled water.";
+    }
+}

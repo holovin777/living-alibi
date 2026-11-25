@@ -13,6 +13,38 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void marketPurchaseConservesCashAndSuppliesAcrossRestart() throws Exception {
+        Path file=directory.resolve("retail.db");
+        try(var game=new GameSession(file)) {
+            assertThrows(IllegalArgumentException.class,()->game.buy("bread"));
+            game.move("market");
+            game.waitMinutes(60);
+            int stock=game.snapshot().shop().stream().filter(x->x.id().equals("bread")).findFirst().orElseThrow().stock();
+            int cash=game.jobs().stream().filter(x->x.id().equals("shop-assistant")).findFirst().orElseThrow().remainingPayroll();
+            game.buy("bread");
+            assertEquals(47,game.snapshot().player().money());
+            assertEquals(1,game.snapshot().player().bread());
+            assertEquals(stock-1,game.snapshot().shop().stream().filter(x->x.id().equals("bread")).findFirst().orElseThrow().stock());
+            assertEquals(cash+3,game.jobs().stream().filter(x->x.id().equals("shop-assistant")).findFirst().orElseThrow().remainingPayroll());
+            game.buy("water");
+            assertEquals(46,game.snapshot().player().money());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(1,game.snapshot().player().bread());
+            assertEquals(1,game.snapshot().player().bottledWater());
+            game.move("park");
+            game.waitMinutes(120);
+            int hunger=game.snapshot().player().hunger();
+            game.consume("bread");
+            assertEquals(0,game.snapshot().player().bread());
+            assertTrue(game.snapshot().player().hunger()<hunger);
+            assertThrows(IllegalArgumentException.class,()->game.consume("bread"));
+            game.consume("water");
+            assertEquals(0,game.snapshot().player().bottledWater());
+        }
+    }
+
+    @Test
     void conversationIsLocalAndMemorySurvivesRestart() throws Exception {
         Path file=directory.resolve("conversation.db");
         try(var game=new GameSession(file)) { }
