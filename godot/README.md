@@ -729,3 +729,7 @@ Present residents with relaxing, resting, free-time, eating or drinking activity
 ## Town soundscape
 
 Original lightweight synthesized audio: distance-based footsteps on approximate grass, stone, asphalt and indoor wood surfaces; outdoor wind, positional fountain water when municipal service works, nearest visible traffic, occasional daytime bird calls near the park, a bell at the hourly game-time transition near the civic tower, and a quiet nonverbal crowd texture when at least two present residents are nearby. Sounds attenuate with distance and outdoor sources stop in sheltered rooms or the car. Jumping and cycling suppress walking steps. Town sound is independently toggleable from weather audio. These are synthesized placeholders, not recorded field sound, speech or actual NPC conversations; only the nearest traffic emitter is modeled. No additional audio downloads or Java state.
+
+### Interactive and district ambience
+
+A landing thump plays only on completed jumps, and the family apartment door plays a creak/latch only when its open state actually changes. Bicycle rolling sound plays only during bicycle movement. Nearby industrial districts have a quiet daytime machinery texture (a cosmetic schedule, not authoritative machine operation). Nocturnal crickets are heard near the park outside winter, rain and snow. All follow the existing Town sound mute control; synthesized audio still requires listening and balance checks on a real device.
