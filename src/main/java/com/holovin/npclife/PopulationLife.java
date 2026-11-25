@@ -13,6 +13,7 @@ final class PopulationLife {
             if(c.generationIndex<=0 || !c.alive)continue;
             lifeTick(town,c,clock,events,observations);
             EducationLife.attendance(town,c,clock);
+            OpinionLife.read(town,c,clock.day,clock.minute);
         }
     }
 

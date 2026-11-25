@@ -24,6 +24,7 @@ final class MarketStallLife {
     }
     static void clear(TownLife.Town t){
         StallSupplyLife.clear(t);
+        OpinionLife.clearStall(t);
         release(t);
         t.employerFunds.merge("city-maintenance",get(t,RESERVE),Math::addExact);
         for(String k:List.of(LICENSE,OPEN,SALES,REVENUE,WORKER,RESERVE,PAID_DAY,PAID_HOUR,WAGES))set(t,k,0);
@@ -100,7 +101,7 @@ final class MarketStallLife {
     static String offer(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         if(!active(t,day,minute)||!c.alive||c.food>=2||isEmployee(t,c))return null;
         String chosen=null;
-        int acceptable=regular(t,c)||(remembered(t,c,"referred")>0&&c.hunger>=65)?4:3;
+        int acceptable=regular(t,c)||((remembered(t,c,"referred")>0||OpinionLife.score(t,c,"stall")>=75)&&c.hunger>=65)?4:3;
         for(String id:ITEMS){
             int amount=get(t,price(id));
             // The normal market offers three food units for 9 EUR.
@@ -119,6 +120,7 @@ final class MarketStallLife {
         c.money-=amount;c.food++;t.player.money=wallet;
         set(t,stock(id),get(t,stock(id))-1);set(t,SALES,sales);set(t,REVENUE,revenue);
         rememberPurchase(t,c,day);
+        OpinionLife.purchase(t,c,day,amount);
         return c.name+" bought "+id+" from the visitor's stall for EUR "+amount+".";
     }
     static String act(TownLife.Town t,String action,int day,int minute){

@@ -72,6 +72,7 @@ final class NewspaperLife {
         int wallet=Math.addExact(reporter.money,REPORTER_PAY);
         ArchiveLife.record(t,"press-edition:"+day,day,minute,CATEGORY,text.toString());
         reporter.money=wallet;t.employerFunds.put(JOB,cash-REPORTER_PAY);
+        OpinionLife.edition(t,day,b);
     }
     record Report(int funds,boolean filedToday,List<ArchiveLife.Entry> editions){}
     static Report report(TownLife.Town t,int day){
