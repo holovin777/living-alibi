@@ -289,6 +289,10 @@ func _exercise() -> void:
             "loaded motor link has cars and a three-phase crossing signal"):
         return
     var traffic: Dictionary = world._traffic_edges["FACTORY:WORKSHOP"]
+    var sample_car: Node3D = traffic["cars"][0]["node"]
+    if not _check(sample_car.has_meta("body_style") and sample_car.get_child_count()>20,
+            "traffic uses detailed compact vehicle models"):
+        return
     var inbound: Dictionary = traffic["cars"][1]
     inbound["delay"] = 0.0
     inbound["distance"] = 14.9
@@ -669,6 +673,13 @@ func _exercise() -> void:
             "only actually co-present residents appear in the park"):
         return
     var marco = world._residents_root.get_node("Resident_marco")
+    var appearance: Dictionary = marco.get_meta("appearance")
+    var elena = world._residents_root.get_node("Resident_elena")
+    if not _check(appearance == world.ResidentAppearance.profile("marco")
+            and appearance != elena.get_meta("appearance")
+            and marco.has_node("LegLeft") and marco.has_node("ArmRight"),
+            "residents have stable distinct visual profiles and articulated limbs"):
+        return
     var start_position: Vector3 = marco.position
     world._animate_residents(0.5)
     if not _check(marco.position.distance_to(start_position) > 0.01,
