@@ -2584,6 +2584,8 @@ func _render_residents() -> void:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
+        person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
+        person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
         _sync_office_employee(person,id)
         person.set_meta("display_name",str(resident.get("name","Resident")))
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
@@ -2971,6 +2973,8 @@ func _create_interface() -> void:
     dialog_col.add_child(_button("Offer water",_send_dialog.bind("Offer water")))
     dialog_col.add_child(_button("Ask for bread",_send_dialog.bind("Ask for bread")))
     dialog_col.add_child(_button("Ask for water",_send_dialog.bind("Ask for water")))
+    dialog_col.add_child(_button("Ask for a 10 EUR loan",_send_dialog.bind("Ask for a 10 EUR loan")))
+    dialog_col.add_child(_button("Repay personal loan",_send_dialog.bind("Repay personal loan")))
     dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
     dialog_col.add_child(_button("Allow sharing my name",_send_dialog.bind("You can tell people my name.")))
     dialog_col.add_child(_button("Ask for visitor news",_send_dialog.bind("Any news about visitors?")))
@@ -3068,6 +3072,12 @@ func _open_dialog() -> void:
 func _render_dialog_mood(person: Node3D) -> void:
     var mood := str(person.get_meta("mood","CALM"))
     _dialog_style.text = tr("Seems: %s") % tr(mood.capitalize())
+    var debt := int(person.get_meta("personal_debt",0))
+    var due := int(person.get_meta("personal_debt_due",0))
+    if debt>0:
+        _dialog_style.text += "\n"+(tr("Personal debt: %s EUR · due day %s") % [debt,due])
+        if int(_last_snapshot.get("day",1))>due:
+            _dialog_style.text += " · "+tr("Overdue")
 
 func _localized_resident_reply(message: String) -> String:
     var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
