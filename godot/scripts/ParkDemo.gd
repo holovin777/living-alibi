@@ -240,7 +240,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
         if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
             if event.keycode == KEY_E and _apartment_active and not _action_panel.visible:
                 var action := _apartment_action()
-                if not action.is_empty():
+                if action=="door":
+                    _apartment.toggle_entrance(_avatar.position)
+                elif action=="exit":
+                    _action_panel.visible=true
+                    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_F:
@@ -3472,6 +3477,9 @@ func _set_apartment(active: bool) -> void:
         _traffic_root.hide()
         _bike_model.hide()
         _residents_root=_apartment.get("residents")
+        _apartment.set("entrance_open",false)
+        _apartment.get_node("EntranceDoor").show()
+        _apartment.get_node("DoorHandle").show()
         _avatar.position=FamilyApartment.SPAWN
         _view_yaw=0.0
         _view_pitch=0.0

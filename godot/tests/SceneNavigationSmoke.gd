@@ -899,12 +899,21 @@ func _exercise() -> void:
         return
     if not _check(world._apartment.has_node("Washbasin") and world._apartment.has_node("EntranceDoor")
             and world._apartment.get_node("WallArt").visible and not world._apartment.get_node("PremiumHeadboard").visible
-            and world._can_stand(Vector3(2.8,0,2.2),world.WALKER_RADIUS)
-            and not world._can_stand(Vector3(2.8,0,0.95),world.WALKER_RADIUS),
+            and world._can_stand(Vector3(3.8,0,2.2),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(3.8,0,0.95),world.WALKER_RADIUS),
             "bathroom opening, furnishings and wall collision"):
         return
-    world._avatar.position=Vector3(4.0,0,2.2)
+    world._avatar.position=Vector3(4.4,0,2.2)
     if not _check(world._apartment_action()=="wash","bathroom contextual wash"):
+        return
+    if not _check(not world._can_stand(Vector3(0,0,4.5),world.WALKER_RADIUS), "closed entrance blocks walking"):
+        return
+    world._apartment.toggle_entrance(Vector3(0,0,3.5))
+    var lobby_pos: Vector3 = world._move_on_ground(Vector3(0,0,3.5),Vector3(0,0,4.5),world.WALKER_RADIUS)
+    if not _check(lobby_pos.z>7.9 and not world._can_stand(Vector3(2.1,0,6.5),world.WALKER_RADIUS), "open entrance allows continuous walk into lobby; lobby walls solid"):
+        return
+    world._avatar.position=lobby_pos
+    if not _check(world._apartment_action()=="exit","building exit offers travel choices"):
         return
     world._on_world_updated(_world("PARK","Park"))
     if not _check(not world._apartment_active and not world._apartment.visible and world._scenery.visible,
