@@ -2980,6 +2980,32 @@ func _render_actions() -> void:
             _action_choices.add_child(_button("Study engineering · 10 EUR",
                     _study.bind("engineering")))
         "LIBRARY":
+            var archive = _last_snapshot.get("archive")
+            if archive is Dictionary:
+                var year := int(archive.get("year",1))
+                var page := int(archive.get("page",1))
+                var pages := int(archive.get("pages",1))
+                var header := Label.new()
+                header.text = "Archivio storico · Year %s · Page %s/%s" % [year,page,pages]
+                _action_choices.add_child(header)
+                if year>int(archive.get("firstYear",year)):
+                    _action_choices.add_child(_button("Previous year",_garden_action.bind("archive-year-%s-1" % (year-1))))
+                if year<int(archive.get("currentYear",year)):
+                    _action_choices.add_child(_button("Next year",_garden_action.bind("archive-year-%s-1" % (year+1))))
+                    _action_choices.add_child(_button("Current year",_garden_action.bind("archive-year-%s-1" % archive.get("currentYear",year))))
+                for entry in archive.get("entries",[]):
+                    var line := Label.new()
+                    line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    line.text = "Day %s · %s\n%s" % [entry.get("day",0),entry.get("category",""),entry.get("text","")]
+                    _action_choices.add_child(line)
+                if int(archive.get("total",0))==0:
+                    var empty := Label.new()
+                    empty.text = "No recorded milestones for this year."
+                    _action_choices.add_child(empty)
+                if page>1:
+                    _action_choices.add_child(_button("Previous page",_garden_action.bind("archive-year-%s-%s" % [year,page-1])))
+                if page<pages:
+                    _action_choices.add_child(_button("Next page",_garden_action.bind("archive-year-%s-%s" % [year,page+1])))
             _action_choices.add_child(_button("Study investigation · 10 EUR",
                     _study.bind("investigation")))
         "RIVER":
@@ -3107,7 +3133,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if ((action.begins_with("archive-year-") and _current_place=="LIBRARY" and _near_kiosk()) or ((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:

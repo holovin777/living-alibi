@@ -165,6 +165,55 @@ class GameSessionTest {
     }
 
     @Test
+    void historicalArchiveRetainsMilestonesAndYearPagesWithoutLeakingPrivateRecords() throws Exception {
+        Path file=directory.resolve("historical-archive.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            ArchiveLife.begin(town,1,450);
+            var candidate=town.copy();
+            candidate.business.registered=true;candidate.business.ownerIncarnation=1;
+            ArchiveLife.transitions(town,candidate,1,600);
+            assertEquals(1,town.archive.size());
+            assertEquals(2,candidate.archive.size());
+            ArchiveLife.transitions(town,candidate,1,600);
+            assertEquals(2,candidate.archive.size());
+            for(int day=2;day<=10;day++)
+                ArchiveLife.record(candidate,"test:"+day,day,600,"Public event","Recorded milestone "+day);
+            ArchiveLife.annual(candidate,365,1439);
+            ArchiveLife.annual(candidate,365,1439);
+            assertEquals(12,candidate.archive.size());
+            var first=ArchiveLife.report(candidate,365,1,1);
+            assertEquals(2,first.pages());assertEquals(8,first.entries().size());
+            assertEquals("Yearbook",first.entries().getFirst().category());
+            assertEquals(4,ArchiveLife.report(candidate,365,1,2).entries().size());
+            assertTrue(ArchiveLife.report(candidate,366,2,1).entries().isEmpty());
+            candidate.player.place=TownLife.Place.LIBRARY;candidate.player.destination=candidate.player.place;
+            candidate.player.travelRemaining=0;
+            state.day=366;state.minute=600;
+            db.save(state,java.util.List.of(),java.util.List.of(),candidate,java.util.List.of(),java.util.List.of(),java.util.List.of());
+            assertTrue(candidate.pendingArchive.isEmpty());
+            db.save(state,java.util.List.of(),java.util.List.of(),candidate,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(12,town.archive.size());
+            assertTrue(town.pendingArchive.isEmpty());
+            assertEquals(12,ArchiveLife.report(town,366,1,1).total());
+        }
+        try(var game=new GameSession(file)){
+            var current=game.snapshot();
+            assertEquals(2,current.archive().year());
+            var history=game.gardenAction("archive-year-1-2").world();
+            assertEquals(1,history.archive().year());assertEquals(2,history.archive().page());
+            assertEquals(current.minute(),history.minute());
+            assertEquals(current.player().money(),history.player().money());
+            game.move("PARK");
+            assertNull(game.snapshot().archive());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("archive-year-1-1"));
+        }
+    }
+
+    @Test
     void educationRequiresAttendanceAndBudgetAndPersistsCareerSkills() throws Exception {
         Path file=directory.resolve("education.db");
         String id;

@@ -99,6 +99,8 @@ final class TownLife {
         final Map<String,Integer> technicalMaterials=new LinkedHashMap<>();
         final Map<String,TechnicalWorkLife.Order> technicalOrders=new LinkedHashMap<>();
         final Map<String,Integer> industryStocks=new LinkedHashMap<>();
+        final Map<String,ArchiveLife.Entry> archive=new LinkedHashMap<>();
+        final List<ArchiveLife.Entry> pendingArchive=new ArrayList<>();
         int lastIndustryExtractDay,lastIndustryTransportDay,lastIndustryRefineDay;
         int lastIndustryFabricateDay,lastIndustryDeliverDay;
         int lastIndustryArrivalDay,lastIndustryRecycleDay;
@@ -147,6 +149,7 @@ final class TownLife {
                 t.technicalOrders.put(e.getKey(),e.getValue().copy());
             t.business=business.copy();
             t.industryStocks.putAll(industryStocks);
+            t.archive.putAll(archive);t.pendingArchive.addAll(pendingArchive);
             t.lastIndustryExtractDay=lastIndustryExtractDay;
             t.lastIndustryTransportDay=lastIndustryTransportDay;
             t.lastIndustryRefineDay=lastIndustryRefineDay;
@@ -182,6 +185,7 @@ final class TownLife {
                 technicalOrders.put(e.getKey(),e.getValue().copy());
             business=other.business.copy();
             industryStocks.clear();industryStocks.putAll(other.industryStocks);
+            archive.clear();archive.putAll(other.archive);pendingArchive.clear();pendingArchive.addAll(other.pendingArchive);
             lastIndustryExtractDay=other.lastIndustryExtractDay;
             lastIndustryTransportDay=other.lastIndustryTransportDay;
             lastIndustryRefineDay=other.lastIndustryRefineDay;
@@ -298,6 +302,7 @@ final class TownLife {
         PropertyLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);
         UtilityLife.tick(town,marco,truth,observations);
+        ArchiveLife.annual(town,marco.day,marco.minute);
         boolean nowTogether=m.alive&&e.alive&&m.travelRemaining==0&&e.travelRemaining==0&&m.place==e.place;
         if(nowTogether&&!town.together) {
             town.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;

@@ -74,6 +74,7 @@ final class ConstructionLife {
         set(t,STEEL,get(t,STEEL)-1);set(t,PARTS,get(t,PARTS)-parts);
         set(t,RESERVE,get(t,RESERVE)-LABOR);t.employerFunds.put(CONTRACTOR,paid);
         set(t,STAGE,stage+1);
+        ArchiveLife.record(t,"construction-stage:"+(stage+1),day,minute,"Construction",switch(stage+1){case 1 -> "Via Verdi foundation completed.";case 2 -> "Via Verdi walls completed.";default -> "Via Verdi house completed.";});
         if(stage+1==STAGES)set(t,ENABLED,0);
     }
     static void estate(TownLife.Town t){

@@ -69,6 +69,7 @@ final class DemographyLife {
         set(t,c,"parent-a",a.generationIndex);set(t,c,"parent-b",b.generationIndex);set(t,c,"born",day);
         for(var p:List.of(a,b)){set(t,p,"children",get(t,p,"children")+1);set(t,p,"last-birth",day);}
         set(t,BIRTHS,Math.addExact(get(t,BIRTHS),1));
+        ArchiveLife.record(t,"birth:"+c.id,day,360,"Population",c.name+" was born.");
         return c;
     }
     static TownLife.Citizen guardian(TownLife.Town t,TownLife.Citizen c){
@@ -119,6 +120,7 @@ final class DemographyLife {
                     c.age++;
                     if(c.age==18){
                         EducationLife.graduate(t,c);
+                        ArchiveLife.record(t,"adulthood:"+c.id,day,360,"Population",c.name+" reached adulthood.");
                         c.occupation="Job seeker";c.employed=false;c.unemploymentDays=0;
                         RentalLife.moveHome(t,c,c.home,TownLife.privateUnit(c.id));
                     }
@@ -143,6 +145,8 @@ final class DemographyLife {
                     }
                 }
             }
+            if(!c.alive&&get(t,c,"estate")==0)
+                ArchiveLife.record(t,"death:"+c.id,day,360,"Population",c.name+" was recorded as deceased.");
             estate(t,c);
         }
         if((day-1)%30!=0)return;
