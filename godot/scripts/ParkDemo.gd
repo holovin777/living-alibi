@@ -48,6 +48,9 @@ var _graphics_quality := 1
 var _leaf_mesh: SphereMesh
 var _leaf_materials: Array[StandardMaterial3D] = []
 var _foliage_season := ""
+var _water_material: ShaderMaterial
+var _lantern_glass: StandardMaterial3D
+var _shop_glass: StandardMaterial3D
 var _graphics_details: Array[Node3D] = []
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
 const GameLanguage = preload("res://scripts/GameLanguage.gd")
@@ -860,6 +863,12 @@ func _set_graphics_quality(index: int) -> void:
     for detail in _graphics_details:
         if is_instance_valid(detail):
             detail.visible = _graphics_quality > 0
+    for chunk in _chunks.values():
+        var water: MeshInstance3D = chunk["water"]
+        if is_instance_valid(water):
+            var spray := water.get_node_or_null("FountainSpray") as CPUParticles3D
+            if spray != null:
+                spray.emitting = water.visible and _graphics_quality > 0
 
 func _register_graphics_detail(detail: Node3D) -> void:
     # Visual-only decoration never alters an obstacle or interaction.
@@ -895,6 +904,17 @@ func _build_world() -> void:
         leaf.roughness = 1.0
         _leaf_materials.append(leaf)
     _update_foliage("SPRING",false)
+    _water_material = ShaderMaterial.new()
+    _water_material.shader = preload("res://shaders/TownWater.gdshader")
+    _lantern_glass = StandardMaterial3D.new()
+    _lantern_glass.albedo_color = Color("#e4d4ac")
+    _lantern_glass.emission = Color("#ffca78")
+    _lantern_glass.emission_energy_multiplier = 1.2
+    _shop_glass = StandardMaterial3D.new()
+    _shop_glass.albedo_color = Color("#496064")
+    _shop_glass.roughness = 0.26
+    _shop_glass.emission = Color("#e4b77a")
+    _shop_glass.emission_energy_multiplier = 0.55
     _sky_material=ProceduralSkyMaterial.new()
     var sky := Sky.new()
     sky.sky_material=_sky_material
@@ -1120,8 +1140,14 @@ func _generate_chunk(place_id: String) -> void:
             # A bridge keeps the east-west public road dry.
             for z in [-10.0, 10.0]:
                 _add_obstacle(Vector3(-11.0, 0.0, z), Vector2(10.0, 15.0))
-            _box(_scenery, Vector3(10.0, 0.11, 35.0), Color(0.12, 0.40, 0.67),
-                    Vector3(-11.0, 0.02, 0.0))
+            var river_mesh := BoxMesh.new()
+            river_mesh.size = Vector3(10.0,0.11,35.0)
+            var river_water := MeshInstance3D.new()
+            river_water.name = "RiverWater"
+            river_water.mesh = river_mesh
+            river_water.material_override = _water_material
+            river_water.position = Vector3(-11.0,0.02,0.0)
+            _scenery.add_child(river_water)
             _box(_scenery, Vector3(10.5, 0.12, 4.8), Color(0.45,0.34,0.23),
                     Vector3(-11.0, 0.10, 0.0))
             _tree(Vector3(12.0, 0.0, 7.0))
@@ -2668,6 +2694,10 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
         _box(parent,Vector3(0.12,2.35,2.55),Color("#6d5140"),Vector3(rear,1.175,z+offset))
         for pane in [-0.83,0.83]:
             _box(parent,Vector3(0.08,1.52,0.72),Color("#496064"),Vector3(rear-side*0.09,1.29,z+offset+pane))
+            var pane_node := parent.get_child(parent.get_child_count()-1) as MeshInstance3D
+            pane_node.material_override = _shop_glass
+            _box(parent,Vector3(0.09,0.055,0.72),Color("#b99b74"),Vector3(rear-side*0.145,0.91,z+offset+pane))
+            _box(parent,Vector3(0.09,0.055,0.72),Color("#b99b74"),Vector3(rear-side*0.145,1.67,z+offset+pane))
             _box(parent,Vector3(0.09,0.045,0.72),trim,Vector3(rear-side*0.14,1.29,z+offset+pane))
         _box(parent,Vector3(0.09,1.94,0.65),Color("#3c3028"),Vector3(rear-side*0.1,0.97,z+offset))
         _box(parent,Vector3(0.14,0.28,2.55),Color("#9c6b45"),Vector3(rear-side*0.11,2.45,z+offset))
@@ -2715,7 +2745,24 @@ func _build_park() -> void:
     _cylinder(fountain, 2.0, 0.35, Color(0.52,0.53,0.54), Vector3(0,0.18,0))
     _cylinder(fountain, 1.85, 0.08, Color(0.24,0.28,0.29), Vector3(0,0.39,0))
     _fountain_water = _cylinder(fountain, 1.78, 0.04, Color(0.24,0.63,0.76), Vector3(0,0.45,0))
+    _fountain_water.name = "FountainWater"
+    _fountain_water.material_override = _water_material
+    var rim := TorusMesh.new()
+    rim.inner_radius = 1.77
+    rim.outer_radius = 2.0
+    rim.rings = 32
+    rim.ring_segments = 12
+    var rim_node := MeshInstance3D.new()
+    rim_node.mesh = rim
+    var stone := StandardMaterial3D.new()
+    stone.albedo_color = Color("#b6ad99")
+    rim_node.material_override = stone
+    rim_node.position = Vector3(0,0.43,0)
+    fountain.add_child(rim_node)
+    _cylinder(fountain,0.38,0.16,Color("#b6ad99"),Vector3(0,0.55,0))
     _cylinder(fountain, 0.25, 1.1, Color(0.60,0.61,0.62), Vector3(0,0.85,0))
+    _cylinder(fountain,0.36,0.12,Color("#b6ad99"),Vector3(0,1.39,0))
+    _add_fountain_spray(_fountain_water)
     _sign(fountain, "Public fountain", Vector3(0,1.8,0))
     # Shared gate and kiosk already have labelled signs.
     # A street along the edge provides visual context, not a new travel route.
@@ -2732,6 +2779,31 @@ func _build_park() -> void:
             _box(park,Vector3(0.98,1.28,0.10),Color("#ddc7a6"),Vector3(x+offset,2.8,-17.70))
             _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.62))
             _box(park,Vector3(0.055,1.08,0.08),Color("#e0c6a0"),Vector3(x+offset,2.8,-17.56))
+
+func _add_fountain_spray(water: MeshInstance3D) -> void:
+    var spray := CPUParticles3D.new()
+    spray.name = "FountainSpray"
+    spray.position = Vector3(0,1.03,0)
+    spray.amount = 48
+    spray.lifetime = 0.95
+    spray.local_coords = true
+    spray.direction = Vector3.UP
+    spray.spread = 28.0
+    spray.initial_velocity_min = 1.65
+    spray.initial_velocity_max = 2.5
+    spray.gravity = Vector3(0,-8.5,0)
+    spray.emitting = false
+    var droplet := SphereMesh.new()
+    droplet.radius = 0.023
+    droplet.height = 0.046
+    droplet.radial_segments = 6
+    droplet.rings = 3
+    var mat := StandardMaterial3D.new()
+    mat.albedo_color = Color("#bbdfdf")
+    mat.roughness = 0.23
+    droplet.material = mat
+    spray.mesh = droplet
+    water.add_child(spray)
 
 func _park_flowers(parent: Node3D, at: Vector3) -> void:
     # Small decorative flowers hug the tree bases, never create obstacles.
@@ -2780,6 +2852,8 @@ func _lamp(parent: Node3D, at: Vector3) -> void:
     _cylinder(parent,0.18,0.3,Color("#3c4140"),at+Vector3(0,0.15,0))
     _cylinder(parent,0.14,0.10,Color("#3c4140"),at+Vector3(0,3.17,0))
     _box(parent,Vector3(0.32,0.39,0.32),Color("#e4d4ac"),at+Vector3(0,3.4,0))
+    var glass := parent.get_child(parent.get_child_count()-1) as MeshInstance3D
+    glass.material_override = _lantern_glass
     for x in [-0.17,0.17]:
         for z in [-0.17,0.17]:
             _box(parent,Vector3(0.035,0.46,0.035),Color("#3c4140"),at+Vector3(x,3.4,z))
@@ -5267,6 +5341,9 @@ func _apply_weather() -> void:
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     _weather_fx.apply(climate,_environment)
     var services: Dictionary = _last_snapshot.get("services", {})
+    _lantern_glass.emission_enabled = night and bool(services.get("lightsWorking",false))
+    # Decorative windows suggest warm interiors, not server-owned opening hours.
+    _shop_glass.emission_enabled = minute >= 1080 or minute < 360
     # Weather and city services affect every loaded chunk, not just the
     # one containing the visitor. Only the active chunk gets NPC data.
     for chunk in _chunks.values():
@@ -5277,6 +5354,9 @@ func _apply_weather() -> void:
         var water: MeshInstance3D = chunk["water"]
         if is_instance_valid(water):
             water.visible = bool(services.get("fountainWorking", false)) and int(services.get("cleanWater", 0)) > 0
+            var spray := water.get_node_or_null("FountainSpray") as CPUParticles3D
+            if spray != null:
+                spray.emitting = water.visible and _graphics_quality > 0
 
 func _on_locations_updated(locations: Array) -> void:
     _locations = locations
