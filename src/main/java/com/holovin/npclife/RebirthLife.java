@@ -419,7 +419,9 @@ final class RebirthLife {
         String key=SocialNetwork.key(c.id,other.id);
         var relation=t.peerRelationships.computeIfAbsent(key,k->new SocialLife.Relationship(
                 c.id.compareTo(other.id)<=0?c.id:other.id,c.id.compareTo(other.id)<=0?other.id:c.id));
-        relation.affinity=Math.min(100,relation.affinity+2);
+        // Very poor personal cleanliness may make an ordinary adult conversation less comfortable.
+        boolean untidy=linkedAdult(t,c)&&(DomesticLife.clothes(t,c)<30||hygiene(t,c)<30);
+        relation.affinity=Math.min(100,relation.affinity+(untidy?1:2));
         relation.trust=Math.min(100,relation.trust+1);
         relation.conversations++;
         c.sociability=Math.min(100,c.sociability+1);
