@@ -40,6 +40,8 @@ const DriveControls = preload("res://scripts/DriveControls.gd")
 const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
+const GameLanguage = preload("res://scripts/GameLanguage.gd")
+const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
 var _apartment: Node3D
 var _apartment_active := false
 var _home_entrance: Node3D
@@ -149,6 +151,8 @@ var _dialog_panel: PanelContainer
 var _dialog_title: Label
 var _dialog_reply: Label
 var _dialog_attitude: Label
+var _dialog_style: Label
+var _language_selector: OptionButton
 var _dialog_input: LineEdit
 var _dialog_target := ""
 var _dialog_pending := false
@@ -156,6 +160,8 @@ var _action_title: Label
 var _action_choices: VBoxContainer
 
 func _ready() -> void:
+    GameLanguage.install()
+    GameLanguage.select_locale(GameLanguage.saved_locale(),false)
     _build_world()
     _create_interface()
     _api = preload("res://examples/WorldApi.gd").new()
@@ -2601,6 +2607,7 @@ func _sync_office_joker() -> void:
     var joker := _residents_root.get_node_or_null("Resident_"+_office_joker_id) as Node3D
     if joker==null:return
     if str(joker.get_meta("activity",""))!="WORKING":return
+    joker.set_meta("personality","joker")
     if not Rect2(-15,2,11,12).has_point(Vector2(joker.position.x,joker.position.z)):
         var anchor := Vector3(-10.8,0,3.15)
         if _can_stand(anchor,WALKER_RADIUS):
@@ -2665,6 +2672,7 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var person := Node3D.new()
     person.name = "Resident_" + id
     person.set_meta("resident_id", id)
+    person.set_meta("personality",ResidentPersonality.style(id))
     var anchor := Vector3((float(index % 8)-3.5)*3.0, 0, -4.0-float(index / 8)*2.5)
     if _apartment_active:
         anchor = FamilyApartment.ANCHORS[index % FamilyApartment.ANCHORS.size()]
@@ -2722,6 +2730,12 @@ func _animate_residents(delta: float) -> void:
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
+            if not walking and activity!="SLEEPING" and limb=="ArmRight":
+                var style := str(person.get_meta("personality","quiet"))
+                if style in ["talkative","joker"]:
+                    angle=sin(float(Time.get_ticks_msec())*0.003+phase)*0.16
+                elif style=="relaxed":
+                    angle=-0.10
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
@@ -2857,6 +2871,12 @@ func _create_interface() -> void:
     map_button.text = "Town map (M)"
     map_button.pressed.connect(_toggle_map)
     column.add_child(map_button)
+    _language_selector = OptionButton.new()
+    _language_selector.add_item("English",0)
+    _language_selector.add_item("Italiano",1)
+    _language_selector.select(1 if TranslationServer.get_locale()=="it" else 0)
+    _language_selector.item_selected.connect(_on_language_selected)
+    column.add_child(_language_selector)
     var clock_row := HBoxContainer.new()
     column.add_child(clock_row)
     var clock_label := Label.new()
@@ -2930,6 +2950,9 @@ func _create_interface() -> void:
     dialog_col.add_child(_dialog_title)
     _dialog_attitude = Label.new()
     dialog_col.add_child(_dialog_attitude)
+    _dialog_style = Label.new()
+    _dialog_style.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    dialog_col.add_child(_dialog_style)
     _dialog_reply = Label.new()
     _dialog_reply.custom_minimum_size = Vector2(400,0)
     _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2966,6 +2989,14 @@ func _create_interface() -> void:
     action_scroll.add_child(_action_choices)
     _action_title = Label.new()
     _action_choices.add_child(_action_title)
+
+func _on_language_selected(index: int) -> void:
+    GameLanguage.select_locale("it" if index==1 else "en")
+    _refresh_localized_hud()
+
+func _refresh_localized_hud() -> void:
+    if _last_snapshot.is_empty():return
+    _render_hud_summary(_last_snapshot)
 
 func _button(caption: String, callback: Callable) -> Button:
     var button := Button.new()
@@ -3010,9 +3041,10 @@ func _open_dialog() -> void:
     _action_panel.visible = false
     _map_panel.visible = false
     _dialog_title.text = str(person.get_meta("display_name","Resident"))
-    _dialog_attitude.text = "Attitude: "+str(person.get_meta("relationship","STRANGER")).capitalize()
+    _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
+    _dialog_style.text = ResidentPersonality.greeting(str(person.get_meta("personality","quiet")))
     var known := str(person.get_meta("known_name",""))
-    _dialog_reply.text = "They know you as "+known if not known.is_empty() else (
+    _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     _dialog_input.clear()
     _dialog_panel.visible = true
@@ -4510,6 +4542,39 @@ func _set_apartment(active: bool) -> void:
         _avatar.position=Vector3.ZERO
     _follow_player()
 
+func _render_hud_summary(snapshot: Dictionary) -> void:
+    var player: Dictionary = snapshot.get("player", {})
+    var job = player.get("jobId")
+    var profession := tr("unemployed") if job == null else str(job)
+    _heading.text = "Living Alibi | " + str(player.get("place", "Park"))
+    _status.text = tr("Visitor #%s | %s EUR | %s") % [
+        str(player.get("incarnation", 1)), str(player.get("money", 50)), profession
+    ]
+    if _rebirth_active():
+        var child: Dictionary = snapshot.get("rebirth",{})
+        _status.text = "Choose a new family" if str(child.get("phase","")) == "CHOICE" else "%s | Age %s | %s" % [child.get("childName",""),child.get("age",0),"Adult" if str(child.get("phase","")) == "LINKED_ADULT" else "Childhood"]
+    var climate: Dictionary = snapshot.get("weather", {})
+    _weather.text = tr("Day %s  %s:%02d | %s | %s  %s °C") % [
+        str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,
+        int(snapshot.get("minute", 450))%60, tr(str(snapshot.get("season", "SPRING"))),
+        tr(str(climate.get("sky", "CLEAR"))), str(climate.get("temperatureC", 0))
+    ]
+    _needs.text = tr("Hunger %s  Thirst %s  Fatigue %s  Health %s  Eng %s  Inv %s") % [
+        str(player.get("hunger", 0)), str(player.get("thirst", 0)),
+        str(player.get("fatigue", 0)), str(player.get("health", 100)),
+        str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
+    ]
+    _needs.text += tr(" | Hygiene %s") % str(player.get("hygiene",100))
+    var utilities: Dictionary = snapshot.get("services", {})
+    var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
+    var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
+    _needs.text += "\nPark fountain: %s (%s clean units) | Street lights: %s" % [
+        fountain, str(utilities.get("cleanWater", 0)), lighting
+    ]
+    _needs.text += tr("\nResidents present in this district: %s") % [
+        str(snapshot.get("residents", []).size())
+    ]
+
 func _on_world_updated(snapshot: Dictionary) -> void:
     var clock_update := _clock_pending
     var walking_transition := _home_transition or not _road_pending.is_empty()
@@ -4555,36 +4620,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if continue_in_cabin:
         _park_in_cabin()
 
-    var job = player.get("jobId")
-    var profession := "unemployed" if job == null else str(job)
-    _heading.text = "Living Alibi | " + str(player.get("place", "Park"))
-    _status.text = "Visitor #%s | %s EUR | %s" % [
-        str(player.get("incarnation", 1)), str(player.get("money", 50)), profession
-    ]
-    if _rebirth_active():
-        var child: Dictionary = snapshot.get("rebirth",{})
-        _status.text = "Choose a new family" if str(child.get("phase","")) == "CHOICE" else "%s | Age %s | %s" % [child.get("childName",""),child.get("age",0),"Adult" if str(child.get("phase","")) == "LINKED_ADULT" else "Childhood"]
-    var climate: Dictionary = snapshot.get("weather", {})
-    _weather.text = "Day %s  %s:%02d | %s | %s  %s °C" % [
-        str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,
-        int(snapshot.get("minute", 450))%60, str(snapshot.get("season", "SPRING")),
-        str(climate.get("sky", "CLEAR")), str(climate.get("temperatureC", 0))
-    ]
-    _needs.text = "Hunger %s  Thirst %s  Fatigue %s  Health %s  Eng %s  Inv %s" % [
-        str(player.get("hunger", 0)), str(player.get("thirst", 0)),
-        str(player.get("fatigue", 0)), str(player.get("health", 100)),
-        str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
-    ]
-    _needs.text += " | Hygiene %s" % str(player.get("hygiene",100))
-    var utilities: Dictionary = snapshot.get("services", {})
-    var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
-    var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
-    _needs.text += "\nPark fountain: %s (%s clean units) | Street lights: %s" % [
-        fountain, str(utilities.get("cleanWater", 0)), lighting
-    ]
-    _needs.text += "\nResidents present in this district: %s" % [
-        str(snapshot.get("residents", []).size())
-    ]
+    _render_hud_summary(snapshot)
     var home = snapshot.get("rebirth",{}).get("homeOptions")
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
@@ -4612,7 +4648,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         if person == null:
             _close_dialog()
         else:
-            _dialog_attitude.text = "Attitude: "+str(person.get_meta("relationship","STRANGER")).capitalize()
+            _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
     _apply_weather()
     _render_actions()
     if _rebirth_active():
