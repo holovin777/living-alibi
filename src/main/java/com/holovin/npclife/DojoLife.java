@@ -39,6 +39,7 @@ final class DojoLife {
         }
         if(!MODES.contains(action)||!v.canTrain())throw new IllegalArgumentException("The dojo class is unavailable.");
         var result=SportLife.train(t,day,minute,"karate");
+        DojoCommunityLife.found(t,day);
         set(t,c,action,Math.min(100,get(t,c,action)+1));
         set(t,c,"sessions",Math.addExact(get(t,c,"sessions"),1));
         return new RebirthLife.HomeAction(result.minutes(),"Completed a Shotokan class.");
