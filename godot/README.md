@@ -426,6 +426,23 @@ Fuel is abstract and available only at the workshop; plan enough
 fuel/condition for the return trip. No towing or roadside refuelling
 yet, and no fuel wholesaler inventory.
 
+## First-person manual road section
+
+At your parked car, F opens the adjacent motor route choices. Selecting
+one places you in the driver's cabin at the start of that road section.
+W accelerates, S reverses, A/D steer within the lane, Space brakes,
+and mouse look turns your head. The first-person cabin includes a
+dashboard, steering wheel, pillars and decorative mirrors. Traffic
+and red/amber crossings stop the car. Crossing the road seam commits
+the existing Java drive action (3 minutes, 1 fuel, 3 condition) exactly
+once; confirmed arrival automatically parks the car. Escape before
+submission cancels the preview and returns to the original parking
+space. The main action panel is hidden while driving. This is a short
+lane-constrained local driving preview: no free steering around town,
+manual parking, physical mirror reflections, or server-side vehicle
+position persistence yet. An uncertain response requires refresh
+before another trip.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

@@ -27,6 +27,8 @@ const BED_POSITION := Vector3(-11.3,0,6.1)
 const KITCHEN_POSITION := Vector3(-5.05,0,12.3)
 const BATH_POSITION := Vector3(-12.1,0,12.95)
 const LiveClock = preload("res://scripts/LiveClock.gd")
+const DriveControls = preload("res://scripts/DriveControls.gd")
+const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 
 # Local presentation only: true movement between districts is Java-authorized.
@@ -74,6 +76,15 @@ var _hint: Label
 var _transport_button: Button
 var _parking_button: Button
 var _car_label: Label
+var _main_panel: PanelContainer
+var _drive_hud: Label
+var _cockpit: Node3D
+var _steering_wheel: Node3D
+var _drive := DriveControls.new()
+var _drive_target := ""
+var _drive_direction := Vector3.ZERO
+var _drive_look := 0.0
+var _drive_pending := false
 var _bike_model: Node3D
 var _bike_wheel_angle := 0.0
 var _jobs: Label
@@ -115,6 +126,12 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    if not _drive_target.is_empty():
+        _process_driving(delta)
+        _advance_traffic(delta)
+        _animate_residents(delta)
+        _weather_fx.follow(_avatar.position)
+        return
     var direction := Vector3.ZERO
     # Do not move away from an open clickable interaction menu.
     if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
@@ -152,7 +169,7 @@ func _process(delta: float) -> void:
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
     elif _near_car():
-        _hint.text = "F: choose a route with your parked car."
+        _hint.text = "F: choose a driving route."
     elif _near_rack() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
         _hint.text = "P: park or retrieve your bicycle · B: ride/walk."
     elif _near_home_station():
@@ -170,8 +187,12 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-        _view_yaw -= event.relative.x * MOUSE_SENSITIVITY
-        _view_pitch = clampf(_view_pitch - event.relative.y * MOUSE_SENSITIVITY, -1.15, 1.15)
+        if not _drive_target.is_empty():
+            _drive_look = clampf(_drive_look-event.relative.x*MOUSE_SENSITIVITY,-1.05,1.05)
+            _view_pitch = clampf(_view_pitch-event.relative.y*MOUSE_SENSITIVITY,-0.45,0.45)
+        else:
+            _view_yaw -= event.relative.x * MOUSE_SENSITIVITY
+            _view_pitch = clampf(_view_pitch - event.relative.y * MOUSE_SENSITIVITY, -1.15, 1.15)
         _follow_player()
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # UI consumes its own clicks before they reach this handler.
@@ -180,6 +201,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
+        if not _drive_target.is_empty():
+            if event.keycode == KEY_ESCAPE and not _drive_pending:
+                _end_driving(true)
+                _message.text = "Trip cancelled; car remains parked."
+            get_viewport().set_input_as_handled()
+            return
         if event.keycode == KEY_ESCAPE:
             Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
             _travel_panel.visible = false
@@ -266,9 +293,98 @@ func _car_action(action: String) -> void:
         _api.car_action(action)
 
 func _drive_to(destination: String) -> void:
-    if _near_car() and _connected and not _api.is_busy():
-        _action_panel.visible = false
-        _api.drive_to(destination)
+    if not _near_car() or not _connected or _api.is_busy():
+        return
+    _begin_driving(destination)
+
+func _drive_position(point: Vector2) -> Vector3:
+    var right := Vector3(-_drive_direction.z,0,_drive_direction.x)
+    return _drive_direction*point.x+right*point.y
+
+func _drive_clear(at: Vector3) -> bool:
+    # Sample centre and both ends of the vehicle to avoid clipping scenery.
+    for offset in [-0.85,0.0,0.85]:
+        var sample := at+_drive_direction*offset
+        if sample.dot(_drive_direction)>ROAD_EDGE:
+            sample -= _drive_direction*(sample.dot(_drive_direction)-ROAD_EDGE)
+        if not _can_stand(sample,0.82,true):
+            return false
+    return true
+
+func _begin_driving(destination: String) -> bool:
+    var player: Dictionary = _last_snapshot.get("player",{})
+    if not _near_car() or not destination in player.get("carDestinations",[]) or not TownLayout.motor_road(_current_place,destination):
+        return false
+    if int(player.get("carFuel",0))<1 or int(player.get("carCondition",0))<3:
+        _message.text = "The car needs fuel or service."
+        return false
+    if bool(player.get("ownsBicycle",false)) and _parked_district().is_empty():
+        _message.text = "Park your bicycle before driving."
+        return false
+    _drive = DriveControls.new()
+    _drive_direction = (TownLayout.world_center(destination)-TownLayout.world_center(_current_place)).normalized()
+    var start := _drive_position(Vector2(_drive.distance,_drive.lateral))
+    if not _drive_clear(start):
+        _message.text = "Road occupied. Let traffic pass before departing."
+        return false
+    _drive_target = destination
+    _drive_pending = false
+    _drive_look = 0.0
+    _view_pitch = 0.0
+    _view_yaw = atan2(-_drive_direction.x,-_drive_direction.z)
+    _avatar.position = start
+    _action_panel.visible = false
+    _travel_panel.visible = false
+    _map_panel.visible = false
+    _close_dialog()
+    _main_panel.visible = false
+    _drive_hud.visible = true
+    _cockpit.visible = true
+    _sync_owned_car()
+    _sync_bicycle()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+    _follow_player()
+    _update_drive_hud()
+    return true
+
+func _update_drive_hud() -> void:
+    var player: Dictionary = _last_snapshot.get("player",{})
+    _drive_hud.text = "%s km/h  |  Fuel %s/12  |  Condition %s%%\nTo %s · W gas / S reverse / A D steer / Space brake\n%s" % [
+        roundi(absf(_drive.speed)*3.6),player.get("carFuel",0),player.get("carCondition",0),
+        _drive_target.capitalize(),"Awaiting confirmed arrival..." if _drive_pending else "Esc: cancel before arrival · Mouse: look around"]
+
+func _process_driving(delta: float) -> void:
+    if not _drive_pending:
+        var throttle := float(Input.is_key_pressed(KEY_W))-float(Input.is_key_pressed(KEY_S))
+        var turn := float(Input.is_key_pressed(KEY_D))-float(Input.is_key_pressed(KEY_A))
+        var next := _drive.propose(delta,throttle,turn,Input.is_key_pressed(KEY_SPACE),_traffic_phase(_traffic_seconds))
+        var at := _drive_position(next)
+        if _drive_clear(at):
+            _drive.accept(next)
+            _avatar.position = at
+        else:
+            _drive.blocked()
+        if _drive.distance>=DriveControls.FINISH-0.001 and _connected and not _api.is_busy():
+            _drive_pending = true
+            _drive.speed = 0.0
+            _api.drive_to(_drive_target)
+    _follow_player()
+    _update_drive_hud()
+
+func _end_driving(return_to_car: bool) -> void:
+    _drive_target = ""
+    _drive_pending = false
+    _drive.speed = 0.0
+    _drive_look = 0.0
+    _view_pitch = 0.0
+    _cockpit.visible = false
+    _drive_hud.visible = false
+    _main_panel.visible = true
+    if return_to_car:
+        _avatar.position = CAR_ARRIVAL
+    _sync_owned_car()
+    _follow_player()
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func _sync_owned_car() -> void:
     for id in TownLayout.MOTOR_DISTRICTS:
@@ -277,7 +393,7 @@ func _sync_owned_car() -> void:
         var root: Node3D = _chunks[id]["root"]
         var car := root.get_node_or_null("PublicCarPark/OwnedCar") as Node3D
         if car!=null:
-            car.visible = _car_place()==id
+            car.visible = _car_place()==id and (_drive_target.is_empty() or id!=_current_place)
 
 func _parked_district() -> String:
     var value = _last_snapshot.get("player",{}).get("bicycleParked")
@@ -328,8 +444,15 @@ func _follow_player() -> void:
     # Fixed first-person presentation in every district and transport mode.
     _avatar.visible = false
     _avatar.rotation.y = _view_yaw
-    _camera.position = _avatar.position + Vector3(0.0,EYE_HEIGHT,0.0)
-    _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
+    if not _drive_target.is_empty():
+        _cockpit.position = _avatar.position
+        _cockpit.rotation.y = _view_yaw
+        _steering_wheel.rotation.z = -_drive.steering*0.7
+        _camera.position = _avatar.position+Basis(Vector3.UP,_view_yaw)*DRIVER_EYE
+        _camera.rotation = Vector3(_view_pitch,_view_yaw+_drive_look,0.0)
+    else:
+        _camera.position = _avatar.position + Vector3(0.0,EYE_HEIGHT,0.0)
+        _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
 func _build_world() -> void:
     _environment = Environment.new()
@@ -360,12 +483,47 @@ func _build_world() -> void:
     _weather_fx = WeatherEffects.new()
     add_child(_weather_fx)
     _weather_fx.follow(_avatar.position)
+    _build_cockpit()
     _camera = Camera3D.new()
     _camera.current = true
     add_child(_camera)
     _follow_player()
     _render_place("PARK")
     _current_place = "PARK"
+
+func _build_cockpit() -> void:
+    _cockpit = Node3D.new()
+    _cockpit.name = "DriverCabin"
+    add_child(_cockpit)
+    var dark := Color("#303538")
+    var trim := Color("#50575a")
+    _box(_cockpit,Vector3(1.65,0.28,0.45),dark,Vector3(0,0.76,-0.55))
+    _box(_cockpit,Vector3(1.72,0.15,0.9),Color("#496e50"),Vector3(0,0.55,-1.2))
+    _box(_cockpit,Vector3(1.72,0.10,1.7),trim,Vector3(0,1.57,0.15))
+    for x in [-0.79,0.79]:
+        _box(_cockpit,Vector3(0.12,0.8,0.13),trim,Vector3(x,1.20,-0.66))
+        _box(_cockpit,Vector3(0.14,0.46,1.2),dark,Vector3(x,0.80,0.02))
+        _box(_cockpit,Vector3(0.23,0.15,0.19),dark,Vector3(x*1.14,1.09,-0.48))
+        _box(_cockpit,Vector3(0.19,0.11,0.03),Color("#a0b7c1"),Vector3(x*1.14,1.09,-0.37))
+    _box(_cockpit,Vector3(0.44,0.18,0.10),Color("#20282a"),Vector3(-0.33,0.93,-0.57))
+    _box(_cockpit,Vector3(0.28,0.095,0.045),Color("#99ad95"),Vector3(-0.33,0.95,-0.51))
+    _steering_wheel = Node3D.new()
+    _steering_wheel.position = Vector3(-0.33,0.94,-0.31)
+    _cockpit.add_child(_steering_wheel)
+    var ring := TorusMesh.new()
+    ring.inner_radius = 0.145
+    ring.outer_radius = 0.18
+    var wheel := MeshInstance3D.new()
+    wheel.mesh = ring
+    var material := StandardMaterial3D.new()
+    material.albedo_color = dark
+    wheel.material_override = material
+    wheel.rotation_degrees.x = 90
+    _steering_wheel.add_child(wheel)
+    _box(_steering_wheel,Vector3(0.30,0.035,0.045),dark,Vector3.ZERO)
+    _box(_steering_wheel,Vector3(0.035,0.15,0.045),dark,Vector3(0,-0.06,0))
+    _box(_steering_wheel,Vector3(0.09,0.08,0.06),trim,Vector3.ZERO)
+    _cockpit.visible = false
 
 func _render_place(place_id: String) -> void:
     # Keep the current and nearby chunks. Positions are rebased around the
@@ -689,7 +847,7 @@ func _advance_traffic(delta: float) -> void:
                 record["delay"] = maxf(0.0,float(record["delay"])-dt)
                 car.visible = false
                 continue
-            if not car.visible and blocked:
+            if not car.visible and (blocked or (not _drive_target.is_empty() and direction.dot(_drive_direction)>0.9 and start.distance_to(Vector3.ZERO)<0.1 and (edge["second"]==_drive_target or edge["first"]==_drive_target))):
                 continue
             car.visible = true
             if blocked:
@@ -1511,6 +1669,15 @@ func _create_interface() -> void:
     add_child(canvas)
 
     var panel := PanelContainer.new()
+    _main_panel = panel
+    _drive_hud = Label.new()
+    _drive_hud.position = Vector2(20,20)
+    _drive_hud.add_theme_color_override("font_color",Color.WHITE)
+    _drive_hud.add_theme_color_override("font_shadow_color",Color.BLACK)
+    _drive_hud.add_theme_constant_override("shadow_offset_x",2)
+    _drive_hud.add_theme_constant_override("shadow_offset_y",2)
+    _drive_hud.visible = false
+    canvas.add_child(_drive_hud)
     panel.position = Vector2(15.0, 15.0)
     panel.custom_minimum_size = Vector2(435.0, 0.0)
     canvas.add_child(panel)
@@ -2137,6 +2304,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _last_snapshot = snapshot
     var player: Dictionary = snapshot.get("player", {})
     var new_place := str(player.get("placeId", "PARK"))
+    if not _drive_target.is_empty() and (_drive_pending or new_place!=_current_place or _car_place()!=_current_place):
+        _end_driving(new_place==_current_place)
     var road_arrival := new_place == _road_pending and not _road_pending.is_empty()
     if not _road_pending.is_empty():
         _road_blocked = "" if road_arrival else _road_pending
@@ -2361,6 +2530,11 @@ func _set_request_busy(busy: bool) -> void:
         _update_bag()
 
 func _on_request_failed(message: String) -> void:
+    if _drive_pending:
+        _end_driving(true)
+        _connected = false
+        _message.text = "Trip response uncertain. Refresh world before retrying: "+message
+        return
     if _dialog_pending:
         _dialog_pending = false
         if _dialog_panel.visible:

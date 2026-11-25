@@ -283,6 +283,32 @@ func _exercise() -> void:
             and not world._can_stand(world.CAR_PARK,world.WALKER_RADIUS),
             "owned car is parked physically and offers nearby motor routes"):
         return
+    var controls = preload("res://scripts/DriveControls.gd").new()
+    for i in range(100):
+        controls.accept(controls.propose(0.1,1.0,0.0,false,0))
+    if not _check(is_equal_approx(controls.distance,15.0) and is_zero_approx(controls.speed),
+            "manual drive stops at red crossing"):
+        return
+    for i in range(15):
+        controls.accept(controls.propose(0.1,1.0,1.0,false,2))
+    if not _check(controls.distance>15.0 and controls.lateral<=1.85 and controls.speed>0,
+            "gas and limited steering move car on green"):
+        return
+    controls.accept(controls.propose(0.1,0.0,0.0,true,2))
+    if not _check(controls.speed<4.5,"brake slows car"):
+        return
+    for edge in world._traffic_edges.values():
+        for record in edge["cars"]:
+            record["node"].visible = false
+    if not _check(world._begin_driving("LIBRARY") and world._cockpit.visible
+            and world._camera.position.is_equal_approx(world._avatar.position+Basis(Vector3.UP,world._view_yaw)*world.DRIVER_EYE),
+            "manual driving starts in first-person cabin"):
+        return
+    world._end_driving(true)
+    if not _check(not world._cockpit.visible and world._avatar.position==world.CAR_ARRIVAL
+            and world._camera.position.is_equal_approx(world.CAR_ARRIVAL+Vector3(0,world.EYE_HEIGHT,0)),
+            "cancelling restores first-person walking at original car"):
+        return
     driver = driver.duplicate(true) # A fresh server response, not mutation of the previous snapshot.
     driver["player"]["carPlace"] = "LIBRARY"
     driver["player"]["placeId"] = "LIBRARY"
