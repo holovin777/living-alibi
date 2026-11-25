@@ -39,6 +39,11 @@ const LiveClock = preload("res://scripts/LiveClock.gd")
 const DriveControls = preload("res://scripts/DriveControls.gd")
 const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
+const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
+var _apartment: Node3D
+var _apartment_active := false
+var _home_entrance: Node3D
+var _home_transition := false
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
@@ -162,21 +167,37 @@ func _process(delta: float) -> void:
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
         var before := _avatar.position
         _avatar.position = _move_on_ground(_avatar.position,
-                relative_motion * delta * _movement_speed(), WALKER_RADIUS, true)
+                relative_motion * delta * _movement_speed(), WALKER_RADIUS, _can_walk_roads())
         if _movement_speed() == CYCLE_SPEED:
             _bike_wheel_angle += before.distance_to(_avatar.position)/0.35
         _follow_player()
-        _try_road_crossing(relative_motion)
+        if _can_walk_roads():
+            _try_road_crossing(relative_motion)
 
+    if _apartment_active:
+        _animate_residents(delta)
+        _weather_fx.follow(_avatar.position)
+        _weather_fx.set_sheltered(true,_environment)
+        var action := _apartment_action()
+        _hint.text = "E: "+action.capitalize()+" · F: home / life choices" if not action.is_empty() else "WASD: walk indoors · F: life choices"
+        return
     _sync_bicycle()
     _advance_traffic(delta)
     _animate_residents(delta)
     _weather_fx.follow(_avatar.position)
-    _weather_fx.set_sheltered(_inside_guest_room(),_environment)
+    _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
+    if _rebirth_active():
+        if _near_family_entrance():
+            _hint.text="E: enter your home · F: life choices"
+        elif _can_walk_roads() and not _road_destination(_avatar.position,ROAD_TRIGGER).is_empty():
+            _hint.text="Walk forward to the next district"
+        else:
+            _hint.text = "F: life choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
+        return
     _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
-    if not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck():
+    if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
@@ -222,6 +243,29 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if _rebirth_active():
+        if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
+            if event.keycode == KEY_E and _apartment_active and not _action_panel.visible:
+                var action := _apartment_action()
+                if action=="door":
+                    _apartment.toggle_entrance(_avatar.position)
+                elif action=="exit":
+                    _request_home_transition("rebirth-home-exit")
+                elif not action.is_empty():
+                    _garden_action("rebirth-home-"+action)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_family_entrance() and not _action_panel.visible:
+                _request_home_transition("rebirth-home-go")
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_F:
+                _action_panel.visible = not _action_panel.visible
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_ESCAPE:
+                _action_panel.visible = true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         if _drive_active():
             if _drive_parked:
@@ -278,7 +322,7 @@ func _has_room_lease() -> bool:
     return _owns_house() if _current_place=="SOUTH_RESIDENCES" else bool(_last_snapshot.get("player",{}).get("roomActive",false))
 
 func _inside_guest_room() -> bool:
-    return _current_place in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"] and ROOM_BOUNDS.has_point(
+    return not _apartment_active and _current_place in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"] and ROOM_BOUNDS.has_point(
             Vector2(_avatar.position.x,_avatar.position.z))
 
 func _near_room_bed() -> bool:
@@ -325,6 +369,8 @@ func _movement_speed() -> float:
     # and grocery interior. No vehicle parking state is simulated yet.
     var at := _avatar.position
     var in_shop := _current_place == "PORTICI" and Rect2(4.4,2.15,6.1,5.7).has_point(Vector2(at.x,at.z))
+    if _rebirth_active() and str(_last_snapshot.get("rebirth",{}).get("phase","")) != "LINKED_ADULT":
+        return WALK_SPEED * 0.65
     return CYCLE_SPEED if _cycling() and not _inside_guest_room() and not in_shop else WALK_SPEED
 
 func _truck_place() -> String:
@@ -598,7 +644,10 @@ func _follow_player() -> void:
         _camera.position = _avatar.position+Basis(Vector3.UP,_view_yaw)*DRIVER_EYE
         _camera.rotation = Vector3(_view_pitch,_view_yaw+_drive_look,0.0)
     else:
-        _camera.position = _avatar.position + Vector3(0.0,EYE_HEIGHT,0.0)
+        var eye := EYE_HEIGHT
+        if str(_last_snapshot.get("rebirth",{}).get("phase","ADULT")) == "CHILDHOOD":
+            eye = lerpf(0.65,EYE_HEIGHT,clampf(float(_last_snapshot.get("rebirth",{}).get("age",0))/18.0,0.0,1.0))
+        _camera.position = _avatar.position + Vector3(0.0,eye,0.0)
         _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
 func _build_world() -> void:
@@ -1059,7 +1108,10 @@ func _try_road_crossing(motion: Vector3) -> void:
     _road_pending = destination
     var lateral := _avatar.position - direction * _avatar.position.dot(direction)
     _road_arrival = lateral - direction * 23.0
-    _api.go_to(destination)
+    if _rebirth_active():
+        _api.garden_action("rebirth-road-"+destination)
+    else:
+        _api.go_to(destination)
 
 # A flat, client-side collision layer. The Java server owns district travel
 # and never trusts these local visual positions as proof of an action.
@@ -1067,6 +1119,8 @@ func _add_obstacle(center: Vector3, size: Vector2) -> void:
     _obstacles.append(Rect2(Vector2(center.x, center.z) - size * 0.5, size))
 
 func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
+    if _apartment_active:
+        return _apartment.can_stand(at,radius)
     if absf(at.x) > 17.0 or absf(at.z) > 17.0:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
@@ -2107,6 +2161,8 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     person.name = "Resident_" + id
     person.set_meta("resident_id", id)
     var anchor := Vector3((float(index % 8)-3.5)*3.0, 0, -4.0-float(index / 8)*2.5)
+    if _apartment_active:
+        anchor = FamilyApartment.ANCHORS[index % FamilyApartment.ANCHORS.size()]
     anchor.z = maxf(anchor.z, -13.0)
     anchor = _open_anchor(anchor)
     person.position = anchor
@@ -2588,8 +2644,150 @@ func _render_logistics(logistics: Dictionary) -> void:
                 if int(second.get("condition",100))<100 and not bool(second.get("active",false)):
                     _action_choices.add_child(_button("Service truck 2 · 15 EUR + 1 part (transport extra)",_freight_action.bind("service-truck-2")))
 
+func _rebirth_active() -> bool:
+    return str(_last_snapshot.get("rebirth",{}).get("phase","ADULT"))!="ADULT"
+
+func _child_can_walk() -> bool:
+    var r: Dictionary = _last_snapshot.get("rebirth",{})
+    return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
+
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _rebirth_active():
+        var rebirth: Dictionary = _last_snapshot.get("rebirth",{})
+        var info := Label.new()
+        info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        if str(rebirth.get("phase",""))=="CHOICE":
+            _action_title.text = "A new life · Choose your parents"
+            var families: Array = rebirth.get("families",[])
+            info.text = "The town continues. Choose an eligible family." if not families.is_empty() else "No eligible family today. Wait or start an adult life."
+            _action_choices.add_child(info)
+            var history: Array = rebirth.get("pastLives",[])
+            if not history.is_empty():
+                var recent: Dictionary = history[0]
+                var memorial := Label.new()
+                memorial.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                var life_name = recent.get("name")
+                memorial.text = "Previous life #%s · %s · day %s" % [recent.get("incarnation",0),"Unnamed visitor" if life_name == null else str(life_name),recent.get("day",0)]
+                if int(recent.get("age",-1)) >= 0:
+                    memorial.text += " · age %s" % recent.get("age",0)
+                _action_choices.add_child(memorial)
+            for family in families:
+                var label_text := "%s (%s) + %s (%s) · %s" % [family.get("firstName",""),family.get("firstJob",""),family.get("secondName",""),family.get("secondJob",""),family.get("district","")]
+                _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-family-%s-%s" % [family.get("first",0),family.get("second",0)])))
+            _action_choices.add_child(_button("Start adult life instead",_garden_action.bind("rebirth-adult")))
+        else:
+            _action_title.text = "Childhood · family life"
+            info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nF: choices / local first-person exploration from age 3. School and home routines continue; afternoon outings unlock at age 6." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
+            _action_choices.add_child(info)
+            var age := int(rebirth.get("age",0))
+            var identity = rebirth.get("identity")
+            if identity is Dictionary:
+                var personal := Label.new()
+                personal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                personal.text = "Personal savings: %s EUR · Born on day %s\nFitness %s · Hobby days %s · Pocket money received %s EUR" % [identity.get("savings",0),identity.get("bornDay",0),identity.get("fitness",0),identity.get("hobbyDays",0),identity.get("allowanceTotal",0)]
+                if age >= 18:
+                    _action_title.text = "Coming of age · personal history"
+                    if str(rebirth.get("phase","")) == "LINKED_ADULT":
+                        _action_title.text = "Adult life · personal history"
+                    else:
+                        personal.text += "\nGraduation recorded. Continue as the same person."
+                        _action_choices.add_child(_button("Continue adult life",_garden_action.bind("rebirth-continue")))
+                _action_choices.add_child(personal)
+                var personality = identity.get("personality")
+                if personality is Dictionary:
+                    var traits := Label.new()
+                    traits.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    traits.text = "Sociability %s · Carefulness %s · Curiosity %s" % [personality.get("sociability",0),personality.get("carefulness",0),personality.get("curiosity",0)]
+                    var ambition = personality.get("ambition")
+                    if ambition is Dictionary:
+                        traits.text += "\nAmbition: %s · %s/%s %s" % [ambition.get("description",""),ambition.get("progress",0),ambition.get("target",0),ambition.get("unit","")]
+                    _action_choices.add_child(traits)
+                    for goal in personality.get("choices",[]):
+                        _action_choices.add_child(_button("Aim: "+str(goal).replace("_"," ").capitalize(),_garden_action.bind("rebirth-ambition-"+str(goal))))
+                for person in identity.get("relationships",[]):
+                    var relation := Label.new()
+                    relation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    relation.text = "%s · %s%s · Trust %s · Affinity %s" % [person.get("name",""),person.get("bond","Acquaintance")," (deceased)" if not person.get("alive",true) else "",person.get("trust",0),person.get("affinity",0)]
+                    _action_choices.add_child(relation)
+            if age >= 6:
+                var skills: Dictionary = rebirth.get("skills",{})
+                var school := Label.new()
+                school.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                var focus = rebirth.get("schoolFocus")
+                school.text = "School days: %s · Focus: %s\nTechnical %s | Social %s | Academic %s | Commerce %s" % [rebirth.get("schoolDays",0),"balanced" if focus == null else str(focus),skills.get("technical",0),skills.get("social",0),skills.get("academic",0),skills.get("commerce",0)]
+                _action_choices.add_child(school)
+                if age < 18:
+                    for subject in ["balanced","technical","social","academic","commerce"]:
+                        _action_choices.add_child(_button("Focus: "+subject.capitalize(),_garden_action.bind("rebirth-focus-"+subject)))
+            var child_options = rebirth.get("childOptions")
+            if child_options is Dictionary:
+                var outing := Label.new()
+                outing.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                var return_minute := int(child_options.get("returnMinute",1080))
+                outing.text = "Afternoon outings · return starts at %02d:%02d" % [return_minute/60,return_minute%60]
+                _action_choices.add_child(outing)
+                _action_choices.add_child(_button("Advance one hour",_garden_action.bind("rebirth-child-hour")))
+                for destination in child_options.get("destinations",[]):
+                    _action_choices.add_child(_button("Visit "+str(destination).capitalize(),_garden_action.bind("rebirth-child-travel-"+str(destination))))
+                for hobby in child_options.get("hobbies",[]):
+                    _action_choices.add_child(_button("%s · %s min" % [hobby.get("label",""),hobby.get("minutes",30)],_garden_action.bind("rebirth-hobby-"+str(hobby.get("id","")))))
+                var allowance := int(child_options.get("allowanceAvailable",0))
+                if allowance > 0:
+                    _action_choices.add_child(_button("Ask for weekly pocket money · %s EUR" % allowance,_garden_action.bind("rebirth-allowance")))
+                if child_options.get("outing",false):
+                    _action_choices.add_child(_button("Return home",_garden_action.bind("rebirth-child-home")))
+            var options = rebirth.get("adultOptions")
+            if options is Dictionary:
+                var career := Label.new()
+                career.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                career.text = "%s · %s" % [options.get("occupation",""),options.get("activity","")]
+                _action_choices.add_child(career)
+                for job in options.get("jobs",[]):
+                    _action_choices.add_child(_button("Apply: "+str(job),_garden_action.bind("rebirth-job-"+str(job))))
+                _action_choices.add_child(_button("Resume work and daily routine",_garden_action.bind("rebirth-routine")))
+                _action_choices.add_child(_button("Advance one hour",_garden_action.bind("rebirth-wait-hour")))
+                _action_choices.add_child(_button("Advance one day",_garden_action.bind("rebirth-wait-adult-day")))
+                for destination in options.get("destinations",[]):
+                    if str(destination) != _current_place:
+                        _action_choices.add_child(_button("Walk to "+str(destination).capitalize(),_garden_action.bind("rebirth-travel-"+str(destination))))
+            var home_options = rebirth.get("homeOptions")
+            if home_options is Dictionary:
+                var home_label := Label.new()
+                home_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                home_label.text = "Home · %s · %s\nFood portions %s · Water portions %s" % [home_options.get("district",""),"at home" if home_options.get("atHome",false) else "away",home_options.get("food",0),home_options.get("water",0)]
+                home_label.text += "\nHygiene %s · Furnishings %s/2" % [home_options.get("hygiene",100),home_options.get("furnitureLevel",0)]
+                for relative in home_options.get("family",[]):
+                    home_label.text += "\nAt home: "+str(relative)
+                _action_choices.add_child(home_label)
+                var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
+                for action in home_options.get("actions",[]):
+                    _action_choices.add_child(_button(str(home_labels.get(action,action)),_garden_action.bind("rebirth-home-"+str(action))))
+            var family_options = rebirth.get("familyOptions")
+            if family_options is Dictionary:
+                var household := Label.new()
+                household.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                var spouse = family_options.get("partner")
+                household.text = "Family · Single" if spouse == null else "Family · Partner: %s · %s" % [spouse.get("name",""),"shared home" if family_options.get("livingTogether",false) else "separate homes"]
+                for kid in family_options.get("children",[]):
+                    household.text += "\nChild: %s · age %s%s" % [kid.get("name",""),kid.get("age",0)," (deceased)" if not kid.get("alive",true) else ""]
+                _action_choices.add_child(household)
+                for candidate in family_options.get("proposals",[]):
+                    _action_choices.add_child(_button("Propose partnership to "+str(candidate.get("name","")),_garden_action.bind("rebirth-propose-"+str(candidate.get("id","")))))
+                if family_options.get("canMoveTogether",false):
+                    _action_choices.add_child(_button("Agree to share a home",_garden_action.bind("rebirth-move-together")))
+                if family_options.get("canHaveChild",false):
+                    _action_choices.add_child(_button("Welcome a child together",_garden_action.bind("rebirth-have-child")))
+                if family_options.get("canSupport",false):
+                    _action_choices.add_child(_button("Support partner · 10 EUR",_garden_action.bind("rebirth-support-partner")))
+            for partner in rebirth.get("conversations",[]):
+                _action_choices.add_child(_button("Talk with "+str(partner.get("name","")),_garden_action.bind("rebirth-chat-"+str(partner.get("id","")))))
+        var max_days := int(rebirth.get("maxWaitDays",0))
+        if max_days > 0:
+            _action_choices.add_child(_button("Advance one shared day",_garden_action.bind("rebirth-wait")))
+        if max_days > 1:
+            _action_choices.add_child(_button("Advance up to %s shared days" % max_days,_garden_action.bind("rebirth-wait-fast")))
+        return
     _action_title.text = "Local actions — " + _current_place.capitalize()
     var player: Dictionary = _last_snapshot.get("player", {})
     var employed := str(player.get("jobId", ""))
@@ -3178,6 +3376,10 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("rebirth-"):
+        if _connected and not _api.is_busy():
+            _api.garden_action(action)
+        return
     if ((action.begins_with("archive-year-") and _current_place=="LIBRARY" and _near_kiosk()) or ((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-") or action.begins_with("election-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
@@ -3267,8 +3469,72 @@ func _wait_one_hour() -> void:
     if not _api.is_busy():
         _api.wait_for(60)
 
+func _can_walk_roads() -> bool:
+    return not _apartment_active and (not _rebirth_active() or str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT")
+
+func _near_family_entrance() -> bool:
+    return is_instance_valid(_home_entrance) and _home_entrance.visible and not _apartment_active and _avatar.position.distance_to(_home_entrance.position)<2.0
+
+func _request_home_transition(action: String) -> void:
+    if _connected and not _api.is_busy():
+        _home_transition=true
+        _api.garden_action(action)
+
+func _sync_family_entrance(home) -> void:
+    if is_instance_valid(_home_entrance):
+        _home_entrance.queue_free()
+        _home_entrance=null
+    if not home is Dictionary or not home.get("outsideHome",false) or _apartment_active:
+        return
+    _home_entrance=Node3D.new()
+    _home_entrance.name="FamilyHomeEntrance"
+    add_child(_home_entrance)
+    _home_entrance.position=_open_anchor(Vector3(0,0,6))
+    _box(_home_entrance,Vector3(1.25,2.25,0.16),Color("#987653"),Vector3(0,1.125,-0.65))
+    _sign(_home_entrance,"Your home",Vector3(0,2.45,-0.65))
+
+func _apartment_action() -> String:
+    if not _apartment_active:
+        return ""
+    var home = _last_snapshot.get("rebirth",{}).get("homeOptions")
+    return _apartment.nearby_action(_avatar.position,home.get("actions",[])) if home is Dictionary else ""
+
+func _set_apartment(active: bool) -> void:
+    if active == _apartment_active:
+        return
+    _apartment_active=active
+    if active:
+        if not is_instance_valid(_apartment):
+            _apartment=FamilyApartment.new()
+            add_child(_apartment)
+        _apartment.show()
+        for chunk in _chunks.values():
+            chunk["root"].hide()
+        _traffic_root.hide()
+        _bike_model.hide()
+        _residents_root=_apartment.get("residents")
+        _apartment.set("entrance_open",false)
+        _apartment.get_node("EntranceDoor").show()
+        _apartment.get_node("DoorHandle").show()
+        _avatar.position=FamilyApartment.SPAWN
+        _view_yaw=0.0
+        _view_pitch=0.0
+    else:
+        _apartment.hide()
+        for resident in _apartment.get("residents").get_children():
+            _apartment.get("residents").remove_child(resident)
+            resident.queue_free()
+        for chunk in _chunks.values():
+            chunk["root"].show()
+        _traffic_root.show()
+        _activate_chunk(_current_place)
+        _avatar.position=Vector3.ZERO
+    _follow_player()
+
 func _on_world_updated(snapshot: Dictionary) -> void:
     var clock_update := _clock_pending
+    var walking_transition := _home_transition or not _road_pending.is_empty()
+    _home_transition=false
     _clock_pending = false
     _connected = true
     var old_car_place := _car_place()
@@ -3285,6 +3551,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        if _apartment_active:
+            _set_apartment(false)
         _close_dialog()
         _current_place = new_place
         _render_place(new_place)
@@ -3305,6 +3573,9 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _status.text = "Visitor #%s | %s EUR | %s" % [
         str(player.get("incarnation", 1)), str(player.get("money", 50)), profession
     ]
+    if _rebirth_active():
+        var child: Dictionary = snapshot.get("rebirth",{})
+        _status.text = "Choose a new family" if str(child.get("phase","")) == "CHOICE" else "%s | Age %s | %s" % [child.get("childName",""),child.get("age",0),"Adult" if str(child.get("phase","")) == "LINKED_ADULT" else "Childhood"]
     var climate: Dictionary = snapshot.get("weather", {})
     _weather.text = "Day %s  %s:%02d | %s | %s  %s °C" % [
         str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,
@@ -3326,6 +3597,13 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _needs.text += "\nResidents present in this district: %s" % [
         str(snapshot.get("residents", []).size())
     ]
+    var home = snapshot.get("rebirth",{}).get("homeOptions")
+    _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
+    if _apartment_active:
+        _apartment.set_furniture_level(int(home.get("furnitureLevel",0)))
+    _sync_family_entrance(home)
+    if walking_transition and is_instance_valid(_home_entrance) and not road_arrival:
+        _avatar.position=_home_entrance.position
     _sync_guest_room()
     _sync_garden()
     _sync_coop()
@@ -3349,6 +3627,12 @@ func _on_world_updated(snapshot: Dictionary) -> void:
             _dialog_attitude.text = "Attitude: "+str(person.get_meta("relationship","STRANGER")).capitalize()
     _apply_weather()
     _render_actions()
+    if _rebirth_active():
+        _travel_panel.visible = false
+        _map_panel.visible = false
+        _close_dialog()
+        _action_panel.visible = not walking_transition
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
     if _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 
@@ -3390,7 +3674,7 @@ func _apply_weather() -> void:
     if climate.get("sky","CLEAR") != "CLEAR":
         _sun.light_energy *= 0.65
     _weather_fx.follow(_avatar.position)
-    _weather_fx.set_sheltered(_inside_guest_room(),_environment)
+    _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     _weather_fx.apply(climate,_environment)
     var services: Dictionary = _last_snapshot.get("services", {})
     # Weather and city services affect every loaded chunk, not just the
@@ -3512,6 +3796,7 @@ func _set_request_busy(busy: bool) -> void:
         _update_bag()
 
 func _on_request_failed(message: String) -> void:
+    _home_transition=false
     if _drive_pending:
         _end_driving(true)
         _connected = false

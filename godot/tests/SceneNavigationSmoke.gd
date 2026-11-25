@@ -876,6 +876,67 @@ func _exercise() -> void:
             "business dashboard exposes real funds and machine wear"):
         return
 
+    var apartment := _world("NORTH_RESIDENCES","North residences")
+    apartment["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","homeOptions":{"atHome":true,"district":"North residences","food":3,"water":3,"furnitureLevel":1,"actions":["go","meal","rest","family","wash"]}}
+    apartment["residents"]=[{"id":"resident-0099","name":"Family member","activity":"AT_HOME"}]
+    world._on_world_updated(apartment)
+    if not _check(world._apartment_active and world._apartment.visible
+            and world._apartment.has_node("BedFrame") and world._apartment.has_node("KitchenCounter")
+            and world._residents_root.has_node("Resident_resident-0099")
+            and not world._scenery.visible,
+            "private home snapshot activates furnished apartment and actual resident"):
+        return
+    if not _check(world._can_stand(Vector3(-3,0,0),world.WALKER_RADIUS)
+            and world._can_stand(Vector3(3,0,0),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(0,0,-2),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(4.7,0,-3.9),world.WALKER_RADIUS),
+            "room doorways are open but partitions and furniture are solid"):
+        return
+    world._avatar.position=Vector3(3.3,0,-2.6)
+    world._follow_player()
+    if not _check(world._apartment_action()=="meal" and world._camera.position.is_equal_approx(world._avatar.position+Vector3(0,world.EYE_HEIGHT,0)),
+            "kitchen contextual action and first-person camera"):
+        return
+    if not _check(world._apartment.has_node("Washbasin") and world._apartment.has_node("EntranceDoor")
+            and world._apartment.get_node("WallArt").visible and not world._apartment.get_node("PremiumHeadboard").visible
+            and world._can_stand(Vector3(3.8,0,2.2),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(3.8,0,0.95),world.WALKER_RADIUS),
+            "bathroom opening, furnishings and wall collision"):
+        return
+    world._avatar.position=Vector3(4.4,0,2.2)
+    if not _check(world._apartment_action()=="wash","bathroom contextual wash"):
+        return
+    if not _check(not world._can_stand(Vector3(0,0,4.5),world.WALKER_RADIUS), "closed entrance blocks walking"):
+        return
+    world._apartment.toggle_entrance(Vector3(0,0,3.5))
+    var lobby_pos: Vector3 = world._move_on_ground(Vector3(0,0,3.5),Vector3(0,0,4.5),world.WALKER_RADIUS)
+    if not _check(lobby_pos.z>7.9 and not world._can_stand(Vector3(2.1,0,6.5),world.WALKER_RADIUS), "open entrance allows continuous walk into lobby; lobby walls solid"):
+        return
+    world._avatar.position=lobby_pos
+    if not _check(world._apartment_action()=="exit","building exit offers travel choices"):
+        return
+    var outside := apartment.duplicate(true)
+    outside["rebirth"]["homeOptions"]["atHome"]=false
+    outside["rebirth"]["homeOptions"]["outsideHome"]=true
+    outside["residents"]=[]
+    world._home_transition=true
+    world._on_world_updated(outside)
+    if not _check(not world._apartment_active and world._near_family_entrance() and world._can_walk_roads() and not world._action_panel.visible,
+            "confirmed exit opens public street and continuous walking without menu"):
+        return
+    world._road_pending="CLINIC"
+    world._road_arrival=Vector3(-23,0,0)
+    var next_street := _world("CLINIC","Clinic")
+    next_street["rebirth"]=outside["rebirth"].duplicate(true)
+    next_street["rebirth"]["homeOptions"]["outsideHome"]=false
+    world._on_world_updated(next_street)
+    if not _check(world._avatar.position.x < -22 and not world._action_panel.visible,"linked adult road arrival preserves walking direction"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+    if not _check(not world._apartment_active and not world._apartment.visible and world._scenery.visible,
+            "authoritative departure restores outdoor scenery"):
+        return
+
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

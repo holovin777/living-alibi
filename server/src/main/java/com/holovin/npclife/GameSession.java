@@ -38,10 +38,14 @@ public final class GameSession implements AutoCloseable {
             db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
         }
         // Old save files might contain a deceased visitor.
-        if(!town.player.alive) {
-            PlayerLife.beginNewLife(town,state.day,state.minute);
-            db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+        boolean changed=RebirthLife.restoreIdentity(town);
+        if(!town.player.alive&&!RebirthLife.active(town)) {
+            RebirthLife.prepare(town,state.day,state.minute);
+            changed=true;
         }
+        if(RebirthLife.settleLinkedDeath(town,state.day,state.minute))changed=true;
+        RebirthLife.synchronize(town);
+        if(changed)db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
     }
 
     public record PlayerView(int incarnation,String place,String placeId,String privateName,
@@ -74,19 +78,21 @@ public final class GameSession implements AutoCloseable {
     public record RetailView(String id,String label,int price,int stock) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election) { }
+                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
         var p=town.player;
-        var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.place.name(),p.privateName,
-                p.hunger,p.thirst,p.fatigue,p.health,p.alive,
-                p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
-                HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,p.hygiene,
+        var linked=RebirthLife.child(town);
+        boolean controlled=RebirthLife.linkedAdult(town,linked);
+        var player=new PlayerView(p.incarnation,controlled?linked.locationText():PlayerLife.position(p),p.place.name(),controlled?linked.name:p.privateName,
+                p.hunger,p.thirst,p.fatigue,p.health,controlled||p.alive,
+                controlled?linked.money:p.money,controlled&&linked.employed?linked.occupation:p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
+                HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,controlled?RebirthLife.hygiene(town,linked):p.hygiene,
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
                 p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
-        var residents=PlayerLife.visible(town).stream()
+        var residents=(RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town)).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,c.name,c.activity,
@@ -102,7 +108,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute));
     }
 
     public synchronized BusinessView business() {
@@ -325,6 +331,79 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if(action!=null&&action.startsWith("rebirth-")){
+            var copy=town.copy();
+            if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){
+                RebirthLife.requireAdult(copy);
+                return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
+            }
+            if(action.equals("rebirth-home-exit")){
+                return applyInternal(copy,0,RebirthLife.leaveHome(copy,state.day),true);
+            }
+            if(action.startsWith("rebirth-road-")){
+                var destination=PlayerLife.destination(action.substring("rebirth-road-".length()));
+                int duration=RebirthLife.roadTravel(copy,destination,state.day);
+                return applyInternal(copy,duration,"Walked along the road to "+destination.label+".",true);
+            }
+            if(action.equals("rebirth-home-go")){
+                int duration=RebirthLife.goHome(copy);
+                return applyInternal(copy,duration,"Returned to your own home.",true);
+            }
+            if(action.startsWith("rebirth-home-")){
+                var home=RebirthLife.homeAction(copy,state.day,action.substring("rebirth-home-".length()));
+                return applyInternal(copy,home.minutes(),home.message(),true);
+            }
+            if(action.equals("rebirth-child-hour")){
+                var child=RebirthLife.child(copy);
+                if(!RebirthLife.linkedChild(copy,child)||child.age<6)throw new IllegalArgumentException("Available from age six.");
+                return applyInternal(copy,60,"Advanced childhood by one hour.",true);
+            }
+            if(action.startsWith("rebirth-hobby-")){
+                String message=RebirthLife.hobby(copy,state.day,state.minute,action.substring("rebirth-hobby-".length()));
+                return applyInternal(copy,30,message,true);
+            }
+            if(action.equals("rebirth-child-home")){
+                int duration=RebirthLife.childReturn(copy);
+                return applyInternal(copy,duration,"Return home.",true);
+            }
+            if(action.startsWith("rebirth-child-travel-")){
+                var destination=PlayerLife.destination(action.substring("rebirth-child-travel-".length()));
+                int duration=RebirthLife.childTravel(copy,destination,state.day,state.minute);
+                return applyInternal(copy,duration,"Outing to "+destination.label+".",true);
+            }
+            if(action.startsWith("rebirth-travel-")){
+                var destination=PlayerLife.destination(action.substring("rebirth-travel-".length()));
+                int duration=RebirthLife.travel(copy,destination,state.day);
+                return applyInternal(copy,duration,"Travel to "+destination.label+".",true);
+            }
+            if(action.equals("rebirth-wait")||action.equals("rebirth-wait-fast")){
+                int maxDays=RebirthLife.maxWaitDays(town);
+                if(maxDays==0)throw new IllegalArgumentException("No childhood waiting is available.");
+                if(action.equals("rebirth-wait-fast")&&maxDays<=1)
+                    throw new IllegalArgumentException("Fast waiting is not available at this age or phase.");
+                int days=action.equals("rebirth-wait-fast")?maxDays:1;
+                return applyInternal(copy,days*1440,"Advanced the shared world.",true);
+            }
+            String message;
+            if(action.equals("rebirth-adult"))message=RebirthLife.adultFallback(copy);
+            else if(action.equals("rebirth-allowance"))message=RebirthLife.allowance(copy,state.day,state.minute);
+            else if(action.equals("rebirth-continue"))message=RebirthLife.continueAdult(copy);
+            else if(action.startsWith("rebirth-propose-"))message=RebirthLife.propose(copy,action.substring("rebirth-propose-".length()),state.day,state.minute);
+            else if(action.equals("rebirth-move-together"))message=RebirthLife.moveTogether(copy);
+            else if(action.equals("rebirth-have-child"))message=RebirthLife.haveChild(copy,state.day);
+            else if(action.equals("rebirth-support-partner"))message=RebirthLife.supportPartner(copy);
+            else if(action.equals("rebirth-routine"))message=RebirthLife.resumeRoutine(copy);
+            else if(action.startsWith("rebirth-job-"))message=EmploymentLife.chooseRole(copy,state,action.substring("rebirth-job-".length()));
+            else if(action.startsWith("rebirth-ambition-"))message=RebirthLife.chooseAmbition(copy,action.substring("rebirth-ambition-".length()));
+            else if(action.startsWith("rebirth-focus-"))message=RebirthLife.chooseFocus(copy,action.substring("rebirth-focus-".length()));
+            else if(action.startsWith("rebirth-chat-"))message=RebirthLife.chat(copy,state.day,action.substring("rebirth-chat-".length()));
+            else if(action.startsWith("rebirth-family-")){
+                String[] values=action.substring("rebirth-family-".length()).split("-");
+                if(values.length!=2)throw new IllegalArgumentException("Choose two eligible parents.");
+                message=RebirthLife.choose(copy,state.day,Integer.parseInt(values[0]),Integer.parseInt(values[1]));
+            }else throw new IllegalArgumentException("Unknown rebirth action.");
+            return applyInternal(copy,0,message,true);
+        }
         if(action!=null&&action.startsWith("archive-year-")){
             TransportLife.ready(town.player);
             if(town.player.place!=TownLife.Place.LIBRARY)throw new IllegalArgumentException("Visit the public library.");
@@ -383,19 +462,32 @@ public final class GameSession implements AutoCloseable {
 
     private ActionView apply(TownLife.Town candidateTown,int minutes,String message)
             throws SQLException {
+        return applyInternal(candidateTown,minutes,message,false);
+    }
+    private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction) throws SQLException {
+        if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Choose a family or use childhood actions first.");
         var candidateState=state.copy();
         ArchiveLife.transitions(town,candidateTown,state.day,state.minute);
         var events=new ArrayList<LifeSimulation.LifeEvent>();
         var truth=new ArrayList<TownLife.Event>();
         var observations=new ArrayList<TownLife.Observation>();
         var interactions=new ArrayList<SocialLife.Interaction>();
+        int initialPhase=RebirthLife.phase(candidateTown);
+        int initialMaxDays=RebirthLife.maxWaitDays(candidateTown);
         events.addAll(LifeSimulation.advance(candidateState,minutes,
-                current->TownLife.tick(candidateTown,current,truth,observations,interactions)));
-        if(!candidateTown.player.alive) {
-            var ended=PlayerLife.beginNewLife(candidateTown,candidateState.day,candidateState.minute);
-            message+=" Visitor #"+ended.incarnation()+" died; visitor #"+
-                    candidateTown.player.incarnation+" begins a new life.";
+                current->TownLife.tick(candidateTown,current,truth,observations,interactions),
+                ()->!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays))));
+        if(rebirthAction&&minutes>0){
+            long elapsed=(candidateState.day-(long)state.day)*1440+candidateState.minute-state.minute;
+            message+=" Elapsed: "+elapsed/1440+" day(s), "+elapsed%1440+" minute(s).";
         }
+        if(!candidateTown.player.alive&&!RebirthLife.active(candidateTown)) {
+            RebirthLife.prepare(candidateTown,candidateState.day,candidateState.minute);
+            message+=" Your previous life ended. Choose a family for your next life.";
+        }
+        if(RebirthLife.settleLinkedDeath(candidateTown,candidateState.day,candidateState.minute))
+            message+=" Your life ended. Its history is preserved. Choose a new family.";
+        RebirthLife.synchronize(candidateTown);
         db.save(candidateState,events,List.of(),candidateTown,truth,observations,interactions);
         state=candidateState;
         town=candidateTown;

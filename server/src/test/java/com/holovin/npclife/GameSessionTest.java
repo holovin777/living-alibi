@@ -13,6 +13,151 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void linkedAdultFamilyIsVoluntaryAndConservesCash() throws Exception {
+        Path file=directory.resolve("linked-family.db");
+        String adultId,partnerId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var a=people.get(0);var b=people.get(1);
+            adultId=a.id;partnerId=b.id;
+            a.age=30;b.age=30;a.money=200;b.money=200;
+            a.place=TownLife.Place.PARK;b.place=a.place;a.travelRemaining=0;b.travelRemaining=0;
+            a.activity="FREE_TIME";b.activity="FREE_TIME";
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,a.generationIndex);
+            DemographyLife.set(town,a,"played-incarnation",town.player.incarnation);
+            var r=new SocialLife.Relationship(a.id,b.id);r.affinity=80;r.trust=80;r.tension=5;
+            town.peerRelationships.put(SocialNetwork.key(a.id,b.id),r);
+            state.day=31;state.minute=359;
+            // The automatic family cycle must not assign a partner to the player.
+            state.minute=360;
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(0,DemographyLife.get(town,a,"partner"));
+            state.minute=850;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().familyOptions().proposals().stream().anyMatch(p->p.id().equals(partnerId)));
+            var paired=game.gardenAction("rebirth-propose-"+partnerId).world();
+            assertEquals(partnerId,paired.rebirth().familyOptions().partner().id());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-propose-"+partnerId));
+            assertFalse(paired.rebirth().familyOptions().canHaveChild());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-have-child"));
+            var moved=game.gardenAction("rebirth-move-together").world();
+            assertTrue(moved.rebirth().familyOptions().livingTogether());
+            var supported=game.gardenAction("rebirth-support-partner").world();
+            assertEquals(190,supported.player().money());
+            assertEquals(210,supported.rebirth().familyOptions().partner().savings());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var a=town.get(adultId);var b=town.get(partnerId);
+            assertEquals(a.homeUnit,b.homeUnit);
+            state.day=301;state.minute=360;
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(0,DemographyLife.get(town,a,"children"));
+            state.minute=850;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().familyOptions().canHaveChild());
+            var born=game.gardenAction("rebirth-have-child").world();
+            assertEquals(180,born.player().money());
+            assertEquals(200,born.rebirth().familyOptions().partner().savings());
+            assertEquals(1,born.rebirth().familyOptions().children().size());
+            assertEquals(20,born.rebirth().familyOptions().children().getFirst().savings());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-have-child"));
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(1,game.snapshot().rebirth().familyOptions().children().size());
+            assertTrue(game.snapshot().rebirth().familyOptions().livingTogether());
+        }
+    }
+    @Test
+    void linkedAdultHomeUsesRealSuppliesAndPrivateSpace() throws Exception {
+        Path file=directory.resolve("linked-home.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var a=people.get(0);var b=people.get(1);
+            id=a.id;a.age=30;b.age=30;
+            a.place=TownLife.Place.PARK;a.destination=a.place;a.travelRemaining=0;
+            a.home=TownLife.Place.NORTH_RESIDENCES;a.activity="FREE_TIME";
+            a.hunger=70;a.thirst=70;a.fatigue=60;a.food=5;a.water=5;a.money=200;
+            b.home=a.home;b.homeUnit=a.homeUnit;b.place=b.home;b.destination=b.home;b.travelRemaining=0;b.activity="AT_HOME";
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,a.generationIndex);
+            DemographyLife.set(town,a,"played-incarnation",town.player.incarnation);
+            DemographyLife.set(town,a,"partner",b.generationIndex);DemographyLife.set(town,b,"partner",a.generationIndex);
+            state.day=2;state.minute=1200;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-home-meal"));
+            var home=game.gardenAction("rebirth-home-go").world();
+            assertTrue(home.rebirth().homeOptions().atHome());
+            assertTrue(home.rebirth().homeOptions().stayingHome());
+            assertEquals("NORTH_RESIDENCES",home.player().placeId());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var a=town.get(id);a.hunger=60;a.thirst=60;a.fatigue=60;a.food=5;a.water=5;
+            EducationLife.set(town,a,"dirt",40);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var before=game.snapshot();
+            var meal=game.gardenAction("rebirth-home-meal").world();
+            assertEquals(before.rebirth().homeOptions().food()-1,meal.rebirth().homeOptions().food());
+            assertEquals(before.minute()+15,meal.minute());
+            var drink=game.gardenAction("rebirth-home-drink").world();
+            assertEquals(meal.rebirth().homeOptions().water()-1,drink.rebirth().homeOptions().water());
+            var washed=game.gardenAction("rebirth-home-wash").world();
+            assertEquals(drink.rebirth().homeOptions().water()-1,washed.rebirth().homeOptions().water());
+            assertTrue(washed.rebirth().homeOptions().hygiene()>=98);
+            var upgraded=game.gardenAction("rebirth-home-upgrade").world();
+            assertEquals(washed.player().money()-80,upgraded.player().money());
+            assertEquals(1,upgraded.rebirth().homeOptions().furnitureLevel());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-home-upgrade"));
+            var rest=game.gardenAction("rebirth-home-rest").world();
+            assertEquals(upgraded.minute()+60,rest.minute());
+            assertTrue(rest.rebirth().homeOptions().stayingHome());
+            if(rest.rebirth().homeOptions().actions().contains("family")){
+                var family=game.gardenAction("rebirth-home-family").world();
+                assertFalse(family.rebirth().homeOptions().actions().contains("family"));
+            }
+            var routine=game.gardenAction("rebirth-routine").world();
+            assertFalse(routine.rebirth().homeOptions().stayingHome());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var a=town.get(id);
+            a.activity="AT_HOME";a.place=a.home;a.destination=a.home;a.travelRemaining=0;
+            state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-road-CLINIC"));
+            var outside=game.gardenAction("rebirth-home-exit").world();
+            assertFalse(outside.rebirth().homeOptions().atHome());
+            assertTrue(outside.rebirth().homeOptions().outsideHome());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-home-meal"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-road-QUARRY"));
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().homeOptions().outsideHome());
+            var road=game.gardenAction("rebirth-road-CLINIC").world();
+            assertEquals("CLINIC",road.player().placeId());
+            assertFalse(road.rebirth().homeOptions().outsideHome());
+            var back=game.gardenAction("rebirth-road-NORTH_RESIDENCES").world();
+            assertTrue(back.rebirth().homeOptions().outsideHome());
+            assertTrue(game.gardenAction("rebirth-home-go").world().rebirth().homeOptions().atHome());
+        }
+    }
+    @Test
     void orchardIsPerennialSeasonalAndConservesFruitOnSale() throws Exception {
         Path file=directory.resolve("orchard.db");
         try(var game=new GameSession(file)) {
@@ -161,6 +306,291 @@ class GameSessionTest {
             assertEquals(7,game.snapshot().garden().rainwater());
             assertEquals(1,game.snapshot().player().bag().get("vegetables"));
             assertEquals(41,game.snapshot().player().money());
+        }
+    }
+
+    @Test
+    void familyRebirthPersistsChoiceAndCreatesExactlyOneRealChild() throws Exception {
+        Path file=directory.resolve("family-rebirth.db");
+        String firstId,secondId;
+        int first,second;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var adults=PopulationGenerator.add(town,2);
+            var a=adults.get(0);var b=adults.get(1);
+            firstId=a.id;secondId=b.id;first=a.generationIndex;second=b.generationIndex;
+            a.age=30;b.age=31;a.money=150;b.money=150;
+            DemographyLife.set(town,a,"partner",second);
+            DemographyLife.set(town,b,"partner",first);
+            DemographyLife.set(town,a,"union-day",1);
+            DemographyLife.set(town,b,"union-day",1);
+            town.player.alive=false;town.player.health=0;
+            state.day=271;state.minute=600;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var view=game.snapshot();
+            assertEquals("CHOICE",view.rebirth().phase());
+            assertEquals(2,view.player().incarnation());
+            assertEquals(0,view.player().money());
+            assertEquals(1,view.rebirth().families().size());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-family-9999-9998"));
+            assertThrows(IllegalArgumentException.class,()->game.waitMinutes(1));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait-fast"));
+        }
+        try(var game=new GameSession(file)){
+            assertEquals("CHOICE",game.snapshot().rebirth().phase());
+            var born=game.gardenAction("rebirth-family-"+first+"-"+second).world();
+            assertEquals("CHILDHOOD",born.rebirth().phase());
+            assertEquals(0,born.rebirth().age());
+            assertEquals(20,born.rebirth().identity().savings());
+            assertEquals(2,born.rebirth().identity().relationships().stream().filter(RebirthLife.KnownPerson::family).count());
+            assertEquals(271,born.rebirth().identity().bornDay());
+            assertEquals(7,born.rebirth().maxWaitDays());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-focus-technical"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-child-travel-PARK"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-hobby-read"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-allowance"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-chat-"+firstId));
+            assertEquals(1,born.demography().births());
+            assertEquals(271,born.day());assertEquals(600,born.minute());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-family-"+first+"-"+second));
+            assertThrows(IllegalArgumentException.class,()->game.applyJob("shop-assistant"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var child=RebirthLife.child(town);
+            assertNotNull(child);assertTrue(child.alive);
+            assertEquals(20,child.money);
+            assertEquals(140,town.get(firstId).money);
+            assertEquals(140,town.get(secondId).money);
+            assertEquals(first,DemographyLife.get(town,child,"parent-a"));
+            assertEquals(second,DemographyLife.get(town,child,"parent-b"));
+            assertEquals(1,town.pastLives.size());
+        }
+        try(var game=new GameSession(file)){
+            assertEquals("CHILDHOOD",game.snapshot().rebirth().phase());
+            var next=game.gardenAction("rebirth-wait").world();
+            assertEquals(272,next.day());
+            assertEquals(1,next.demography().births());
+            assertEquals(2,next.player().incarnation());
+            assertEquals(7,next.rebirth().maxWaitDays());
+            var fast=game.gardenAction("rebirth-wait-fast").world();
+            assertEquals(279,fast.day());
+            assertEquals(600,fast.minute());
+        }
+        // School focus persists and does not award free skills.
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var child=RebirthLife.child(town);
+            assertNotNull(child);child.age=6;
+            child.place=child.home;child.destination=child.home;child.travelRemaining=0;child.activity="AT_HOME";
+            state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var before=game.snapshot();
+            assertEquals(3,before.rebirth().maxWaitDays());
+            var after=game.gardenAction("rebirth-focus-technical").world();
+            assertEquals("technical",after.rebirth().schoolFocus());
+            assertEquals(before.rebirth().skills(),after.rebirth().skills());
+            assertEquals(before.minute(),after.minute());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-focus-invalid"));
+            assertEquals(java.util.List.of("PARK","LIBRARY"),after.rebirth().childOptions().destinations());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-child-travel-CENTRO"));
+            var outing=game.gardenAction("rebirth-child-travel-PARK").world();
+            assertEquals("PARK",outing.player().placeId());
+            assertTrue(outing.rebirth().childOptions().outing());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var child=RebirthLife.child(town);
+            assertEquals("technical",RebirthLife.focus(town,child));
+            assertEquals(TownLife.Place.PARK,RebirthLife.childOuting(town,child,state.day,state.minute));
+            state.minute=1079;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().childOptions().outing());
+            var home=game.gardenAction("rebirth-child-hour").world();
+            assertFalse(home.rebirth().childOptions().outing());
+            assertTrue(home.rebirth().childOptions().destinations().isEmpty());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-child-travel-PARK"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var child=RebirthLife.child(town);
+            assertEquals(child.home,child.place);
+            child.age=13;
+            assertTrue(RebirthLife.childOptions(town,state.day,state.minute).destinations().contains("CENTRO"));
+            child.age=6;
+            child.place=TownLife.Place.SCHOOL;child.travelRemaining=0;child.activity="STUDYING";
+            state.day=281;state.minute=600;
+            town.employerFunds.put("school",10);
+            int skill=EducationLife.get(town,child,"technical");
+            int days=EducationLife.get(town,child,"school-days");
+            EducationLife.attendance(town,child,state);
+            assertTrue(EducationLife.get(town,child,"technical")>skill);
+            assertEquals(days+1,EducationLife.get(town,child,"school-days"));
+            assertEquals(9,town.employerFunds.get("school"));
+            EducationLife.attendance(town,child,state);
+            assertEquals(days+1,EducationLife.get(town,child,"school-days"));
+            child.place=child.home;child.activity="AT_HOME";
+            var parent=town.get(firstId);
+            parent.place=child.home;parent.home=child.home;parent.homeUnit=child.homeUnit;parent.travelRemaining=0;parent.activity="AT_HOME";
+            var previous=town.peerRelationships.get(SocialNetwork.key(child.id,parent.id));
+            int affinity=previous==null?50:previous.affinity;
+            RebirthLife.chat(town,state.day,firstId);
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.chat(town,state.day,firstId));
+            assertEquals(Math.min(100,affinity+2),town.peerRelationships.get(SocialNetwork.key(child.id,parent.id)).affinity);
+            state.minute=850;
+            child.destination=child.home;child.travelRemaining=0;child.hunger=20;child.thirst=20;child.fatigue=20;child.sickUntilDay=0;
+            parent.money=100;
+            int wallet=child.money;
+            assertEquals(3,RebirthLife.allowanceAmount(town,child,state.day,state.minute));
+            RebirthLife.allowance(town,state.day,state.minute);
+            assertEquals(wallet+3,child.money);
+            assertEquals(97,parent.money);
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.allowance(town,state.day,state.minute));
+            int technical=EducationLife.get(town,child,"technical");
+            int careful=child.carefulness;
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.chooseAmbition(town,"LEARN_SKILLS"));
+            RebirthLife.hobby(town,state.day,state.minute,"build");
+            assertEquals(Math.min(100,technical+1),EducationLife.get(town,child,"technical"));
+            assertEquals(1,EducationLife.get(town,child,"hobby-days"));
+            assertEquals(Math.min(100,careful+1),child.carefulness);
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.hobby(town,state.day,state.minute,"read"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        // Move the existing child to the evening before its eighteenth birthday.
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var child=RebirthLife.child(town);
+            assertNotNull(child);
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.chat(town,state.day,firstId));
+            assertEquals(3,EducationLife.get(town,child,"allowance-total"));
+            assertEquals(1,EducationLife.get(town,child,"hobby-days"));
+            child.age=17;
+            RebirthLife.chooseAmbition(town,"LEARN_SKILLS");
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.chooseAmbition(town,"unknown"));
+            state.day=DemographyLife.get(town,child,"born")+18*365-1;
+            state.minute=600;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(1,game.snapshot().rebirth().maxWaitDays());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait-fast"));
+            var previous=game.snapshot().rebirth().identity();
+            var adult=game.gardenAction("rebirth-wait").world();
+            assertEquals(18,adult.rebirth().age());
+            assertEquals(previous.residentId(),adult.rebirth().identity().residentId());
+            assertTrue(adult.rebirth().identity().graduated());
+            assertEquals(3,adult.rebirth().identity().allowanceTotal());
+            assertEquals(1,adult.rebirth().identity().hobbyDays());
+            var ambition=adult.rebirth().identity().personality().ambition();
+            assertEquals("LEARN_SKILLS",ambition.id());
+            assertEquals(60,ambition.target());
+            assertTrue(ambition.progress()>0);
+            assertEquals("technical",adult.rebirth().schoolFocus());
+            assertTrue(adult.rebirth().skills().get("technical")>0);
+            assertEquals(2,adult.rebirth().identity().relationships().stream().filter(RebirthLife.KnownPerson::family).count());
+            assertEquals(360,adult.minute());
+            assertEquals(0,adult.rebirth().maxWaitDays());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait"));
+        }
+        try(var game=new GameSession(file)){
+            var adult=game.snapshot().rebirth();
+            assertEquals(18,adult.age());assertTrue(adult.identity().graduated());
+            assertEquals("technical",adult.schoolFocus());
+            assertTrue(adult.skills().get("technical")>0);
+            String id=adult.identity().residentId();
+            int savings=adult.identity().savings();
+            var continued=game.gardenAction("rebirth-continue").world();
+            assertEquals("LINKED_ADULT",continued.rebirth().phase());
+            assertEquals(id,continued.rebirth().identity().residentId());
+            assertEquals(savings,continued.player().money());
+            var changed=game.gardenAction("rebirth-ambition-SAVE_MONEY").world();
+            assertEquals("SAVE_MONEY",changed.rebirth().identity().personality().ambition().id());
+            assertEquals(savings,changed.rebirth().identity().personality().ambition().progress());
+            assertTrue(continued.player().alive());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-continue"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-job-unknown"));
+            var hired=game.gardenAction("rebirth-job-Barista").world();
+            assertEquals("Barista",hired.rebirth().adultOptions().occupation());
+            assertEquals(savings,hired.player().money());
+            var moved=game.gardenAction("rebirth-travel-PARK").world();
+            assertEquals("PARK",moved.player().placeId());
+            assertEquals(id,moved.rebirth().identity().residentId());
+        }
+        try(var game=new GameSession(file)){
+            var adult=game.snapshot();
+            assertEquals("LINKED_ADULT",adult.rebirth().phase());
+            assertEquals("Barista",adult.rebirth().adultOptions().occupation());
+            assertEquals("SAVE_MONEY",adult.rebirth().identity().personality().ambition().id());
+            assertEquals("PARK",adult.rebirth().adultOptions().destination());
+            assertEquals(adult.rebirth().identity().savings(),adult.player().money());
+            var resumed=game.gardenAction("rebirth-routine").world();
+            assertNull(resumed.rebirth().adultOptions().destination());
+            var later=game.gardenAction("rebirth-wait-hour").world();
+            assertEquals(resumed.minute()+60,later.minute());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(0,town.player.money,"inactive shell never duplicates the citizen wallet");
+            assertFalse(town.player.alive);
+            // Exercise death while a linked adult is advancing the shared world.
+            var c=RebirthLife.child(town);
+            c.age=100;c.health=100;
+            state.day=DemographyLife.get(town,c,"born")+101*365;
+            state.minute=359;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        String deceased;
+        int deathCount;
+        try(var game=new GameSession(file)){
+            var before=game.snapshot();
+            deceased=before.rebirth().identity().residentId();
+            deathCount=before.demography().deaths();
+            var ended=game.gardenAction("rebirth-wait-adult-day").world();
+            assertEquals("CHOICE",ended.rebirth().phase());
+            assertEquals(before.day(),ended.day());assertEquals(360,ended.minute());
+            assertEquals(3,ended.player().incarnation());
+            assertEquals(0,ended.player().money());
+            assertEquals(deceased,ended.rebirth().pastLives().getFirst().residentId());
+            assertEquals(101,ended.rebirth().pastLives().getFirst().age());
+            assertEquals(2,ended.rebirth().pastLives().size());
+            // Other residents may also die at this birthday; the specific estate is checked below.
+            assertTrue(ended.demography().deaths()>deathCount);
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(3,game.snapshot().player().incarnation());
+            assertEquals(2,game.snapshot().rebirth().pastLives().size());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var dead=town.get(deceased);
+            assertFalse(dead.alive);assertEquals(0,dead.money);
+            assertEquals(1,DemographyLife.get(town,dead,"estate"));
+            int city=town.employerFunds.getOrDefault(MunicipalLife.CITY,0);
+            DemographyLife.estate(town,dead);
+            assertEquals(city,town.employerFunds.getOrDefault(MunicipalLife.CITY,0));
+            assertEquals(2,town.pastLives.size());
+        }
+    }
+
+    @Test
+    void noEligibleFamilyAllowsExplicitAdultFallback() throws Exception {
+        Path file=directory.resolve("rebirth-fallback.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            town.player.alive=false;town.player.health=0;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().families().isEmpty());
+            var fallback=game.gardenAction("rebirth-adult").world();
+            assertEquals("ADULT",fallback.rebirth().phase());
+            assertTrue(fallback.player().alive());
+            assertEquals(50,fallback.player().money());
+            assertEquals("PARK",fallback.player().placeId());
+            assertEquals(2,fallback.player().incarnation());
         }
     }
 

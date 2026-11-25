@@ -10,7 +10,7 @@ final class DemographyLife {
     static final String LAST="demography:last-day", BIRTHS="demography:births", DEATHS="demography:deaths",
             PENSIONS="demography:pensions", INHERITED="demography:inherited";
     static final int CHILD_DAILY_CASH=18, WEEKLY_PENSION=35;
-    static final List<String> FIELDS=List.of("parent-a","parent-b","partner","union-day","born","last-birth","children","estate");
+    static final List<String> FIELDS=List.of("parent-a","parent-b","partner","union-day","born","last-birth","children","estate","played-incarnation");
     static String key(TownLife.Citizen c,String field){return "demography:"+c.id+":"+field;}
     static int get(TownLife.Town t,String k){return t.industryStocks.getOrDefault(k,0);}
     static void set(TownLife.Town t,String k,int n){t.industryStocks.put(k,n);}
@@ -39,21 +39,28 @@ final class DemographyLife {
         collect(t,byIndex(t,get(t,c,"parent-a")),result);
         collect(t,byIndex(t,get(t,c,"parent-b")),result);
     }
-    static boolean pair(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
-        if(a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=0||get(t,b,"partner")!=0)return false;
+    static boolean canPair(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b){
+        if(a==null||b==null||a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=0||get(t,b,"partner")!=0)return false;
         var relation=t.peerRelationships.get(SocialNetwork.key(a.id,b.id));
         if(relation==null||relation.trust<60||relation.affinity<65||relation.tension>25)return false;
-        if(!java.util.Collections.disjoint(ancestors(t,a),ancestors(t,b)))return false;
+        return java.util.Collections.disjoint(ancestors(t,a),ancestors(t,b));
+    }
+    static boolean pair(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
+        if(!canPair(t,a,b))return false;
         set(t,a,"partner",b.generationIndex);set(t,b,"partner",a.generationIndex);
         set(t,a,"union-day",day);set(t,b,"union-day",day);
         return true;
     }
-    static TownLife.Citizen birth(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
-        if(a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=b.generationIndex||get(t,b,"partner")!=a.generationIndex||
+    static boolean canBirth(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
+        if(a==null||b==null||a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=b.generationIndex||get(t,b,"partner")!=a.generationIndex||
                 day-get(t,a,"union-day")<270||get(t,a,"children")>=2||get(t,b,"children")>=2||
                 (get(t,a,"last-birth")>0&&day-get(t,a,"last-birth")<1095)||
                 (get(t,b,"last-birth")>0&&day-get(t,b,"last-birth")<1095)||
-                a.money<100||b.money<100||living(t)>=PopulationGenerator.MAX_GENERATED)return null;
+                a.money<100||b.money<100||living(t)>=PopulationGenerator.MAX_GENERATED)return false;
+        return t.people.values().stream().mapToInt(c->c.generationIndex).max().orElse(0)<9999;
+    }
+    static TownLife.Citizen birth(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
+        if(!canBirth(t,a,b,day))return null;
         int next=t.people.values().stream().mapToInt(c->c.generationIndex).max().orElse(0)+1;
         if(next>9999)return null;
         String id="resident-%04d".formatted(next);
@@ -62,6 +69,10 @@ final class DemographyLife {
         var c=new TownLife.Citizen(id,names[Math.floorMod(next,names.length)]+" "+surname,"Child",a.home);
         c.age=0;c.money=20;c.food=2;c.water=2;c.employed=false;c.occupation="Child";c.activity="AT_HOME";
         c.generationIndex=next;c.personalSeed=a.personalSeed^Long.rotateLeft(b.personalSeed,17)^next;
+        c.sociability=15+Math.floorMod(c.personalSeed,76);
+        c.carefulness=15+Math.floorMod(Long.rotateLeft(c.personalSeed,21),76);
+        c.curiosity=15+Math.floorMod(Long.rotateLeft(c.personalSeed,43),76);
+        c.goal="FIND_BALANCE";
         c.home=a.home;c.homeUnit=a.homeUnit;c.workplace=TownLife.Place.SCHOOL;
         a.money-=10;b.money-=10;t.people.put(id,c);
         ensure(t);
@@ -153,9 +164,12 @@ final class DemographyLife {
         for(int i=0;i<residents.size();i++){
             var a=residents.get(i);
             if(!parentAge(a))continue;
-            for(int j=i+1;j<residents.size()&&get(t,a,"partner")==0;j++)pair(t,a,residents.get(j),day);
+            for(int j=i+1;j<residents.size()&&get(t,a,"partner")==0;j++){
+                var candidate=residents.get(j);
+                if(!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,candidate))pair(t,a,candidate,day);
+            }
             var b=byIndex(t,get(t,a,"partner"));
-            if(b!=null&&a.generationIndex<b.generationIndex){
+            if(b!=null&&a.generationIndex<b.generationIndex&&!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,b)){
                 var newborn=birth(t,a,b,day);
                 if(newborn!=null)TownLife.publish(t,clock,a.id,a.place,a.name+" welcomed a new family member.",events,observations);
             }
