@@ -3812,7 +3812,7 @@ class GameSessionTest {
             assertEquals(30,town.people.size());
             assertEquals(28,town.industryStocks.get(GameSession.POPULATION_SEED_TARGET));
             town.people.values().stream().filter(c->c.generationIndex==28).findFirst().orElseThrow().alive=false;
-            db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
         try(var game=new GameSession(file,28)){
             assertEquals(27,game.snapshot().demography().alive());
