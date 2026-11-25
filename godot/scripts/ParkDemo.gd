@@ -281,6 +281,8 @@ func _process(delta: float) -> void:
         _hint.text = "F: use your bed, kitchen or bathroom."
     elif _current_place == "NORTH_RESIDENCES" and _avatar.position.distance_to(ROOM_EXIT) < 2.3:
         _hint.text = "Your room is open." if _has_room_lease() else "Rent a room at reception (blue kiosk)."
+    elif _near_visitor_counter():
+        _hint.text=tr("E or F: order at the counter")
     elif _near_gate():
         _hint.text = tr("E: travel gate (game time). Esc: cursor.")
     elif _near_kiosk():
@@ -407,7 +409,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
             _toggle_transport()
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_E and not _map_panel.visible:
-            if _near_gate():
+            if _near_visitor_counter():
+                _toggle_actions()
+            elif _near_gate():
                 _toggle_travel()
             else:
                 _message.text=tr("Find the yellow TRAVEL gate. Follow the distance and direction in First steps.")
@@ -458,6 +462,9 @@ func _update_first_steps() -> void:
             guide=tr("Your job: %s. Travel gate %s (E).") % [str(TownLayout.LABELS.get(site,site)),_guide_direction(GATE_POSITION)]
         else:
             guide=tr("Explore freely: use the blue SERVICES kiosk for local actions.")
+    if _current_place in ["CAFE","BAKERY","PORTICI"]:
+        var counter: Vector3 = {"CAFE":CAFE_COUNTER,"BAKERY":BAKERY_COUNTER,"PORTICI":GROCERY_COUNTER}[_current_place]
+        guide=tr("Explore the shop: walk through the entrance to the counter %s, press E.") % _guide_direction(counter)
     _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T") % [_guide_direction(GATE_POSITION),_guide_direction(DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)])
 
 func _near_gate() -> bool:
@@ -4403,6 +4410,12 @@ func _render_actions() -> void:
                     instruction.text = "Your room is across the street. Walk to the bed."
                     _action_choices.add_child(instruction)
         "MARKET", "PORTICI", "FUEL_STATION", "CAFE", "BAKERY":
+            if _current_place in ["CAFE","BAKERY","PORTICI"]:
+                var hours := Label.new()
+                hours.text=tr("Opening hours: %s") % ("07:00–21:00" if _current_place=="CAFE" else "07:00–18:00" if _current_place=="BAKERY" else "08:00–20:00")
+                _action_choices.add_child(hours)
+                if _current_place=="CAFE":
+                    _action_choices.add_child(_button("Order coffee · 2 EUR",_visitor_coffee))
             if _current_place=="MARKET" and employed!="shop-assistant":
                 _action_choices.add_child(_button("Apply: market assistant",_apply_job.bind("shop-assistant")))
             for item in _last_snapshot.get("shop",[]):
@@ -4843,6 +4856,10 @@ func _rent_room() -> void:
 func _sleep_room(hours: int) -> void:
     if _near_room_bed() and _connected and not _api.is_busy():
         _api.sleep_in_room(hours)
+
+func _visitor_coffee() -> void:
+    if _near_visitor_counter() and _current_place=="CAFE" and _connected and not _api.is_busy():
+        _api.garden_action("visitor-coffee")
 
 func _buy_product(id: String) -> void:
     if (_near_kiosk() or _near_visitor_counter()) and not _api.is_busy() and _connected:
