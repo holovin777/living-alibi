@@ -922,6 +922,7 @@ func _generate_chunk(place_id: String) -> void:
                     Vector3(4.0, 2.35, 8.0))
         "SCHOOL":
             _build_college()
+            _build_dojo()
         "LIBRARY":
             _building("Public library", Color(0.59, 0.48, 0.33))
             for offset in [-10.0, -7.0, -4.0]:
@@ -2093,6 +2094,43 @@ func _build_college() -> void:
     light.omni_range=8
     light.light_energy=1.5
     campus.add_child(light)
+
+func _build_dojo() -> void:
+    var dojo := Node3D.new()
+    dojo.name="DojoShotokan"
+    _scenery.add_child(dojo)
+    var wall := Color("#e2dbca")
+    var wood := Color("#8d6b48")
+    for part in [[Vector3(13,0,7),Vector2(0.24,8)],
+            [Vector3(8.5,0,3),Vector2(9,0.24)],
+            [Vector3(8.5,0,11),Vector2(9,0.24)],
+            [Vector3(4,0,4.5),Vector2(0.24,3)],
+            [Vector3(4,0,9.5),Vector2(0.24,3)]]:
+        _room_wall(dojo,part[0],part[1],wall)
+    _box(dojo,Vector3(9,0.08,8),wood,Vector3(8.5,0.025,7))
+    _box(dojo,Vector3(9.4,0.24,8.4),Color("#555c58"),Vector3(8.5,3.12,7))
+    _box(dojo,Vector3(0.24,0.55,2),wood,Vector3(4,2.75,7))
+    _sign(dojo,"Dojo Shotokan",Vector3(3.8,3.3,7))
+    var mat := Node3D.new()
+    mat.name="Tatami"
+    dojo.add_child(mat)
+    for x in range(5):
+        for z in range(4):
+            var edge := x==0 or x==4 or z==0 or z==3
+            _box(mat,Vector3(1.1,0.035,1.1),Color("#b16d61") if edge else Color("#78948a"),Vector3(6.7+x*1.1,0.095,4.65+z*1.1))
+    _room_furniture(dojo,Vector3(11.9,0,9.6),Vector3(1.5,0.45,0.45),wood)
+    for z in [4.1,4.8,5.5]:
+        _room_furniture(dojo,Vector3(12.5,0,z),Vector3(0.65,1.8,0.58),Color("#8a9696"))
+    _sign(dojo,"Rei · Kihon · Kata · Kumite",Vector3(12.7,2.25,7))
+    _sign(dojo,"Training · F",Vector3(6,1.8,7))
+    var light := OmniLight3D.new()
+    light.position=Vector3(8.5,2.65,7)
+    light.omni_range=9
+    light.light_energy=1.6
+    dojo.add_child(light)
+
+func _near_dojo() -> bool:
+    return not _apartment_active and _current_place=="SCHOOL" and Rect2(5.9,4.0,5.9,5.2).has_point(Vector2(_avatar.position.x,_avatar.position.z))
 
 func _build_medical_building(pharmacy: bool) -> void:
     var building := Node3D.new()
@@ -3789,6 +3827,18 @@ func _render_actions() -> void:
                 var study_info := Label.new()
                 study_info.text="Education · %s · %s/%s lessons" % [college.get("enrolled",""),college.get("completed",0),college.get("required",0)]
                 _action_choices.add_child(study_info)
+            var dojo = rebirth.get("dojo")
+            if dojo is Dictionary:
+                var dojo_label := Label.new()
+                dojo_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                dojo_label.text=tr("Shotokan · belt %s · Mon/Wed/Fri 18:00–21:00") % tr(str(dojo.get("belt","White")))
+                dojo_label.text+="\n"+(tr("Kihon %s · Kata %s · Kumite %s · next target %s each") % [dojo.get("kihon",0),dojo.get("kata",0),dojo.get("kumite",0),dojo.get("required",3)])
+                _action_choices.add_child(dojo_label)
+                if _near_dojo() and dojo.get("canTrain",false):
+                    for mode in ["kihon","kata","kumite"]:
+                        _action_choices.add_child(_button(tr("Practice %s · 60 min · 5 EUR") % tr(mode.capitalize()),_garden_action.bind("rebirth-dojo-"+mode)))
+                if _near_dojo() and dojo.get("canExam",false):
+                    _action_choices.add_child(_button(tr("Belt exam · %s · 15 EUR") % tr(str(dojo.get("nextBelt",""))),_garden_action.bind("rebirth-dojo-exam")))
             var sports = rebirth.get("sports")
             if sports is Dictionary:
                 var sport_label := Label.new()
@@ -4507,6 +4557,7 @@ func _room_wash() -> void:
 
 func _garden_action(action: String) -> void:
     if not _office_action_allowed(action):return
+    if action.begins_with("rebirth-dojo-") and not _near_dojo():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit":
