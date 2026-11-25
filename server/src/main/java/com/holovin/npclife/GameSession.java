@@ -340,6 +340,10 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if("visitor-coffee".equals(action)){
+            var copy=town.copy();
+            return apply(copy,5,RetailLife.coffee(copy,state.minute));
+        }
         if(action!=null&&action.startsWith("rebirth-")){
             var copy=town.copy();
             if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){

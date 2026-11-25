@@ -343,7 +343,14 @@ const IT := {
     "Your job: %s. Travel gate %s (E).": "Il tuo lavoro: %s. Portale VIAGGIA %s (E).",
     "Explore freely: use the blue SERVICES kiosk for local actions.": "Esplora liberamente: usa il chiosco blu SERVIZI per le azioni locali.",
     "Travel E: %s · Services F: %s · Map M · Talk T": "Viaggia E: %s · Servizi F: %s · Mappa M · Parla T",
-    "Walk forward to %s": "Prosegui verso %s"
+    "Walk forward to %s": "Prosegui verso %s",
+    "Entrance · walk inside": "Ingresso · entra a piedi",
+    "E or F: order at the counter": "E o F: ordina al banco",
+    "Opening hours: %s": "Orario: %s",
+    "Order coffee · 2 EUR": "Ordina caffè · 2 EUR",
+    "Explore the shop: walk through the entrance to the counter %s, press E.": "Entra nel negozio, raggiungi il banco %s e premi E.",
+    "Enjoyed a coffee at Bar Centrale.": "Hai preso un caffè al Bar Centrale.",
+    "Visiting": "In visita"
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:

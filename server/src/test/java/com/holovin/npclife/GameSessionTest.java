@@ -3796,6 +3796,29 @@ class GameSessionTest {
     }
 
     @Test
+    void visitorCafeAndBakeryUseRealStockAndHours() throws Exception {
+        Path file=directory.resolve("visitor-cafe.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var p=town.player;
+            p.place=TownLife.Place.CAFE;p.money=50;p.fatigue=30;p.thirst=30;
+            int water=town.retailStock.get("water");
+            int funds=town.employerFunds.getOrDefault("shop-assistant",0);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.coffee(town,400));
+            RetailLife.coffee(town,600);
+            assertEquals(48,p.money);assertEquals(25,p.fatigue);
+            assertEquals(water-1,town.retailStock.get("water"));
+            assertEquals(funds+2,town.employerFunds.get("shop-assistant"));
+            p.place=TownLife.Place.BAKERY;
+            assertThrows(IllegalArgumentException.class,()->RetailLife.coffee(town,600));
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"milk",600));
+            RetailLife.buy(town,"bread",600);
+            assertEquals(45,p.money);assertEquals(1,p.bread);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"bread",1090));
+        }
+    }
+
+    @Test
     void newWorldActionsAndRestart() throws Exception {
         Path file=directory.resolve("fresh-world.db");
         try(var game=new GameSession(file)) {
