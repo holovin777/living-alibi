@@ -2743,6 +2743,32 @@ func _render_actions() -> void:
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
             if _current_place == "MARKET":
+                var stall: Dictionary = _last_snapshot.get("stall",{})
+                if not bool(stall.get("registered",false)):
+                    _action_choices.add_child(_button("Register private stall · 20 EUR",_garden_action.bind("stall-register")))
+                else:
+                    var stall_info := Label.new()
+                    stall_info.text = "Bottega · Stock %s/12 | Sold %s | Revenue %s EUR" % [stall.get("stocked",0),stall.get("sales",0),stall.get("revenue",0)]
+                    _action_choices.add_child(stall_info)
+                    if bool(stall.get("open",false)):
+                        _action_choices.add_child(_button("Close stall",_garden_action.bind("stall-close")))
+                    else:
+                        _action_choices.add_child(_button("Open stall",_garden_action.bind("stall-open")))
+                    for item in stall.get("items",[]):
+                        var item_id := str(item.get("id",""))
+                        var shelf := int(item.get("stock",0))
+                        if shelf==0 and int(player.get("bag",{}).get(item_id,0))==0:
+                            continue
+                        var price := int(item.get("price",3))
+                        var shelf_label := Label.new()
+                        shelf_label.text = "%s · %s in stock · %s EUR" % [item_id,shelf,price]
+                        _action_choices.add_child(shelf_label)
+                        var shelf_row := HBoxContainer.new()
+                        _action_choices.add_child(shelf_row)
+                        shelf_row.add_child(_button("Stock",_garden_action.bind("stall-stock-"+item_id)))
+                        shelf_row.add_child(_button("Take",_garden_action.bind("stall-take-"+item_id)))
+                        shelf_row.add_child(_button("-1 EUR",_garden_action.bind("stall-price-down-"+item_id)))
+                        shelf_row.add_child(_button("+1 EUR",_garden_action.bind("stall-price-up-"+item_id)))
                 var trade: Dictionary = _last_snapshot.get("garden",{})
                 if int(player.get("bag",{}).get("vegetables",0))>0:
                     var sale := _button("Sell vegetables · 2 EUR / unit",_garden_action.bind("sell-vegetables"))
@@ -2956,7 +2982,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (_near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if (_near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:
