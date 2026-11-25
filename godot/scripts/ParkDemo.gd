@@ -2635,15 +2635,30 @@ func _render_actions() -> void:
             info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nF: choices / local first-person exploration from age 3. District travel follows the daily schedule." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
             _action_choices.add_child(info)
             var age := int(rebirth.get("age",0))
-            if age >= 6 and age < 18:
+            var identity = rebirth.get("identity")
+            if identity is Dictionary:
+                var personal := Label.new()
+                personal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                personal.text = "Personal savings: %s EUR · Born on day %s" % [identity.get("savings",0),identity.get("bornDay",0)]
+                if age >= 18:
+                    _action_title.text = "Coming of age · personal history"
+                    personal.text += "\nGraduation recorded. Adult controls are not available yet."
+                _action_choices.add_child(personal)
+                for person in identity.get("relationships",[]):
+                    var relation := Label.new()
+                    relation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                    relation.text = "%s%s%s · Trust %s · Affinity %s" % [person.get("name","")," (family)" if person.get("family",false) else ""," (deceased)" if not person.get("alive",true) else "",person.get("trust",0),person.get("affinity",0)]
+                    _action_choices.add_child(relation)
+            if age >= 6:
                 var skills: Dictionary = rebirth.get("skills",{})
                 var school := Label.new()
                 school.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 var focus = rebirth.get("schoolFocus")
                 school.text = "School days: %s · Focus: %s\nTechnical %s | Social %s | Academic %s | Commerce %s" % [rebirth.get("schoolDays",0),"balanced" if focus == null else str(focus),skills.get("technical",0),skills.get("social",0),skills.get("academic",0),skills.get("commerce",0)]
                 _action_choices.add_child(school)
-                for subject in ["balanced","technical","social","academic","commerce"]:
-                    _action_choices.add_child(_button("Focus: "+subject.capitalize(),_garden_action.bind("rebirth-focus-"+subject)))
+                if age < 18:
+                    for subject in ["balanced","technical","social","academic","commerce"]:
+                        _action_choices.add_child(_button("Focus: "+subject.capitalize(),_garden_action.bind("rebirth-focus-"+subject)))
             for partner in rebirth.get("conversations",[]):
                 _action_choices.add_child(_button("Talk with "+str(partner.get("name","")),_garden_action.bind("rebirth-chat-"+str(partner.get("id","")))))
         var max_days := int(rebirth.get("maxWaitDays",0))

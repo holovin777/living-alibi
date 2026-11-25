@@ -11,6 +11,7 @@ final class RebirthLife {
     static final int ADULT=0, CHOICE=1, CHILDHOOD=2;
     static void ensure(TownLife.Town t){
         t.industryStocks.putIfAbsent(PHASE,ADULT);t.industryStocks.putIfAbsent(CHILD,0);
+        t.industryStocks.putIfAbsent(FOCUS,0);t.industryStocks.putIfAbsent(LAST_CHAT,0);
     }
     static int phase(TownLife.Town t){return t.industryStocks.getOrDefault(PHASE,ADULT);}
     static boolean active(TownLife.Town t){return phase(t)!=ADULT;}
@@ -58,10 +59,13 @@ final class RebirthLife {
     }
     private static final String FOCUS="rebirth:focus", LAST_CHAT="rebirth:last-chat";
     static boolean linkedChild(TownLife.Town t,TownLife.Citizen c){
-        return phase(t)==CHILDHOOD&&c==child(t)&&c.alive&&c.age<18;
+        return c!=null&&phase(t)==CHILDHOOD&&c==child(t)&&c.alive&&c.age<18;
     }
     static String focus(TownLife.Town t,TownLife.Citizen c){
         if(!linkedChild(t,c)||c.age<6)return null;
+        return storedFocus(t);
+    }
+    private static String storedFocus(TownLife.Town t){
         int n=t.industryStocks.getOrDefault(FOCUS,0);
         return n>=1&&n<=EducationLife.SUBJECTS.size()?EducationLife.SUBJECTS.get(n-1):null;
     }
@@ -121,7 +125,26 @@ final class RebirthLife {
         t.industryStocks.put(PHASE,ADULT);t.industryStocks.put(CHILD,0);
         return "Started an adult life in the park.";
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations){}
+    record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations){}
+    record Identity(String residentId,int generationIndex,int bornDay,int savings,boolean graduated,List<KnownPerson> relationships){}
+    static Identity identity(TownLife.Town t,TownLife.Citizen c){
+        if(c==null)return null;
+        int a=DemographyLife.get(t,c,"parent-a"),b=DemographyLife.get(t,c,"parent-b");
+        var known=new ArrayList<KnownPerson>();
+        for(var p:t.people.values()){
+            if(p==c)continue;
+            boolean family=p.generationIndex>0&&(p.generationIndex==a||p.generationIndex==b);
+            var relation=t.peerRelationships.get(SocialNetwork.key(c.id,p.id));
+            if(!family&&(relation==null||relation.conversations==0))continue;
+            known.add(new KnownPerson(p.id,p.name,family,p.alive,relation==null?0:relation.affinity,
+                    relation==null?0:relation.trust,relation==null?0:relation.conversations));
+        }
+        known.sort(java.util.Comparator.comparing(KnownPerson::family).reversed()
+                .thenComparing(KnownPerson::name).thenComparing(KnownPerson::id));
+        return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
+                EducationLife.get(t,c,"graduate")>0,List.copyOf(known));
+    }
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity){}
     static Report report(TownLife.Town t,int day){
         int phase=phase(t);var c=child(t);
         var a=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-a"));
@@ -130,6 +153,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null?null:focus(t,c),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations);
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c));
     }
 }
