@@ -800,6 +800,7 @@ func _generate_chunk(place_id: String) -> void:
         "NORTH_RESIDENCES":
             _build_guesthouse()
             _build_construction_site()
+            _build_lombardy_neighborhood()
         "SOUTH_RESIDENCES":
             _build_guesthouse(true)
             _build_home_garden()
@@ -1534,6 +1535,72 @@ func _sync_construction_site() -> void:
     site.get_node("Foundation").visible = stage>=1
     site.get_node("Walls").visible = stage>=2
     site.get_node("Roof").visible = stage>=3
+
+# Fictional Lombard residential block, with a real street-facing home entrance.
+# Keep the established guesthouse, rental room, construction site and road lanes intact.
+func _build_lombardy_neighborhood() -> void:
+    var street := Node3D.new()
+    street.name="ViaDelleMagnolie"
+    _scenery.add_child(street)
+    var paving := Color("#b8b2a5")
+    _box(street,Vector3(34,0.045,3.2),Color("#777b78"),Vector3(0,0.025,-0.1))
+    for z in [-2.35,2.15]:
+        _box(street,Vector3(32,0.10,1.5),paving,Vector3(0,0.04,z))
+        for x in range(-15,16):
+            _box(street,Vector3(0.035,0.018,1.45),Color("#918e85"),Vector3(x,0.1,z))
+    _lombardy_facade(street,"CasaMagnolia",Vector3(11,0,-6.8),Color("#d3b895"),3)
+    _lombardy_facade(street,"CasaTiglio",Vector3(-10,0,-7.5),Color("#c88f7b"),2)
+    _sign(street,"Via delle Magnolie",Vector3(-3,2.5,-2.4))
+    for x in [-15.0,15.0]:
+        _lamp(street,Vector3(x,0,-2.3))
+    _box(street,Vector3(4.0,0.055,5.3),paving,Vector3(-4.6,0.025,-8.0))
+    _tree(Vector3(-4.5,0,-9.5))
+    _bench(street,Vector3(-4.5,0,-6.2))
+    _sign(street,"Piazzetta del Tiglio",Vector3(-4.5,2.2,-10.5))
+
+func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: int) -> void:
+    var building := Node3D.new()
+    building.name=id
+    parent.add_child(building)
+    var width := 7.4
+    var depth := 5.6
+    var height := 3.1*float(floors)
+    var face := at.z+depth/2.0
+    var stone := Color("#d7cbb7")
+    var shutter := Color("#4c6255")
+    var dark := Color("#394c52")
+    _add_obstacle(at,Vector2(width,depth))
+    _box(building,Vector3(width,height,depth),wall,at+Vector3(0,height/2,0))
+    _box(building,Vector3(width+0.4,0.35,depth+0.4),Color("#8e503a"),at+Vector3(0,height+0.12,0))
+    _box(building,Vector3(width+0.16,0.45,0.12),stone,Vector3(at.x,0.23,face+0.07))
+    for level in range(floors):
+        var y := 1.6+float(level)*3.1
+        if level>0:
+            _box(building,Vector3(width+0.18,0.12,0.16),stone,Vector3(at.x,y-1.35,face+0.08))
+        for offset in [-2.35,0.0,2.35]:
+            var x: float = at.x+offset
+            if level==0 and offset==0.0:
+                _box(building,Vector3(1.8,2.55,0.14),stone,Vector3(x,1.27,face+0.09))
+                _box(building,Vector3(1.38,2.2,0.16),Color("#72513a"),Vector3(x,1.10,face+0.18))
+                _box(building,Vector3(0.08,0.12,0.1),Color("#c5a45e"),Vector3(x+0.43,1.03,face+0.28))
+                continue
+            _box(building,Vector3(1.17,1.5,0.12),stone,Vector3(x,y,face+0.06))
+            _box(building,Vector3(0.85,1.24,0.14),dark,Vector3(x,y,face+0.14))
+            _box(building,Vector3(0.055,1.23,0.16),stone,Vector3(x,y,face+0.21))
+            for sx in [-0.71,0.71]:
+                _box(building,Vector3(0.32,1.35,0.15),shutter,Vector3(x+sx,y,face+0.13))
+            _box(building,Vector3(1.6,0.12,0.35),stone,Vector3(x,y-0.75,face+0.17))
+            if level>0 and offset==0.0:
+                _box(building,Vector3(1.9,0.14,0.75),stone,Vector3(x,y-0.87,face+0.42))
+                for bar in range(7):
+                    _box(building,Vector3(0.045,0.65,0.045),Color("#444442"),Vector3(x-0.84+float(bar)*0.28,y-0.48,face+0.77))
+                _box(building,Vector3(1.85,0.055,0.055),Color("#444442"),Vector3(x,y-0.14,face+0.77))
+    _sign(building,"Casa Magnolia" if id=="CasaMagnolia" else "Casa Tiglio",Vector3(at.x,2.8,face+0.35))
+    if id=="CasaMagnolia":
+        var entrance := Marker3D.new()
+        entrance.name="HomeApproach"
+        entrance.position=Vector3(at.x,0,face+1.2)
+        building.add_child(entrance)
 
 func _build_guesthouse(owned: bool = false) -> void:
     var house := Node3D.new()
@@ -3489,9 +3556,14 @@ func _sync_family_entrance(home) -> void:
     _home_entrance=Node3D.new()
     _home_entrance.name="FamilyHomeEntrance"
     add_child(_home_entrance)
-    _home_entrance.position=_open_anchor(Vector3(0,0,6))
-    _box(_home_entrance,Vector3(1.25,2.25,0.16),Color("#987653"),Vector3(0,1.125,-0.65))
-    _sign(_home_entrance,"Your home",Vector3(0,2.45,-0.65))
+    var approach := _scenery.get_node_or_null("ViaDelleMagnolie/CasaMagnolia/HomeApproach") as Marker3D
+    if approach != null:
+        _home_entrance.position=approach.global_position
+        _sign(_home_entrance,"Your home · E",Vector3(0,2.3,-0.6))
+    else:
+        _home_entrance.position=_open_anchor(Vector3(0,0,6))
+        _box(_home_entrance,Vector3(1.25,2.25,0.16),Color("#987653"),Vector3(0,1.125,-0.65))
+        _sign(_home_entrance,"Your home",Vector3(0,2.45,-0.65))
 
 func _apartment_action() -> String:
     if not _apartment_active:

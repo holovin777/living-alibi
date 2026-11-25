@@ -148,6 +148,12 @@ func _exercise() -> void:
 
     var guest := _world("NORTH_RESIDENCES","North residences")
     world._on_world_updated(guest)
+    if not _check(world._scenery.has_node("ViaDelleMagnolie/CasaMagnolia/HomeApproach")
+            and world._scenery.has_node("ViaDelleMagnolie/CasaTiglio")
+            and world._can_stand(Vector3(11,0,-2.8),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(11,0,-6.8),world.WALKER_RADIUS),
+            "Lombard neighborhood has walkable sidewalk, distinct buildings and solid facades"):
+        return
     if not _check(world._scenery.has_node("CasaOspiti/LeaseDoor")
             and not world._can_stand(Vector3(-5,0,8.5),world.WALKER_RADIUS),
             "unrented guest room is locked"):
@@ -921,7 +927,8 @@ func _exercise() -> void:
     outside["residents"]=[]
     world._home_transition=true
     world._on_world_updated(outside)
-    if not _check(not world._apartment_active and world._near_family_entrance() and world._can_walk_roads() and not world._action_panel.visible,
+    if not _check(not world._apartment_active and world._near_family_entrance() and world._can_walk_roads() and not world._action_panel.visible
+            and world._home_entrance.position.is_equal_approx(Vector3(11,0,-2.8)),
             "confirmed exit opens public street and continuous walking without menu"):
         return
     world._road_pending="CLINIC"
