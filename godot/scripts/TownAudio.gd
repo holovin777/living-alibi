@@ -156,6 +156,12 @@ func footstep(moved: float, surface: String, running: bool, grounded: bool, on_f
     steps.volume_db = -15.0 if running else -19.0
     steps.play()
 
+func play_alarm() -> void:
+    if not enabled:return
+    effects.stream = _streams["bell"]
+    effects.pitch_scale = 1.45
+    effects.play()
+
 func play_effect(kind: String) -> void:
     if not enabled or not kind in ["landing","door"]:
         return
