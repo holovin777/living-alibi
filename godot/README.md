@@ -55,6 +55,9 @@ clickable action menu opens. WASD movement remains camera-relative.
 - **WASD / arrow keys:** walk relative to the camera inside the visible
   *local public district* (this is a visual preview, not per-meter
   networked gameplay).
+- **Hold Shift:** run on foot (6.5 units/s instead of 4.5).
+- **Hold Ctrl:** crouch and move more slowly (2.2 units/s); the first-person view lowers smoothly. Crouching takes priority over running, and jumping requires standing. The planar collision radius is unchanged: crouching does not open new passages. Children retain their existing movement-speed scaling.
+- **Camera motion:** optional subtle head bob driven by actual distance walked, disabled while jumping or riding. Turn it off in the HUD if preferred.
 - **Space:** jump while walking with the mouse captured. The eye-level camera follows a gravity-based arc; holding Space cannot repeatedly jump, and bicycles, cars, menus and district transitions prevent new jumps. Horizontal obstacle footprints remain solid even in midair. This is a first local jump, not yet height-aware obstacle traversal.
 - **Walk to the yellow gate, press E:** select a public district. The
   list and travel minutes come from `GET /api/v1/locations`. Confirming

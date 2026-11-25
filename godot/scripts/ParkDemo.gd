@@ -10,6 +10,8 @@ const DEPOT_DESK := Vector3(-9.0,0.0,10.0)
 const DEPOT_BAYS := [Vector3(6.5,0,12.0),Vector3(12.5,0,12.0)]
 const INTERACTION_RADIUS := 3.5
 const WALK_SPEED := 4.5
+const RUN_SPEED := 6.5
+const CROUCH_SPEED := 2.2
 const CYCLE_SPEED := 8.0
 const RACK_POSITION := Vector3(6.0,0,-10.0)
 const CAR_PARK := Vector3(11.0,0,-10.0)
@@ -92,6 +94,10 @@ var _view_pitch := 0.0
 # Vertical presentation is separate from the existing planar collision anchor.
 var _jump_elapsed := -1.0
 var _jump_height := 0.0
+var _crouch_amount := 0.0
+var _step_phase := 0.0
+var _step_bob := 0.0
+var _head_bob_enabled := true
 
 var _avatar: Node3D
 var _camera: Camera3D
@@ -193,6 +199,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     if _drive_active():
         _reset_jump()
+        _reset_locomotion()
         if not _drive_parked:
             _process_driving(delta)
         else:
@@ -202,6 +209,7 @@ func _process(delta: float) -> void:
         _weather_fx.follow(_avatar.position)
         return
     var direction := Vector3.ZERO
+    var moved := 0.0
     # Do not move away from an open clickable interaction menu.
     if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
@@ -216,14 +224,17 @@ func _process(delta: float) -> void:
         # The Java world controls district transitions; this is local preview walking.
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
         var before := _avatar.position
+        var speed := _movement_speed()
         _avatar.position = _move_on_ground(_avatar.position,
-                relative_motion * delta * _movement_speed(), WALKER_RADIUS, _can_walk_roads())
-        if _movement_speed() == CYCLE_SPEED:
-            _bike_wheel_angle += before.distance_to(_avatar.position)/0.35
-        _follow_player()
+                relative_motion * delta * speed, WALKER_RADIUS, _can_walk_roads())
+        moved = before.distance_to(_avatar.position)
+        if speed == CYCLE_SPEED:
+            _bike_wheel_angle += moved/0.35
         if _can_walk_roads() and _jump_elapsed < 0.0:
             _try_road_crossing(relative_motion)
     _advance_jump(delta)
+    _advance_locomotion(delta,moved)
+    _follow_player()
 
     if _apartment_active:
         _update_first_steps()
@@ -293,7 +304,7 @@ func _process(delta: float) -> void:
     elif not _nearest_resident().is_empty():
         _hint.text = "T: talk to nearby resident · Esc: cursor."
     else:
-        _hint.text = tr("WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.")
+        _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -468,7 +479,7 @@ func _update_first_steps() -> void:
             guide=tr("Your job: %s. Travel gate %s (E).") % [str(TownLayout.LABELS.get(site,site)),_guide_direction(GATE_POSITION)]
         else:
             guide=tr("Explore freely: use the blue SERVICES kiosk for local actions.")
-    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T · Space: jump") % [_guide_direction(GATE_POSITION),_guide_direction(DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)])
+    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch") % [_guide_direction(GATE_POSITION),_guide_direction(DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)])
 
 func _near_gate() -> bool:
     return _avatar.position.distance_to(GATE_POSITION) < INTERACTION_RADIUS
@@ -518,6 +529,7 @@ func _sync_guest_room() -> void:
             door.visible = not (_owns_house() if district=="SOUTH_RESIDENCES" else bool(_last_snapshot.get("player",{}).get("roomActive",false)))
     if _inside_guest_room() and not _has_room_lease():
         _reset_jump()
+        _reset_locomotion()
         _avatar.position = ROOM_EXIT
         _action_panel.visible = false
         _follow_player()
@@ -532,9 +544,16 @@ func _movement_speed() -> float:
     # and grocery interior. No vehicle parking state is simulated yet.
     var at := _avatar.position
     var in_shop := _current_place == "PORTICI" and Rect2(4.4,2.15,6.1,5.7).has_point(Vector2(at.x,at.z))
-    if _rebirth_active() and str(_last_snapshot.get("rebirth",{}).get("phase","")) != "LINKED_ADULT":
-        return WALK_SPEED * 0.65
-    return CYCLE_SPEED if _cycling() and not _inside_guest_room() and not in_shop else WALK_SPEED
+    var child := _rebirth_active() and str(_last_snapshot.get("rebirth",{}).get("phase","")) != "LINKED_ADULT"
+    if not child and _cycling() and not _inside_guest_room() and not in_shop and not _apartment_active:
+        return CYCLE_SPEED
+    var speed := WALK_SPEED
+    if _foot_controls_available():
+        if _crouch_requested():
+            speed = CROUCH_SPEED
+        elif Input.is_key_pressed(KEY_SHIFT):
+            speed = RUN_SPEED
+    return speed * (0.65 if child else 1.0)
 
 func _truck_place() -> String:
     var value = _last_snapshot.get("freight",{}).get("truckPlace")
@@ -630,6 +649,7 @@ func _begin_driving(destination: String,freight: bool = false) -> bool:
     _view_pitch = 0.0
     _view_yaw = atan2(-_drive_direction.x,-_drive_direction.z)
     _reset_jump()
+    _reset_locomotion()
     _avatar.position = start
     _action_panel.visible = false
     _travel_panel.visible = false
@@ -797,12 +817,40 @@ func _buy_bicycle() -> void:
     if _current_place == "WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():
         _api.buy_bicycle()
 
-func _can_jump() -> bool:
-    return _jump_elapsed < 0.0 and not _drive_active() and not _cycling() \
+func _foot_controls_available() -> bool:
+    return not _drive_active() and not _cycling() \
         and (not _rebirth_active() or _child_can_walk()) \
         and _road_pending.is_empty() and not _home_transition \
         and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
         and not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible)
+
+func _crouch_requested() -> bool:
+    return Input.is_key_pressed(KEY_CTRL) and _jump_elapsed < 0.0
+
+func _can_jump() -> bool:
+    return _jump_elapsed < 0.0 and not _crouch_requested() and _crouch_amount < 0.1 and _foot_controls_available()
+
+func _reset_locomotion() -> void:
+    _crouch_amount = 0.0
+    _step_phase = 0.0
+    _step_bob = 0.0
+
+func _advance_locomotion(delta: float, moved: float) -> void:
+    var on_foot := _foot_controls_available()
+    var blend := 1.0 - exp(-12.0 * maxf(delta,0.0))
+    _crouch_amount = lerpf(_crouch_amount,1.0 if on_foot and _crouch_requested() else 0.0,blend)
+    var target_bob := 0.0
+    if on_foot and _head_bob_enabled and _jump_elapsed < 0.0 and moved > 0.0001:
+        _step_phase = fposmod(_step_phase + moved * TAU / 1.7,TAU)
+        var amplitude := 0.025 if _crouch_requested() else (0.045 if Input.is_key_pressed(KEY_SHIFT) else 0.03)
+        target_bob = sin(_step_phase) * amplitude
+    _step_bob = lerpf(_step_bob,target_bob,blend)
+
+func _set_head_bob(enabled: bool) -> void:
+    _head_bob_enabled = enabled
+    if not enabled:
+        _step_bob = 0.0
+        _follow_player()
 
 func _reset_jump() -> void:
     _jump_elapsed = -1.0
@@ -835,7 +883,7 @@ func _follow_player() -> void:
         var eye := EYE_HEIGHT
         if str(_last_snapshot.get("rebirth",{}).get("phase","ADULT")) == "CHILDHOOD":
             eye = lerpf(0.65,EYE_HEIGHT,clampf(float(_last_snapshot.get("rebirth",{}).get("age",0))/18.0,0.0,1.0))
-        _camera.position = _avatar.position + Vector3(0.0,eye + _jump_height,0.0)
+        _camera.position = _avatar.position + Vector3(0.0,eye * (1.0 - 0.35 * _crouch_amount) + _jump_height + _step_bob,0.0)
         _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
 func _build_world() -> void:
@@ -3133,9 +3181,14 @@ func _create_interface() -> void:
     audio_toggle.button_pressed = true
     audio_toggle.toggled.connect(_set_weather_audio)
     atmosphere_row.add_child(audio_toggle)
+    var head_bob_toggle := CheckButton.new()
+    head_bob_toggle.text = tr("Camera motion")
+    head_bob_toggle.button_pressed = _head_bob_enabled
+    head_bob_toggle.toggled.connect(_set_head_bob)
+    column.add_child(head_bob_toggle)
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-    _hint.text = tr("WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.")
+    _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
     column.add_child(_hint)
     _jobs = Label.new()
     _jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -4931,6 +4984,7 @@ func _set_apartment(active: bool) -> void:
     if active == _apartment_active:
         return
     _reset_jump()
+    _reset_locomotion()
     _apartment_active=active
     if active:
         if not is_instance_valid(_apartment):
@@ -5017,6 +5071,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_pending = ""
     if new_place != _current_place:
         _reset_jump()
+        _reset_locomotion()
         _office_app="work"
         _office_joke_hold=0.0
         _office_joke_wait=8.0
@@ -5052,6 +5107,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _sync_family_entrance(home)
     if walking_transition and is_instance_valid(_home_entrance) and not road_arrival:
         _reset_jump()
+        _reset_locomotion()
         _avatar.position=_home_entrance.position
     _sync_guest_room()
     _sync_garden()
