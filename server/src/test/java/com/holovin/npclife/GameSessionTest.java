@@ -165,6 +165,55 @@ class GameSessionTest {
     }
 
     @Test
+    void compostUsesCookingScrapsAndBoostsOnlyOneCrop() throws Exception {
+        Path file=directory.resolve("compost.db");
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            p.ownsHouse=true;p.place=HousingLife.HOUSE_DISTRICT;p.destination=p.place;
+            p.travelRemaining=0;p.money=50;
+            GardenLife.act(town,"build-composter",1,720);
+            assertEquals(40,p.money);
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"build-composter",1,720));
+            FoodLife.change(p,"apples",true,3);
+            for(int n=0;n<3;n++) {
+                p.hunger=90;
+                GardenLife.cookWithCompost(town,FoodLife.recipe("apple-plate"),1,720);
+            }
+            assertEquals(0,FoodLife.quantity(p,"apples",true));
+            assertEquals(3,GardenLife.get(town,GardenLife.SCRAPS));
+            assertThrows(IllegalArgumentException.class,()->GardenLife.cookWithCompost(town,FoodLife.recipe("apple-plate"),1,720));
+            assertEquals(3,GardenLife.get(town,GardenLife.SCRAPS));
+            GardenLife.act(town,"start-compost",1,720);
+            assertEquals(0,GardenLife.get(town,GardenLife.SCRAPS));
+            GardenLife.tick(town,3,1080);
+            assertEquals(0,GardenLife.get(town,GardenLife.COMPOST));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(4,GardenLife.get(town,GardenLife.COMPOST_DUE));
+            GardenLife.tick(town,4,1080);GardenLife.tick(town,4,1080);
+            assertEquals(1,GardenLife.get(town,GardenLife.COMPOST));
+            GardenLife.act(town,"plant",5,720);
+            GardenLife.act(town,"fertilize",5,720);
+            assertEquals(0,GardenLife.get(town,GardenLife.COMPOST));
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"fertilize",5,720));
+            assertEquals(6,GardenLife.harvestUnits(town));
+            GardenLife.set(town,GardenLife.GROWTH,3);
+            GardenLife.act(town,"harvest",8,720);
+            assertEquals(6,FoodLife.quantity(town.player,"vegetables",true));
+            assertEquals(4,GardenLife.harvestUnits(town));
+            assertThrows(IllegalArgumentException.class,()->GardenLife.act(town,"harvest",8,720));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertTrue(game.snapshot().garden().composter());
+            assertFalse(game.snapshot().garden().fertilized());
+            assertEquals(6,game.snapshot().player().pantry().get("vegetables"));
+        }
+    }
+
+    @Test
     void greenhouseAllowsWinterGrowthAndPersistsWithoutDuplicateHarvest() throws Exception {
         Path file=directory.resolve("greenhouse.db");
         try(var game=new GameSession(file)) {
