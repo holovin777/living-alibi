@@ -165,6 +165,53 @@ class GameSessionTest {
     }
 
     @Test
+    void apartmentLeaseMovesResidentConservesRentAndSurvivesRestart() throws Exception {
+        Path file=directory.resolve("rental.db");
+        String tenantId;
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            var tenant=PopulationGenerator.add(town,1).getFirst();tenantId=tenant.id;
+            tenant.home=TownLife.Place.SOUTH_RESIDENCES;tenant.place=tenant.home;tenant.destination=tenant.home;
+            tenant.travelRemaining=0;tenant.money=200;tenant.unpaidBills=0;
+            p.place=TownLife.Place.OFFICE;p.destination=p.place;p.travelRemaining=0;p.money=250;
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            RentalLife.act(town,"rental-buy",600);
+            assertEquals(70,p.money);assertEquals(city+180,town.employerFunds.get("city-maintenance"));
+            RentalLife.act(town,"rental-list",600);
+            RentalLife.tick(town,1,360);RentalLife.tick(town,1,360);
+            assertEquals(125,p.money);assertEquals(145,tenant.money);
+            assertEquals(TownLife.Place.NORTH_RESIDENCES,tenant.home);
+            assertEquals(TownLife.Place.SOUTH_RESIDENCES,tenant.place);
+            assertEquals(RentalLife.UNIT,tenant.homeUnit);
+            assertEquals(8,RentalLife.report(town).paidUntilDay());
+            assertThrows(IllegalArgumentException.class,()->RentalLife.act(town,"rental-sell",600));
+            state.day=4;state.minute=480;
+            EconomyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(145,tenant.money);assertEquals(0,tenant.unpaidBills);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;var tenant=town.get(tenantId);
+            assertTrue(RentalLife.report(town).occupied());
+            assertEquals(RentalLife.UNIT,tenant.homeUnit);
+            assertEquals(55,RentalLife.report(town).revenue());
+            RentalLife.tick(town,8,360);RentalLife.tick(town,8,360);
+            assertEquals(180,p.money);assertEquals(90,tenant.money);
+            assertEquals(15,RentalLife.report(town).paidUntilDay());
+            RentalLife.act(town,"rental-unlist",600);
+            assertTrue(RentalLife.housed(town,tenant,14));
+            RentalLife.tick(town,15,360);
+            assertFalse(RentalLife.report(town).occupied());
+            assertEquals(TownLife.Place.SOUTH_RESIDENCES,tenant.home);
+            assertEquals(TownLife.privateUnit(tenant.id),tenant.homeUnit);
+            assertEquals(90,tenant.money);
+            RentalLife.act(town,"rental-sell",600);
+            assertEquals(320,p.money);
+            assertFalse(RentalLife.report(town).owned());
+        }
+    }
+
+    @Test
     void bankConservesCashProtectsDepositsAndPersistsWeeklyInterest() throws Exception {
         Path file=directory.resolve("bank.db");
         try(var db=new WorldDatabase(file)) {

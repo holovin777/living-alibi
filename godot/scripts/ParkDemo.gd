@@ -2867,6 +2867,23 @@ func _render_actions() -> void:
                                 _business_hire.bind(id)))
                 _action_choices.add_child(_button("Withdraw 10 EUR", _business_withdraw.bind(10)))
         "OFFICE":
+            var rental: Dictionary = _last_snapshot.get("rental",{})
+            var property_info := Label.new()
+            property_info.text = "Appartamento Verdi · North residences | %s" % ["Occupied" if bool(rental.get("occupied",false)) else "Vacant"]
+            if bool(rental.get("owned",false)):
+                property_info.text += "\nRent %s EUR / week | Revenue %s EUR" % [rental.get("weeklyRent",55),rental.get("revenue",0)]
+                if bool(rental.get("occupied",false)):
+                    property_info.text += "\nTenant: %s | Paid until day %s" % [str(rental.get("tenantName","")),rental.get("paidUntilDay",0)]
+            _action_choices.add_child(property_info)
+            if not bool(rental.get("owned",false)):
+                _action_choices.add_child(_button("Buy apartment · 180 EUR",_garden_action.bind("rental-buy")))
+            else:
+                if bool(rental.get("listed",false)):
+                    _action_choices.add_child(_button("Stop lease renewals",_garden_action.bind("rental-unlist")))
+                else:
+                    _action_choices.add_child(_button("List apartment · 55 EUR/week",_garden_action.bind("rental-list")))
+                if not bool(rental.get("occupied",false)):
+                    _action_choices.add_child(_button("Sell vacant apartment · 140 EUR",_garden_action.bind("rental-sell")))
             var bank: Dictionary = _last_snapshot.get("bank",{})
             var bank_info := Label.new()
             bank_info.text = "Banca · Personal %s EUR | Business %s EUR | Debt %s EUR" % [bank.get("personal",0),bank.get("business",0),bank.get("debt",0)]
@@ -3015,7 +3032,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if ((action.begins_with("bank-") and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if (((action.begins_with("bank-") or action.begins_with("rental-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:
