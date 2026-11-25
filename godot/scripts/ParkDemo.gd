@@ -2639,6 +2639,8 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Frittata · 20m (eggs + veg)",_room_cook.bind("frittata")))
                 _action_choices.add_child(_button("Pancakes · 25m (flour + eggs + milk)",_room_cook.bind("pancakes")))
                 _action_choices.add_child(_button("Rice verdure · 25m (rice + veg + water)",_room_cook.bind("rice-verdure")))
+                _action_choices.add_child(_button("Garden soup · 20m (bread + veg + water)",_room_cook.bind("garden-soup")))
+                _action_choices.add_child(_button("Omelette · 15m (eggs + milk)",_room_cook.bind("omelette")))
                 for fruit in ["apple","pear","plum","grape"]:
                     if int(pantry.get(fruit+"s",0))>0:
                         _action_choices.add_child(_button("Prepare "+fruit+" plate · 5m",_room_cook.bind(fruit+"-plate")))

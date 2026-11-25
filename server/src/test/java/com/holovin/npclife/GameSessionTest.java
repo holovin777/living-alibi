@@ -833,6 +833,38 @@ class GameSessionTest {
     }
 
     @Test
+    void gardenSoupAndOmeletteConsumeOnlyRealIngredients() throws Exception {
+        Path file=directory.resolve("home-recipes.db");
+        try(var game=new GameSession(file)) {
+            game.move("market");
+            game.waitMinutes(60);
+            for(String id:java.util.List.of("bread","vegetables","water","eggs","milk"))
+                game.buy(id);
+            game.move("north");
+            game.rentRoom();
+            for(String id:java.util.List.of("bread","vegetables","water","eggs","milk"))
+                game.transferRoomItem(id,true);
+            game.waitMinutes(120);
+            game.cookRoomMeal("garden-soup");
+            for(String id:java.util.List.of("bread","vegetables","water"))
+                assertEquals(0,game.snapshot().player().pantry().get(id));
+            assertEquals(1,game.snapshot().player().pantry().get("eggs"));
+            assertEquals(1,game.snapshot().player().pantry().get("milk"));
+        }
+        try(var game=new GameSession(file)) {
+            game.waitMinutes(120);
+            int hunger=game.snapshot().player().hunger();
+            game.cookRoomMeal("omelette");
+            assertTrue(game.snapshot().player().hunger()<hunger);
+            assertEquals(0,game.snapshot().player().pantry().get("eggs"));
+            assertEquals(0,game.snapshot().player().pantry().get("milk"));
+            game.waitMinutes(120);
+            assertThrows(IllegalArgumentException.class,()->game.cookRoomMeal("omelette"));
+            assertEquals(0,game.snapshot().player().pantry().get("eggs"));
+        }
+    }
+
+    @Test
     void rentedKitchenConservesFoodAndPersistsHygiene() throws Exception {
         Path file=directory.resolve("kitchen.db");
         try(var game=new GameSession(file)) {
