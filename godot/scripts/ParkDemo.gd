@@ -56,6 +56,19 @@ var _engineering_menu := false
 var _software_menu := false
 var _office_app := "work"
 var _office_drafts: Dictionary = {}
+# Presentation only: a real co-present worker gets a stable comic personality.
+var _office_joker_id := ""
+var _office_joke_index := 0
+var _office_joke_wait := 8.0
+var _office_joke_hold := 0.0
+const OFFICE_JOKE_LINES := [
+    "WHO MERGED ON A FRIDAY?!",
+    "It works on my machine. My machine is a genius!",
+    "Coffee first. Then we debug reality.",
+    "I fixed one bug and adopted three more!",
+    "Attention! The build is green! Nobody move!",
+    "The server needs a holiday. So do I."
+]
 const JAVA_DESK := Vector3(-10,0,4)
 const DEVOPS_DESK := Vector3(-10,0,8)
 const COMPANY_DESK := Vector3(-10,0,12)
@@ -203,6 +216,7 @@ func _process(delta: float) -> void:
     _sync_bicycle()
     _advance_traffic(delta)
     _animate_residents(delta)
+    _tick_office_joker(delta)
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
@@ -2572,6 +2586,66 @@ func _render_residents() -> void:
             _residents_root.remove_child(child)
             child.queue_free()
 
+    _sync_office_joker()
+
+func _sync_office_joker() -> void:
+    if _current_place!="OFFICE" or _apartment_active:return
+    if _office_joker_id.is_empty():
+        var candidates: Array[String] = []
+        for person in _residents_root.get_children():
+            if str(person.get_meta("activity",""))=="WORKING":
+                candidates.append(str(person.get_meta("resident_id","")))
+        if candidates.is_empty():return
+        candidates.sort()
+        _office_joker_id=candidates[0]
+    var joker := _residents_root.get_node_or_null("Resident_"+_office_joker_id) as Node3D
+    if joker==null:return
+    if str(joker.get_meta("activity",""))!="WORKING":return
+    if not Rect2(-15,2,11,12).has_point(Vector2(joker.position.x,joker.position.z)):
+        var anchor := Vector3(-10.8,0,3.15)
+        if _can_stand(anchor,WALKER_RADIUS):
+            joker.position=anchor
+            joker.set_meta("anchor",anchor)
+
+func _tick_office_joker(delta: float) -> void:
+    if _current_place!="OFFICE" or _apartment_active or not is_instance_valid(_residents_root):return
+    if _office_joker_id.is_empty():return
+    var joker := _residents_root.get_node_or_null("Resident_"+_office_joker_id) as Node3D
+    if joker==null:
+        _office_joke_hold=0.0
+        return
+    var bubble := joker.get_node_or_null("OfficeJoke") as Label3D
+    var inside := Rect2(-15,2,11,12).has_point(Vector2(_avatar.position.x,_avatar.position.z))
+    var can_hear := inside and _avatar.position.distance_to(joker.position)<7.0 and str(joker.get_meta("activity",""))=="WORKING"
+    if not can_hear:
+        if bubble!=null:bubble.hide()
+        _office_joke_hold=0.0
+        return
+    if _office_joke_hold>0.0:
+        _office_joke_hold=maxf(0.0,_office_joke_hold-delta)
+        if bubble!=null:bubble.visible=_office_joke_hold>0.0
+        if _office_joke_hold>0.0:
+            var arm := joker.get_node_or_null("ArmRight") as Node3D
+            if arm!=null:arm.rotation.x=-0.65
+        return
+    _office_joke_wait=maxf(0.0,_office_joke_wait-delta)
+    if _office_joke_wait>0.0:return
+    if bubble==null:
+        bubble=Label3D.new()
+        bubble.name="OfficeJoke"
+        bubble.position=Vector3(0,2.65,0)
+        bubble.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+        bubble.font_size=34
+        bubble.pixel_size=0.004
+        bubble.modulate=Color("#ffe6a0")
+        bubble.outline_size=9
+        joker.add_child(bubble)
+    bubble.text=OFFICE_JOKE_LINES[_office_joke_index % OFFICE_JOKE_LINES.size()]
+    bubble.show()
+    _office_joke_index+=1
+    _office_joke_hold=4.0
+    _office_joke_wait=28.0+float(_office_joke_index%3)*7.0
+
 func _sync_office_employee(person: Node3D,id: String) -> void:
     if _current_place!="OFFICE" or _apartment_active:return
     var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
@@ -4457,6 +4531,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_pending = ""
     if new_place != _current_place:
         _office_app="work"
+        _office_joke_hold=0.0
+        _office_joke_wait=8.0
         _software_menu=false
         _engineering_menu=false
         _college_menu=false
