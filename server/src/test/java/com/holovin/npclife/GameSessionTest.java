@@ -201,6 +201,8 @@ class GameSessionTest {
             assertEquals(1,report.sales());assertEquals(2,report.revenue());assertEquals(82,p.money);
             var buyer=new TownLife.Citizen("test-buyer","Test buyer","Worker",TownLife.Place.MARKET);
             buyer.generationIndex=99;buyer.money=10;buyer.food=0;buyer.home=TownLife.Place.NORTH_RESIDENCES;
+            buyer.employed=false;
+            for(var resident:town.people.values())resident.food=3;
             town.people.put(buyer.id,buyer);
             state.minute=720;
             PopulationLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
