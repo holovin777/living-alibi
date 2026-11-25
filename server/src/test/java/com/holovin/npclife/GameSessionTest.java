@@ -2966,6 +2966,58 @@ class GameSessionTest {
     }
 
     @Test
+    void residentsHelpFamilyAndFriendsWithoutPlayerInvolvement() throws Exception {
+        Path file=directory.resolve("peer-aid.db");
+        String donorId,recipientId;
+        try(var game=new GameSession(file)) { }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var donor=people.get(0);var recipient=people.get(1);
+            donorId=donor.id;recipientId=recipient.id;
+            donor.age=35;donor.sociability=80;donor.food=4;donor.hunger=10;
+            recipient.age=30;recipient.food=0;recipient.hunger=85;
+            donor.place=TownLife.Place.PARK;recipient.place=TownLife.Place.CAFE;
+            donor.travelRemaining=0;recipient.travelRemaining=0;
+            donor.activity="FREE_TIME";recipient.activity="FREE_TIME";
+            var relation=new SocialLife.Relationship(donor.id,recipient.id);
+            relation.trust=75;relation.affinity=80;relation.tension=5;
+            town.peerRelationships.put(SocialNetwork.key(donor.id,recipient.id),relation);
+            assertFalse(PeerAidLife.share(town,donor,recipient,false,3));
+            recipient.place=TownLife.Place.PARK;
+            relation.trust=20;
+            assertFalse(PeerAidLife.share(town,donor,recipient,false,3));
+            relation.trust=75;
+            state.day=3;state.minute=450;
+            var events=new java.util.ArrayList<TownLife.Event>();
+            PeerAidLife.tick(town,state,events,new java.util.ArrayList<>());
+            assertEquals(3,donor.food);assertEquals(1,recipient.food);
+            assertEquals(77,relation.trust);
+            assertEquals(1,events.size());
+            assertTrue(events.getFirst().text().contains("shared food"));
+            assertFalse(PeerAidLife.share(town,donor,recipient,false,3));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(3,town.industryStocks.get("peer-aid:"+donorId+":last-gift"));
+            assertEquals(3,town.industryStocks.get("peer-aid:"+donorId+":"+recipientId+":last-help"));
+            var donor=town.get(donorId);var recipient=town.get(recipientId);
+            donor.place=recipient.place=TownLife.Place.PARK;
+            donor.activity=recipient.activity="FREE_TIME";
+            donor.travelRemaining=recipient.travelRemaining=0;
+            donor.water=4;donor.thirst=10;recipient.water=0;recipient.thirst=90;
+            var relation=town.peerRelationships.get(SocialNetwork.key(donorId,recipientId));
+            relation.trust=20;donor.sociability=10;
+            DemographyLife.set(town,recipient,"parent-a",donor.generationIndex);
+            assertFalse(PeerAidLife.share(town,donor,recipient,true,3));
+            assertTrue(PeerAidLife.share(town,donor,recipient,true,4));
+            assertEquals(3,donor.water);assertEquals(1,recipient.water);
+        }
+    }
+
+    @Test
     void friendsOfferSuppliesWithoutBeingAsked() throws Exception {
         try(var db=new WorldDatabase(directory.resolve("autonomous-aid.db"))){
             var state=db.load();var town=db.loadTown(state);
