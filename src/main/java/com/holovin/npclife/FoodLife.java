@@ -14,6 +14,8 @@ final class FoodLife {
             new Recipe("frittata","Vegetable frittata",20,60,0,Map.of("eggs",1,"vegetables",1)),
             new Recipe("pancakes","Pancakes",25,60,5,Map.of("flour",1,"eggs",1,"milk",1)),
             new Recipe("rice-verdure","Rice with vegetables",25,65,5,Map.of("rice",1,"vegetables",1,"water",1)),
+            new Recipe("garden-soup","Garden vegetable soup",20,55,20,Map.of("bread",1,"vegetables",1,"water",1)),
+            new Recipe("omelette","Milk omelette",15,50,0,Map.of("eggs",1,"milk",1)),
             new Recipe("apple-plate","Apple plate",5,25,5,Map.of("apples",1)),
             new Recipe("pear-plate","Pear plate",5,25,5,Map.of("pears",1)),
             new Recipe("plum-plate","Plum plate",5,25,5,Map.of("plums",1)),
