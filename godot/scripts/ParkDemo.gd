@@ -2952,8 +2952,13 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         leg.name = "LegLeft" if side < 0 else "LegRight"
         leg.position = Vector3(side*0.105*width,0.86,0)
         person.add_child(leg)
-        _resident_capsule(leg,0.09,0.74,trousers,Vector3(0,-0.36,0),Vector3(1,1,0.94),"Trouser")
-        _box(leg,Vector3(0.19,0.13,0.31),Color("#292b2c"),Vector3(0,-0.785,-0.06))
+        _resident_capsule(leg,0.09,0.40,trousers,Vector3(0,-0.18,0),Vector3(1,1,0.94),"Trouser")
+        var knee := Node3D.new()
+        knee.name="Knee"
+        knee.position=Vector3(0,-0.38,0)
+        leg.add_child(knee)
+        _resident_capsule(knee,0.075,0.37,trousers,Vector3(0,-0.18,0),Vector3(1,1,0.94),"Shin")
+        _box(knee,Vector3(0.19,0.13,0.31),Color("#292b2c"),Vector3(0,-0.405,-0.06))
         var arm := Node3D.new()
         arm.name = "ArmLeft" if side < 0 else "ArmRight"
         arm.position = Vector3(side*0.25*width,1.39,0)
@@ -3021,6 +3026,8 @@ func _animate_residents(delta: float) -> void:
                 walking=false
         if _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target:
             walking = false
+            if not bool(person.get_meta("seated",false)):
+                mode=""
         if walking:
             phase += delta * 0.65
             person.set_meta("phase", phase)
@@ -3074,6 +3081,9 @@ func _animate_residents(delta: float) -> void:
                 elif style=="relaxed":
                     angle=-0.10
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
+            var knee := part.get_node_or_null("Knee") as Node3D
+            if knee!=null:
+                knee.rotation.x=lerpf(knee.rotation.x,-PI/2.0 if sitting else 0.0,minf(delta*10.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
     _add_obstacle(Vector3(-7.0, 0.0, 7.5), Vector2(11.0, 7.0))
