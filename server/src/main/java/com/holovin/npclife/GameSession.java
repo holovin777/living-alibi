@@ -38,8 +38,8 @@ public final class GameSession implements AutoCloseable {
             db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
         }
         // Old save files might contain a deceased visitor.
-        if(!town.player.alive) {
-            PlayerLife.beginNewLife(town,state.day,state.minute);
+        if(!town.player.alive&&!RebirthLife.active(town)) {
+            RebirthLife.prepare(town,state.day,state.minute);
             db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
         }
     }
@@ -74,7 +74,7 @@ public final class GameSession implements AutoCloseable {
     public record RetailView(String id,String label,int price,int stock) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election) { }
+                            List<SourceView> sources,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -102,7 +102,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day));
     }
 
     public synchronized BusinessView business() {
@@ -325,6 +325,23 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if(action!=null&&action.startsWith("rebirth-")){
+            var copy=town.copy();
+            if(action.equals("rebirth-wait")){
+                if(!RebirthLife.active(town))throw new IllegalArgumentException("No rebirth in progress.");
+                var child=RebirthLife.child(town);
+                if(child!=null&&child.age>=18)throw new IllegalArgumentException("Adult transition requires the next childhood implementation.");
+                return applyInternal(copy,1440,"Advanced one shared game day.",true);
+            }
+            String message;
+            if(action.equals("rebirth-adult"))message=RebirthLife.adultFallback(copy);
+            else if(action.startsWith("rebirth-family-")){
+                String[] values=action.substring("rebirth-family-".length()).split("-");
+                if(values.length!=2)throw new IllegalArgumentException("Choose two eligible parents.");
+                message=RebirthLife.choose(copy,state.day,Integer.parseInt(values[0]),Integer.parseInt(values[1]));
+            }else throw new IllegalArgumentException("Unknown rebirth action.");
+            return applyInternal(copy,0,message,true);
+        }
         if(action!=null&&action.startsWith("archive-year-")){
             TransportLife.ready(town.player);
             if(town.player.place!=TownLife.Place.LIBRARY)throw new IllegalArgumentException("Visit the public library.");
@@ -383,6 +400,10 @@ public final class GameSession implements AutoCloseable {
 
     private ActionView apply(TownLife.Town candidateTown,int minutes,String message)
             throws SQLException {
+        return applyInternal(candidateTown,minutes,message,false);
+    }
+    private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction) throws SQLException {
+        if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Choose a family or use childhood actions first.");
         var candidateState=state.copy();
         ArchiveLife.transitions(town,candidateTown,state.day,state.minute);
         var events=new ArrayList<LifeSimulation.LifeEvent>();
@@ -391,11 +412,11 @@ public final class GameSession implements AutoCloseable {
         var interactions=new ArrayList<SocialLife.Interaction>();
         events.addAll(LifeSimulation.advance(candidateState,minutes,
                 current->TownLife.tick(candidateTown,current,truth,observations,interactions)));
-        if(!candidateTown.player.alive) {
-            var ended=PlayerLife.beginNewLife(candidateTown,candidateState.day,candidateState.minute);
-            message+=" Visitor #"+ended.incarnation()+" died; visitor #"+
-                    candidateTown.player.incarnation+" begins a new life.";
+        if(!candidateTown.player.alive&&!RebirthLife.active(candidateTown)) {
+            RebirthLife.prepare(candidateTown,candidateState.day,candidateState.minute);
+            message+=" Your previous life ended. Choose a family for your next life.";
         }
+        RebirthLife.synchronize(candidateTown);
         db.save(candidateState,events,List.of(),candidateTown,truth,observations,interactions);
         state=candidateState;
         town=candidateTown;

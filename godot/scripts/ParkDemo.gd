@@ -176,7 +176,7 @@ func _process(delta: float) -> void:
     _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
-    if not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck():
+    if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
@@ -222,6 +222,8 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if _rebirth_active():
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         if _drive_active():
             if _drive_parked:
@@ -2588,8 +2590,31 @@ func _render_logistics(logistics: Dictionary) -> void:
                 if int(second.get("condition",100))<100 and not bool(second.get("active",false)):
                     _action_choices.add_child(_button("Service truck 2 · 15 EUR + 1 part (transport extra)",_freight_action.bind("service-truck-2")))
 
+func _rebirth_active() -> bool:
+    return str(_last_snapshot.get("rebirth",{}).get("phase","ADULT"))!="ADULT"
+
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _rebirth_active():
+        var rebirth: Dictionary = _last_snapshot.get("rebirth",{})
+        var info := Label.new()
+        info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        if str(rebirth.get("phase",""))=="CHOICE":
+            _action_title.text = "A new life · Choose your parents"
+            var families: Array = rebirth.get("families",[])
+            info.text = "The town continues. Choose an eligible family." if not families.is_empty() else "No eligible family today. Wait or start an adult life."
+            _action_choices.add_child(info)
+            for family in families:
+                var label_text := "%s (%s) + %s (%s) · %s" % [family.get("firstName",""),family.get("firstJob",""),family.get("secondName",""),family.get("secondJob",""),family.get("district","")]
+                _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-family-%s-%s" % [family.get("first",0),family.get("second",0)])))
+            _action_choices.add_child(_button("Start adult life instead",_garden_action.bind("rebirth-adult")))
+        else:
+            _action_title.text = "Childhood · preview"
+            info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nYour child lives in the simulated family; independent controls are not implemented yet." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
+            _action_choices.add_child(info)
+        if int(rebirth.get("age",0))<18:
+            _action_choices.add_child(_button("Advance one shared day",_garden_action.bind("rebirth-wait")))
+        return
     _action_title.text = "Local actions — " + _current_place.capitalize()
     var player: Dictionary = _last_snapshot.get("player", {})
     var employed := str(player.get("jobId", ""))
@@ -3178,6 +3203,10 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("rebirth-"):
+        if _connected and not _api.is_busy():
+            _api.garden_action(action)
+        return
     if ((action.begins_with("archive-year-") and _current_place=="LIBRARY" and _near_kiosk()) or ((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-") or action.begins_with("election-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
@@ -3349,6 +3378,12 @@ func _on_world_updated(snapshot: Dictionary) -> void:
             _dialog_attitude.text = "Attitude: "+str(person.get_meta("relationship","STRANGER")).capitalize()
     _apply_weather()
     _render_actions()
+    if _rebirth_active():
+        _travel_panel.visible = false
+        _map_panel.visible = false
+        _close_dialog()
+        _action_panel.visible = true
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
     if _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 

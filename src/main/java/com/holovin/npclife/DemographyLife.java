@@ -48,12 +48,16 @@ final class DemographyLife {
         set(t,a,"union-day",day);set(t,b,"union-day",day);
         return true;
     }
-    static TownLife.Citizen birth(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
-        if(a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=b.generationIndex||get(t,b,"partner")!=a.generationIndex||
+    static boolean canBirth(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
+        if(a==null||b==null||a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=b.generationIndex||get(t,b,"partner")!=a.generationIndex||
                 day-get(t,a,"union-day")<270||get(t,a,"children")>=2||get(t,b,"children")>=2||
                 (get(t,a,"last-birth")>0&&day-get(t,a,"last-birth")<1095)||
                 (get(t,b,"last-birth")>0&&day-get(t,b,"last-birth")<1095)||
-                a.money<100||b.money<100||living(t)>=PopulationGenerator.MAX_GENERATED)return null;
+                a.money<100||b.money<100||living(t)>=PopulationGenerator.MAX_GENERATED)return false;
+        return t.people.values().stream().mapToInt(c->c.generationIndex).max().orElse(0)<9999;
+    }
+    static TownLife.Citizen birth(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
+        if(!canBirth(t,a,b,day))return null;
         int next=t.people.values().stream().mapToInt(c->c.generationIndex).max().orElse(0)+1;
         if(next>9999)return null;
         String id="resident-%04d".formatted(next);
