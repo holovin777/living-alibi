@@ -13,6 +13,45 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void recoveryKitRequiresAssessmentAndPersistsDailyProgress() throws Exception {
+        Path file=directory.resolve("medical-followup.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=100;c.health=65;c.place=TownLife.Place.CLINIC;
+            c.activity="FREE_TIME";c.travelRemaining=0;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            int shop=town.employerFunds.getOrDefault("shop-assistant",0);
+            assertThrows(IllegalArgumentException.class,()->MedicalFollowupLife.act(town,c,1,600,"collect"));
+            MedicalFollowupLife.act(town,c,1,600,"exam");
+            MedicalFollowupLife.act(town,c,1,620,"collect");
+            assertEquals(79,c.money);assertEquals(city+12,town.employerFunds.get("city-maintenance"));
+            assertEquals(shop+9,town.employerFunds.get("shop-assistant"));
+            assertThrows(IllegalArgumentException.class,()->MedicalFollowupLife.act(town,c,1,630,"recover"));
+            c.place=c.home;c.activity="AT_HOME";c.food=3;c.water=4;c.fatigue=50;
+            MedicalFollowupLife.act(town,c,1,700,"recover");
+            assertEquals(69,c.health);assertEquals(2,c.food);assertEquals(3,c.water);
+            assertEquals(2,MedicalFollowupLife.view(town,c,1,760).remainingSupplies());
+            assertThrows(IllegalArgumentException.class,()->MedicalFollowupLife.act(town,c,1,760,"recover"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            var v=MedicalFollowupLife.view(town,c,2,700);
+            assertEquals(65,v.assessedHealth());assertEquals(2,v.remainingSupplies());assertEquals(1,v.completedDays());
+            c.place=c.home;c.activity="AT_HOME";c.travelRemaining=0;
+            MedicalFollowupLife.act(town,c,2,700,"recover");
+            assertEquals(73,c.health);
+            assertEquals(1,MedicalFollowupLife.view(town,c,2,760).remainingSupplies());
+        }
+    }
+
+    @Test
     void wardrobePurchasesWearAndComfortSurviveReload() throws Exception {
         Path file=directory.resolve("wardrobe.db");
         String id;
