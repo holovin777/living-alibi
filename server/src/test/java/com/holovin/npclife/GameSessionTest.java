@@ -13,6 +13,43 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void linkedHomeMarketConservesCashAndPersistsOwnership() throws Exception {
+        Path file=directory.resolve("linked-housing.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=400;c.place=TownLife.Place.OFFICE;c.travelRemaining=0;c.activity="FREE_TIME";
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            assertThrows(IllegalArgumentException.class,()->HomeMarketLife.act(town,"buy-tiglio",480));
+            assertThrows(IllegalArgumentException.class,()->HomeMarketLife.act(town,"buy-rosa",600));
+            HomeMarketLife.act(town,"buy-tiglio",600);
+            assertEquals(160,c.money);assertEquals(city+240,town.employerFunds.get("city-maintenance"));
+            assertEquals("unit:home-market-tiglio",c.homeUnit);
+            assertEquals(TownLife.Place.NORTH_RESIDENCES,c.home);
+            assertThrows(IllegalArgumentException.class,()->HomeMarketLife.act(town,"buy-tiglio",600));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            var c=town.get(id);
+            assertEquals("tiglio",HomeMarketLife.owned(town,c).id());
+            assertEquals("unit:home-market-tiglio",c.homeUnit);
+            c.place=TownLife.Place.OFFICE;c.travelRemaining=0;c.activity="FREE_TIME";
+            int city=town.employerFunds.getOrDefault("city-maintenance",0);
+            HomeMarketLife.act(town,"sell-tiglio",600);
+            assertEquals(340,c.money);assertEquals(city-180,town.employerFunds.get("city-maintenance"));
+            assertNull(HomeMarketLife.owned(town,c));
+            assertEquals(TownLife.privateUnit(c.id),c.homeUnit);
+            assertThrows(IllegalArgumentException.class,()->HomeMarketLife.act(town,"sell-tiglio",600));
+        }
+    }
+
+    @Test
     void familySavingsAreVoluntaryAndSurviveReload() throws Exception {
         Path file=directory.resolve("family-budget.db");
         String adultId,partnerId;
