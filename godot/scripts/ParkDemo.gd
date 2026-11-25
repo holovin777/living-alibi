@@ -2582,6 +2582,7 @@ func _render_residents() -> void:
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
+        person.set_meta("mood",str(resident.get("mood","CALM")))
         _sync_office_employee(person,id)
         person.set_meta("display_name",str(resident.get("name","Resident")))
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
@@ -2624,7 +2625,7 @@ func _tick_office_joker(delta: float) -> void:
     var bubble := joker.get_node_or_null("OfficeJoke") as Label3D
     var inside := Rect2(-15,2,11,12).has_point(Vector2(_avatar.position.x,_avatar.position.z))
     var can_hear := inside and _avatar.position.distance_to(joker.position)<7.0 and str(joker.get_meta("activity",""))=="WORKING"
-    if not can_hear:
+    if not can_hear or str(joker.get_meta("mood","CALM")) in ["TIRED","SAD","STRESSED","IRRITATED","LONELY"]:
         if bubble!=null:bubble.hide()
         _office_joke_hold=0.0
         return
@@ -2732,7 +2733,7 @@ func _animate_residents(delta: float) -> void:
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
             if not walking and activity!="SLEEPING" and limb=="ArmRight":
                 var style := str(person.get_meta("personality","quiet"))
-                if style in ["talkative","joker"]:
+                if style in ["talkative","joker"] and str(person.get_meta("mood","CALM")) in ["CALM","HAPPY","ENTHUSIASTIC"]:
                     angle=sin(float(Time.get_ticks_msec())*0.003+phase)*0.16
                 elif style=="relaxed":
                     angle=-0.10
@@ -2958,6 +2959,7 @@ func _create_interface() -> void:
     _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_reply)
     dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
+    dialog_col.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
     dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
     dialog_col.add_child(_button("Allow sharing my name",_send_dialog.bind("You can tell people my name.")))
     dialog_col.add_child(_button("Ask for visitor news",_send_dialog.bind("Any news about visitors?")))
@@ -3044,13 +3046,24 @@ func _open_dialog() -> void:
     _map_panel.visible = false
     _dialog_title.text = str(person.get_meta("display_name","Resident"))
     _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
-    _dialog_style.text = ResidentPersonality.greeting(str(person.get_meta("personality","quiet")))
+    _render_dialog_mood(person)
     var known := str(person.get_meta("known_name",""))
     _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     _dialog_input.clear()
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _render_dialog_mood(person: Node3D) -> void:
+    var mood := str(person.get_meta("mood","CALM"))
+    _dialog_style.text = tr("Seems: %s") % tr(mood.capitalize())
+
+func _localized_resident_reply(message: String) -> String:
+    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    if person==null:return message
+    var prefix := str(person.get_meta("display_name",""))+": "
+    if not message.begins_with(prefix):return message
+    return prefix+tr(message.substr(prefix.length()))
 
 func _close_dialog() -> void:
     _dialog_panel.visible = false
@@ -4651,6 +4664,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
             _close_dialog()
         else:
             _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
+            _render_dialog_mood(person)
     _apply_weather()
     _render_actions()
     if _rebirth_active():
@@ -4789,7 +4803,7 @@ func _on_action_feedback(message: String) -> void:
     if _dialog_pending:
         _dialog_pending = false
         if _dialog_panel.visible:
-            _dialog_reply.text = message
+            _dialog_reply.text = _localized_resident_reply(message)
             _dialog_input.clear()
     if not _clock_pending:
         _message.text = message
