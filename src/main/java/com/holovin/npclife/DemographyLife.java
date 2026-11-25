@@ -107,6 +107,7 @@ final class DemographyLife {
         if(c.alive||get(t,c,"estate")>0)return;
         var heirs=t.people.values().stream().filter(x->x.alive&&(get(t,x,"parent-a")==c.generationIndex||get(t,x,"parent-b")==c.generationIndex)).toList();
         ITBusinessLife.liquidate(t,c);
+        HomeMarketLife.estate(t,c);
         FamilyBudgetLife.releaseEstate(t,c);
         int amount=c.money;
         if(!heirs.isEmpty()){
