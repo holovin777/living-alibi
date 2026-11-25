@@ -73,7 +73,7 @@ final class HomeMarketLife {
     static void estate(TownLife.Town t,TownLife.Citizen c){
         var l=owned(t,c);
         if(l==null)return;
-        var heir=t.people.values().stream().filter(x->x!=c&&x.alive&&x.generationIndex>0&&
+        var heir=t.people.values().stream().filter(x->x!=c&&x.alive&&x.age>=18&&x.generationIndex>0&&
             x.homeUnit.equals(unit(l))&&owned(t,x)==null&&
             (DemographyLife.get(t,c,"partner")==x.generationIndex||
              DemographyLife.get(t,x,"parent-a")==c.generationIndex||DemographyLife.get(t,x,"parent-b")==c.generationIndex))
