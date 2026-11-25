@@ -81,7 +81,7 @@ final class PopulationLife {
             }
         }
         if(c.place==TownLife.Place.MARKET && marketOpen) {
-            String stallSale=MarketStallLife.purchase(town,c,minute);
+            String stallSale=MarketStallLife.purchase(town,c,clock.day,minute);
             if(stallSale!=null)TownLife.publish(town,clock,c.id,c.place,stallSale,events,observations);
             else if(c.food<2 && c.money>=9) {
                 c.money-=9;c.food+=3;

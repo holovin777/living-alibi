@@ -182,13 +182,13 @@ class GameSessionTest {
             MarketStallLife.act(town,"stall-open",720);
             var buyer=new TownLife.Citizen("test-buyer","Test buyer","Worker",TownLife.Place.MARKET);
             buyer.generationIndex=99;buyer.money=10;buyer.food=0;
-            assertNull(MarketStallLife.purchase(town,buyer,720));
+            assertNull(MarketStallLife.purchase(town,buyer,1,720));
             MarketStallLife.act(town,"stall-price-down-vegetables",720);
             MarketStallLife.act(town,"stall-price-down-vegetables",720);
             p.place=TownLife.Place.PARK;
-            assertNull(MarketStallLife.purchase(town,buyer,720));
+            assertNull(MarketStallLife.purchase(town,buyer,1,720));
             p.place=TownLife.Place.MARKET;
-            assertNotNull(MarketStallLife.purchase(town,buyer,720));
+            assertNotNull(MarketStallLife.purchase(town,buyer,1,720));
             assertEquals(8,buyer.money);assertEquals(1,buyer.food);
             assertEquals(82,p.money);
             assertEquals(1,MarketStallLife.total(town));
@@ -208,7 +208,7 @@ class GameSessionTest {
             PopulationLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
             assertEquals(0,MarketStallLife.total(town));assertEquals(84,p.money);
             assertEquals(8,buyer.money);
-            assertNull(MarketStallLife.purchase(town,buyer,720));
+            assertNull(MarketStallLife.purchase(town,buyer,1,720));
         }
     }
 

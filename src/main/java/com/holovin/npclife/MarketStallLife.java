@@ -15,10 +15,38 @@ final class MarketStallLife {
     static void ensure(TownLife.Town t){
         for(String k:List.of(LICENSE,OPEN,SALES,REVENUE))t.industryStocks.putIfAbsent(k,0);
         for(String id:ITEMS){t.industryStocks.putIfAbsent(stock(id),0);t.industryStocks.putIfAbsent(price(id),3);}
+        for(var c:t.people.values())if(c.generationIndex>0)
+            for(String field:MEMORY_FIELDS)t.industryStocks.putIfAbsent(memory(c.id,field),0);
     }
     static void clear(TownLife.Town t){
         for(String k:List.of(LICENSE,OPEN,SALES,REVENUE))set(t,k,0);
         for(String id:ITEMS){set(t,stock(id),0);set(t,price(id),3);}
+        t.industryStocks.replaceAll((k,v)->k.startsWith("stall:customer:")?0:v);
+    }
+    private static String memory(String id,String field){return "stall:customer:"+id+":"+field;}
+    private static final List<String> MEMORY_FIELDS=List.of("purchases","days","last-day","referred");
+    private static int remembered(TownLife.Town t,TownLife.Citizen c,String field){
+        return get(t,memory(c.id,field));
+    }
+    static boolean regular(TownLife.Town t,TownLife.Citizen c){return remembered(t,c,"days")>=2;}
+    private static void rememberPurchase(TownLife.Town t,TownLife.Citizen c,int day){
+        String count=memory(c.id,"purchases"),last=memory(c.id,"last-day"),days=memory(c.id,"days");
+        set(t,count,Math.min(1000000,get(t,count)+1));
+        if(day>get(t,last)){
+            set(t,last,day);set(t,days,Math.min(1000000,get(t,days)+1));
+        }
+    }
+    /** Only direct customers can recommend the stall to a trusted, co-present acquaintance. */
+    static boolean recommend(TownLife.Town t,TownLife.Citizen source,TownLife.Citizen listener){
+        if(get(t,LICENSE)==0||source==null||listener==null||source==listener||source.generationIndex<=0||
+                listener.generationIndex<=0||!source.alive||!listener.alive||
+                source.travelRemaining>0||listener.travelRemaining>0||
+                source.place!=listener.place||!source.currentSpace().equals(listener.currentSpace())||
+                !regular(t,source)||remembered(t,listener,"purchases")>0||
+                remembered(t,listener,"referred")>0)return false;
+        var relation=t.peerRelationships.get(SocialNetwork.key(source.id,listener.id));
+        if(relation==null||relation.trust<58||relation.tension>=35)return false;
+        set(t,memory(listener.id,"referred"),1);return true;
     }
     static int total(TownLife.Town t){return ITEMS.stream().mapToInt(id->get(t,stock(id))).sum();}
     static boolean active(TownLife.Town t,int minute){
@@ -29,15 +57,16 @@ final class MarketStallLife {
     static String offer(TownLife.Town t,TownLife.Citizen c,int minute){
         if(!active(t,minute)||!c.alive||c.food>=2)return null;
         String chosen=null;
+        int acceptable=regular(t,c)||(remembered(t,c,"referred")>0&&c.hunger>=65)?4:3;
         for(String id:ITEMS){
             int amount=get(t,price(id));
             // The normal market offers three food units for 9 EUR.
-            if(get(t,stock(id))>0&&amount>=1&&amount<=3&&amount<=c.money
+            if(get(t,stock(id))>0&&amount>=1&&amount<=acceptable&&amount<=c.money
                     &&(chosen==null||amount<get(t,price(chosen))))chosen=id;
         }
         return chosen;
     }
-    static String purchase(TownLife.Town t,TownLife.Citizen c,int minute){
+    static String purchase(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         if(c.generationIndex<=0||!c.presentAt(TownLife.Place.MARKET))return null;
         String id=offer(t,c,minute);
         if(id==null)return null;
@@ -46,6 +75,7 @@ final class MarketStallLife {
         int sales=Math.addExact(get(t,SALES),1),revenue=Math.addExact(get(t,REVENUE),amount);
         c.money-=amount;c.food++;t.player.money=wallet;
         set(t,stock(id),get(t,stock(id))-1);set(t,SALES,sales);set(t,REVENUE,revenue);
+        rememberPurchase(t,c,day);
         return c.name+" bought "+id+" from the visitor's stall for EUR "+amount+".";
     }
     static String act(TownLife.Town t,String action,int minute){
@@ -84,9 +114,12 @@ final class MarketStallLife {
         throw new IllegalArgumentException("Unknown stall action.");
     }
     record Item(String id,int stock,int price) {}
-    record Report(boolean registered,boolean open,boolean active,int licensePrice,int capacity,int stocked,int sales,int revenue,List<Item> items) {}
+    record Report(boolean registered,boolean open,boolean active,int licensePrice,int capacity,int stocked,int sales,int revenue,List<Item> items,int customers,int regularCustomers,int recommendedCustomers) {}
     static Report report(TownLife.Town t,int minute){
         return new Report(get(t,LICENSE)>0,get(t,OPEN)>0,active(t,minute),LICENSE_PRICE,CAPACITY,total(t),get(t,SALES),get(t,REVENUE),
-                ITEMS.stream().map(id->new Item(id,get(t,stock(id)),get(t,price(id)))).toList());
+                ITEMS.stream().map(id->new Item(id,get(t,stock(id)),get(t,price(id)))).toList(),
+                (int)t.people.values().stream().filter(c->c.alive&&remembered(t,c,"purchases")>0).count(),
+                (int)t.people.values().stream().filter(c->c.alive&&regular(t,c)).count(),
+                (int)t.people.values().stream().filter(c->c.alive&&remembered(t,c,"referred")>0).count());
     }
 }
