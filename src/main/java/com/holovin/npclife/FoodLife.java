@@ -19,7 +19,8 @@ final class FoodLife {
             new Recipe("apple-plate","Apple plate",5,25,5,Map.of("apples",1)),
             new Recipe("pear-plate","Pear plate",5,25,5,Map.of("pears",1)),
             new Recipe("plum-plate","Plum plate",5,25,5,Map.of("plums",1)),
-            new Recipe("grape-plate","Grape plate",5,25,5,Map.of("grapes",1)));
+            new Recipe("grape-plate","Grape plate",5,25,5,Map.of("grapes",1)),
+            new Recipe("honey-bread","Bread with honey",5,55,0,Map.of("bread",1,"honey",1)));
     static Recipe recipe(String id) {
         return RECIPES.stream().filter(r->r.id().equals(id)).findFirst()
                 .orElseThrow(()->new IllegalArgumentException("Unknown recipe."));

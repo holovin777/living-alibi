@@ -18,9 +18,10 @@ final class RetailLife {
             new Product("apples","Apples",3,12,0),
             new Product("pears","Pears",3,12,0),
             new Product("plums","Plums",3,12,0),
-            new Product("grapes","Grapes",3,12,0));
+            new Product("grapes","Grapes",3,12,0),
+            new Product("honey","Honey",5,8,0));
     static void ensure(TownLife.Town t) {
-        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),OrchardLife.isFruit(p.id())?0:p.capacity());
+        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),(OrchardLife.isFruit(p.id())||p.id().equals("honey"))?0:p.capacity());
     }
     static void tick(TownLife.Town t,int minute) {
         if(minute!=360)return;
@@ -104,6 +105,21 @@ final class RetailLife {
         t.employerFunds.merge("shop-assistant",-OrchardLife.SELL_PRICE,Integer::sum);
         p.money=Math.addExact(p.money,OrchardLife.SELL_PRICE);
         return "Sold one "+id+" unit for 2 EUR.";
+    }
+    static int honeySpace(TownLife.Town t){
+        return Math.max(0,product("honey").capacity()-t.retailStock.getOrDefault("honey",0));
+    }
+    static String buyHoney(TownLife.Town t,int minute){
+        var p=t.player;TransportLife.ready(p);
+        if(p.place!=TownLife.Place.MARKET||minute<480||minute>=1200)
+            throw new IllegalArgumentException("Sell honey at Market 08:00–20:00.");
+        int funds=t.employerFunds.getOrDefault("shop-assistant",0);
+        if(honeySpace(t)<1||funds<OrchardLife.HONEY_PRICE)
+            throw new IllegalArgumentException("Market cannot accept more honey.");
+        int newMoney=Math.addExact(p.money,OrchardLife.HONEY_PRICE);
+        FoodLife.change(p,"honey",false,-1);t.retailStock.merge("honey",1,Math::addExact);
+        t.employerFunds.put("shop-assistant",funds-OrchardLife.HONEY_PRICE);p.money=newMoney;
+        return "Sold one honey unit for 3 EUR.";
     }
     static String consume(PlayerLife.Player p,String id) {
         PlayerLife.requireAlive(p);
