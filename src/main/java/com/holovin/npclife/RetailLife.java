@@ -35,10 +35,10 @@ final class RetailLife {
                 .orElseThrow(()->new IllegalArgumentException("Unknown retail product."));
     }
     static boolean hasCounter(TownLife.Place place) {
-        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI || place==TownLife.Place.FUEL_STATION;
+        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI || place==TownLife.Place.FUEL_STATION || place==TownLife.Place.CAFE || place==TownLife.Place.BAKERY;
     }
     static boolean availableAt(TownLife.Place place,Product product) {
-        return hasCounter(place) && (place!=TownLife.Place.FUEL_STATION || product.id().equals("bread") || product.id().equals("water"));
+        return hasCounter(place) && (!(place==TownLife.Place.FUEL_STATION||place==TownLife.Place.CAFE||place==TownLife.Place.BAKERY) || product.id().equals("bread") || product.id().equals("water"));
     }
     static String buy(TownLife.Town t,String id,int minute) {
         var player=t.player;
@@ -46,8 +46,10 @@ final class RetailLife {
         var product=product(id);
         if(!availableAt(player.place,product) || player.travelRemaining>0)
             throw new IllegalArgumentException("This product is not available at your local counter.");
-        if(minute<480 || minute>=1200)
-            throw new IllegalArgumentException("Market opens 08:00–20:00.");
+        int opens=player.place==TownLife.Place.CAFE||player.place==TownLife.Place.BAKERY?420:480;
+        int closes=player.place==TownLife.Place.CAFE?1260:player.place==TownLife.Place.BAKERY?1080:1200;
+        if(minute<opens || minute+2>closes)
+            throw new IllegalArgumentException("The local counter is closed.");
         if(t.retailStock.getOrDefault(id,0)<1)
             throw new IllegalArgumentException("This product is sold out.");
         if(player.money<product.price())throw new IllegalArgumentException("Not enough money.");
