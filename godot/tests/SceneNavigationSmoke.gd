@@ -136,7 +136,7 @@ func _exercise() -> void:
             "shared foliage responds to seasons and snow"):
         return
     var sound = world._town_audio
-    if not _check(sound._streams.size()==10 and sound.water is AudioStreamPlayer3D
+    if not _check(sound._streams.size()==15 and sound.water is AudioStreamPlayer3D
             and sound.traffic is AudioStreamPlayer3D,
             "town has original sound streams and positional audio sources"):
         return
@@ -144,8 +144,17 @@ func _exercise() -> void:
     if not _check(sound.steps.stream==sound._streams["grass"],
             "walking distance triggers surface-specific footsteps"):
         return
+    sound.play_effect("landing")
+    if not _check(sound.effects.stream==sound._streams["landing"],
+            "landing uses a distinct impact sound"):
+        return
+    sound.play_effect("door")
+    if not _check(sound.effects.stream==sound._streams["door"]
+            and sound.industry is AudioStreamPlayer3D and sound.crickets is AudioStreamPlayer3D,
+            "door latch and additional spatial sources exist"):
+        return
     sound.set_enabled(false)
-    if not _check(not sound.enabled and not sound.steps.playing and not sound.water.playing,
+    if not _check(not sound.enabled and not sound.steps.playing and not sound.water.playing and not sound.effects.playing and not sound.bicycle.playing,
             "town sound can be muted independently"):
         return
     sound.set_enabled(true)
