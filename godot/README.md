@@ -124,9 +124,26 @@ snapshot. The HUD shows how many people are nearby.
 
 The figures use **approximate display positions only** because the Java
 world currently stores district-level positions, not real 3D coordinates.
-There are no invented people, no simulated NPC street animations, and
-no new personal data exposed by the client. Fine-grained movement, full
-NPC character models, dialogue proximity and animations are future work.
+There are no invented people. Articulated low-poly residents animate
+locally during walking, free time, shopping and job searching. Visual
+identities survive refreshes; exact NPC positions and activities within
+a district are still not tracked by the Java simulation.
+
+## Local movement and collisions
+
+Trees, benches, lamp posts, fountain, kiosks, gate posts, building
+exteriors, selected industrial equipment and the river have solid
+ground-level footprints. Both the visitor and visual NPCs use the same
+radius-based movement constraints; small substeps prevent walking
+through obstacles and permit sliding along walls. The open gate remains
+passable. NPCs start on a nearby unobstructed point and can slide or
+stop at obstacles rather than walk through them.
+
+This is a deterministic, lightweight planar collision system, not full
+Godot rigid-body physics or pathfinding. It does not yet model stairs,
+jumping, NPC-to-NPC collisions, interiors or continuous connected streets.
+The Java engine still validates actual district transitions and actions.
+
 
 ## Boundaries
 

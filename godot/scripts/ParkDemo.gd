@@ -8,6 +8,8 @@ const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
 const INTERACTION_RADIUS := 3.5
 const WALK_SPEED := 4.5
+const WALKER_RADIUS := 0.32
+const COLLISION_STEP := 0.12
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
 
@@ -20,6 +22,7 @@ var _avatar: Node3D
 var _camera: Camera3D
 var _scenery: Node3D
 var _residents_root: Node3D
+var _obstacles: Array[Rect2] = []
 var _park_lamps: Array[OmniLight3D] = []
 var _fountain_water: MeshInstance3D
 var _sun: DirectionalLight3D
@@ -82,9 +85,8 @@ func _process(delta: float) -> void:
     if direction.length_squared() > 0.0:
         # The Java world controls district transitions; this is local preview walking.
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
-        _avatar.position += relative_motion * delta * WALK_SPEED
-        _avatar.position.x = clampf(_avatar.position.x, -17.0, 17.0)
-        _avatar.position.z = clampf(_avatar.position.z, -17.0, 17.0)
+        _avatar.position = _move_on_ground(_avatar.position,
+                relative_motion * delta * WALK_SPEED, WALKER_RADIUS)
         _follow_player()
 
     _animate_residents(delta)
@@ -188,6 +190,7 @@ func _render_place(place_id: String) -> void:
     if _scenery != null:
         remove_child(_scenery)
         _scenery.queue_free()
+    _obstacles.clear()
     _park_lamps.clear()
     _fountain_water = null
     _scenery = Node3D.new()
@@ -239,6 +242,9 @@ func _render_place(place_id: String) -> void:
                 _box(_scenery, Vector3(1.6, 1.8, 0.12), Color(0.61, 0.83, 0.94),
                         Vector3(offset, 2.3, 4.9))
         "QUARRY":
+            _add_obstacle(Vector3(-8.0, 0.0, 9.0), Vector2(11.0, 3.0))
+            for x in [-11.0, -8.0, -5.0]:
+                _add_obstacle(Vector3(x, 0.0, 3.0), Vector2(1.8, 2.0))
             # Placeholder rock face and ore heaps; the finite seam is Java-owned.
             _box(_scenery, Vector3(11.0, 7.0, 3.0), Color(0.42, 0.43, 0.46),
                     Vector3(-8.0, 3.4, 9.0))
@@ -246,6 +252,8 @@ func _render_place(place_id: String) -> void:
                 _box(_scenery, Vector3(1.8, 1.1, 2.0), Color(0.57, 0.38, 0.28),
                         Vector3(offset, 0.55, 3.0))
         "FACTORY":
+            for x in [-8.0, -5.0, -2.0]:
+                _add_obstacle(Vector3(x, 0.0, 2.2), Vector2(2.0, 1.6))
             _building("Parts factory", Color(0.50, 0.53, 0.56))
             _box(_scenery, Vector3(1.5, 8.0, 1.5), Color(0.36, 0.37, 0.40),
                     Vector3(-10.0, 8.0, 7.0))
@@ -253,6 +261,7 @@ func _render_place(place_id: String) -> void:
                 _box(_scenery, Vector3(2.0, 1.0, 1.6), Color(0.32, 0.38, 0.42),
                         Vector3(offset, 0.5, 2.2))
         "RIVER":
+            _add_obstacle(Vector3(-11.0, 0.0, 0.0), Vector2(10.0, 35.0))
             _box(_scenery, Vector3(10.0, 0.11, 35.0), Color(0.12, 0.40, 0.67),
                     Vector3(-11.0, 0.02, 0.0))
             _tree(Vector3(12.0, 0.0, 7.0))
@@ -268,6 +277,50 @@ func _render_place(place_id: String) -> void:
             _tree(Vector3(11.0, 0.0, 7.0))
 
     _apply_weather()
+
+# A flat, client-side collision layer. The Java server owns district travel
+# and never trusts these local visual positions as proof of an action.
+func _add_obstacle(center: Vector3, size: Vector2) -> void:
+    _obstacles.append(Rect2(Vector2(center.x, center.z) - size * 0.5, size))
+
+func _can_stand(at: Vector3, radius: float) -> bool:
+    if absf(at.x) > 17.0 or absf(at.z) > 17.0:
+        return false
+    var p := Vector2(at.x, at.z)
+    for obstacle in _obstacles:
+        var nearest := p.clamp(obstacle.position, obstacle.end)
+        if p.distance_squared_to(nearest) < radius * radius:
+            return false
+    return true
+
+func _move_on_ground(from: Vector3, displacement: Vector3, radius: float) -> Vector3:
+    # Substeps prevent tunnelling even when a frame takes longer than usual.
+    # Independent axes permit sliding along walls instead of sticking to them.
+    var count := maxi(1, ceili(Vector2(displacement.x, displacement.z).length() / COLLISION_STEP))
+    var step := Vector3(displacement.x, 0.0, displacement.z) / float(count)
+    var at := from
+    for i in range(count):
+        var candidate := at + step
+        if _can_stand(candidate, radius):
+            at = candidate
+        else:
+            candidate = at + Vector3(step.x, 0.0, 0.0)
+            if _can_stand(candidate, radius):
+                at = candidate
+            candidate = at + Vector3(0.0, 0.0, step.z)
+            if _can_stand(candidate, radius):
+                at = candidate
+    return at
+
+func _open_anchor(preferred: Vector3) -> Vector3:
+    if _can_stand(preferred, WALKER_RADIUS):
+        return preferred
+    for distance in range(1, 7):
+        for side in [Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD, Vector3.BACK]:
+            var candidate := preferred + side * float(distance)
+            if _can_stand(candidate, WALKER_RADIUS):
+                return candidate
+    return Vector3.ZERO
 
 func _build_park() -> void:
     var park := Node3D.new()
@@ -289,6 +342,7 @@ func _build_park() -> void:
     fountain.name = "PublicFountain"
     fountain.position = Vector3(8, 0, -5)
     park.add_child(fountain)
+    _add_obstacle(fountain.position, Vector2(4.0, 4.0))
     _cylinder(fountain, 2.0, 0.35, Color(0.52,0.53,0.54), Vector3(0,0.18,0))
     _cylinder(fountain, 1.85, 0.08, Color(0.24,0.28,0.29), Vector3(0,0.39,0))
     _fountain_water = _cylinder(fountain, 1.78, 0.04, Color(0.24,0.63,0.76), Vector3(0,0.45,0))
@@ -301,11 +355,13 @@ func _build_park() -> void:
     for x in range(-16,17,4):
         _box(park, Vector3(1.5,0.02,0.11), Color(0.92,0.85,0.61), Vector3(x,0.07,-16))
     for x in [-14.0,-8.0,8.0,14.0]:
+        _add_obstacle(Vector3(x,0,-19), Vector2(4.7,2.5))
         _box(park, Vector3(4.7,4.0,2.5), Color(0.69,0.59,0.47), Vector3(x,2,-19))
         for offset in [-1.2,1.2]:
             _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.7))
 
 func _bench(parent: Node3D, at: Vector3) -> void:
+    _add_obstacle(at, Vector2(2.0, 0.66))
     var wood := Color(0.43,0.27,0.14)
     _box(parent, Vector3(2.0,0.12,0.58), wood, at + Vector3(0,0.52,0))
     _box(parent, Vector3(2.0,0.42,0.10), wood, at + Vector3(0,0.85,0.25))
@@ -313,6 +369,7 @@ func _bench(parent: Node3D, at: Vector3) -> void:
         _box(parent, Vector3(0.11,0.50,0.47), Color(0.20,0.23,0.24), at+Vector3(x,0.25,0))
 
 func _lamp(parent: Node3D, at: Vector3) -> void:
+    _add_obstacle(at, Vector2(0.18, 0.18))
     _cylinder(parent, 0.09, 3.4, Color(0.19,0.22,0.24), at+Vector3(0,1.7,0))
     _sphere(parent, 0.23, Color(0.91,0.87,0.65), at+Vector3(0,3.4,0))
     var lamp := OmniLight3D.new()
@@ -378,6 +435,7 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     person.set_meta("resident_id", id)
     var anchor := Vector3((float(index % 8)-3.5)*3.0, 0, -4.0-float(index / 8)*2.5)
     anchor.z = maxf(anchor.z, -13.0)
+    anchor = _open_anchor(anchor)
     person.position = anchor
     person.set_meta("anchor", anchor)
     person.set_meta("phase", float(absi(id.hash()) % 628) / 100.0)
@@ -420,7 +478,10 @@ func _animate_residents(delta: float) -> void:
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
-            person.position = person.position.move_toward(target,delta*1.5)
+            var next := person.position.move_toward(target,delta*1.5)
+            var old := person.position
+            person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
+            walking = person.position.distance_squared_to(old) > 0.000001
         var swing := sin(phase*12.0)*0.42 if walking else 0.0
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
@@ -428,6 +489,7 @@ func _animate_residents(delta: float) -> void:
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
+    _add_obstacle(Vector3(-7.0, 0.0, 7.5), Vector2(11.0, 7.0))
     _box(_scenery, Vector3(11.0, 4.5, 7.0), wall_color,
             Vector3(-7.0, 2.25, 7.5))
     _box(_scenery, Vector3(12.0, 0.7, 8.0), Color(0.27, 0.30, 0.33),
@@ -437,6 +499,9 @@ func _building(_title: String, wall_color: Color) -> void:
 
 func _create_gate_and_kiosk() -> void:
     # A yellow gate is a map transition — actual travel is authorized by Java.
+    for offset in [-1.6, 1.6]:
+        _add_obstacle(GATE_POSITION + Vector3(offset, 0.0, 0.0), Vector2(0.4, 0.4))
+    _add_obstacle(KIOSK_POSITION, Vector2(2.4, 1.6))
     _box(_scenery, Vector3(0.4, 3.1, 0.4), Color(0.94, 0.69, 0.12),
             GATE_POSITION + Vector3(-1.6, 1.55, 0.0))
     _box(_scenery, Vector3(0.4, 3.1, 0.4), Color(0.94, 0.69, 0.12),
@@ -450,6 +515,7 @@ func _create_gate_and_kiosk() -> void:
             KIOSK_POSITION + Vector3(0.0, 1.6, 0.0))
 
 func _tree(at: Vector3) -> void:
+    _add_obstacle(at, Vector2(0.45, 0.45))
     _box(_scenery, Vector3(0.45, 1.8, 0.45), Color(0.33, 0.19, 0.11),
             at + Vector3(0.0, 0.9, 0.0))
     _sphere(_scenery, 1.15, Color(0.16, 0.37, 0.16),

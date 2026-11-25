@@ -38,6 +38,39 @@ func _exercise() -> void:
     world._view_yaw = 0.0
     world._follow_player()
 
+    # Physical footprints: long steps cannot tunnel through solid objects.
+    var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
+            Vector3(0,0,-6), world.WALKER_RADIUS)
+    if not _check(kiosk_stop.z > 4.1 and kiosk_stop.z < 4.3
+            and world._can_stand(kiosk_stop, world.WALKER_RADIUS),
+            "kiosk blocks even a long movement step"):
+        return
+    var fountain_stop: Vector3 = world._move_on_ground(Vector3(8,0,-1),
+            Vector3(0,0,-8), world.WALKER_RADIUS)
+    if not _check(fountain_stop.z > -2.8 and fountain_stop.z < -2.5,
+            "visitor cannot walk through the fountain"):
+        return
+    var tree_stop: Vector3 = world._move_on_ground(Vector3(-8,0,-3),
+            Vector3(0,0,-4), world.WALKER_RADIUS)
+    if not _check(tree_stop.z > -4.5 and tree_stop.z < -4.3,
+            "tree trunk blocks movement"):
+        return
+    var gate_pass: Vector3 = world._move_on_ground(Vector3(0,0,-9),
+            Vector3(0,0,-5), world.WALKER_RADIUS)
+    if not _check(gate_pass.is_equal_approx(Vector3(0,0,-14)),
+            "the open gate remains passable"):
+        return
+    var slid: Vector3 = world._move_on_ground(Vector3(7,0,4.3),
+            Vector3(0.6,0,-1.0), world.WALKER_RADIUS)
+    if not _check(slid.x > 7.5 and slid.z >= 4.1,
+            "diagonal movement slides along an obstacle"):
+        return
+    var edge: Vector3 = world._move_on_ground(Vector3(16,0,0),
+            Vector3(4,0,0), world.WALKER_RADIUS)
+    if not _check(edge.x <= 17.0 and edge.x > 16.8,
+            "district boundary remains enforced"):
+        return
+
     var populated_park := _world("PARK", "Park")
     populated_park["residents"] = [
         {"id": "marco", "name": "Marco Bianchi", "activity": "WALKING"},
@@ -83,7 +116,7 @@ func _exercise() -> void:
     if not _check(world._scenery.name == "PublicScene_PARK",
             "park scenery was generated"):
         return
-    world._avatar.position = world.KIOSK_POSITION
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._toggle_actions()
     if not _check(_has_button(world._action_choices, "Drink from park fountain"),
             "public park offers the limited fountain separately from unsafe puddles"):
@@ -106,11 +139,16 @@ func _exercise() -> void:
         return
 
     world._on_world_updated(_world("MARKET", "Market"))
+    var wall_stop: Vector3 = world._move_on_ground(Vector3(-7,0,0),
+            Vector3(0,0,9), world.WALKER_RADIUS)
+    if not _check(wall_stop.z > 3.5 and wall_stop.z < 3.8,
+            "market building has a solid exterior"):
+        return
     if not _check(world._scenery.name == "PublicScene_MARKET" and
             world._avatar.position == Vector3.ZERO,
             "authoritative market arrival regenerates scenery and spawns visitor"):
         return
-    world._avatar.position = world.KIOSK_POSITION
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._toggle_actions()
     if not _check(world._action_panel.visible and
             _has_button(world._action_choices, "Apply: market assistant"),
@@ -118,7 +156,7 @@ func _exercise() -> void:
         return
 
     world._on_world_updated(_world("SCHOOL", "School"))
-    world._avatar.position = world.KIOSK_POSITION
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._toggle_actions()
     if not _check(world._action_panel.visible and
             _has_button(world._action_choices, "Study engineering"),
@@ -126,7 +164,7 @@ func _exercise() -> void:
         return
 
     world._on_world_updated(_world("WORKSHOP", "Workshop"))
-    world._avatar.position = world.KIOSK_POSITION
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._toggle_actions()
     if not _check(_has_button(world._action_choices, "Apply: technician"),
             "workshop provides technician applications"):
@@ -149,7 +187,7 @@ func _exercise() -> void:
         return
 
     world._on_world_updated(_world("OFFICE", "Office"))
-    world._avatar.position = world.KIOSK_POSITION
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._toggle_actions()
     world._on_work_orders_updated([{
         "id": "street-lights", "place": "OFFICE",
@@ -164,7 +202,7 @@ func _exercise() -> void:
     if not _check(world._scenery.name == "PublicScene_QUARRY",
             "quarry has its own physical district"):
         return
-    world._avatar.position = world.KIOSK_POSITION
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._toggle_actions()
     if not _check(_has_button(world._action_choices, "Apply: quarry miner"),
             "quarry offers a real paid mining career"):
@@ -179,7 +217,7 @@ func _exercise() -> void:
     if not _check(world._scenery.name == "PublicScene_FACTORY",
             "manufacturing factory has its own physical district"):
         return
-    world._avatar.position = world.KIOSK_POSITION
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._toggle_actions()
     if not _check(_has_button(world._action_choices, "Apply: factory machinist"),
             "factory lets the visitor become a worker rather than only watch NPCs"):
@@ -197,7 +235,7 @@ func _exercise() -> void:
         return
 
     world._on_world_updated(_world("WORKSHOP", "Workshop"))
-    world._avatar.position = world.KIOSK_POSITION
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._action_panel.visible = true
     world._on_business_updated({
         "registered": false, "yours": false, "ownerIncarnation": 0,
