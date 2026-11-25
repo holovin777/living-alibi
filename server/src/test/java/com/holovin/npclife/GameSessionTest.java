@@ -13,6 +13,45 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void controlledKumiteRequiresPartnerAndPersistsScoreWithoutInjury() throws Exception {
+        Path file=directory.resolve("kumite.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,3);
+            var c=people.get(0);var teacher=people.get(1);var student=people.get(2);
+            id=c.id;
+            for(var p:people){p.age=30;p.health=100;p.place=TownLife.Place.SCHOOL;p.travelRemaining=0;p.activity="FREE_TIME";p.money=100;p.fatigue=10;p.hunger=10;p.thirst=10;}
+            teacher.carefulness=80;student.carefulness=30;student.goal="STAY_HEALTHY";
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            assertThrows(IllegalArgumentException.class,()->KumiteLife.act(town,1,1080,"start"));
+            DojoCommunityLife.found(town,1);
+            KumiteLife.act(town,1,1080,"start");
+            assertEquals(95,c.money);
+            assertEquals(student.id,KumiteLife.view(town,c,1,1081).partnerId());
+            for(int i=0;i<5;i++){
+                String expected=switch(KumiteLife.cue(town,c)){case "close"->"guard";case "far"->"step";default->"touch";};
+                KumiteLife.act(town,1,1081+i,i==0?(expected.equals("guard")?"step":"guard"):expected);
+            }
+            assertEquals(4,KumiteLife.view(town,c,1,1086).score());
+            assertEquals(1,KumiteLife.view(town,c,1,1086).partnerScore());
+            assertEquals(100,c.health);assertEquals(100,student.health);
+            assertEquals(1,DojoLife.get(town,c,"kumite"));
+            assertThrows(IllegalArgumentException.class,()->KumiteLife.act(town,1,1087,"start"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            assertTrue(KumiteLife.view(town,c,1,1087).completed());
+            assertEquals(4,KumiteLife.get(town,c,"score"));
+            assertEquals(1,DojoLife.get(town,c,"kumite"));
+        }
+    }
+
+    @Test
     void dojoCommunityUsesRealResidentsAndPersistentAttendance() throws Exception {
         Path file=directory.resolve("dojo-community.db");
         String teacherId,studentId;
