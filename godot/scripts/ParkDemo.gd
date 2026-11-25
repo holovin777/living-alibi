@@ -424,13 +424,17 @@ func _render_actions() -> void:
                 var cash := str(business.get("cash", 0))
                 var machine := bool(business.get("machine", false))
                 var label := Label.new()
-                label.text = "YOUR COMPANY | Bank: " + cash + " EUR | machine: " + str(machine)
+                var machine_health := int(business.get("machineCondition", 0))
+                label.text = "YOUR COMPANY | Bank: " + cash + " EUR | machine: " + str(machine) + " " + str(machine_health) + "/100"
                 _action_choices.add_child(label)
                 _action_choices.add_child(_button("Invest 10 EUR", _business_invest.bind(10)))
                 _action_choices.add_child(_button("Invest 25 EUR", _business_invest.bind(25)))
                 if not machine:
                     _action_choices.add_child(_button("Buy fabrication machine · 25 EUR",
                             _business_machine))
+                elif machine_health < 100:
+                    _action_choices.add_child(_button("Service machine · 2 parts + 10 EUR",
+                            _business_service))
                 if machine and str(business.get("employeeId", "")) in ["", "<null>"]:
                     for candidate in _business_candidates:
                         var id := str(candidate.get("id", ""))
@@ -511,6 +515,11 @@ func _business_machine() -> void:
     if _near_kiosk() and not _api.is_busy():
         _action_panel.visible = false
         _api.business_machine()
+
+func _business_service() -> void:
+    if _near_kiosk() and not _api.is_busy():
+        _action_panel.visible = false
+        _api.business_service()
 
 func _business_hire(resident_id: String) -> void:
     if _near_kiosk() and not _api.is_busy():
@@ -658,8 +667,9 @@ func _on_business_updated(report: Dictionary) -> void:
     var state := "NOT REGISTERED"
     if bool(report.get("registered", false)):
         state = "OWNED" if bool(report.get("yours", false)) else "SOMEONE ELSE'S BUSINESS"
-    _jobs.text = "SMALL WORKSHOP: %s | bank %s EUR | machine %s\n" % [
-        state, str(report.get("cash", 0)), str(report.get("machine", false))
+    _jobs.text = "SMALL WORKSHOP: %s | bank %s EUR | machine %s (%s/100)\n" % [
+        state, str(report.get("cash", 0)), str(report.get("machine", false)),
+        str(report.get("machineCondition", 0))
     ]
     _jobs.text += "Employee %s | parts in stock %s | paid hours today %s" % [
         employee, str(report.get("spareParts", 0)), str(report.get("paidHoursToday", 0))
