@@ -4,7 +4,7 @@
 
 > A living town where you can be an unknown visitor, build relationships, or investigate when you choose.
 
-Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player is an ordinary park visitor; detective cases are optional. A first Godot 3D park preview now exists, but it is not a complete 3D world.** Code, documentation, and game text are English-only.
+Living Alibi is an early prototype for an emergent detective simulation. Its residents pursue independent activities while the player observes; an authoritative event log is kept separate from what individuals witness. **The player is an ordinary park visitor; detective cases are optional. A first Godot 3D park preview now exists, but it is not a complete 3D world.** Code and documentation are primarily English; the Godot interface supports English and Italian, with some game text still English-only.
 
 ## Play the current 3D prototype on Linux
 
@@ -14,7 +14,7 @@ repositories if missing (for example `jdk21-openjdk`, `maven`, `curl`,
 `godot`). The first Maven build requires internet access to download
 dependencies; regular game logic does not require an OpenAI key.
 
-From the **v1.16 feature branch** in the repository root:
+From the **main branch** in the repository root:
 
 ```bash
 bash play.sh --check
@@ -47,11 +47,11 @@ server and displays its output, and `data/server.log` records normal
 game-launch errors. Do not launch the console and Spring server
 simultaneously against the same save file.
 
-To get this branch into a *separate* folder without replacing your current
+To get the current main branch into a *separate* folder without replacing your current
 checkout:
 
 ```bash
-git clone --branch feat/player-needs-persistence-v1.16 \
+git clone --branch main \
   https://github.com/holovin777/living-alibi.git living-alibi-preview
 cd living-alibi-preview
 bash play.sh
