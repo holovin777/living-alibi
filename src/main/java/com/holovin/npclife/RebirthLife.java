@@ -194,8 +194,9 @@ final class RebirthLife {
         return Math.max(0,Math.min(2,EducationLife.get(t,c,"furniture-level")));
     }
     static int furniturePrice(int level){return level==0?80:level==1?180:0;}
-    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions,int hygiene,int furnitureLevel,int upgradePrice,boolean outsideHome){} 
-    static HomeOptions homeOptions(TownLife.Town t,int day){
+    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions,int hygiene,int furnitureLevel,int upgradePrice,boolean outsideHome,List<HomeMarketLife.Offer> properties){} 
+    static HomeOptions homeOptions(TownLife.Town t,int day){return homeOptions(t,day,-1);}
+    static HomeOptions homeOptions(TownLife.Town t,int day,int minute){
         var c=child(t);
         if(!linkedAdult(t,c))return null;
         var family=homeFamily(t,c);
@@ -211,7 +212,7 @@ final class RebirthLife {
             if(!family.isEmpty()&&EducationLife.get(t,c,"last-family-time")<day)actions.add("family");
         }
         return new HomeOptions(c.home.label,atHome(c),stayingHome(t,c),c.food,c.water,
-                family.stream().map(p->p.name).toList(),List.copyOf(actions),hygiene(t,c),furnitureLevel(t,c),furniturePrice(furnitureLevel(t,c)),outsideHome(t,c));
+                family.stream().map(p->p.name).toList(),List.copyOf(actions),hygiene(t,c),furnitureLevel(t,c),furniturePrice(furnitureLevel(t,c)),outsideHome(t,c),HomeMarketLife.offers(t,minute));
     }
     record HomeAction(int minutes,String message){}
     static HomeAction homeAction(TownLife.Town t,int day,String action){
@@ -688,6 +689,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute),EducationLife.college(t,day,minute),TechnicalWorkLife.linkedOrders(t,day,minute),SoftwareLife.projects(t,day,minute),JavaTicketLife.workspace(t,day,minute));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day,minute),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute),EducationLife.college(t,day,minute),TechnicalWorkLife.linkedOrders(t,day,minute),SoftwareLife.projects(t,day,minute),JavaTicketLife.workspace(t,day,minute));
     }
 }
