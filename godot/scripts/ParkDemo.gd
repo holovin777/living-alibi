@@ -46,6 +46,8 @@ var _message: Label
 var _hint: Label
 var _view_button: Button
 var _jobs: Label
+var _map_panel: PanelContainer
+var _town_map
 var _travel_panel: PanelContainer
 var _travel_choices: GridContainer
 var _action_panel: PanelContainer
@@ -73,7 +75,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     var direction := Vector3.ZERO
     # Do not move away from an open clickable interaction menu.
-    if not _travel_panel.visible and not _action_panel.visible:
+    if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
             direction.z -= 1.0
         if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -108,7 +110,7 @@ func _unhandled_input(event: InputEvent) -> void:
         _follow_player()
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # UI consumes its own clicks before they reach this handler.
-        if not _travel_panel.visible and not _action_panel.visible:
+        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -117,14 +119,18 @@ func _unhandled_key_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
             _travel_panel.visible = false
             _action_panel.visible = false
+            _map_panel.visible = false
+            get_viewport().set_input_as_handled()
+        elif event.keycode == KEY_M:
+            _toggle_map()
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_V:
             _toggle_view_mode()
             get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_E and _near_gate():
+        elif event.keycode == KEY_E and _near_gate() and not _map_panel.visible:
             _toggle_travel()
             get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_F and _near_kiosk():
+        elif event.keycode == KEY_F and _near_kiosk() and not _map_panel.visible:
             _toggle_actions()
             get_viewport().set_input_as_handled()
 
@@ -584,6 +590,10 @@ func _create_interface() -> void:
     buttons.add_child(_button("Wait 60m", _wait_one_hour))
     _view_button = _button("View: first person (V)", _toggle_view_mode)
     column.add_child(_view_button)
+    var map_button := Button.new()
+    map_button.text = "Town map (M)"
+    map_button.pressed.connect(_toggle_map)
+    column.add_child(map_button)
     _hint = Label.new()
     _hint.text = "WASD: walk · click scene: mouse look · V: camera · Esc: cursor."
     column.add_child(_hint)
@@ -591,6 +601,22 @@ func _create_interface() -> void:
     _jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _jobs.text = ""
     column.add_child(_jobs)
+
+    _map_panel = PanelContainer.new()
+    _map_panel.position = Vector2(15, 15)
+    _map_panel.visible = false
+    canvas.add_child(_map_panel)
+    var map_column := VBoxContainer.new()
+    _map_panel.add_child(map_column)
+    var map_header := Label.new()
+    map_header.text = "Living Alibi — public town map (schematic)"
+    map_column.add_child(map_header)
+    _town_map = preload("res://scripts/TownMap.gd").new()
+    map_column.add_child(_town_map)
+    var close_map := Button.new()
+    close_map.text = "Close map (M)"
+    close_map.pressed.connect(_toggle_map)
+    map_column.add_child(close_map)
 
     _travel_panel = PanelContainer.new()
     _travel_panel.position = Vector2(480.0, 15.0)
@@ -630,6 +656,16 @@ func _replace_choices(parent: Control, keep_header: bool = false) -> void:
             continue
         parent.remove_child(children[i])
         children[i].queue_free()
+
+func _toggle_map() -> void:
+    _map_panel.visible = not _map_panel.visible
+    if _map_panel.visible:
+        _travel_panel.visible = false
+        _action_panel.visible = false
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+        _town_map.update_world(_current_place, _locations)
+        if _connected and not _api.is_busy():
+            _api.list_locations()
 
 func _toggle_travel() -> void:
     if not _near_gate() or not _connected:
@@ -879,6 +915,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _current_place = new_place
         _render_place(new_place)
         _avatar.position = Vector3.ZERO
+        _locations.clear() # Previous-origin travel estimates are now stale.
         _follow_player()
         _action_panel.visible = false
         _travel_panel.visible = false
@@ -909,6 +946,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _needs.text += "\nResidents present in this district: %s" % [
         str(snapshot.get("residents", []).size())
     ]
+    _town_map.update_world(_current_place, _locations)
     _render_residents()
     _apply_weather()
     _render_actions()
@@ -942,6 +980,7 @@ func _apply_weather() -> void:
 
 func _on_locations_updated(locations: Array) -> void:
     _locations = locations
+    _town_map.update_world(_current_place, _locations)
     if _travel_panel.visible:
         _render_destinations()
 

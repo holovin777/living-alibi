@@ -38,6 +38,23 @@ func _exercise() -> void:
     world._view_yaw = 0.0
     world._follow_player()
 
+    var layout = world._town_map
+    if not _check(layout.DISTRICTS.size() == 15
+            and layout.world_center("PARK") == Vector3.ZERO
+            and layout.adjacent("PARK", "SCHOOL")
+            and not layout.adjacent("PARK", "QUARRY")
+            and not layout.DISTRICTS.has("MARCO_HOME"),
+            "public map defines all districts, neighbours and no private residences"):
+        return
+    world._toggle_map()
+    if not _check(world._map_panel.visible and not world._travel_panel.visible
+            and not world._action_panel.visible and layout.current_place == "PARK",
+            "map opens independently of the gate"):
+        return
+    world._toggle_map()
+    if not _check(not world._map_panel.visible, "map closes without travelling"):
+        return
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)
@@ -129,6 +146,9 @@ func _exercise() -> void:
         {"id": "MARKET", "label": "Market", "travelMinutes": 10},
         {"id": "SCHOOL", "label": "School", "travelMinutes": 10}
     ])
+    if not _check(layout.travel_minutes.get("SCHOOL") == 10,
+            "map reads travel minutes from the Java location response"):
+        return
     world._avatar.position = world.GATE_POSITION
     world._toggle_travel()
     if not _check(world._travel_panel.visible,
@@ -139,6 +159,9 @@ func _exercise() -> void:
         return
 
     world._on_world_updated(_world("MARKET", "Market"))
+    if not _check(layout.current_place == "MARKET" and layout.travel_minutes.is_empty(),
+            "map follows committed arrival and clears stale travel estimates"):
+        return
     var wall_stop: Vector3 = world._move_on_ground(Vector3(-7,0,0),
             Vector3(0,0,9), world.WALKER_RADIUS)
     if not _check(wall_stop.z > 3.5 and wall_stop.z < 3.8,

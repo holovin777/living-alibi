@@ -145,6 +145,20 @@ jumping, NPC-to-NPC collisions, interiors or continuous connected streets.
 The Java engine still validates actual district transitions and actions.
 
 
+## Town map — first step toward connected districts
+
+Press **M** or the Town map button to open the schematic overview.
+All 15 public districts are arranged on a shared grid, with a nominal
+48-unit spacing and neighbouring road links. Your current district is
+highlighted; travel times come only from the Java location response.
+The map is read-only: it does not teleport the player, expose private
+homes or introduce new travel rules. Moving to a different district
+still uses the gate and the existing Java travel action.
+
+The grid is a proposed layout for later district streaming, not a
+physical street network yet. Java's existing travel times are unchanged
+and need not correspond to the drawn distance.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world
