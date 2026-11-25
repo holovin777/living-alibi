@@ -317,7 +317,7 @@ func _open_anchor(preferred: Vector3) -> Vector3:
         return preferred
     for distance in range(1, 7):
         for side in [Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD, Vector3.BACK]:
-            var candidate := preferred + side * float(distance)
+            var candidate: Vector3 = preferred + side * float(distance)
             if _can_stand(candidate, WALKER_RADIUS):
                 return candidate
     return Vector3.ZERO
