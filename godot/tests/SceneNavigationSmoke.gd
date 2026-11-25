@@ -65,7 +65,7 @@ func _exercise() -> void:
     world._follow_player()
 
     var layout = world._town_map
-    if not _check(layout.DISTRICTS.size() == 16
+    if not _check(layout.DISTRICTS.size() == 17
             and layout.world_center("PARK") == Vector3.ZERO
             and layout.adjacent("PARK", "SCHOOL")
             and not layout.adjacent("PARK", "QUARRY")
@@ -128,6 +128,18 @@ func _exercise() -> void:
         if not _check(world._can_stand(at,world.WALKER_RADIUS,true),
                 "all four Centro exits remain walkable"):
             return
+    world._on_world_updated(_world("PARK","Park"))
+
+    world._on_world_updated(_world("PORTICI","Via dei Portici"))
+    if not _check(world._scenery.has_node("ViaDeiPortici/BottegaAlimentare")
+            and world._road_links.size() == 4
+            and world._road_destination(Vector3(0,0,-23.9),23.8) == "CENTRO",
+            "historic street connects to the square and has a real shop doorway"):
+        return
+    var entered: Vector3 = world._move_on_ground(Vector3(3,0,5.4),Vector3(4,0,0),world.WALKER_RADIUS)
+    if not _check(entered.x > 6.8 and not world._can_stand(Vector3(4.4,0,3.2),world.WALKER_RADIUS),
+            "walk through open grocery door, but not through its wall"):
+        return
     world._on_world_updated(_world("PARK","Park"))
 
     # Physical footprints: long steps cannot tunnel through solid objects.

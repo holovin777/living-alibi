@@ -287,6 +287,21 @@ fronts, decorative iron balconies, flower boxes, cornices and a small
 walkable garden court (Cortile dei Fiori) with collision footprints.
 Upper floors and storefront interiors are still non-enterable.
 
+## Via dei Portici
+
+South of Centro, a new public district connects the square, Bakery,
+River and South residences. Cafe is relocated west of Bakery on the
+schematic grid; no existing Java place IDs or save data are removed.
+The 48-unit street includes narrow sidewalks, varied three-storey
+building shells, door surrounds, shutters and lanterns. An Alimentari
+shop has an open doorway, a walkable ground-floor interior, shelves,
+lighting and the existing interaction kiosk inside. It sells bread
+and bottled water from the same finite Market stock/account during
+the same opening hours. This is a branch counter, not a new independent
+business. Other doors and upper floors are decorative. Local collision
+checks enforce the doorway; the server validates the district, not
+exact indoor coordinates. The room rental is still a kiosk action.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

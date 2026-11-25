@@ -21,12 +21,15 @@ final class RetailLife {
         return PRODUCTS.stream().filter(p->p.id().equals(id)).findFirst()
                 .orElseThrow(()->new IllegalArgumentException("Unknown retail product."));
     }
+    static boolean hasCounter(TownLife.Place place) {
+        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI;
+    }
     static String buy(TownLife.Town t,String id,int minute) {
         var player=t.player;
         PlayerLife.requireAlive(player);
         var product=product(id);
-        if(player.place!=TownLife.Place.MARKET || player.travelRemaining>0)
-            throw new IllegalArgumentException("Visit the market to buy supplies.");
+        if(!hasCounter(player.place) || player.travelRemaining>0)
+            throw new IllegalArgumentException("Visit the market or Via dei Portici grocery to buy supplies.");
         if(minute<480 || minute>=1200)
             throw new IllegalArgumentException("Market opens 08:00–20:00.");
         if(t.retailStock.getOrDefault(id,0)<1)

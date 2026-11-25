@@ -95,7 +95,7 @@ public final class GameSession implements AutoCloseable {
                 CalendarLife.dayOfYear(state.day),weather.season().name(),
                 new WeatherView(weather.sky().name(),weather.temperatureC(),
                         weather.raining(),weather.snowing()),
-                player,residents,resources,services(),p.place==TownLife.Place.MARKET
+                player,residents,resources,services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().map(item->new RetailView(item.id(),item.label(),item.price(),
                             town.retailStock.getOrDefault(item.id(),0))).toList() : List.of());
     }

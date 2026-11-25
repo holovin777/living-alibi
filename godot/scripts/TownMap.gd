@@ -8,12 +8,12 @@ const DISTRICTS := {
     "MARKET": Vector2i(0,1), "CENTRO": Vector2i(1,1),
     "PARK": Vector2i(2,1), "LIBRARY": Vector2i(3,1),
     "WORKSHOP": Vector2i(4,1),
-    "SOUTH_RESIDENCES": Vector2i(0,2), "CAFE": Vector2i(1,2),
+    "SOUTH_RESIDENCES": Vector2i(0,2), "PORTICI": Vector2i(1,2),
     "RIVER": Vector2i(2,2), "WOODS": Vector2i(3,2),
-    "QUARRY": Vector2i(4,2), "BAKERY": Vector2i(1,3)
+    "QUARRY": Vector2i(4,2), "BAKERY": Vector2i(1,3), "CAFE": Vector2i(0,3)
 }
 const LABELS := {
-    "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes", "CENTRO": "Centro storico"
+    "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes", "CENTRO": "Centro storico", "PORTICI": "Via dei Portici"
 }
 const TILE_SPACING := 48.0
 var current_place := "PARK"
@@ -63,7 +63,7 @@ func _draw() -> void:
         var color := Color("#40564a")
         if id in ["PARK","WOODS"]:
             color = Color("#47784e")
-        elif id == "CENTRO":
+        elif id in ["CENTRO","PORTICI"]:
             color = Color("#947453")
         elif id == "RIVER":
             color = Color("#326c85")

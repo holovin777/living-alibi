@@ -13,6 +13,24 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void porticiGrocerySharesTheExistingMarketStock() throws Exception {
+        Path file=directory.resolve("portici.db");
+        try(var game=new GameSession(file)) {
+            game.move("portici");
+            game.waitMinutes(60);
+            assertEquals("PORTICI",game.snapshot().player().placeId());
+            int bread=game.snapshot().shop().stream().filter(x->x.id().equals("bread")).findFirst().orElseThrow().stock();
+            game.buy("bread");
+            assertEquals(47,game.snapshot().player().money());
+            game.move("market");
+            assertEquals(bread-1,game.snapshot().shop().stream().filter(x->x.id().equals("bread")).findFirst().orElseThrow().stock());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(1,game.snapshot().player().bread());
+        }
+    }
+
+    @Test
     void historicCentreIsPublicAndParkRemainsFirstSpawn() throws Exception {
         Path file=directory.resolve("centro.db");
         try(var game=new GameSession(file)) {

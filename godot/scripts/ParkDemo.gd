@@ -303,6 +303,8 @@ func _generate_chunk(place_id: String) -> void:
     _scenery.add_child(_residents_root)
 
     match place_id:
+        "PORTICI":
+            _build_portici()
         "CENTRO":
             _build_centro()
         "PARK":
@@ -392,7 +394,7 @@ func _build_road_links(place_id: String) -> void:
         var dimensions := Vector3(4.0,0.05,15.0) if vertical else Vector3(15.0,0.05,4.0)
         _box(roads, dimensions, Color(0.49,0.47,0.42),
                 direction * 16.5 + Vector3(0,0.025,0))
-        _sign(roads, str(id).capitalize(), direction * 19.0 + Vector3(0,2.8,0))
+        _sign(roads, str(TownLayout.LABELS.get(id,str(id).capitalize())), direction * 19.0 + Vector3(0,2.8,0))
 
 func _road_destination(at: Vector3, minimum: float) -> String:
     for key in _road_links:
@@ -467,6 +469,86 @@ func _open_anchor(preferred: Vector3) -> Vector3:
 
 # Piazza Centrale: fictional Lombard piazza, reusable portico modules.
 # The four axial lanes stay clear for the district road connections.
+func _build_portici() -> void:
+    var street := Node3D.new()
+    street.name = "ViaDeiPortici"
+    _scenery.add_child(street)
+    _box(street,Vector3(7.4,0.06,34),Color("#b7aa93"),Vector3(0,0.025,0))
+    _box(street,Vector3(34,0.06,5.1),Color("#b7aa93"),Vector3(0,0.025,0))
+    for side in [-1,1]:
+        _box(street,Vector3(1.1,0.12,34),Color("#d1c4a9"),Vector3(side*3.65,0.06,0))
+    # The four road axes are open; blocks occupy the corners only.
+    _portici_house(street,-1.0,-9.5,12.0,8.0,Color("#c8ae89"),"Casa 12")
+    _portici_house(street,-1.0,10.0,12.0,9.2,Color("#bc8b73"),"Casa 14")
+    _portici_house(street,1.0,-10.0,12.0,9.0,Color("#d5c09c"),"Casa 15")
+    _portici_house(street,1.0,12.6,8.0,7.2,Color("#c29b73"),"Casa 17")
+    _portici_grocery(street)
+    for at in [Vector3(-3,0,-8),Vector3(3,0,-4),Vector3(-3,0,9),Vector3(3,0,12)]:
+        _lamp(street,at)
+    _sign(street,"Via dei Portici",Vector3(0,3.6,-8))
+    _sign(street,"Piazza Centrale",Vector3(0,3.4,-16))
+
+func _portici_house(parent: Node3D,side: float,z: float,length: float,height: float,
+        wall: Color,caption: String) -> void:
+    var front := side*4.4
+    var center := side*9.2
+    var trim := Color("#dfc9a5")
+    _add_obstacle(Vector3(center,0,z),Vector2(9.6,length))
+    _box(parent,Vector3(9.6,height,length),wall,Vector3(center,height*0.5,z))
+    _box(parent,Vector3(9.85,0.32,length+0.2),Color("#744536"),Vector3(center,height+0.12,z))
+    _box(parent,Vector3(0.12,0.18,length),trim,Vector3(front-side*0.06,3.3,z))
+    for offset in [-length/3.0,0.0,length/3.0]:
+        for y in [4.5,6.5]:
+            var face := front-side*0.055
+            _box(parent,Vector3(0.1,1.3,0.88),Color("#35454a"),Vector3(face,y,z+offset))
+            _box(parent,Vector3(0.22,0.12,1.65),trim,Vector3(face,y-0.72,z+offset))
+            for shutter in [-0.65,0.65]:
+                _box(parent,Vector3(0.12,1.4,0.36),Color("#455644"),Vector3(face-side*0.07,y,z+offset+shutter))
+        if offset == 0.0:
+            _box(parent,Vector3(0.16,2.55,1.5),Color("#503c2e"),Vector3(front-side*0.08,1.275,z))
+            _box(parent,Vector3(0.18,0.25,1.85),trim,Vector3(front-side*0.12,2.65,z))
+        else:
+            _box(parent,Vector3(0.14,1.25,1.2),Color("#5d6460"),Vector3(front-side*0.08,1.55,z+offset))
+    _sign(parent,caption,Vector3(front-side*0.28,2.95,z))
+    _centro_flowers(parent,Vector3(front-side*0.22,3.78,z+length/3.0))
+
+func _portici_grocery(parent: Node3D) -> void:
+    var shop := Node3D.new()
+    shop.name = "BottegaAlimentare"
+    parent.add_child(shop)
+    var wall := Color("#d3b995")
+    # Open doorway on the west face (x=4.4), z=4.3..6.3.
+    # The existing local action kiosk at (7,3) sits INSIDE the shop.
+    var walls := [
+        [Vector3(10.5,0,5.0),Vector2(0.3,6.0)],
+        [Vector3(7.45,0,2.15),Vector2(6.4,0.3)],
+        [Vector3(7.45,0,7.85),Vector2(6.4,0.3)],
+        [Vector3(4.4,0,3.2),Vector2(0.3,2.2)],
+        [Vector3(4.4,0,7.1),Vector2(0.3,1.6)]]
+    for part in walls:
+        var at: Vector3 = part[0]
+        var footprint: Vector2 = part[1]
+        _add_obstacle(at,footprint)
+        _box(shop,Vector3(footprint.x,3.4,footprint.y),wall,at+Vector3(0,1.7,0))
+    _box(shop,Vector3(6.4,0.065,6),Color("#b69b78"),Vector3(7.45,0.03,5))
+    _box(shop,Vector3(6.4,3.8,6),wall,Vector3(7.45,5.3,5))
+    _box(shop,Vector3(6.65,0.3,6.25),Color("#794b36"),Vector3(7.45,7.35,5))
+    _box(shop,Vector3(0.24,0.45,2.3),Color("#6f4931"),Vector3(4.4,2.85,5.3))
+    _sign(shop,"Alimentari · F",Vector3(4.05,3.1,5.3))
+    for z in [4.5,6.8]:
+        var shelf := Vector3(9.8,0,z)
+        _add_obstacle(shelf,Vector2(0.6,1.3))
+        _box(shop,Vector3(0.6,1.8,1.3),Color("#765c40"),shelf+Vector3(0,0.9,0))
+        for y in [0.75,1.25]:
+            _box(shop,Vector3(0.25,0.24,0.9),Color("#d9bb76"),shelf+Vector3(-0.35,y,0))
+    var light := OmniLight3D.new()
+    light.position = Vector3(7.5,2.95,5)
+    light.light_color = Color("#ffe0aa")
+    light.light_energy = 1.2
+    light.omni_range = 5.5
+    shop.add_child(light)
+    _park_lamps.append(light)
+
 func _build_centro() -> void:
     var piazza := Node3D.new()
     piazza.name = "PiazzaCentrale"
@@ -1157,7 +1239,7 @@ func _render_actions() -> void:
             if bool(player.get("roomActive",false)):
                 _action_choices.add_child(_button("Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in guest room · 8h",_sleep_room.bind(8)))
-        "MARKET":
+        "MARKET", "PORTICI":
             for item in _last_snapshot.get("shop",[]):
                 var id := str(item.get("id",""))
                 var stock := int(item.get("stock",0))
@@ -1166,8 +1248,9 @@ func _render_actions() -> void:
                 choice.disabled = stock <= 0
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
-            _action_choices.add_child(_button("Apply: market assistant",
-                    _apply_job.bind("shop-assistant")))
+            if _current_place == "MARKET":
+                _action_choices.add_child(_button("Apply: market assistant",
+                        _apply_job.bind("shop-assistant")))
         "WORKSHOP":
             _action_choices.add_child(_button("Apply: technician",
                     _apply_job.bind("technician")))
