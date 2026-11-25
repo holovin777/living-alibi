@@ -43,6 +43,7 @@ const LiveClock = preload("res://scripts/LiveClock.gd")
 const DriveControls = preload("res://scripts/DriveControls.gd")
 const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
+const TownAudio = preload("res://scripts/TownAudio.gd")
 const TownVisuals = preload("res://scripts/TownVisuals.gd")
 var _sky_material: ProceduralSkyMaterial
 var _surface_textures: Dictionary = {}
@@ -120,6 +121,7 @@ var _sun: DirectionalLight3D
 var _ground_material: StandardMaterial3D
 var _environment: Environment
 var _weather_fx: Node3D
+var _town_audio: Node3D
 var _api
 var _current_place := ""
 var _road_links: Dictionary = {}
@@ -216,6 +218,7 @@ func _process(delta: float) -> void:
         _advance_traffic(delta)
         _animate_residents(delta)
         _weather_fx.follow(_avatar.position)
+        _update_town_audio(delta,0.0)
         return
     var direction := Vector3.ZERO
     var moved := 0.0
@@ -244,6 +247,7 @@ func _process(delta: float) -> void:
     _advance_jump(delta)
     _advance_locomotion(delta,moved)
     _follow_player()
+    _update_town_audio(delta,moved)
 
     if _apartment_active:
         _update_first_steps()
@@ -998,6 +1002,8 @@ func _build_world() -> void:
     _weather_fx = WeatherEffects.new()
     add_child(_weather_fx)
     _weather_fx.follow(_avatar.position)
+    _town_audio = TownAudio.new()
+    add_child(_town_audio)
     _build_cockpit()
     _camera = Camera3D.new()
     _camera.current = true
@@ -3539,6 +3545,11 @@ func _create_interface() -> void:
     audio_toggle.button_pressed = true
     audio_toggle.toggled.connect(_set_weather_audio)
     atmosphere_row.add_child(audio_toggle)
+    var sound_toggle := CheckButton.new()
+    sound_toggle.text = "Town sound"
+    sound_toggle.button_pressed = true
+    sound_toggle.toggled.connect(_set_town_audio)
+    column.add_child(sound_toggle)
     var head_bob_toggle := CheckButton.new()
     head_bob_toggle.text = tr("Camera motion")
     head_bob_toggle.button_pressed = _head_bob_enabled
@@ -5503,6 +5514,64 @@ func _on_world_updated(snapshot: Dictionary) -> void:
 func _set_weather_visuals(enabled: bool) -> void:
     _weather_fx.visual_enabled = enabled
     _apply_weather()
+
+func _set_town_audio(enabled: bool) -> void:
+    _town_audio.set_enabled(enabled)
+
+func _footstep_surface() -> String:
+    if _apartment_active or _inside_guest_room():
+        return "wood"
+    var at := _avatar.position
+    if not _road_destination(at,17.0).is_empty():
+        return "asphalt"
+    if _current_place=="PARK":
+        if absf(at.z+16.0)<1.6:
+            return "asphalt"
+        if absf(at.x)<1.5 or absf(at.z-5.0)<1.3 or (absf(at.x+11.0)<1.6 and absf(at.z+3.0)<8.0):
+            return "stone"
+        return "grass"
+    if _current_place in ["WOODS","FARM"]:
+        return "grass"
+    return "stone"
+
+func _update_town_audio(delta: float,moved: float) -> void:
+    var at := _avatar.position
+    var sheltered := _apartment_active or _inside_guest_room() or _drive_active()
+    _town_audio.footstep(moved,_footstep_surface(),_movement_speed()>=RUN_SPEED,
+        _jump_elapsed<0.0,not _drive_active() and not _cycling())
+    var fountain: Variant = null
+    var park: Variant = null
+    var tower: Variant = null
+    if _chunks.has("PARK"):
+        var park_root: Node3D = _chunks["PARK"]["root"]
+        park = park_root.position
+        var water_node: MeshInstance3D = _chunks["PARK"]["water"]
+        if is_instance_valid(water_node) and water_node.visible:
+            fountain = water_node.global_position
+    if _chunks.has("CENTRO"):
+        var centre: Node3D = _chunks["CENTRO"]["root"]
+        tower = centre.position+Vector3(6.8,10,-14.1)
+    var car: Variant = null
+    var car_distance := 28.0
+    for edge in _traffic_edges.values():
+        for record in edge["cars"]:
+            var vehicle: Node3D = record["node"]
+            if vehicle.visible:
+                var distance := at.distance_to(vehicle.global_position)
+                if distance<car_distance:
+                    car_distance = distance
+                    car = vehicle.global_position
+    var crowd: Variant = null
+    var nearby_people := 0
+    var crowd_sum := Vector3.ZERO
+    if is_instance_valid(_residents_root):
+        for person in _residents_root.get_children():
+            if str(person.get_meta("activity","")) not in ["SLEEPING","DECEASED"] and at.distance_to(person.global_position)<10.0:
+                nearby_people += 1
+                crowd_sum += person.global_position
+        if nearby_people>=2:
+            crowd = crowd_sum/float(nearby_people)
+    _town_audio.update_scene(delta,at,sheltered,_last_snapshot,fountain,car,crowd,park,tower)
 
 func _set_weather_audio(enabled: bool) -> void:
     _weather_fx.audio_enabled = enabled

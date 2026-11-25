@@ -33,6 +33,7 @@ const IT := {
     "High": "Alta",
     "Ultra": "Ultra",
     "Weather FX": "Effetti meteo",
+    "Town sound": "Suoni della città",
     "Weather sound": "Suoni meteo",
     "WASD: walk · click scene: mouse look · Esc: cursor.": "WASD: cammina · clic: visuale · Esc: cursore.",
     "Living Alibi — public town map (schematic)": "Living Alibi — mappa schematica della città",
