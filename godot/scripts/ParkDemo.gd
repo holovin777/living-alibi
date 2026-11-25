@@ -2649,7 +2649,7 @@ func _render_actions() -> void:
             if identity is Dictionary:
                 var personal := Label.new()
                 personal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                personal.text = "Personal savings: %s EUR · Born on day %s" % [identity.get("savings",0),identity.get("bornDay",0)]
+                personal.text = "Personal savings: %s EUR · Born on day %s\nFitness %s · Hobby days %s · Pocket money received %s EUR" % [identity.get("savings",0),identity.get("bornDay",0),identity.get("fitness",0),identity.get("hobbyDays",0),identity.get("allowanceTotal",0)]
                 if age >= 18:
                     _action_title.text = "Coming of age · personal history"
                     if str(rebirth.get("phase","")) == "LINKED_ADULT":
@@ -2683,6 +2683,11 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Advance one hour",_garden_action.bind("rebirth-child-hour")))
                 for destination in child_options.get("destinations",[]):
                     _action_choices.add_child(_button("Visit "+str(destination).capitalize(),_garden_action.bind("rebirth-child-travel-"+str(destination))))
+                for hobby in child_options.get("hobbies",[]):
+                    _action_choices.add_child(_button("%s · %s min" % [hobby.get("label",""),hobby.get("minutes",30)],_garden_action.bind("rebirth-hobby-"+str(hobby.get("id","")))))
+                var allowance := int(child_options.get("allowanceAvailable",0))
+                if allowance > 0:
+                    _action_choices.add_child(_button("Ask for weekly pocket money · %s EUR" % allowance,_garden_action.bind("rebirth-allowance")))
                 if child_options.get("outing",false):
                     _action_choices.add_child(_button("Return home",_garden_action.bind("rebirth-child-home")))
             var options = rebirth.get("adultOptions")

@@ -342,6 +342,10 @@ public final class GameSession implements AutoCloseable {
                 if(!RebirthLife.linkedChild(copy,child)||child.age<6)throw new IllegalArgumentException("Available from age six.");
                 return applyInternal(copy,60,"Advanced childhood by one hour.",true);
             }
+            if(action.startsWith("rebirth-hobby-")){
+                String message=RebirthLife.hobby(copy,state.day,state.minute,action.substring("rebirth-hobby-".length()));
+                return applyInternal(copy,30,message,true);
+            }
             if(action.equals("rebirth-child-home")){
                 int duration=RebirthLife.childReturn(copy);
                 return applyInternal(copy,duration,"Return home.",true);
@@ -366,6 +370,7 @@ public final class GameSession implements AutoCloseable {
             }
             String message;
             if(action.equals("rebirth-adult"))message=RebirthLife.adultFallback(copy);
+            else if(action.equals("rebirth-allowance"))message=RebirthLife.allowance(copy,state.day,state.minute);
             else if(action.equals("rebirth-continue"))message=RebirthLife.continueAdult(copy);
             else if(action.equals("rebirth-routine"))message=RebirthLife.resumeRoutine(copy);
             else if(action.startsWith("rebirth-job-"))message=EmploymentLife.chooseRole(copy,state,action.substring("rebirth-job-".length()));

@@ -204,6 +204,8 @@ class GameSessionTest {
             assertEquals(7,born.rebirth().maxWaitDays());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-focus-technical"));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-child-travel-PARK"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-hobby-read"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-allowance"));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-chat-"+firstId));
             assertEquals(1,born.demography().births());
             assertEquals(271,born.day());assertEquals(600,born.minute());
@@ -294,6 +296,20 @@ class GameSessionTest {
             RebirthLife.chat(town,state.day,firstId);
             assertThrows(IllegalArgumentException.class,()->RebirthLife.chat(town,state.day,firstId));
             assertEquals(Math.min(100,affinity+2),town.peerRelationships.get(SocialNetwork.key(child.id,parent.id)).affinity);
+            state.minute=850;
+            child.destination=child.home;child.travelRemaining=0;child.hunger=20;child.thirst=20;child.fatigue=20;child.sickUntilDay=0;
+            parent.money=100;
+            int wallet=child.money;
+            assertEquals(3,RebirthLife.allowanceAmount(town,child,state.day,state.minute));
+            RebirthLife.allowance(town,state.day,state.minute);
+            assertEquals(wallet+3,child.money);
+            assertEquals(97,parent.money);
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.allowance(town,state.day,state.minute));
+            int technical=EducationLife.get(town,child,"technical");
+            RebirthLife.hobby(town,state.day,state.minute,"build");
+            assertEquals(Math.min(100,technical+1),EducationLife.get(town,child,"technical"));
+            assertEquals(1,EducationLife.get(town,child,"hobby-days"));
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.hobby(town,state.day,state.minute,"read"));
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
         // Move the existing child to the evening before its eighteenth birthday.
@@ -302,6 +318,8 @@ class GameSessionTest {
             var child=RebirthLife.child(town);
             assertNotNull(child);
             assertThrows(IllegalArgumentException.class,()->RebirthLife.chat(town,state.day,firstId));
+            assertEquals(3,EducationLife.get(town,child,"allowance-total"));
+            assertEquals(1,EducationLife.get(town,child,"hobby-days"));
             child.age=17;
             state.day=DemographyLife.get(town,child,"born")+18*365-1;
             state.minute=600;
@@ -315,6 +333,8 @@ class GameSessionTest {
             assertEquals(18,adult.rebirth().age());
             assertEquals(previous.residentId(),adult.rebirth().identity().residentId());
             assertTrue(adult.rebirth().identity().graduated());
+            assertEquals(3,adult.rebirth().identity().allowanceTotal());
+            assertEquals(1,adult.rebirth().identity().hobbyDays());
             assertEquals("technical",adult.rebirth().schoolFocus());
             assertTrue(adult.rebirth().skills().get("technical")>0);
             assertEquals(2,adult.rebirth().identity().relationships().stream().filter(RebirthLife.KnownPerson::family).count());

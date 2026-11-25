@@ -194,14 +194,73 @@ final class RebirthLife {
         if(duration>0){c.destination=c.home;c.travelRemaining=duration;c.activity="TRAVELING";}
         return duration;
     }
-    record ChildOptions(List<String> destinations,boolean outing,int returnMinute,String activity){}
+    record Hobby(String id,String label,int minutes){}
+    static List<Hobby> hobbies(TownLife.Town t,TownLife.Citizen c,int day,int minute){
+        if(!linkedChild(t,c)||c.age<6||!awakePresent(c)||EmploymentLife.sick(c,day)
+                ||!outingHours(c,minute)||minute+30>=outingEnd(c)||c.fatigue>=85
+                ||c.hunger>=85||c.thirst>=85||EducationLife.get(t,c,"last-hobby")>=day)return List.of();
+        var result=new ArrayList<Hobby>();
+        if(c.place==c.home&&t.industryStocks.getOrDefault(TRAVEL,0)==0){
+            result.add(new Hobby("read","Read at home",30));
+            result.add(new Hobby("build","Build and tinker at home",30));
+        }
+        if(childOutingAt(t,c,day,minute,TownLife.Place.LIBRARY))
+            result.add(new Hobby("read","Read at the library",30));
+        if(childOutingAt(t,c,day,minute,TownLife.Place.PARK))
+            result.add(new Hobby("sport","Exercise at the park",30));
+        return List.copyOf(result);
+    }
+    // Read-only check for reports; unlike childOuting(), never clears stored state.
+    private static boolean childOutingAt(TownLife.Town t,TownLife.Citizen c,int day,int minute,TownLife.Place place){
+        return c.place==place&&outingHours(c,minute)&&!EmploymentLife.sick(c,day)
+                &&t.industryStocks.getOrDefault(TRAVEL,0)==PlayerLife.publicPlaces().indexOf(place)+1;
+    }
+    static String hobby(TownLife.Town t,int day,int minute,String id){
+        var c=child(t);
+        var option=hobbies(t,c,day,minute).stream().filter(h->h.id().equals(id)).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("This hobby is not available now."));
+        String skill=switch(id){case "read" -> "academic";case "build" -> "technical";case "sport" -> "fitness";default -> throw new IllegalArgumentException("Unknown hobby.");};
+        EducationLife.learn(t,c,skill,1);
+        c.fatigue=Math.min(100,c.fatigue+("sport".equals(id)?8:3));
+        EducationLife.set(t,c,"last-hobby",day);
+        EducationLife.set(t,c,"hobby-days",Math.addExact(EducationLife.get(t,c,"hobby-days"),1));
+        return option.label()+". Practiced "+skill+" for 30 minutes.";
+    }
+    static int allowanceAmount(TownLife.Town t,TownLife.Citizen c,int day,int minute){
+        if(!linkedChild(t,c)||c.age<6||!awakePresent(c)||c.place!=c.home
+                ||!outingHours(c,minute)||EmploymentLife.sick(c,day)
+                ||EducationLife.get(t,c,"allowance-week")>=1+(day-1)/7)return 0;
+        int amount=c.age<13?3:5;
+        for(String f:List.of("parent-a","parent-b")){
+            var parent=DemographyLife.byIndex(t,DemographyLife.get(t,c,f));
+            if(awakePresent(parent)&&parent.currentSpace().equals(c.currentSpace())&&parent.money>=80+amount)return amount;
+        }
+        return 0;
+    }
+    static String allowance(TownLife.Town t,int day,int minute){
+        var c=child(t);int amount=allowanceAmount(t,c,day,minute);
+        if(amount==0)throw new IllegalArgumentException("No affordable weekly allowance from a parent at home.");
+        for(String f:List.of("parent-a","parent-b")){
+            var parent=DemographyLife.byIndex(t,DemographyLife.get(t,c,f));
+            if(!awakePresent(parent)||!parent.currentSpace().equals(c.currentSpace())||parent.money<80+amount)continue;
+            int wallet=Math.addExact(c.money,amount);
+            int total=Math.addExact(EducationLife.get(t,c,"allowance-total"),amount);
+            parent.money-=amount;c.money=wallet;
+            EducationLife.set(t,c,"allowance-week",1+(day-1)/7);
+            EducationLife.set(t,c,"allowance-total",total);
+            return "Received EUR "+amount+" pocket money from "+parent.name+".";
+        }
+        throw new IllegalStateException("Allowance parent no longer available.");
+    }
+    record ChildOptions(List<String> destinations,boolean outing,int returnMinute,String activity,List<Hobby> hobbies,int allowanceAvailable){}
+
     static ChildOptions childOptions(TownLife.Town t,int day,int minute){
         var c=child(t);
         if(!linkedChild(t,c)||c.age<6)return null;
         var destinations=awakePresent(c)&&!EmploymentLife.sick(c,day)&&outingHours(c,minute)
                 ?childDestinations(c).stream().filter(p->minute+TownLife.travelTime(c.place,p)<outingEnd(c)).map(Enum::name).toList():List.<String>of();
         boolean outing=t.industryStocks.getOrDefault(TRAVEL,0)>0&&outingHours(c,minute)&&!EmploymentLife.sick(c,day);
-        return new ChildOptions(destinations,outing,outingEnd(c),c.activity);
+        return new ChildOptions(destinations,outing,outingEnd(c),c.activity,hobbies(t,c,day,minute),allowanceAmount(t,c,day,minute));
     }
     static String focus(TownLife.Town t,TownLife.Citizen c){
         if(!linkedChild(t,c)||c.age<6)return null;
@@ -268,7 +327,7 @@ final class RebirthLife {
         return "Started an adult life in the park.";
     }
     record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations){}
-    record Identity(String residentId,int generationIndex,int bornDay,int savings,boolean graduated,List<KnownPerson> relationships){}
+    record Identity(String residentId,int generationIndex,int bornDay,int savings,boolean graduated,List<KnownPerson> relationships,int fitness,int hobbyDays,int allowanceTotal){}
     static Identity identity(TownLife.Town t,TownLife.Citizen c){
         if(c==null)return null;
         int a=DemographyLife.get(t,c,"parent-a"),b=DemographyLife.get(t,c,"parent-b");
@@ -284,7 +343,7 @@ final class RebirthLife {
         known.sort(java.util.Comparator.comparing(KnownPerson::family).reversed()
                 .thenComparing(KnownPerson::name).thenComparing(KnownPerson::id));
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
-                EducationLife.get(t,c,"graduate")>0,List.copyOf(known));
+                EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"));
     }
     record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
