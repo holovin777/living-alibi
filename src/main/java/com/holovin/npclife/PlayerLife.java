@@ -332,7 +332,8 @@ final class PlayerLife {
             throw new IllegalArgumentException("Introduce yourself before sharing your name.");
         boolean rude=spoken.equalsIgnoreCase("Leave me alone!");
         boolean apology=spoken.equalsIgnoreCase("I'm sorry.");
-        boolean positive=introduction || spoken.equalsIgnoreCase("Hello") || apology
+        boolean askingMood=spoken.equalsIgnoreCase("How are you?") || spoken.equalsIgnoreCase("Come stai?");
+        boolean positive=introduction || spoken.equalsIgnoreCase("Hello") || apology || askingMood
                 || spoken.equalsIgnoreCase("What do you do?");
         if(changedAlias)adjust(contact,-12,-4);
         else if(rude)adjust(contact,-8,-12);
@@ -347,6 +348,7 @@ final class PlayerLife {
             KnowledgeLife.shareableIntroduction(town,resident,contact.knownName,day,minute);
             return "All right. I may mention that we met.";
         }
+        if(askingMood)return EmotionLife.reply(EmotionLife.mood(town,resident,day,minute),contact.trust>=55);
         if(spoken.equalsIgnoreCase("Any news about visitors?"))
             return KnowledgeLife.visitorNews(town,resident,day,minute);
         if(changedAlias)return "I remember a different name. I'll remember "+greeting+" for now.";

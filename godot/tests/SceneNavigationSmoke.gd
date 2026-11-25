@@ -1171,6 +1171,12 @@ func _exercise() -> void:
     world._tick_office_joker(1.0)
     if not _check(not speech.visible,"walking away hides speech"):
         return
+    office["residents"][0]["mood"]="STRESSED"
+    world._on_world_updated(office)
+    world._avatar.position=world.JAVA_DESK
+    world._tick_office_joker(60.0)
+    if not _check(str(joker.get_meta("mood",""))=="STRESSED" and not speech.visible,"stressed colleague stops joking"):
+        return
     office["residents"]=[]
     world._on_world_updated(office)
     world._avatar.position=world.JAVA_DESK
