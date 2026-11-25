@@ -165,6 +165,51 @@ class GameSessionTest {
     }
 
     @Test
+    void beekeepingProducesFiniteHoneyAndPollinatesOrchardAcrossRestart() throws Exception {
+        Path file=directory.resolve("bees.db");
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            p.ownsHouse=true;p.place=HousingLife.HOUSE_DISTRICT;p.destination=p.place;
+            p.travelRemaining=0;p.money=100;p.bottledWater=12;
+            OrchardLife.act(town,"orchard-build-hive",186,720);
+            assertEquals(70,p.money);
+            OrchardLife.act(town,"orchard-plant-apples",186,720);
+            var apple=OrchardLife.CROPS.getFirst();
+            OrchardLife.set(town,OrchardLife.key(apple,"age"),5);
+            int cared=0;
+            for(int day=186;day<275&&cared<2;day++) {
+                if(WeatherLife.at(day,1080).raining()||WeatherLife.at(day,720).raining())continue;
+                OrchardLife.act(town,"orchard-water-bees",day,720);
+                OrchardLife.act(town,"orchard-water",day,720);
+                OrchardLife.tick(town,day,1080);OrchardLife.tick(town,day,1080);
+                cared++;
+            }
+            assertEquals(2,cared);
+            assertEquals(1,OrchardLife.get(town,OrchardLife.HONEY));
+            assertEquals(1,OrchardLife.get(town,OrchardLife.key(apple,"pollinated")));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            assertTrue(OrchardLife.report(town,200,720).hive());
+            OrchardLife.act(town,"orchard-collect-honey",200,720);
+            assertEquals(1,FoodLife.quantity(p,"honey",true));
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"orchard-collect-honey",200,720));
+            var apple=OrchardLife.CROPS.getFirst();
+            OrchardLife.set(town,OrchardLife.key(apple,"fruit"),3);
+            OrchardLife.act(town,"orchard-harvest-apples",200,720);
+            assertEquals(4,FoodLife.quantity(p,"apples",true));
+            FoodLife.change(p,"honey",true,-1);FoodLife.change(p,"honey",false,1);
+            p.place=TownLife.Place.MARKET;p.destination=p.place;
+            int money=p.money;
+            OrchardLife.act(town,"sell-honey",200,720);
+            assertEquals(money+3,p.money);
+            assertEquals(1,town.retailStock.get("honey"));
+            assertThrows(IllegalArgumentException.class,()->OrchardLife.act(town,"sell-honey",200,720));
+        }
+    }
+
+    @Test
     void compostUsesCookingScrapsAndBoostsOnlyOneCrop() throws Exception {
         Path file=directory.resolve("compost.db");
         try(var db=new WorldDatabase(file)) {
