@@ -12,7 +12,8 @@ final class FoodLife {
             new Recipe("bread-soup","Bread soup",15,45,20,Map.of("bread",1,"water",1)),
             new Recipe("pasta-verdure","Pasta with vegetables",25,65,5,Map.of("pasta",1,"vegetables",1,"water",1)),
             new Recipe("frittata","Vegetable frittata",20,60,0,Map.of("eggs",1,"vegetables",1)),
-            new Recipe("pancakes","Pancakes",25,60,5,Map.of("flour",1,"eggs",1,"milk",1)));
+            new Recipe("pancakes","Pancakes",25,60,5,Map.of("flour",1,"eggs",1,"milk",1)),
+            new Recipe("rice-verdure","Rice with vegetables",25,65,5,Map.of("rice",1,"vegetables",1,"water",1)));
     static Recipe recipe(String id) {
         return RECIPES.stream().filter(r->r.id().equals(id)).findFirst()
                 .orElseThrow(()->new IllegalArgumentException("Unknown recipe."));

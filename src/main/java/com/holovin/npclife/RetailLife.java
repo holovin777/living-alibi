@@ -13,13 +13,14 @@ final class RetailLife {
             new Product("eggs","Eggs",3,16,6),
             new Product("pasta","Pasta",2,20,8),
             new Product("vegetables","Vegetables",3,18,8),
-            new Product("milk","Milk",2,16,6));
+            new Product("milk","Milk",2,16,6),
+            new Product("rice","Rice",2,20,0));
     static void ensure(TownLife.Town t) {
         for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),p.capacity());
     }
     static void tick(TownLife.Town t,int minute) {
         if(minute!=360)return;
-        for(var p:PRODUCTS)t.retailStock.compute(p.id(),
+        for(var p:PRODUCTS)if(!FarmLife.local(p.id()))t.retailStock.compute(p.id(),
                 (id,stock)->Math.min(p.capacity(),(stock==null?0:stock)+p.dailyDelivery()));
     }
     static Product product(String id) {

@@ -31,7 +31,8 @@ final class CareerLife {
             new Offer("miner","Quarry miner",TownLife.Place.QUARRY,
                     "none",0,30,360),
             new Offer("machinist","Factory machinist",TownLife.Place.FACTORY,
-                    "none",0,34,560)
+                    "none",0,34,560),
+            new Offer("farm-worker","Farm worker",TownLife.Place.FARM,"none",0,26,300)
     );
 
     static List<Offer> offers() {return OFFERS;}
@@ -45,6 +46,7 @@ final class CareerLife {
         town.employerFunds.putIfAbsent("city-maintenance",500);
         town.employerFunds.putIfAbsent("survey-office",0);
         town.employerFunds.putIfAbsent("guesthouse",0);
+        town.employerFunds.putIfAbsent("farm-contractors",0);
     }
 
     private static Offer offer(String id) {
@@ -137,7 +139,7 @@ final class CareerLife {
             throw new IllegalArgumentException("Employer has insufficient payroll funds.");
         // Industrial roles must produce real physical goods during the shift.
         // A copied town is committed only after this and the rest of the action succeed.
-        String industrialOutput=IndustryLife.playerShift(town,vacancy.id);
+        String industrialOutput=vacancy.id.equals("farm-worker")?FarmLife.playerShift(town):IndustryLife.playerShift(town,vacancy.id);
         // One conserved transfer: employer cash -> player cash.
         town.employerFunds.put(vacancy.id,funds-vacancy.wage);
         p.money=Math.addExact(p.money,vacancy.wage);

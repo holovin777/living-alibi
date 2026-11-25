@@ -15,7 +15,7 @@ final class TownLife {
         NORTH_RESIDENCES("North residences"), SOUTH_RESIDENCES("South residences"),
         OFFICE("Office"), CLINIC("Clinic"), SCHOOL("School"),
         WORKSHOP("Workshop"), LIBRARY("Library"),
-        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory"), CENTRO("Centro Storico"), PORTICI("Via dei Portici");
+        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory"), CENTRO("Centro Storico"), PORTICI("Via dei Portici"), FARM("Cascina delle Risaie");
         final String label;
         Place(String label) { this.label=label; }
     }
@@ -238,6 +238,7 @@ final class TownLife {
         BusinessLife.ensure(t);
         TechnicalWorkLife.ensure(t);
         IndustryLife.ensure(t);
+        FarmLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -252,6 +253,7 @@ final class TownLife {
         HousingLife.expire(town.player,marco.day,marco.minute);
         NatureLife.tick(town,marco.day,marco.minute);
         RetailLife.tick(town,marco.minute);
+        FarmLife.tick(town,marco.day,marco.minute);
         TechnicalWorkLife.tick(town,marco.day,marco.minute);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");

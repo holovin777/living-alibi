@@ -344,6 +344,23 @@ Deliveries still use capped scheduled replenishment; no spoilage,
 refrigeration, supplier contracts or NPC shared purchases yet.
 The kitchen and shop action panel is scrollable.
 
+## Cascina delle Risaie
+
+A new agricultural district south of River, east of Bakery, has a
+Lombard farmhouse, vegetable beds, rice paddies and a stationary
+tractor. The optional farm worker job pays 26 EUR per two-hour shift
+from the finite farm account and moves up to four units of each crop
+from field to barn. Seasonal growth is capped at 24 units per crop.
+An abstract paid contractor harvests at 08:00; at 11:00 up to six
+units move from barn to shared retail stock, paid at wholesale prices
+from the market account. The physical stock ledger stores fields,
+barn and daily markers. Rice and vegetables no longer receive
+external daily retail top-ups; other grocery products still do.
+Rice can be cooked with vegetables and water. Crop meshes are static
+illustrations, not individual harvestable plants; the tractor is not
+driveable, and shipment timing is abstract rather than a moving truck.
+No named farm NPC or irrigation network yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

@@ -13,6 +13,42 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void farmHarvestAndWholesaleAreConservedAndPersistent() throws Exception {
+        Path file=directory.resolve("farm.db");
+        int barn;
+        try(var game=new GameSession(file)) {
+            game.move("farm");
+            game.waitMinutes(60);
+            game.applyJob("farm-worker");
+            var before=game.snapshot().farm();
+            game.work();
+            var after=game.snapshot().farm();
+            assertEquals(76,game.snapshot().player().money());
+            assertEquals(before.payroll()-26,after.payroll());
+            assertEquals(before.vegetablesInField()-4,after.vegetablesInField());
+            assertEquals(before.vegetablesInBarn()+4,after.vegetablesInBarn());
+            barn=after.vegetablesInBarn();
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(barn,game.snapshot().farm().vegetablesInBarn());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            town.retailStock.put("vegetables",0);
+            town.retailStock.put("rice",0);
+            int money=town.employerFunds.get("shop-assistant")+town.employerFunds.get("farm-worker");
+            int stock=FarmLife.stock(town,FarmLife.barn("vegetables"))+FarmLife.stock(town,FarmLife.barn("rice"));
+            assertEquals(6,FarmLife.deliver(town));
+            assertEquals(stock-6,FarmLife.stock(town,FarmLife.barn("vegetables"))+FarmLife.stock(town,FarmLife.barn("rice")));
+            assertEquals(6,town.retailStock.get("vegetables")+town.retailStock.get("rice"));
+            assertEquals(money,town.employerFunds.get("shop-assistant")+town.employerFunds.get("farm-worker"));
+            RetailLife.tick(town,360);
+            assertEquals(6,town.retailStock.get("vegetables")+town.retailStock.get("rice"));
+        }
+    }
+
+    @Test
     void newIngredientsPersistAndRecipesConsumeExactStock() throws Exception {
         Path file=directory.resolve("recipes.db");
         try(var game=new GameSession(file)) {

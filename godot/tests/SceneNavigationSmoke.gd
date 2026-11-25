@@ -65,7 +65,7 @@ func _exercise() -> void:
     world._follow_player()
 
     var layout = world._town_map
-    if not _check(layout.DISTRICTS.size() == 17
+    if not _check(layout.DISTRICTS.size() == 18
             and layout.world_center("PARK") == Vector3.ZERO
             and layout.adjacent("PARK", "SCHOOL")
             and not layout.adjacent("PARK", "QUARRY")
@@ -180,6 +180,15 @@ func _exercise() -> void:
     if not _check(door.visible and world._avatar.position == world.ROOM_EXIT
             and not world._weather_fx.sheltered,
             "expired lease moves visitor safely outside and closes entrance"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
+    world._on_world_updated(_world("FARM","Cascina delle Risaie"))
+    if not _check(world._scenery.has_node("CascinaDelleRisaie")
+            and world._road_destination(Vector3(0,0,-23.9),23.8) == "RIVER"
+            and not world._can_stand(Vector3(10,0,-8),world.WALKER_RADIUS)
+            and _has_button(world._action_choices,"Apply: farm worker"),
+            "farm district is connected with solid paddy and available job"):
         return
     world._on_world_updated(_world("PARK","Park"))
 

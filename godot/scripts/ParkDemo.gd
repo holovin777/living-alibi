@@ -344,6 +344,8 @@ func _generate_chunk(place_id: String) -> void:
     _scenery.add_child(_residents_root)
 
     match place_id:
+        "FARM":
+            _build_farm()
         "NORTH_RESIDENCES":
             _build_guesthouse()
         "PORTICI":
@@ -521,6 +523,41 @@ func _room_wall(parent: Node3D,at: Vector3,footprint: Vector2,color: Color) -> v
 func _room_furniture(parent: Node3D,at: Vector3,size: Vector3,color: Color) -> void:
     _add_obstacle(at,Vector2(size.x,size.z))
     _box(parent,size,color,at+Vector3(0,size.y*0.5,0))
+
+func _build_farm() -> void:
+    var farm := Node3D.new()
+    farm.name = "CascinaDelleRisaie"
+    _scenery.add_child(farm)
+    # Field beds and shallow rice paddy, outside the north/south road.
+    _box(farm,Vector3(12,0.06,14),Color("#66503a"),Vector3(-10,0.015,-8))
+    for x in [-15.0,-13.0,-11.0,-9.0,-7.0,-5.0]:
+        _box(farm,Vector3(1.1,0.17,13),Color("#796043"),Vector3(x,0.1,-8))
+        for z in range(-14,-1,2):
+            _box(farm,Vector3(0.48,0.24,0.45),Color("#668740"),Vector3(x,0.31,z))
+    _box(farm,Vector3(12,0.09,14),Color("#608e80"),Vector3(10,0.04,-8))
+    for x in range(5,16,2):
+        for z in range(-14,-1,2):
+            _box(farm,Vector3(0.14,0.5,0.14),Color("#a9b75d"),Vector3(x,0.3,z))
+    _add_obstacle(Vector3(10,0,-8),Vector2(12,14))
+    _sign(farm,"Risaia",Vector3(8,1.6,-1))
+    _sign(farm,"Orto",Vector3(-8,1.6,-1))
+    # Lombard farmhouse / barn and stationary tractor.
+    _add_obstacle(Vector3(-10,0,10),Vector2(10,8))
+    _box(farm,Vector3(10,4.2,8),Color("#b99a74"),Vector3(-10,2.1,10))
+    _box(farm,Vector3(10.6,0.5,8.6),Color("#8b4e38"),Vector3(-10,4.45,10))
+    _box(farm,Vector3(3,2.8,0.12),Color("#694a34"),Vector3(-10,1.4,5.96))
+    _sign(farm,"Cascina delle Risaie",Vector3(-10,3.4,5.8))
+    var tractor := Vector3(10,0,10)
+    _add_obstacle(tractor,Vector2(3.5,4.6))
+    _box(farm,Vector3(2.0,0.85,3.8),Color("#527c47"),tractor+Vector3(0,1.0,0))
+    _box(farm,Vector3(1.6,1.4,1.6),Color("#759b9b"),tractor+Vector3(0,2.0,0.8))
+    _box(farm,Vector3(1.9,0.16,1.9),Color("#426746"),tractor+Vector3(0,2.8,0.8))
+    for side in [-1.0,1.0]:
+        for z in [-1.3,1.3]:
+            var wheel := _cylinder(farm,0.65 if z>0 else 0.43,0.52,Color("#343431"),tractor+Vector3(side*1.25,0.65 if z>0 else 0.43,z))
+            wheel.rotation_degrees.z = 90
+    _sign(farm,"Farm office · F",KIOSK_POSITION+Vector3(0,2.2,0))
+    _lamp(farm,Vector3(-3,0,8))
 
 func _build_guesthouse() -> void:
     var house := Node3D.new()
@@ -1343,6 +1380,14 @@ func _render_actions() -> void:
     var player: Dictionary = _last_snapshot.get("player", {})
     var employed := str(player.get("jobId", ""))
     match _current_place:
+        "FARM":
+            var report: Dictionary = _last_snapshot.get("farm",{})
+            var label := Label.new()
+            label.text = "Fields: vegetables %s · rice %s\nBarn: vegetables %s · rice %s\nFarm funds: %s EUR" % [
+                report.get("vegetablesInField",0),report.get("riceInField",0),
+                report.get("vegetablesInBarn",0),report.get("riceInBarn",0),report.get("payroll",0)]
+            _action_choices.add_child(label)
+            _action_choices.add_child(_button("Apply: farm worker",_apply_job.bind("farm-worker")))
         "QUARRY":
             _action_choices.add_child(_button("Apply: quarry miner",
                     _apply_job.bind("miner")))
@@ -1364,7 +1409,7 @@ func _render_actions() -> void:
                 var stock := Label.new()
                 stock.text = "Cupboard %s/24" % _inventory_count(pantry)
                 _action_choices.add_child(stock)
-                for item in ["bread","water","flour","eggs","pasta","vegetables","milk"]:
+                for item in ["bread","water","flour","eggs","pasta","vegetables","milk","rice"]:
                     if item not in ["bread","water"] and int(bag.get(item,0))+int(pantry.get(item,0)) == 0:
                         continue
                     var line := HBoxContainer.new()
@@ -1375,6 +1420,7 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Pasta verdure · 25m (pasta + veg + water)",_room_cook.bind("pasta-verdure")))
                 _action_choices.add_child(_button("Frittata · 20m (eggs + veg)",_room_cook.bind("frittata")))
                 _action_choices.add_child(_button("Pancakes · 25m (flour + eggs + milk)",_room_cook.bind("pancakes")))
+                _action_choices.add_child(_button("Rice verdure · 25m (rice + veg + water)",_room_cook.bind("rice-verdure")))
             elif _near_bath():
                 _action_choices.add_child(_button("Wash · 10m",_room_wash))
             elif _near_kiosk():
@@ -1454,6 +1500,8 @@ func _render_actions() -> void:
 
     var work_site := ""
     match employed:
+        "farm-worker":
+            work_site = "FARM"
         "shop-assistant":
             work_site = "MARKET"
         "miner":
