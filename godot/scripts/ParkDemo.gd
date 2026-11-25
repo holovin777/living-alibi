@@ -3046,6 +3046,8 @@ func _render_actions() -> void:
 
     var work_site := ""
     match employed:
+        "journalist":
+            work_site = "LIBRARY"
         "fuel-attendant":
             work_site = "FUEL_STATION"
         "farm-worker":
