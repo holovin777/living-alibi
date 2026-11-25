@@ -7,7 +7,7 @@ final class NewspaperLife {
     private NewspaperLife(){}
     static final String JOB="journalist", OCCUPATION="Journalist", CATEGORY="Newspaper (reported claims)";
     static final String LAST="press:last-edition", DISPATCH_DAY="press:dispatch-day", DISPATCH_OWNER="press:dispatch-owner";
-    static final int REPORTER_PAY=6;
+    static final int REPORTER_PAY=40;
     static void ensure(TownLife.Town t){
         for(String k:List.of(LAST,DISPATCH_DAY,DISPATCH_OWNER))t.industryStocks.putIfAbsent(k,0);
     }

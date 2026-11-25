@@ -200,8 +200,8 @@ class GameSessionTest {
             assertTrue(issue.text().contains("Official notice: Via Verdi walls completed."));
             assertTrue(issue.text().contains("first-hand account"));
             assertFalse(issue.text().contains("private home"));
-            assertEquals(106,reporter.money);
-            assertEquals(cash-26,town.employerFunds.get(NewspaperLife.JOB));
+            assertEquals(140,reporter.money);
+            assertEquals(cash-60,town.employerFunds.get(NewspaperLife.JOB));
             assertEquals(1,NewspaperLife.report(town,1).editions().size());
             state.day=1;state.minute=960;
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
@@ -211,7 +211,7 @@ class GameSessionTest {
             assertTrue(NewspaperLife.filed(town,1));
             assertEquals(1,NewspaperLife.report(town,1).editions().size());
             NewspaperLife.tick(town,1,960);
-            assertEquals(106,town.get(reporterId).money);
+            assertEquals(140,town.get(reporterId).money);
             town.get(reporterId).place=TownLife.Place.PARK;
             NewspaperLife.tick(town,2,960);
             assertEquals(1,NewspaperLife.report(town,2).editions().size());
