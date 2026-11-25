@@ -77,7 +77,16 @@ func _ready() -> void:
     _box("WallArt",Vector3(1.0,0.65,0.04),Color("#527c82"),Vector3(-2.0,1.7,4.36))
     _box("DecorCushion",Vector3(0.55,0.25,0.40),Color("#d4a86c"),Vector3(-3.6,0.82,2.85))
     _box("PremiumHeadboard",Vector3(0.10,1.25,1.7),Color("#815b45"),Vector3(-5.65,0.65,-3.3))
+    _box("KitchenMicrowave",Vector3(0.58,0.33,0.42),Color("#5d6568"),Vector3(4.7,1.22,-3.9))
+    _box("KitchenMicrowaveGlass",Vector3(0.44,0.23,0.025),Color("#272d33"),Vector3(4.67,1.22,-3.68))
+    _box("KitchenUpperCabinet",Vector3(2.0,0.65,0.36),Color("#ded3be"),Vector3(4.7,2.2,-4.24))
+    _box("BedroomThrow",Vector3(1.2,0.07,1.44),Color("#ba865b"),Vector3(-3.85,0.78,-3.3))
+    _box("BedroomArtwork",Vector3(0.05,0.75,1.0),Color("#8a9c9a"),Vector3(-5.86,1.9,-2.95))
+    _box("ChildBooks",Vector3(0.37,0.32,0.7),Color("#d8ae56"),Vector3(-5.38,1.25,1.7))
+    _box("ChildDrawing",Vector3(0.65,0.48,0.035),Color("#f0c883"),Vector3(-0.9,1.5,4.35))
+    _box("ChildPlayMat",Vector3(1.15,0.018,0.95),Color("#8caea4"),Vector3(1.8,0.025,2.9))
     set_furniture_level(0)
+    set_room_packages([])
     _box("LivingWindow",Vector3(2.6,1.1,0.035),Color("#8bb5c6"),Vector3(1.7,1.7,4.37))
     _box("WindowSill",Vector3(2.8,0.10,0.22),wood,Vector3(1.7,1.1,4.27))
     _sign("Bedroom",Vector3(-3.0,2.05,0.25))
@@ -140,6 +149,39 @@ func set_furniture_level(level: int) -> void:
     var sofa := get_node("Sofa") as MeshInstance3D
     var material := sofa.material_override as StandardMaterial3D
     material.albedo_color=Color("#657f73") if level==0 else Color("#496976") if level==1 else Color("#9b684d")
+
+func _paint(node_name: String,color: Color) -> void:
+    var mesh := get_node(node_name) as MeshInstance3D
+    (mesh.material_override as StandardMaterial3D).albedo_color=color
+
+func set_home_style(style: String) -> void:
+    var floor_color := Color("#c8a581")
+    var wall_color := Color("#eee0ca")
+    match style:
+        "tiglio":
+            floor_color=Color("#b6946e")
+            wall_color=Color("#eee7d8")
+        "rosa":
+            floor_color=Color("#c18f81")
+            wall_color=Color("#f4e2df")
+        "olmo":
+            floor_color=Color("#a58f7a")
+            wall_color=Color("#dfe5dc")
+    _paint("Floor",floor_color)
+    for wall in ["NorthWall","SouthWallLeft","SouthWallRight","WestWall","EastWall","BedroomDivider"]:
+        _paint(wall,wall_color)
+
+func set_room_packages(packages: Array) -> void:
+    var installed := []
+    for item in packages:
+        if item is Dictionary and item.get("installed",false):
+            installed.append(str(item.get("id","")))
+    for node_name in ["KitchenMicrowave","KitchenMicrowaveGlass","KitchenUpperCabinet"]:
+        get_node(node_name).visible="kitchen" in installed
+    for node_name in ["BedroomThrow","BedroomArtwork"]:
+        get_node(node_name).visible="bedroom" in installed
+    for node_name in ["ChildBooks","ChildDrawing","ChildPlayMat"]:
+        get_node(node_name).visible="children" in installed
 
 func toggle_entrance(at: Vector3) -> void:
     if entrance_open and absf(at.z-ENTRY.z)<0.65:return
