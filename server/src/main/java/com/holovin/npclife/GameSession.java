@@ -345,6 +345,13 @@ public final class GameSession implements AutoCloseable {
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
             }
+            if(action.equals("rebirth-developer-promote")){
+                return applyInternal(copy,15,DeveloperCareerLife.promote(copy,state.day,state.minute),true);
+            }
+            if(action.startsWith("rebirth-developer-audit:")){
+                var result=DeveloperCareerLife.audit(copy,state.day,state.minute,action.substring("rebirth-developer-audit:".length()));
+                return applyInternal(copy,result.minutes(),result.message(),true);
+            }
             if(action.startsWith("rebirth-git:")){
                 String[] parts=action.split(":",3);
                 if(parts.length!=3)throw new IllegalArgumentException("Choose a Git step and ticket.");

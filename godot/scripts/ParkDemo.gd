@@ -3013,6 +3013,30 @@ func _render_software() -> void:
             _action_choices.add_child(start)
             _action_choices.add_child(_button("Leave",_close_software))
             return
+    if workspace is Dictionary and workspace.get("career") is Dictionary:
+        var career: Dictionary = workspace["career"]
+        var profile := Label.new()
+        profile.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        profile.text="%s · XP %s · Technical %s/100\nReleases %s · Audits %s" % [career.get("rank","Junior"),career.get("xp",0),career.get("technical",0),career.get("releases",0),career.get("audits",0)]
+        _action_choices.add_child(profile)
+        if career.get("nextRank")!=null:
+            var promotion := _button("Promotion: %s · XP %s · Skill %s · Audits %s" % [career.get("nextRank",""),career.get("requiredXp",0),career.get("requiredTechnical",0),career.get("requiredAudits",0)],_garden_action.bind("rebirth-developer-promote"))
+            promotion.disabled=not bool(career.get("canPromote",false))
+            _action_choices.add_child(promotion)
+        var audit: Dictionary = career.get("audit",{})
+        var assignment := Label.new()
+        assignment.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        assignment.text="%s · %s EUR · 60 min\n%s" % [audit.get("title","Daily operations"),audit.get("wage",0),audit.get("prompt","")]
+        _action_choices.add_child(assignment)
+        var answer := LineEdit.new()
+        answer.name="DeveloperAuditAnswer"
+        answer.placeholder_text="Enter numeric result"
+        answer.max_length=10
+        answer.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+        _action_choices.add_child(answer)
+        var submit_audit := _button("Submit daily audit",_submit_developer_audit.bind(answer))
+        submit_audit.disabled=not bool(audit.get("available",false))
+        _action_choices.add_child(submit_audit)
     for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
         var info := Label.new()
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3047,6 +3071,10 @@ func _render_software() -> void:
             advance.disabled=not bool(project.get("canAdvance",false))
             _action_choices.add_child(advance)
     _action_choices.add_child(_button("Leave",_close_software))
+
+func _submit_developer_audit(editor: LineEdit) -> void:
+    if is_instance_valid(editor):
+        _garden_action("rebirth-developer-audit:"+editor.text)
 
 func _submit_java(ticket: String,editor: LineEdit) -> void:
     if is_instance_valid(editor):
@@ -3953,7 +3981,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:")) and not _near_software():return
+    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-")) and not _near_software():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return

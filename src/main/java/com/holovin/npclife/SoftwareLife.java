@@ -91,6 +91,7 @@ final class SoftwareLife {
         EducationLife.learn(t,c,"technical",1);
         if(next==3){
             t.employerFunds.merge(p.account(),-p.wage(),Integer::sum);c.money=wallet;
+            DeveloperCareerLife.release(t,c);
             return new RebirthLife.HomeAction(view.minutes(),"Deployed "+p.title()+"; earned EUR "+p.wage()+".");
         }
         return new RebirthLife.HomeAction(view.minutes(),view.nextAction()+" completed for "+p.title()+".");

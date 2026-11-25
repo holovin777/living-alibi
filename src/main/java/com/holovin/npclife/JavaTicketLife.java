@@ -35,14 +35,14 @@ final class JavaTicketLife {
         +"Git keeps changes isolated in a feature branch. Commit records changes; a pull request invites review; CI checks the change; merge updates main. Deployment releases it to users. "
         +"Spring Boot maps HTTP GET requests to controller methods; JSON is the response format. SQL reads structured tables with SELECT, WHERE and ORDER BY. "
         +"SQL tickets run against disposable test databases, not the saved city. This is an in-game Git workflow, not a connection to a real repository. Only a delivered contract pays.";
-    record Workspace(String company,String intro,boolean onboarded,boolean canOnboard,List<Ticket> tickets){}
+    record Workspace(String company,String intro,boolean onboarded,boolean canOnboard,List<Ticket> tickets,DeveloperCareerLife.Career career){}
     static Workspace workspace(TownLife.Town t,int day,int minute){
         var c=RebirthLife.child(t);
         if(!SoftwareLife.linkedProgrammer(t,c))return null;
         boolean onboarded=EducationLife.get(t,c,"java-onboarded")>0;
         boolean ready=RebirthLife.awakePresent(c)&&!RebirthLife.atHome(c)&&c.place==TownLife.Place.OFFICE
             &&!EmploymentLife.sick(c,day)&&minute>=480&&minute+15<=1080;
-        return new Workspace("Borgo Digital",INTRO,onboarded,!onboarded&&ready,TICKETS);
+        return new Workspace("Borgo Digital",INTRO,onboarded,!onboarded&&ready,TICKETS,DeveloperCareerLife.report(t,day,minute));
     }
     static String onboard(TownLife.Town t,int day,int minute){
         var c=RebirthLife.requireAdult(t);var workspace=workspace(t,day,minute);

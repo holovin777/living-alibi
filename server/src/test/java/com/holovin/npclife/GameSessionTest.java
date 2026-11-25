@@ -346,6 +346,53 @@ class GameSessionTest {
         }
     }
     @Test
+    void developerCareerRequiresPersonalExperienceAndPaysFromBudget() throws Exception {
+        Path file=directory.resolve("developer-career.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=30;c.hunger=10;c.thirst=10;c.fatigue=20;c.food=5;c.water=5;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.OFFICE;c.destination=c.place;c.activity="FREE_TIME";
+            c.workplace=TownLife.Place.OFFICE;c.occupation="Programmer";c.employed=true;
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            EducationLife.set(town,c,"technical",70);EducationLife.set(town,c,"diploma-programming",1);
+            EducationLife.set(town,c,"java-onboarded",1);
+            EducationLife.set(town,c,"developer-xp",3);
+            EducationLife.set(town,c,"developer-audits",1);
+            town.retailStock.put("bread",2);town.retailStock.put("water",3);
+            town.employerFunds.put("city-maintenance",500);
+            state.day=2;state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-developer-promote"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-developer-audit:6"));
+            var audit=game.gardenAction("rebirth-developer-audit:5").world();
+            assertEquals(48,audit.player().money());
+            assertEquals(4,audit.rebirth().javaWorkspace().career().xp());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-developer-audit:5"));
+            assertTrue(audit.rebirth().javaWorkspace().career().canPromote());
+            var promotion=game.gardenAction("rebirth-developer-promote").world();
+            assertEquals("Middle",promotion.rebirth().javaWorkspace().career().rank());
+            assertEquals(24,promotion.rebirth().javaWorkspace().career().audit().wage());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-developer-promote"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var c=town.get(id);
+            assertEquals(482,town.employerFunds.get("city-maintenance").intValue());
+            assertEquals(1,EducationLife.get(town,c,"developer-rank"));
+            assertEquals(2,EducationLife.get(town,c,"developer-audits"));
+        }
+        try(var game=new GameSession(file)){
+            assertEquals("Middle",game.snapshot().rebirth().javaWorkspace().career().rank());
+            assertFalse(game.snapshot().rebirth().javaWorkspace().career().audit().available());
+        }
+    }
+    @Test
     void programmerDeploysPersistentSoftwareWithFundedContract() throws Exception {
         Path file=directory.resolve("linked-software.db");
         String id;int budget;
@@ -394,6 +441,8 @@ class GameSessionTest {
             var deployed=game.gardenAction("rebirth-software-water-control").world();
             assertEquals(990,deployed.minute());
             assertEquals(75,deployed.player().money());
+            assertEquals(1,deployed.rebirth().javaWorkspace().career().releases());
+            assertEquals(3,deployed.rebirth().javaWorkspace().career().xp());
             assertTrue(deployed.rebirth().softwareProjects().getFirst().deployed());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-software-water-control"));
         }

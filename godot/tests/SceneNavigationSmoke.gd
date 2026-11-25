@@ -1070,6 +1070,14 @@ func _exercise() -> void:
     if not _check(sql_editor is LineEdit and sql_editor.text=="SELECT id FROM products","SQL ticket uses language-specific starter"):
         return
     world._close_software()
+    office["rebirth"]["javaWorkspace"]["career"]={"rank":"Junior","xp":0,"technical":55,"releases":0,"audits":0,"nextRank":"Middle","requiredXp":4,"requiredTechnical":55,"requiredAudits":2,"canPromote":false,"audit":{"title":"Inventory audit","wage":18,"prompt":"Bread 3 · Water 2","available":true}}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Promotion: Middle") and _has_button(world._action_choices,"Submit daily audit") and world._action_choices.has_node("DeveloperAuditAnswer"),"developer career and daily audit menu"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 
