@@ -329,6 +329,77 @@ final class RebirthLife {
         t.industryStocks.put(PHASE,ADULT);t.industryStocks.put(CHILD,0);
         return "Started an adult life in the park.";
     }
+    record HouseholdMember(String id,String name,int age,boolean alive,String role,int savings){}
+    record FamilyOptions(List<Conversation> proposals,HouseholdMember partner,List<HouseholdMember> children,
+                         boolean livingTogether,boolean canMoveTogether,boolean canHaveChild,boolean canSupport,int supportAmount){}
+    static List<Conversation> proposals(TownLife.Town t,TownLife.Citizen c){
+        if(!linkedAdult(t,c)||!awakePresent(c))return List.of();
+        return visible(t).stream().filter(p->awakePresent(p)&&DemographyLife.canPair(t,c,p))
+                .map(p->new Conversation(p.id,p.name)).toList();
+    }
+    static TownLife.Citizen partner(TownLife.Town t,TownLife.Citizen c){
+        var p=DemographyLife.byIndex(t,DemographyLife.get(t,c,"partner"));
+        return p!=null&&p.alive&&DemographyLife.get(t,p,"partner")==c.generationIndex?p:null;
+    }
+    static boolean together(TownLife.Citizen a,TownLife.Citizen b){
+        return a.home==b.home&&a.homeUnit.equals(b.homeUnit);
+    }
+    static boolean meeting(TownLife.Citizen a,TownLife.Citizen b){
+        return awakePresent(a)&&awakePresent(b)&&a.currentSpace().equals(b.currentSpace());
+    }
+    static boolean willing(TownLife.Town t,TownLife.Citizen c,TownLife.Citizen p){
+        if(p==null)return false;
+        var r=t.peerRelationships.get(SocialNetwork.key(c.id,p.id));
+        return r!=null&&r.affinity>=65&&r.trust>=60&&r.tension<=25;
+    }
+    static boolean canMoveTogether(TownLife.Town t,TownLife.Citizen c,TownLife.Citizen p){
+        return p!=null&&!together(c,p)&&meeting(c,p)&&willing(t,c,p)
+                &&TownLife.privateUnit(c.id).equals(c.homeUnit)&&TownLife.privateUnit(p.id).equals(p.homeUnit);
+    }
+    static boolean canHaveChild(TownLife.Town t,TownLife.Citizen c,TownLife.Citizen p,int day){
+        return p!=null&&together(c,p)&&meeting(c,p)&&willing(t,c,p)&&DemographyLife.canBirth(t,c,p,day);
+    }
+    static HouseholdMember householdMember(TownLife.Citizen c,String role){
+        return new HouseholdMember(c.id,c.name,c.age,c.alive,role,c.money);
+    }
+    static FamilyOptions familyOptions(TownLife.Town t,int day){
+        var c=child(t);
+        if(!linkedAdult(t,c))return null;
+        var p=partner(t,c);
+        var children=t.people.values().stream().filter(x->DemographyLife.get(t,x,"parent-a")==c.generationIndex
+                ||DemographyLife.get(t,x,"parent-b")==c.generationIndex).map(x->householdMember(x,"Child")).toList();
+        return new FamilyOptions(proposals(t,c),p==null?null:householdMember(p,"Partner"),children,
+                p!=null&&together(c,p),canMoveTogether(t,c,p),canHaveChild(t,c,p,day),
+                p!=null&&meeting(c,p)&&c.money>=60,10);
+    }
+    static String propose(TownLife.Town t,String id,int day,int minute){
+        var c=requireAdult(t);
+        if(proposals(t,c).stream().noneMatch(p->p.id().equals(id)))throw new IllegalArgumentException("This resident is not ready for a partnership.");
+        var p=t.people.get(id);
+        if(!DemographyLife.pair(t,c,p,day))throw new IllegalArgumentException("Partnership unavailable.");
+        ArchiveLife.record(t,"union:"+c.id+":"+p.id+":"+day,day,minute,"Population",c.name+" and "+p.name+" formed a household partnership.");
+        return "You and "+p.name+" agreed to become partners.";
+    }
+    static String moveTogether(TownLife.Town t){
+        var c=requireAdult(t);var p=partner(t,c);
+        if(!canMoveTogether(t,c,p))throw new IllegalArgumentException("Both partners must meet and have compatible private homes.");
+        RentalLife.moveHome(t,p,c.home,c.homeUnit);
+        return "You and "+p.name+" now share a home.";
+    }
+    static String haveChild(TownLife.Town t,int day){
+        var c=requireAdult(t);var p=partner(t,c);
+        if(!canHaveChild(t,c,p,day))throw new IllegalArgumentException("Family birth requirements are not met.");
+        var newborn=DemographyLife.birth(t,c,p,day);
+        if(newborn==null)throw new IllegalArgumentException("Birth unavailable.");
+        return "Welcome "+newborn.name+" to your family.";
+    }
+    static String supportPartner(TownLife.Town t){
+        var c=requireAdult(t);var p=partner(t,c);
+        if(p==null||!meeting(c,p)||c.money<60)throw new IllegalArgumentException("Meet your partner and retain EUR 50 in savings.");
+        int wallet=Math.addExact(p.money,10);
+        c.money-=10;p.money=wallet;
+        return "Transferred EUR 10 to "+p.name+".";
+    }
     record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations,String bond){}
     private static String bond(boolean family,SocialLife.Relationship r){
         if(family)return "Family";
@@ -372,7 +443,9 @@ final class RebirthLife {
         var known=new ArrayList<KnownPerson>();
         for(var p:t.people.values()){
             if(p==c)continue;
-            boolean family=p.generationIndex>0&&(p.generationIndex==a||p.generationIndex==b);
+            boolean family=p.generationIndex>0&&(p.generationIndex==a||p.generationIndex==b
+                    ||p.generationIndex==DemographyLife.get(t,c,"partner")
+                    ||DemographyLife.get(t,p,"parent-a")==c.generationIndex||DemographyLife.get(t,p,"parent-b")==c.generationIndex);
             var relation=t.peerRelationships.get(SocialNetwork.key(c.id,p.id));
             if(!family&&(relation==null||relation.conversations==0))continue;
             known.add(new KnownPerson(p.id,p.name,family,p.alive,relation==null?0:relation.affinity,
@@ -383,7 +456,7 @@ final class RebirthLife {
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
                 EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known));
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions){}
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
     static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
@@ -393,6 +466,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day));
     }
 }

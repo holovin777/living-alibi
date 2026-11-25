@@ -39,11 +39,14 @@ final class DemographyLife {
         collect(t,byIndex(t,get(t,c,"parent-a")),result);
         collect(t,byIndex(t,get(t,c,"parent-b")),result);
     }
-    static boolean pair(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
-        if(a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=0||get(t,b,"partner")!=0)return false;
+    static boolean canPair(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b){
+        if(a==null||b==null||a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=0||get(t,b,"partner")!=0)return false;
         var relation=t.peerRelationships.get(SocialNetwork.key(a.id,b.id));
         if(relation==null||relation.trust<60||relation.affinity<65||relation.tension>25)return false;
-        if(!java.util.Collections.disjoint(ancestors(t,a),ancestors(t,b)))return false;
+        return java.util.Collections.disjoint(ancestors(t,a),ancestors(t,b));
+    }
+    static boolean pair(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day){
+        if(!canPair(t,a,b))return false;
         set(t,a,"partner",b.generationIndex);set(t,b,"partner",a.generationIndex);
         set(t,a,"union-day",day);set(t,b,"union-day",day);
         return true;
@@ -161,9 +164,12 @@ final class DemographyLife {
         for(int i=0;i<residents.size();i++){
             var a=residents.get(i);
             if(!parentAge(a))continue;
-            for(int j=i+1;j<residents.size()&&get(t,a,"partner")==0;j++)pair(t,a,residents.get(j),day);
+            for(int j=i+1;j<residents.size()&&get(t,a,"partner")==0;j++){
+                var candidate=residents.get(j);
+                if(!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,candidate))pair(t,a,candidate,day);
+            }
             var b=byIndex(t,get(t,a,"partner"));
-            if(b!=null&&a.generationIndex<b.generationIndex){
+            if(b!=null&&a.generationIndex<b.generationIndex&&!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,b)){
                 var newborn=birth(t,a,b,day);
                 if(newborn!=null)TownLife.publish(t,clock,a.id,a.place,a.name+" welcomed a new family member.",events,observations);
             }

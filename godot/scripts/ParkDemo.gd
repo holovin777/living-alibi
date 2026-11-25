@@ -2715,6 +2715,23 @@ func _render_actions() -> void:
                 for destination in options.get("destinations",[]):
                     if str(destination) != _current_place:
                         _action_choices.add_child(_button("Walk to "+str(destination).capitalize(),_garden_action.bind("rebirth-travel-"+str(destination))))
+            var family_options = rebirth.get("familyOptions")
+            if family_options is Dictionary:
+                var household := Label.new()
+                household.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                var spouse = family_options.get("partner")
+                household.text = "Family · Single" if spouse == null else "Family · Partner: %s · %s" % [spouse.get("name",""),"shared home" if family_options.get("livingTogether",false) else "separate homes"]
+                for kid in family_options.get("children",[]):
+                    household.text += "\nChild: %s · age %s%s" % [kid.get("name",""),kid.get("age",0)," (deceased)" if not kid.get("alive",true) else ""]
+                _action_choices.add_child(household)
+                for candidate in family_options.get("proposals",[]):
+                    _action_choices.add_child(_button("Propose partnership to "+str(candidate.get("name","")),_garden_action.bind("rebirth-propose-"+str(candidate.get("id","")))))
+                if family_options.get("canMoveTogether",false):
+                    _action_choices.add_child(_button("Agree to share a home",_garden_action.bind("rebirth-move-together")))
+                if family_options.get("canHaveChild",false):
+                    _action_choices.add_child(_button("Welcome a child together",_garden_action.bind("rebirth-have-child")))
+                if family_options.get("canSupport",false):
+                    _action_choices.add_child(_button("Support partner · 10 EUR",_garden_action.bind("rebirth-support-partner")))
             for partner in rebirth.get("conversations",[]):
                 _action_choices.add_child(_button("Talk with "+str(partner.get("name","")),_garden_action.bind("rebirth-chat-"+str(partner.get("id","")))))
         var max_days := int(rebirth.get("maxWaitDays",0))

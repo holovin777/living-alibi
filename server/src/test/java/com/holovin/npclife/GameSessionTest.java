@@ -13,6 +13,69 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void linkedAdultFamilyIsVoluntaryAndConservesCash() throws Exception {
+        Path file=directory.resolve("linked-family.db");
+        String adultId,partnerId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,2);
+            var a=people.get(0);var b=people.get(1);
+            adultId=a.id;partnerId=b.id;
+            a.age=30;b.age=30;a.money=200;b.money=200;
+            a.place=TownLife.Place.PARK;b.place=a.place;a.travelRemaining=0;b.travelRemaining=0;
+            a.activity="FREE_TIME";b.activity="FREE_TIME";
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,a.generationIndex);
+            DemographyLife.set(town,a,"played-incarnation",town.player.incarnation);
+            var r=new SocialLife.Relationship(a.id,b.id);r.affinity=80;r.trust=80;r.tension=5;
+            town.peerRelationships.put(SocialNetwork.key(a.id,b.id),r);
+            state.day=31;state.minute=359;
+            // The automatic family cycle must not assign a partner to the player.
+            state.minute=360;
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(0,DemographyLife.get(town,a,"partner"));
+            state.minute=850;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().familyOptions().proposals().stream().anyMatch(p->p.id().equals(partnerId)));
+            var paired=game.gardenAction("rebirth-propose-"+partnerId).world();
+            assertEquals(partnerId,paired.rebirth().familyOptions().partner().id());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-propose-"+partnerId));
+            assertFalse(paired.rebirth().familyOptions().canHaveChild());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-have-child"));
+            var moved=game.gardenAction("rebirth-move-together").world();
+            assertTrue(moved.rebirth().familyOptions().livingTogether());
+            var supported=game.gardenAction("rebirth-support-partner").world();
+            assertEquals(190,supported.player().money());
+            assertEquals(210,supported.rebirth().familyOptions().partner().savings());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var a=town.get(adultId);var b=town.get(partnerId);
+            assertEquals(a.homeUnit,b.homeUnit);
+            state.day=301;state.minute=360;
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(0,DemographyLife.get(town,a,"children"));
+            state.minute=850;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().familyOptions().canHaveChild());
+            var born=game.gardenAction("rebirth-have-child").world();
+            assertEquals(180,born.player().money());
+            assertEquals(200,born.rebirth().familyOptions().partner().savings());
+            assertEquals(1,born.rebirth().familyOptions().children().size());
+            assertEquals(20,born.rebirth().familyOptions().children().getFirst().savings());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-have-child"));
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(1,game.snapshot().rebirth().familyOptions().children().size());
+            assertTrue(game.snapshot().rebirth().familyOptions().livingTogether());
+        }
+    }
+    @Test
     void orchardIsPerennialSeasonalAndConservesFruitOnSale() throws Exception {
         Path file=directory.resolve("orchard.db");
         try(var game=new GameSession(file)) {

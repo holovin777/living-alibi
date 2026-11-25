@@ -372,6 +372,10 @@ public final class GameSession implements AutoCloseable {
             if(action.equals("rebirth-adult"))message=RebirthLife.adultFallback(copy);
             else if(action.equals("rebirth-allowance"))message=RebirthLife.allowance(copy,state.day,state.minute);
             else if(action.equals("rebirth-continue"))message=RebirthLife.continueAdult(copy);
+            else if(action.startsWith("rebirth-propose-"))message=RebirthLife.propose(copy,action.substring("rebirth-propose-".length()),state.day,state.minute);
+            else if(action.equals("rebirth-move-together"))message=RebirthLife.moveTogether(copy);
+            else if(action.equals("rebirth-have-child"))message=RebirthLife.haveChild(copy,state.day);
+            else if(action.equals("rebirth-support-partner"))message=RebirthLife.supportPartner(copy);
             else if(action.equals("rebirth-routine"))message=RebirthLife.resumeRoutine(copy);
             else if(action.startsWith("rebirth-job-"))message=EmploymentLife.chooseRole(copy,state,action.substring("rebirth-job-".length()));
             else if(action.startsWith("rebirth-ambition-"))message=RebirthLife.chooseAmbition(copy,action.substring("rebirth-ambition-".length()));
