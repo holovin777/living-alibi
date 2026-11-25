@@ -344,7 +344,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
             if event.keycode == KEY_E and _apartment_active and not _action_panel.visible:
                 var action := _apartment_action()
                 if action=="door":
+                    var was_open: bool = _apartment.get("entrance_open")
                     _apartment.toggle_entrance(_avatar.position)
+                    if was_open != bool(_apartment.get("entrance_open")):
+                        _town_audio.play_effect("door")
                 elif action=="exit":
                     _request_home_transition("rebirth-home-exit")
                 elif not action.is_empty():
@@ -880,6 +883,7 @@ func _advance_jump(delta: float) -> void:
         _jump_height = maxf(0.0, JUMP_SPEED * _jump_elapsed - 0.5 * JUMP_GRAVITY * _jump_elapsed * _jump_elapsed)
         if _jump_elapsed >= 2.0 * JUMP_SPEED / JUMP_GRAVITY:
             _reset_jump()
+            _town_audio.play_effect("landing")
     _follow_player()
 
 func _follow_player() -> void:
@@ -5572,6 +5576,17 @@ func _update_town_audio(delta: float,moved: float) -> void:
         if nearby_people>=2:
             crowd = crowd_sum/float(nearby_people)
     _town_audio.update_scene(delta,at,sheltered,_last_snapshot,fountain,car,crowd,park,tower)
+    var industrial: Variant = null
+    var closest := 32.0
+    for id in ["FACTORY","WORKSHOP","QUARRY","LOGISTICS_DEPOT"]:
+        if _chunks.has(id):
+            var root: Node3D = _chunks[id]["root"]
+            var source := root.position+Vector3(-8,1,7)
+            var distance := at.distance_to(source)
+            if distance<closest:
+                closest = distance
+                industrial = source
+    _town_audio.update_local(moved,_movement_speed()==CYCLE_SPEED and _cycling(),sheltered,at,_last_snapshot,industrial,park)
 
 func _set_weather_audio(enabled: bool) -> void:
     _weather_fx.audio_enabled = enabled
