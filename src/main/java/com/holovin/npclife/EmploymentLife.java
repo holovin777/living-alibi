@@ -103,8 +103,9 @@ final class EmploymentLife {
         p.fatigue=Math.min(100,p.fatigue+12);
         p.health=Math.max(1,p.health-2);
         log(town,clock,p,Kind.SICK_LEAVE,"Brief illness; resting at home through day "+p.sickUntilDay+".");
-        EconomyLife.addBill(town,clock,p,medicalCost,"medical costs",truth,observations);
-        log(town,clock,p,Kind.MEDICAL_EXPENSE,"Medical expenses EUR "+medicalCost+" (paid or in arrears).");
+        int subsidy=MunicipalLife.medicalAid(town,p,medicalCost);
+        if(medicalCost>subsidy)EconomyLife.addBill(town,clock,p,medicalCost-subsidy,"medical costs",truth,observations);
+        log(town,clock,p,Kind.MEDICAL_EXPENSE,"Medical expenses EUR "+medicalCost+"; municipal aid EUR "+subsidy+" (remaining paid or in arrears).");
     }
 
     private static void log(TownLife.Town town,WorldState clock,TownLife.Citizen p,
