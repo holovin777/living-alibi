@@ -3,6 +3,12 @@ signal close_requested
 signal jobs_requested
 signal map_requested
 signal alarm_rang(message: String)
+signal sms_reply_requested(resident_id: String, choice: int)
+signal sms_received(message: String)
+var _sms_seen: Dictionary = {}
+var _sms_initialized := false
+var _sms_choice: OptionButton
+var _sms_decline: Button
 var alarm_at := -1
 var _last_world_minute := -1
 var _alarm_hour: SpinBox
@@ -47,7 +53,7 @@ func _ready() -> void:
     var apps := GridContainer.new()
     apps.columns = 2
     col.add_child(apps)
-    for entry in [["home","Phone home"],["jobs","Phone jobs"],["map","Phone map"],["contacts","Phone contacts"],["bank","Phone bank"],["messages","Phone notifications"],["calendar","Phone calendar"],["weather","Phone weather"],["alarm","Phone alarm"]]:
+    for entry in [["home","Phone home"],["jobs","Phone jobs"],["map","Phone map"],["contacts","Phone contacts"],["bank","Phone bank"],["messages","Phone notifications"],["calendar","Phone calendar"],["weather","Phone weather"],["alarm","Phone alarm"],["sms","Phone SMS"]]:
         var button := Button.new()
         button.text = entry[1]
         button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -80,6 +86,12 @@ func _ready() -> void:
     _alarm_cancel.text = "Cancel alarm"
     _alarm_cancel.pressed.connect(cancel_alarm)
     col.add_child(_alarm_cancel)
+    _sms_choice = OptionButton.new()
+    col.add_child(_sms_choice)
+    _sms_decline = Button.new()
+    _sms_decline.text = "Reply: not today"
+    _sms_decline.pressed.connect(_send_sms_reply.bind(2))
+    col.add_child(_sms_decline)
     _action = Button.new()
     _action.pressed.connect(_app_action)
     col.add_child(_action)
@@ -100,6 +112,8 @@ func update_data(snapshot: Dictionary,jobs: Array,locations: Array) -> void:
         _contacts.clear()
         _messages.clear()
         _identity = identity
+        _sms_seen.clear()
+        _sms_initialized = false
         alarm_at = -1
         _last_world_minute = -1
     for resident in snapshot.get("residents",[]):
@@ -107,6 +121,15 @@ func update_data(snapshot: Dictionary,jobs: Array,locations: Array) -> void:
             var id := str(resident.get("id",""))
             if not id.is_empty():
                 _contacts[id] = str(resident.get("name",""))
+    var phone = snapshot.get("phone")
+    if phone is Dictionary:
+        for sms in phone.get("messages",[]):
+            var key := "%s:%s:%s" % [sms.get("residentId",""),sms.get("day",0),sms.get("minute",0)]
+            if not _sms_seen.has(key):
+                _sms_seen[key] = true
+                if _sms_initialized:
+                    sms_received.emit(tr("New SMS from %s") % sms.get("name",""))
+        _sms_initialized = true
     var now := world_minute(snapshot)
     if alarm_at>=0 and _last_world_minute>=0 and now>=alarm_at and _last_world_minute<alarm_at:
         var message := tr("Alarm: day %s, %s") % [alarm_at/1440+1,format_time(alarm_at%1440)]
@@ -156,6 +179,12 @@ func _app_action() -> void:
         map_requested.emit()
     elif app=="alarm":
         set_alarm(int(_alarm_hour.value),int(_alarm_minute.value))
+    elif app=="sms":
+        _send_sms_reply(1)
+
+func _send_sms_reply(choice: int) -> void:
+    if _sms_choice.selected>=0:
+        sms_reply_requested.emit(str(_sms_choice.get_item_metadata(_sms_choice.selected)),choice)
 
 func refresh() -> void:
     if not is_instance_valid(_body):return
@@ -164,6 +193,8 @@ func refresh() -> void:
     var player: Dictionary = _snapshot.get("player",{})
     var lines := PackedStringArray()
     _action.hide()
+    _sms_choice.hide()
+    _sms_decline.hide()
     _alarm_controls.visible = app=="alarm"
     _alarm_cancel.visible = app=="alarm" and alarm_at>=0
     match app:
@@ -194,7 +225,7 @@ func refresh() -> void:
                 lines.append(tr("Talk to residents to add known contacts."))
             for id in _contacts:
                 lines.append(str(_contacts[id]))
-            lines.append("\n"+tr("Calls and texts are not available yet."))
+            lines.append("\n"+tr("Calls are not available yet. Open SMS for messages."))
         "bank":
             var bank = _snapshot.get("bank")
             lines.append(tr("Phone bank"))
@@ -234,6 +265,32 @@ func refresh() -> void:
             lines.append(tr("If the time has passed, the alarm is set for tomorrow."))
             _action.text = "Set alarm"
             _action.show()
+        "sms":
+            lines.append(tr("Phone SMS"))
+            var phone = _snapshot.get("phone")
+            if not phone is Dictionary or not phone.get("available",false):
+                lines.append(tr("SMS is unavailable in this life stage."))
+            else:
+                var selected_id := str(_sms_choice.get_item_metadata(_sms_choice.selected)) if _sms_choice.selected>=0 else ""
+                _sms_choice.clear()
+                for sms in phone.get("messages",[]):
+                    lines.append("\n%s · %s %s · %s" % [sms.get("name",""),tr("Day"),sms.get("day",0),format_time(int(sms.get("minute",0)))])
+                    lines.append(tr(str(sms.get("text",""))))
+                    if str(sms.get("reply","")).is_empty():
+                        _sms_choice.add_item(str(sms.get("name","")))
+                        var index := _sms_choice.item_count-1
+                        _sms_choice.set_item_metadata(index,sms.get("residentId",""))
+                        if str(sms.get("residentId",""))==selected_id:_sms_choice.select(index)
+                    else:
+                        lines.append(tr("You: %s") % tr(str(sms.get("reply",""))))
+                if phone.get("messages",[]).is_empty():
+                    lines.append(tr("No SMS yet. Introduce yourself and build friendships."))
+                if _sms_choice.item_count>0:
+                    if _sms_choice.selected<0:_sms_choice.select(0)
+                    _sms_choice.show()
+                    _sms_decline.show()
+                    _action.text = "Reply: thanks"
+                    _action.show()
         "messages":
             lines.append(tr("Phone notifications"))
             if _messages.is_empty():
