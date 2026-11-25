@@ -175,7 +175,7 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_inside_guest_room(),_environment)
     if _rebirth_active():
-        _hint.text = "F: childhood choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
+        _hint.text = "F: life choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
         return
     _tick_live_clock(delta)
     if not _near_gate():
@@ -340,7 +340,7 @@ func _movement_speed() -> float:
     # and grocery interior. No vehicle parking state is simulated yet.
     var at := _avatar.position
     var in_shop := _current_place == "PORTICI" and Rect2(4.4,2.15,6.1,5.7).has_point(Vector2(at.x,at.z))
-    if _rebirth_active():
+    if _rebirth_active() and str(_last_snapshot.get("rebirth",{}).get("phase","")) != "LINKED_ADULT":
         return WALK_SPEED * 0.65
     return CYCLE_SPEED if _cycling() and not _inside_guest_room() and not in_shop else WALK_SPEED
 
@@ -2613,7 +2613,7 @@ func _rebirth_active() -> bool:
 
 func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
-    return str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18
+    return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
@@ -2642,7 +2642,11 @@ func _render_actions() -> void:
                 personal.text = "Personal savings: %s EUR · Born on day %s" % [identity.get("savings",0),identity.get("bornDay",0)]
                 if age >= 18:
                     _action_title.text = "Coming of age · personal history"
-                    personal.text += "\nGraduation recorded. Adult controls are not available yet."
+                    if str(rebirth.get("phase","")) == "LINKED_ADULT":
+                        _action_title.text = "Adult life · personal history"
+                    else:
+                        personal.text += "\nGraduation recorded. Continue as the same person."
+                        _action_choices.add_child(_button("Continue adult life",_garden_action.bind("rebirth-continue")))
                 _action_choices.add_child(personal)
                 for person in identity.get("relationships",[]):
                     var relation := Label.new()
@@ -2659,6 +2663,20 @@ func _render_actions() -> void:
                 if age < 18:
                     for subject in ["balanced","technical","social","academic","commerce"]:
                         _action_choices.add_child(_button("Focus: "+subject.capitalize(),_garden_action.bind("rebirth-focus-"+subject)))
+            var options = rebirth.get("adultOptions")
+            if options is Dictionary:
+                var career := Label.new()
+                career.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                career.text = "%s · %s" % [options.get("occupation",""),options.get("activity","")]
+                _action_choices.add_child(career)
+                for job in options.get("jobs",[]):
+                    _action_choices.add_child(_button("Apply: "+str(job),_garden_action.bind("rebirth-job-"+str(job))))
+                _action_choices.add_child(_button("Resume work and daily routine",_garden_action.bind("rebirth-routine")))
+                _action_choices.add_child(_button("Advance one hour",_garden_action.bind("rebirth-wait-hour")))
+                _action_choices.add_child(_button("Advance one day",_garden_action.bind("rebirth-wait-adult-day")))
+                for destination in options.get("destinations",[]):
+                    if str(destination) != _current_place:
+                        _action_choices.add_child(_button("Walk to "+str(destination).capitalize(),_garden_action.bind("rebirth-travel-"+str(destination))))
             for partner in rebirth.get("conversations",[]):
                 _action_choices.add_child(_button("Talk with "+str(partner.get("name","")),_garden_action.bind("rebirth-chat-"+str(partner.get("id","")))))
         var max_days := int(rebirth.get("maxWaitDays",0))
@@ -3388,7 +3406,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     ]
     if _rebirth_active():
         var child: Dictionary = snapshot.get("rebirth",{})
-        _status.text = "Choose a new family" if str(child.get("phase","")) == "CHOICE" else "%s | Age %s | Childhood" % [child.get("childName",""),child.get("age",0)]
+        _status.text = "Choose a new family" if str(child.get("phase","")) == "CHOICE" else "%s | Age %s | %s" % [child.get("childName",""),child.get("age",0),"Adult" if str(child.get("phase","")) == "LINKED_ADULT" else "Childhood"]
     var climate: Dictionary = snapshot.get("weather", {})
     _weather.text = "Day %s  %s:%02d | %s | %s  %s °C" % [
         str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,

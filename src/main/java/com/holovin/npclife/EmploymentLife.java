@@ -54,7 +54,8 @@ final class EmploymentLife {
             }
             if(!p.employed) {
                 p.unemploymentDays++;
-                if((industryAccount!=null || workshopEmployee) &&
+                if(RebirthLife.linkedAdult(town,p)) { /* employment is the player’s choice */ }
+                else if((industryAccount!=null || workshopEmployee) &&
                         p.unemploymentDays>=2) {
                     // Simplified emergency placement after a factory closure:
                     // the old industrial career and physical production end.
@@ -77,6 +78,17 @@ final class EmploymentLife {
         }
     }
 
+    static List<String> openRoles(TownLife.Town t,TownLife.Citizen c,int day){
+        if(c.employed||!DemographyLife.workingAge(c)||sick(c,day))return List.of();
+        return java.util.Arrays.stream(JOBS).filter(job->EducationLife.availableRole(t,c,job)).toList();
+    }
+    static String chooseRole(TownLife.Town t,WorldState clock,String role){
+        var c=RebirthLife.requireAdult(t);
+        if(!openRoles(t,c,clock.day).contains(role))throw new IllegalArgumentException("This position is not available or its qualifications are not met.");
+        hire(t,clock,c,java.util.Arrays.asList(JOBS).indexOf(role));
+        RebirthLife.resumeRoutine(t);
+        return "Hired as "+role+". Attend work during the normal schedule to earn wages.";
+    }
     private static void seekSuitableJob(TownLife.Town town,WorldState clock,TownLife.Citizen p){
         int role=EducationLife.preferredRole(town,p,JOBS);
         if(role>=0)hire(town,clock,p,role);

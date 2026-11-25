@@ -79,9 +79,11 @@ public final class GameSession implements AutoCloseable {
 
     public synchronized WorldView snapshot() {
         var p=town.player;
-        var player=new PlayerView(p.incarnation,PlayerLife.position(p),p.place.name(),p.privateName,
-                p.hunger,p.thirst,p.fatigue,p.health,p.alive,
-                p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
+        var linked=RebirthLife.child(town);
+        boolean controlled=RebirthLife.linkedAdult(town,linked);
+        var player=new PlayerView(p.incarnation,controlled?linked.locationText():PlayerLife.position(p),p.place.name(),controlled?linked.name:p.privateName,
+                p.hunger,p.thirst,p.fatigue,p.health,controlled||p.alive,
+                controlled?linked.money:p.money,controlled&&linked.employed?linked.occupation:p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,p.hygiene,
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
@@ -327,6 +329,15 @@ public final class GameSession implements AutoCloseable {
     public synchronized ActionView gardenAction(String action) throws SQLException {
         if(action!=null&&action.startsWith("rebirth-")){
             var copy=town.copy();
+            if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){
+                RebirthLife.requireAdult(copy);
+                return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
+            }
+            if(action.startsWith("rebirth-travel-")){
+                var destination=PlayerLife.destination(action.substring("rebirth-travel-".length()));
+                int duration=RebirthLife.travel(copy,destination,state.day);
+                return applyInternal(copy,duration,"Travel to "+destination.label+".",true);
+            }
             if(action.equals("rebirth-wait")||action.equals("rebirth-wait-fast")){
                 int maxDays=RebirthLife.maxWaitDays(town);
                 if(maxDays==0)throw new IllegalArgumentException("No childhood waiting is available.");
@@ -337,6 +348,9 @@ public final class GameSession implements AutoCloseable {
             }
             String message;
             if(action.equals("rebirth-adult"))message=RebirthLife.adultFallback(copy);
+            else if(action.equals("rebirth-continue"))message=RebirthLife.continueAdult(copy);
+            else if(action.equals("rebirth-routine"))message=RebirthLife.resumeRoutine(copy);
+            else if(action.startsWith("rebirth-job-"))message=EmploymentLife.chooseRole(copy,state,action.substring("rebirth-job-".length()));
             else if(action.startsWith("rebirth-focus-"))message=RebirthLife.chooseFocus(copy,action.substring("rebirth-focus-".length()));
             else if(action.startsWith("rebirth-chat-"))message=RebirthLife.chat(copy,state.day,action.substring("rebirth-chat-".length()));
             else if(action.startsWith("rebirth-family-")){
@@ -418,7 +432,7 @@ public final class GameSession implements AutoCloseable {
         int initialMaxDays=RebirthLife.maxWaitDays(candidateTown);
         events.addAll(LifeSimulation.advance(candidateState,minutes,
                 current->TownLife.tick(candidateTown,current,truth,observations,interactions),
-                ()->!rebirthAction||minutes==0||RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays)));
+                ()->!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays))));
         if(rebirthAction&&minutes>0){
             long elapsed=(candidateState.day-(long)state.day)*1440+candidateState.minute-state.minute;
             message+=" Elapsed: "+elapsed/1440+" day(s), "+elapsed%1440+" minute(s).";

@@ -67,19 +67,23 @@ final class EducationLife {
             set(t,EXPERIENCE,Math.addExact(get(t,EXPERIENCE),1));
         }
     }
+    static boolean availableRole(TownLife.Town t,TownLife.Citizen c,String job){
+        String f=subject(job);
+        int minimum=switch(job){case "Teacher","Nurse","Journalist" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
+        if(get(t,c,f)<minimum)return false;
+        if(NewspaperLife.OCCUPATION.equals(job)&&(t.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY*30||c.money<200))return false;
+        String employer=IndustryLife.companyFor(job);
+        if(employer!=null&&t.employerFunds.getOrDefault(employer,0)<IndustryLife.HOURLY_WAGE)return false;
+        return t.people.values().stream().filter(x->x.alive&&x.employed&&job.equals(x.occupation)).count()<(employer==null?5:2);
+    }
     static int preferredRole(TownLife.Town t,TownLife.Citizen c,String[] jobs){
         ensureResident(t,c);
         int best=-1,bestScore=Integer.MIN_VALUE;
         for(int i=0;i<jobs.length;i++){
             String job=jobs[i],f=subject(job);
             int skill=get(t,c,f);
-            int minimum=switch(job){case "Teacher","Nurse","Journalist" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
-            if(skill<minimum)continue;
-            if(NewspaperLife.OCCUPATION.equals(job)&&(t.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY*30||c.money<200))continue;
-            String employer=IndustryLife.companyFor(job);
-            if(employer!=null&&t.employerFunds.getOrDefault(employer,0)<IndustryLife.HOURLY_WAGE)continue;
+            if(!availableRole(t,c,job))continue;
             long occupied=t.people.values().stream().filter(x->x.alive&&x.employed&&job.equals(x.occupation)).count();
-            if(occupied>=(employer==null?5:2))continue;
             int score=skill*2+aptitude(c,f)*8-(int)occupied*12;
             if("LEARN_SKILLS".equals(c.goal)&&f.equals("academic"))score+=8;
             if("MAKE_FRIENDS".equals(c.goal)&&f.equals("social"))score+=8;

@@ -49,7 +49,9 @@ final class PopulationLife {
         boolean publicWater=needWater && UtilityLife.status(town).fountainWorking()
                 && town.cleanWater>0;
         TownLife.Place desired;
+        TownLife.Place manual=RebirthLife.manualDestination(town,c);
         if(sick)desired=c.home;
+        else if(manual!=null)desired=manual;
         else if(freightRun)desired=freightDestination;
         else if(sleeping)desired=c.home;
         else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:c.home;

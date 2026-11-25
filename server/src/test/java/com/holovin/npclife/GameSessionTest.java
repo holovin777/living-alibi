@@ -302,6 +302,37 @@ class GameSessionTest {
             assertEquals(18,adult.age());assertTrue(adult.identity().graduated());
             assertEquals("technical",adult.schoolFocus());
             assertTrue(adult.skills().get("technical")>0);
+            String id=adult.identity().residentId();
+            int savings=adult.identity().savings();
+            var continued=game.gardenAction("rebirth-continue").world();
+            assertEquals("LINKED_ADULT",continued.rebirth().phase());
+            assertEquals(id,continued.rebirth().identity().residentId());
+            assertEquals(savings,continued.player().money());
+            assertTrue(continued.player().alive());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-continue"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-job-unknown"));
+            var hired=game.gardenAction("rebirth-job-Barista").world();
+            assertEquals("Barista",hired.rebirth().adultOptions().occupation());
+            assertEquals(savings,hired.player().money());
+            var moved=game.gardenAction("rebirth-travel-PARK").world();
+            assertEquals("PARK",moved.player().placeId());
+            assertEquals(id,moved.rebirth().identity().residentId());
+        }
+        try(var game=new GameSession(file)){
+            var adult=game.snapshot();
+            assertEquals("LINKED_ADULT",adult.rebirth().phase());
+            assertEquals("Barista",adult.rebirth().adultOptions().occupation());
+            assertEquals("PARK",adult.rebirth().adultOptions().destination());
+            assertEquals(adult.rebirth().identity().savings(),adult.player().money());
+            var resumed=game.gardenAction("rebirth-routine").world();
+            assertNull(resumed.rebirth().adultOptions().destination());
+            var later=game.gardenAction("rebirth-wait-hour").world();
+            assertEquals(resumed.minute()+60,later.minute());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(0,town.player.money,"inactive shell never duplicates the citizen wallet");
+            assertFalse(town.player.alive);
         }
     }
 

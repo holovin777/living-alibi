@@ -414,7 +414,7 @@ final class TownLife {
             default -> current==null?Place.MARCO_HOME:current;
         };
     }
-    private static int travelTime(Place from,Place to) {
+    static int travelTime(Place from,Place to) {
         // Coarse walking times; no route geometry yet.
         return from==to?0:(from==Place.PARK||to==Place.PARK?10:8);
     }
