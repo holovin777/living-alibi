@@ -206,7 +206,15 @@ const IT := {
     "I haven't had much company lately.": "Ultimamente ho avuto poca compagnia.",
     "I'm having a good day, thanks!": "È una bella giornata, grazie!",
     "I'm really enjoying my work today!": "Oggi mi piace davvero il mio lavoro!",
-    "I'm doing all right, thanks for asking.": "Sto bene, grazie per avermelo chiesto."
+    "I'm doing all right, thanks for asking.": "Sto bene, grazie per avermelo chiesto.",
+    "Offer support": "Offri sostegno",
+    "Ask about shared memories": "Chiedi dei ricordi condivisi",
+    "I remember how you treated me. Trust takes time.": "Ricordo come mi hai trattato. Ci vuole tempo per ritrovare la fiducia.",
+    "I remember your apology. We can move forward.": "Ricordo le tue scuse. Possiamo andare avanti.",
+    "I remember when you were there for me. Thank you.": "Ricordo quando mi sei stato vicino. Grazie.",
+    "We haven't shared anything like that yet.": "Non abbiamo ancora condiviso esperienze del genere.",
+    "Thank you for being here.": "Grazie per essermi vicino.",
+    "Thank you for the kind words.": "Grazie per le belle parole."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
