@@ -2961,6 +2961,16 @@ func _create_interface() -> void:
     _status = Label.new()
     _status.text = "A visitor with 50 EUR and no assigned profession"
     column.add_child(_status)
+    var guide_toggle := CheckButton.new()
+    guide_toggle.text = "First steps / navigation"
+    guide_toggle.button_pressed = true
+    guide_toggle.toggled.connect(_set_guide_enabled)
+    column.add_child(guide_toggle)
+    _guide_label=Label.new()
+    _guide_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _guide_label.custom_minimum_size=Vector2(420,0)
+    _guide_label.text=tr("First steps: connecting to the world...")
+    column.add_child(_guide_label)
     _weather = Label.new()
     _weather.text = "Connecting to the local Java world..."
     column.add_child(_weather)
@@ -3042,16 +3052,6 @@ func _create_interface() -> void:
     audio_toggle.button_pressed = true
     audio_toggle.toggled.connect(_set_weather_audio)
     atmosphere_row.add_child(audio_toggle)
-    var guide_toggle := CheckButton.new()
-    guide_toggle.text = "First steps / navigation"
-    guide_toggle.button_pressed = true
-    guide_toggle.toggled.connect(_set_guide_enabled)
-    column.add_child(guide_toggle)
-    _guide_label=Label.new()
-    _guide_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-    _guide_label.custom_minimum_size=Vector2(420,0)
-    _guide_label.text=tr("First steps: connecting to the world...")
-    column.add_child(_guide_label)
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _hint.text = "WASD: walk · click scene: mouse look · Esc: cursor."
@@ -4287,6 +4287,8 @@ func _render_actions() -> void:
                     instruction.text = "Your room is across the street. Walk to the bed."
                     _action_choices.add_child(instruction)
         "MARKET", "PORTICI", "FUEL_STATION":
+            if _current_place=="MARKET" and employed!="shop-assistant":
+                _action_choices.add_child(_button("Apply: market assistant",_apply_job.bind("shop-assistant")))
             for item in _last_snapshot.get("shop",[]):
                 var id := str(item.get("id",""))
                 var stock := int(item.get("stock",0))
@@ -4370,8 +4372,7 @@ func _render_actions() -> void:
                     var egg_sale := _button("Sell eggs · 2 EUR / unit",_garden_action.bind("sell-eggs"))
                     egg_sale.disabled = int(eggs.get("marketFree",0))<=0 or int(eggs.get("marketBudget",0))<2
                     _action_choices.add_child(egg_sale)
-                _action_choices.add_child(_button("Apply: market assistant",
-                        _apply_job.bind("shop-assistant")))
+
             elif _current_place=="FUEL_STATION":
                 var fuel: Dictionary = _last_snapshot.get("fuel",{})
                 var supply := Label.new()
