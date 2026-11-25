@@ -135,6 +135,7 @@ if [[ ! -d "$ROOT/godot/.godot" ]]; then
 fi
 
 echo "Opening Living Alibi..."
-echo "WASD/arrow keys = walk; E at yellow gate = travel; F at blue kiosk = actions."
+echo "WASD/arrows = walk; click scene = mouse look; V = first/third person; Esc = cursor."
+echo "E at yellow gate = travel; F at blue kiosk = actions."
 echo "Close the Godot window to stop the server. The SQLite save is preserved."
 "$GODOT" --path "$ROOT/godot"
