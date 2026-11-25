@@ -2704,6 +2704,8 @@ func _build_park() -> void:
         _bench(park, p)
     for p in [Vector3(-3,0,-9), Vector3(3,0,-3), Vector3(-3,0,8), Vector3(13,0,3)]:
         _lamp(park, p)
+    for at in [Vector3(-8,0,-5),Vector3(-15,0,9),Vector3(10,0,11)]:
+        _park_flowers(park,at)
     # The pool is decorative; drinking still requires the validated Java action.
     var fountain := Node3D.new()
     fountain.name = "PublicFountain"
@@ -2731,6 +2733,37 @@ func _build_park() -> void:
             _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.62))
             _box(park,Vector3(0.055,1.08,0.08),Color("#e0c6a0"),Vector3(x+offset,2.8,-17.56))
 
+func _park_flowers(parent: Node3D, at: Vector3) -> void:
+    # Small decorative flowers hug the tree bases, never create obstacles.
+    var blossom := SphereMesh.new()
+    blossom.radius = 0.065
+    blossom.height = 0.10
+    blossom.radial_segments = 6
+    blossom.rings = 3
+    var mat := StandardMaterial3D.new()
+    mat.vertex_color_use_as_albedo = true
+    mat.roughness = 0.95
+    blossom.material = mat
+    var batch := MultiMesh.new()
+    batch.transform_format = MultiMesh.TRANSFORM_3D
+    batch.use_colors = true
+    batch.mesh = blossom
+    batch.instance_count = 40
+    var rng := RandomNumberGenerator.new()
+    rng.seed = absi(roundi(at.x*127.0+at.z*53.0))
+    var colors := [Color("#f0c250"),Color("#e0a5b7"),Color("#f5ede0"),Color("#ae727d")]
+    for i in range(batch.instance_count):
+        var angle := rng.randf_range(0.0,TAU)
+        var radius := rng.randf_range(0.38,0.85)
+        var pos := at+Vector3(cos(angle)*radius,rng.randf_range(0.035,0.09),sin(angle)*radius)
+        batch.set_instance_transform(i,Transform3D(Basis.IDENTITY,pos))
+        batch.set_instance_color(i,colors[i%colors.size()])
+    var bed := MultiMeshInstance3D.new()
+    bed.name = "Wildflowers"
+    bed.multimesh = batch
+    parent.add_child(bed)
+    _register_graphics_detail(bed)
+
 func _bench(parent: Node3D, at: Vector3) -> void:
     _add_obstacle(at, Vector2(2.0, 0.66))
     var wood := Color(0.43,0.27,0.14)
@@ -2744,7 +2777,14 @@ func _bench(parent: Node3D, at: Vector3) -> void:
 func _lamp(parent: Node3D, at: Vector3) -> void:
     _add_obstacle(at, Vector2(0.18, 0.18))
     _cylinder(parent, 0.09, 3.4, Color(0.19,0.22,0.24), at+Vector3(0,1.7,0))
-    _sphere(parent, 0.23, Color(0.91,0.87,0.65), at+Vector3(0,3.4,0))
+    _cylinder(parent,0.18,0.3,Color("#3c4140"),at+Vector3(0,0.15,0))
+    _cylinder(parent,0.14,0.10,Color("#3c4140"),at+Vector3(0,3.17,0))
+    _box(parent,Vector3(0.32,0.39,0.32),Color("#e4d4ac"),at+Vector3(0,3.4,0))
+    for x in [-0.17,0.17]:
+        for z in [-0.17,0.17]:
+            _box(parent,Vector3(0.035,0.46,0.035),Color("#3c4140"),at+Vector3(x,3.4,z))
+    _cylinder(parent,0.24,0.08,Color("#343b39"),at+Vector3(0,3.64,0))
+    _sphere(parent,0.07,Color("#343b39"),at+Vector3(0,3.72,0))
     var lamp := OmniLight3D.new()
     lamp.position = at+Vector3(0,3.2,0)
     lamp.light_color = Color(1.0,0.81,0.53)
@@ -3039,9 +3079,9 @@ func _create_gate_and_kiosk() -> void:
 
 func _tree(at: Vector3) -> void:
     _add_obstacle(at, Vector2(0.45, 0.45))
-    var seed := absi(roundi(at.x*43.0+at.z*79.0))
+    var tree_seed := absi(roundi(at.x*43.0+at.z*79.0))
     var rng := RandomNumberGenerator.new()
-    rng.seed = seed
+    rng.seed = tree_seed
     var trunk_height := rng.randf_range(2.0,2.6)
     var trunk := _cylinder(_scenery,0.22,trunk_height,Color("#70513b"),at+Vector3(0,trunk_height*0.5,0))
     TownVisuals.surface(trunk.material_override as StandardMaterial3D,_surface_textures["wood"],0.75)
@@ -3199,6 +3239,17 @@ func _create_interface() -> void:
     _clock_selector.select(3)
     _clock_selector.item_selected.connect(_on_clock_speed_selected)
     clock_row.add_child(_clock_selector)
+    var graphics_row := HBoxContainer.new()
+    column.add_child(graphics_row)
+    var graphics_label := Label.new()
+    graphics_label.text = "Graphics quality"
+    graphics_row.add_child(graphics_label)
+    var quality := OptionButton.new()
+    for caption in ["Low","Medium","High","Ultra"]:
+        quality.add_item(caption)
+    quality.select(_graphics_quality)
+    quality.item_selected.connect(_set_graphics_quality)
+    graphics_row.add_child(quality)
     var atmosphere_row := HBoxContainer.new()
     column.add_child(atmosphere_row)
     var effects_toggle := CheckButton.new()
@@ -3211,17 +3262,6 @@ func _create_interface() -> void:
     audio_toggle.button_pressed = true
     audio_toggle.toggled.connect(_set_weather_audio)
     atmosphere_row.add_child(audio_toggle)
-    var graphics_row := HBoxContainer.new()
-    column.add_child(graphics_row)
-    var graphics_label := Label.new()
-    graphics_label.text = "Graphics quality"
-    graphics_row.add_child(graphics_label)
-    var quality := OptionButton.new()
-    for caption in ["Low","Medium","High","Ultra"]:
-        quality.add_item(caption)
-    quality.select(_graphics_quality)
-    quality.item_selected.connect(_set_graphics_quality)
-    graphics_row.add_child(quality)
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _hint.text = tr("WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.")
