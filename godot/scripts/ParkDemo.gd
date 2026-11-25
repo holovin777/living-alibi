@@ -2707,7 +2707,11 @@ func _sync_dojo_member(person: Node3D,id: String) -> void:
             if _can_stand(anchor,WALKER_RADIUS):
                 person.position=anchor
                 person.set_meta("anchor",anchor)
-                person.set_meta("activity","DOJO")
+                var match_view = _last_snapshot.get("rebirth",{}).get("kumite")
+                var sparring: bool = match_view is Dictionary and match_view.get("active",false) and str(match_view.get("partnerId",""))==id
+                person.set_meta("activity","KUMITE" if sparring else "DOJO")
+                if sparring:
+                    person.rotation.y=atan2(person.position.x-_avatar.position.x,person.position.z-_avatar.position.z)
                 person.set_meta("dojo_member",true)
                 return
         index+=1
@@ -2794,7 +2798,9 @@ func _animate_residents(delta: float) -> void:
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
-            if not walking and activity!="SLEEPING" and limb=="ArmRight":
+            if activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
+                angle=-0.7
+            elif not walking and activity!="SLEEPING" and limb=="ArmRight":
                 var style := str(person.get_meta("personality","quiet"))
                 if style in ["talkative","joker"] and str(person.get_meta("mood","CALM")) in ["CALM","HAPPY","ENTHUSIASTIC"]:
                     angle=sin(float(Time.get_ticks_msec())*0.003+phase)*0.16
@@ -3869,6 +3875,26 @@ func _render_actions() -> void:
                         _action_choices.add_child(_button(tr("Practice %s · 60 min · 5 EUR") % tr(mode.capitalize()),_garden_action.bind("rebirth-dojo-"+mode)))
                 if _near_dojo() and dojo.get("canExam",false):
                     _action_choices.add_child(_button(tr("Belt exam · %s · 15 EUR") % tr(str(dojo.get("nextBelt",""))),_garden_action.bind("rebirth-dojo-exam")))
+            var match_view = rebirth.get("kumite")
+            if match_view is Dictionary and _near_dojo():
+                var match_label := Label.new()
+                match_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                match_label.text=tr("Controlled kumite · %s : %s") % [match_view.get("score",0),match_view.get("partnerScore",0)]
+                _action_choices.add_child(match_label)
+                if match_view.get("active",false):
+                    var cue_names := {"close":"Partner approaches","far":"Partner keeps distance","opening":"Scoring opportunity"}
+                    var cue_label := Label.new()
+                    cue_label.text=tr("Exchange %s/5 · %s") % [match_view.get("round",1),tr(str(cue_names.get(str(match_view.get("cue","")),"")))]
+                    _action_choices.add_child(cue_label)
+                    for choice in ["guard","step","touch"]:
+                        _action_choices.add_child(_button(tr(str({"guard":"Guard","step":"Adjust distance","touch":"Controlled point"}.get(choice))),_garden_action.bind("rebirth-dojo-match-"+choice)))
+                    _action_choices.add_child(_button("End practice",_garden_action.bind("rebirth-dojo-match-stop")))
+                elif match_view.get("canStart",false):
+                    _action_choices.add_child(_button(tr("Practice with %s · 5 EUR") % str(match_view.get("partnerName","")),_garden_action.bind("rebirth-dojo-match-start")))
+                elif match_view.get("completed",false):
+                    var done := Label.new()
+                    done.text=tr("Practice completed")
+                    _action_choices.add_child(done)
             var sports = rebirth.get("sports")
             if sports is Dictionary:
                 var sport_label := Label.new()
