@@ -258,7 +258,7 @@ func _process(delta: float) -> void:
     _update_first_steps()
     if not _near_gate():
         _travel_panel.visible = false
-    if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck():
+    if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck() and not _near_visitor_counter():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
@@ -2274,6 +2274,17 @@ func _build_medical_building(pharmacy: bool) -> void:
     light.omni_range=7
     building.add_child(light)
 
+func _shop_entrance(parent: Node3D,at: Vector3,side: float,trim: Color) -> void:
+    var entry := Node3D.new()
+    entry.name="OpenShopEntrance"
+    entry.position=at
+    parent.add_child(entry)
+    for z in [-0.94,0.94]:
+        _box(entry,Vector3(0.14,2.45,0.12),trim,Vector3(0,1.225,z))
+    _box(entry,Vector3(0.14,0.12,2),trim,Vector3(0,2.4,0))
+    _box(entry,Vector3(1.2,0.05,1.75),Color("#b7a58e"),Vector3(side*0.6,0.025,0),"paving")
+    _sign(entry,tr("Entrance · walk inside"),Vector3(side*0.8,2.72,0))
+
 func _build_cafe() -> void:
     var cafe := Node3D.new()
     cafe.name="BarCentrale"
@@ -2293,6 +2304,7 @@ func _build_cafe() -> void:
     _box(cafe,Vector3(0.22,0.50,2.1),wood,Vector3(-4,2.75,7))
     _box(cafe,Vector3(1.45,0.14,2.4),Color("#537569"),Vector3(-3.4,3.0,7))
     _sign(cafe,"Bar Centrale",Vector3(-3.0,3.4,7))
+    _shop_entrance(cafe,Vector3(-4,0,7),1.0,Color("#537569"))
     for z in [4.5,9.5]:
         _box(cafe,Vector3(0.12,1.55,1.85),Color("#536e75"),Vector3(-3.82,1.45,z))
         _box(cafe,Vector3(0.16,1.3,1.1),Color("#4e6352"),Vector3(-3.84,4.6,z))
@@ -2347,6 +2359,7 @@ func _build_bakery() -> void:
         _box(bakery,Vector3(0.24,0.12,1.4),stone,Vector3(-3.72,0.88,z))
         _box(bakery,Vector3(0.16,1.25,1.10),Color("#526554"),Vector3(-3.85,4.55,z))
     _sign(bakery,"Panetteria del Borgo",Vector3(-3.1,3.36,7))
+    _shop_entrance(bakery,Vector3(-4,0,7),1.0,Color("#a36c49"))
     _box(bakery,Vector3(2.1,0.07,4.0),stone,Vector3(-2.95,0.045,7))
     var counter := Node3D.new()
     counter.name="BakeryCounter"
@@ -2442,6 +2455,7 @@ func _portici_grocery(parent: Node3D) -> void:
     _box(shop,Vector3(6.65,0.3,6.25),Color("#794b36"),Vector3(7.45,7.35,5))
     _box(shop,Vector3(0.24,0.45,2.3),Color("#6f4931"),Vector3(4.4,2.85,5.3))
     _sign(shop,"Alimentari · F",Vector3(4.05,3.1,5.3))
+    _shop_entrance(shop,Vector3(4.4,0,5.3),-1.0,Color("#795c42"))
     for z in [4.5,6.8]:
         var shelf := Vector3(9.8,0,z)
         _add_obstacle(shelf,Vector2(0.6,1.3))
@@ -2720,6 +2734,7 @@ func _render_residents() -> void:
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
         _sync_office_employee(person,id)
         _sync_dojo_member(person,id)
+        _sync_shop_resident(person,i)
         person.set_meta("display_name",str(resident.get("name","Resident")))
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
         person.set_meta("conversations",int(resident.get("conversations",0)))
@@ -2792,6 +2807,30 @@ func _tick_office_joker(delta: float) -> void:
     _office_joke_index+=1
     _office_joke_hold=4.0
     _office_joke_wait=28.0+float(_office_joke_index%3)*7.0
+
+func _sync_shop_resident(person: Node3D,index: int) -> void:
+    if _apartment_active or _current_place not in ["CAFE","BAKERY","PORTICI"]:return
+    var activity := str(person.get_meta("activity",""))
+    if activity not in ["WORKING","FREE_TIME","SHOPPING"]:return
+    var slots: Array = []
+    match _current_place:
+        "CAFE":
+            slots=[Vector3(-9.8,0,5.8),Vector3(-7,0,8.5),Vector3(-11.9,0,8.8),Vector3(-5,0,7.2)]
+        "BAKERY":
+            slots=[Vector3(-9.6,0,7.6),Vector3(-6.1,0,6.1),Vector3(-5.3,0,8.3)]
+        "PORTICI":
+            slots=[Vector3(9.6,0,3.0),Vector3(6.3,0,5.2),Vector3(7.6,0,6.9)]
+    if slots.is_empty():return
+    var slot := 0 if activity=="WORKING" else 1+posmod(index,slots.size()-1)
+    var target: Vector3 = slots[slot]
+    if not _can_stand(target,WALKER_RADIUS):return
+    # Avoid placing two real residents on the same spot.
+    for other in _residents_root.get_children():
+        if other!=person and other.position.distance_to(target)<0.75:return
+    person.position=target
+    person.set_meta("anchor",target)
+    if activity=="FREE_TIME" or activity=="SHOPPING":
+        person.set_meta("activity","VISITING")
 
 func _sync_dojo_member(person: Node3D,id: String) -> void:
     if _current_place!="SCHOOL" or _apartment_active:return
@@ -3364,7 +3403,7 @@ func _travel_to(destination: String) -> void:
     _api.go_to(destination)
 
 func _toggle_actions() -> void:
-    if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck()) or not _connected:
+    if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck() and not _near_visitor_counter()) or not _connected:
         _message.text = "Approach a local kiosk or your rented bed."
         return
     _close_dialog()
@@ -3848,6 +3887,12 @@ func _render_cafe() -> void:
         for guest in cafe.get("guests",[]):
             _action_choices.add_child(_button("Talk with "+str(guest.get("name","")),_garden_action.bind("rebirth-cafe-chat-"+str(guest.get("id","")))))
     _action_choices.add_child(_button("Leave",_close_cafe))
+
+func _near_visitor_counter() -> bool:
+    if _rebirth_active() or _apartment_active:return false
+    var counters := {"PORTICI":GROCERY_COUNTER,"BAKERY":BAKERY_COUNTER,"CAFE":CAFE_COUNTER}
+    if not counters.has(_current_place):return false
+    return _avatar.position.distance_to(counters[_current_place])<1.6
 
 func _near_grocery_counter() -> bool:
     var counter := BAKERY_COUNTER if _current_place=="BAKERY" else GROCERY_COUNTER
@@ -4357,7 +4402,7 @@ func _render_actions() -> void:
                     var instruction := Label.new()
                     instruction.text = "Your room is across the street. Walk to the bed."
                     _action_choices.add_child(instruction)
-        "MARKET", "PORTICI", "FUEL_STATION":
+        "MARKET", "PORTICI", "FUEL_STATION", "CAFE", "BAKERY":
             if _current_place=="MARKET" and employed!="shop-assistant":
                 _action_choices.add_child(_button("Apply: market assistant",_apply_job.bind("shop-assistant")))
             for item in _last_snapshot.get("shop",[]):
@@ -4800,7 +4845,7 @@ func _sleep_room(hours: int) -> void:
         _api.sleep_in_room(hours)
 
 func _buy_product(id: String) -> void:
-    if _near_kiosk() and not _api.is_busy() and _connected:
+    if (_near_kiosk() or _near_visitor_counter()) and not _api.is_busy() and _connected:
         _api.buy_product(id)
 
 func _consume_product(id: String) -> void:
