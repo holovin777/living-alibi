@@ -149,8 +149,9 @@ func _exercise() -> void:
         return
     world._on_business_updated({
         "registered": true, "yours": true, "ownerIncarnation": 1,
-        "machine": true, "cash": 70, "employeeId": null,
-        "employeeName": null, "spareParts": 2, "paidHoursToday": 2
+        "machine": true, "machineCondition": 85, "cash": 70,
+        "employeeId": null, "employeeName": null, "spareParts": 2,
+        "paidHoursToday": 2
     })
     world._on_business_candidates_updated([{
         "id": "resident-0002", "name": "A local mechanic",
@@ -158,11 +159,13 @@ func _exercise() -> void:
     }])
     if not _check(_has_button(world._action_choices, "Invest 25 EUR") and
             _has_button(world._action_choices, "Hire A local mechanic") and
+            _has_button(world._action_choices, "Service machine") and
             _has_button(world._action_choices, "Withdraw 10 EUR"),
             "owner sees actual investment, local hiring and available profit controls"):
         return
-    if not _check(world._jobs.text.contains("bank 70 EUR"),
-            "business dashboard exposes the authoritative company account"):
+    if not _check(world._jobs.text.contains("bank 70 EUR") and
+            world._jobs.text.contains("85/100"),
+            "business dashboard exposes real funds and machine wear"):
         return
 
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
