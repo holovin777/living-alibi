@@ -3799,6 +3799,23 @@ func _render_actions() -> void:
                 var home_labels := {"go":"Go to your home","meal":"Prepare meal · 15 min","drink":"Drink water · 5 min","rest":"Rest · 60 min","family":"Spend time with family · 30 min","wash":"Wash · 10 min","microwave":"Heat meal · 5 min · 1 EUR","clean":"Clean home · 30 min · 1 water","laundry":"Wash clothes · 45 min · 1 water · 1 EUR","upgrade":"Upgrade furnishings · %s EUR" % home_options.get("upgradePrice",0)}
                 for action in home_options.get("actions",[]):
                     _action_choices.add_child(_button(str(home_labels.get(action,action)),_garden_action.bind("rebirth-home-"+str(action))))
+                var wardrobe = home_options.get("wardrobe")
+                if wardrobe is Dictionary:
+                    var wardrobe_label := Label.new()
+                    wardrobe_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                    wardrobe_label.text=tr("Wardrobe · %s · weather comfort %s/100") % [tr(str(wardrobe.get("worn","casual")).capitalize()),wardrobe.get("comfort",100)]
+                    _action_choices.add_child(wardrobe_label)
+                    for outfit in wardrobe.get("items",[]):
+                        var outfit_id := str(outfit.get("id",""))
+                        var outfit_name := tr(outfit_id.capitalize())
+                        if outfit.get("owned",false):
+                            var condition_label := Label.new()
+                            condition_label.text=tr("%s · condition %s/100") % [outfit_name,outfit.get("condition",100)]
+                            _action_choices.add_child(condition_label)
+                        if outfit.get("canBuy",false):
+                            _action_choices.add_child(_button(tr("Buy outfit: %s · %s EUR") % [outfit_name,outfit.get("price",0)],_garden_action.bind("rebirth-wardrobe-buy-"+outfit_id)))
+                        if outfit.get("canWear",false):
+                            _action_choices.add_child(_button(tr("Wear %s") % outfit_name,_garden_action.bind("rebirth-wardrobe-wear-"+outfit_id)))
                 var furnishing_names := {"kitchen":"Kitchen furnishings","bedroom":"Bedroom furnishings","children":"Children’s furnishings","laundry":"Washing machine"}
                 for offer in home_options.get("furnishings",[]):
                     var item_id := str(offer.get("id",""))
