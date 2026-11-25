@@ -247,6 +247,7 @@ final class TownLife {
         MarketStallLife.ensure(t);
         BankLife.ensure(t);
         RentalLife.ensure(t);
+        ConstructionLife.ensure(t);
         t.together=initial==t.get("elena").place;
         if(t.together)t.meetingSinceTick=(long)(marco.day-1)*1440L+marco.minute;
         return t;
@@ -283,6 +284,7 @@ final class TownLife {
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
         IndustryLife.tick(town,marco,truth,observations);
+        ConstructionLife.tick(town,marco.day,marco.minute);
         BusinessLife.tick(town,marco,truth,observations);
         LogisticsLife.tick(town,marco,truth,observations);
         SecondFleetLife.tick(town,marco,truth,observations);
