@@ -318,6 +318,35 @@ func _exercise() -> void:
             and world._camera.position.is_equal_approx(world.CAR_ARRIVAL+Vector3(0,world.EYE_HEIGHT,0)),
             "confirmed car trip arrives at destination parking"):
         return
+    driver = driver.duplicate(true)
+    driver["player"]["carDestinations"] = ["WORKSHOP","OFFICE"]
+    world._on_world_updated(driver)
+    for edge in world._traffic_edges.values():
+        for record in edge["cars"]:
+            record["node"].visible = false
+    if not _check(world._begin_driving("OFFICE"),"second motor route can start"):
+        return
+    world._drive_pending = true
+    driver = driver.duplicate(true)
+    driver["player"]["placeId"] = "OFFICE"
+    driver["player"]["place"] = "Office"
+    driver["player"]["carPlace"] = "OFFICE"
+    driver["player"]["carDestinations"] = ["FACTORY","LIBRARY"]
+    driver["player"]["carFuel"] = 5
+    world._on_world_updated(driver)
+    if not _check(world._drive_parked and world._drive_target.is_empty()
+            and world._cockpit.visible and world._avatar.position==world.CAR_PARK
+            and world._camera.position.is_equal_approx(world.CAR_PARK+world.DRIVER_EYE)
+            and world._drive_hud.text.contains("1: Factory"),
+            "confirmed trip keeps the driver seated at the new parking space"):
+        return
+    for edge in world._traffic_edges.values():
+        for record in edge["cars"]:
+            record["node"].visible = false
+    if not _check(world._begin_driving("FACTORY") and not world._drive_parked and world._cockpit.visible,
+            "choose another adjacent road without leaving the cabin"):
+        return
+    world._end_driving(true)
     world._on_world_updated(_world("PARK","Park"))
 
     # Physical footprints: long steps cannot tunnel through solid objects.

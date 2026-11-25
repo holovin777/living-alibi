@@ -85,6 +85,7 @@ var _drive_target := ""
 var _drive_direction := Vector3.ZERO
 var _drive_look := 0.0
 var _drive_pending := false
+var _drive_parked := false
 var _bike_model: Node3D
 var _bike_wheel_angle := 0.0
 var _jobs: Label
@@ -126,8 +127,11 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
-    if not _drive_target.is_empty():
-        _process_driving(delta)
+    if _drive_active():
+        if not _drive_parked:
+            _process_driving(delta)
+        else:
+            _update_drive_hud()
         _advance_traffic(delta)
         _animate_residents(delta)
         _weather_fx.follow(_avatar.position)
@@ -187,7 +191,7 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-        if not _drive_target.is_empty():
+        if _drive_active():
             _drive_look = clampf(_drive_look-event.relative.x*MOUSE_SENSITIVITY,-1.05,1.05)
             _view_pitch = clampf(_view_pitch-event.relative.y*MOUSE_SENSITIVITY,-0.45,0.45)
         else:
@@ -201,8 +205,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        if not _drive_target.is_empty():
-            if event.keycode == KEY_ESCAPE and not _drive_pending:
+        if _drive_active():
+            if _drive_parked:
+                if event.keycode in [KEY_F,KEY_ESCAPE]:
+                    _end_driving(true)
+                    _message.text = "Car parked. You are on foot."
+                elif event.keycode in [KEY_1,KEY_2,KEY_3]:
+                    var choices: Array = _last_snapshot.get("player",{}).get("carDestinations",[])
+                    var index: int = event.keycode-KEY_1
+                    if index<choices.size() and _connected and not _api.is_busy():
+                        _begin_driving(str(choices[index]))
+            elif event.keycode == KEY_ESCAPE and not _drive_pending:
                 _end_driving(true)
                 _message.text = "Trip cancelled; car remains parked."
             get_viewport().set_input_as_handled()
@@ -292,6 +305,9 @@ func _car_action(action: String) -> void:
     if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():
         _api.car_action(action)
 
+func _drive_active() -> bool:
+    return _drive_parked or not _drive_target.is_empty()
+
 func _drive_to(destination: String) -> void:
     if not _near_car() or not _connected or _api.is_busy():
         return
@@ -304,7 +320,7 @@ func _drive_position(point: Vector2) -> Vector3:
 func _drive_clear(at: Vector3) -> bool:
     # Sample centre and both ends of the vehicle to avoid clipping scenery.
     for offset in [-0.85,0.0,0.85]:
-        var sample := at+_drive_direction*offset
+        var sample: Vector3 = at+_drive_direction*float(offset)
         if sample.dot(_drive_direction)>ROAD_EDGE:
             sample -= _drive_direction*(sample.dot(_drive_direction)-ROAD_EDGE)
         if not _can_stand(sample,0.82,true):
@@ -321,13 +337,15 @@ func _begin_driving(destination: String) -> bool:
     if bool(player.get("ownsBicycle",false)) and _parked_district().is_empty():
         _message.text = "Park your bicycle before driving."
         return false
-    _drive = DriveControls.new()
+    var candidate := DriveControls.new()
     _drive_direction = (TownLayout.world_center(destination)-TownLayout.world_center(_current_place)).normalized()
-    var start := _drive_position(Vector2(_drive.distance,_drive.lateral))
+    var start := _drive_position(Vector2(candidate.distance,candidate.lateral))
     if not _drive_clear(start):
         _message.text = "Road occupied. Let traffic pass before departing."
         return false
+    _drive = candidate
     _drive_target = destination
+    _drive_parked = false
     _drive_pending = false
     _drive_look = 0.0
     _view_pitch = 0.0
@@ -349,6 +367,16 @@ func _begin_driving(destination: String) -> bool:
 
 func _update_drive_hud() -> void:
     var player: Dictionary = _last_snapshot.get("player",{})
+    if _drive_parked:
+        var lines := PackedStringArray()
+        var choices: Array = player.get("carDestinations",[])
+        for i in range(choices.size()):
+            lines.append("%s: %s" % [i+1,str(choices[i]).capitalize()])
+        _drive_hud.text = "Parked at %s | Fuel %s/12 | Condition %s%%\n%s\nF / Esc: get out · Mouse: look around" % [
+            _current_place.capitalize(),player.get("carFuel",0),player.get("carCondition",0),"   ".join(lines)]
+        if int(player.get("carFuel",0))<1 or int(player.get("carCondition",0))<3:
+            _drive_hud.text += "\nCar needs fuel or service."
+        return
     _drive_hud.text = "%s km/h  |  Fuel %s/12  |  Condition %s%%\nTo %s · W gas / S reverse / A D steer / Space brake\n%s" % [
         roundi(absf(_drive.speed)*3.6),player.get("carFuel",0),player.get("carCondition",0),
         _drive_target.capitalize(),"Awaiting confirmed arrival..." if _drive_pending else "Esc: cancel before arrival · Mouse: look around"]
@@ -372,6 +400,7 @@ func _process_driving(delta: float) -> void:
     _update_drive_hud()
 
 func _end_driving(return_to_car: bool) -> void:
+    _drive_parked = false
     _drive_target = ""
     _drive_pending = false
     _drive.speed = 0.0
@@ -386,6 +415,22 @@ func _end_driving(return_to_car: bool) -> void:
     _follow_player()
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
+func _park_in_cabin() -> void:
+    _drive_target = ""
+    _drive_pending = false
+    _drive_parked = true
+    _drive = DriveControls.new()
+    _drive_look = 0.0
+    _view_pitch = 0.0
+    _view_yaw = 0.0
+    _avatar.position = CAR_PARK
+    _cockpit.visible = true
+    _drive_hud.visible = true
+    _main_panel.visible = false
+    _sync_owned_car()
+    _follow_player()
+    _update_drive_hud()
+
 func _sync_owned_car() -> void:
     for id in TownLayout.MOTOR_DISTRICTS:
         if not _chunks.has(id):
@@ -393,7 +438,7 @@ func _sync_owned_car() -> void:
         var root: Node3D = _chunks[id]["root"]
         var car := root.get_node_or_null("PublicCarPark/OwnedCar") as Node3D
         if car!=null:
-            car.visible = _car_place()==id and (_drive_target.is_empty() or id!=_current_place)
+            car.visible = _car_place()==id and (not _drive_active() or id!=_current_place)
 
 func _parked_district() -> String:
     var value = _last_snapshot.get("player",{}).get("bicycleParked")
@@ -417,7 +462,7 @@ func _toggle_parking() -> void:
 func _sync_bicycle() -> void:
     if not is_instance_valid(_bike_model):
         return
-    var riding := _movement_speed() == CYCLE_SPEED
+    var riding := not _drive_active() and _movement_speed() == CYCLE_SPEED
     _bike_model.visible = riding
     _bike_model.position = _avatar.position
     _bike_model.rotation.y = _view_yaw
@@ -444,7 +489,7 @@ func _follow_player() -> void:
     # Fixed first-person presentation in every district and transport mode.
     _avatar.visible = false
     _avatar.rotation.y = _view_yaw
-    if not _drive_target.is_empty():
+    if _drive_active():
         _cockpit.position = _avatar.position
         _cockpit.rotation.y = _view_yaw
         _steering_wheel.rotation.z = -_drive.steering*0.7
@@ -2304,7 +2349,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _last_snapshot = snapshot
     var player: Dictionary = snapshot.get("player", {})
     var new_place := str(player.get("placeId", "PARK"))
-    if not _drive_target.is_empty() and (_drive_pending or new_place!=_current_place or _car_place()!=_current_place):
+    var continue_in_cabin := _drive_pending and not _drive_target.is_empty() and new_place==_drive_target and _car_place()==new_place
+    if _drive_active() and not continue_in_cabin and (_drive_pending or new_place!=_current_place or _car_place()!=_current_place):
         _end_driving(new_place==_current_place)
     var road_arrival := new_place == _road_pending and not _road_pending.is_empty()
     if not _road_pending.is_empty():
@@ -2322,6 +2368,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _follow_player()
         _action_panel.visible = false
         _travel_panel.visible = false
+    if continue_in_cabin:
+        _park_in_cabin()
 
     var job = player.get("jobId")
     var profession := "unemployed" if job == null else str(job)
@@ -2356,6 +2404,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _refresh_transport_buttons(false)
     _sync_bicycle()
     _follow_player()
+    if _drive_active():
+        _update_drive_hud()
     _update_bag()
     _town_map.update_world(_current_place, _locations)
     _render_residents()

@@ -435,9 +435,11 @@ and mouse look turns your head. The first-person cabin includes a
 dashboard, steering wheel, pillars and decorative mirrors. Traffic
 and red/amber crossings stop the car. Crossing the road seam commits
 the existing Java drive action (3 minutes, 1 fuel, 3 condition) exactly
-once; confirmed arrival automatically parks the car. Escape before
-submission cancels the preview and returns to the original parking
-space. The main action panel is hidden while driving. This is a short
+once; confirmed arrival parks the car and keeps you in the driver seat.
+Press 1–3 for the listed adjacent routes, or F/Escape to exit the parked
+car. Escape before submission cancels the current preview and returns
+to the last committed parking space. The main action panel is hidden
+while driving or seated. This is a short
 lane-constrained local driving preview: no free steering around town,
 manual parking, physical mirror reflections, or server-side vehicle
 position persistence yet. An uncertain response requires refresh
