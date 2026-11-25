@@ -71,6 +71,7 @@ final class PopulationGenerator {
             c.food=3;c.water=3;c.activity="SETTLING_IN";
             c.generationIndex=index;
             town.people.put(id,c);
+            EducationLife.ensureResident(town,c);
             generated.add(c);
         }
         return generated;

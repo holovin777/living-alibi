@@ -2912,6 +2912,11 @@ func _render_actions() -> void:
             census.text = "Anagrafe · Residents %s/%s | Children %s | Retired %s" % [population.get("alive",0),population.get("capacity",40),population.get("children",0),population.get("retired",0)]
             census.text += "\nBirths %s | Deaths %s | Pensions %s EUR" % [population.get("births",0),population.get("deaths",0),population.get("pensions",0)]
             _action_choices.add_child(census)
+            var education: Dictionary = _last_snapshot.get("education",{})
+            var school_info := Label.new()
+            school_info.text = "Scuola · Pupils %s | Lessons %s | Graduates %s" % [education.get("pupils",0),education.get("lessons",0),education.get("graduates",0)]
+            school_info.text += "\nSchool reserve %s EUR | Work experience days %s" % [education.get("schoolFunds",0),education.get("workDays",0)]
+            _action_choices.add_child(school_info)
             var comune: Dictionary = _last_snapshot.get("comune",{})
             var budget_info := Label.new()
             budget_info.text = "Comune · Budget %s EUR | Taxes %s EUR" % [comune.get("budget",0),comune.get("taxes",0)]

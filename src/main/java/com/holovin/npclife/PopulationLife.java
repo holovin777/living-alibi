@@ -12,6 +12,7 @@ final class PopulationLife {
         for(var c:town.people.values()) {
             if(c.generationIndex<=0 || !c.alive)continue;
             lifeTick(town,c,clock,events,observations);
+            EducationLife.attendance(town,c,clock);
         }
     }
 

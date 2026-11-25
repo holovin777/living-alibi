@@ -53,6 +53,7 @@ final class CareerLife {
         town.employerFunds.putIfAbsent(StallSupplyLife.CARRIER,0);
         town.employerFunds.putIfAbsent(BankLife.ACCOUNT,500);
         town.employerFunds.putIfAbsent(ConstructionLife.CONTRACTOR,0);
+        town.employerFunds.putIfAbsent(EducationLife.SCHOOL_SERVICE,0);
         for(String account:List.of(MunicipalLife.CLINIC,MunicipalLife.CARE,MunicipalLife.MAINTENANCE))town.employerFunds.putIfAbsent(account,0);
     }
 
