@@ -151,6 +151,40 @@ class GameSessionTest {
         }
     }
     @Test
+    void linkedAdultCafeOrdersAndRestUseActualWalletAndTime() throws Exception {
+        Path file=directory.resolve("linked-cafe.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();
+            c.age=30;c.money=20;c.fatigue=50;c.thirst=30;c.hunger=10;c.food=4;c.water=4;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.CAFE;c.destination=c.place;c.activity="FREE_TIME";
+            c.employed=false;town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            state.day=2;state.minute=800;town.retailStock.put("water",1);
+            assertFalse(RebirthLife.cafe(town,2,1260).open());
+            assertThrows(IllegalArgumentException.class,()->RebirthLife.cafeAction(town,2,800,"unknown"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            var coffee=game.gardenAction("rebirth-cafe-espresso").world();
+            assertEquals(19,coffee.player().money());
+            assertEquals(805,coffee.minute());
+            assertTrue(coffee.player().fatigue()<50);
+            var water=game.gardenAction("rebirth-cafe-water").world();
+            assertEquals(18,water.player().money());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-cafe-water"));
+            var rest=game.gardenAction("rebirth-cafe-rest").world();
+            assertEquals(830,rest.minute());
+            assertFalse(rest.rebirth().cafe().canRest());
+        }
+        try(var game=new GameSession(file)){
+            assertFalse(game.snapshot().rebirth().cafe().canRest());
+            assertEquals(18,game.snapshot().player().money());
+        }
+    }
+    @Test
     void linkedAdultHomeUsesRealSuppliesAndPrivateSpace() throws Exception {
         Path file=directory.resolve("linked-home.db");
         String id;

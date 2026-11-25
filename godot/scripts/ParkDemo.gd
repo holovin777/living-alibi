@@ -47,6 +47,9 @@ var _home_transition := false
 var _grocery_menu := false
 const GROCERY_COUNTER := Vector3(7.3,0,3.8)
 const BAKERY_COUNTER := Vector3(-6.3,0,7.0)
+const CAFE_COUNTER := Vector3(-7.0,0,5.9)
+const CAFE_TABLE := Vector3(-7.0,0,9.0)
+var _cafe_menu := false
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
@@ -190,7 +193,9 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
-        if _near_grocery_counter():
+        if not _cafe_station().is_empty():
+            _hint.text="E: Bar Centrale · "+_cafe_station()+" · F: life choices"
+        elif _near_grocery_counter():
             _hint.text="E: "+str(_last_snapshot["rebirth"]["grocery"].get("name","Shop"))+" · F: life choices"
         elif _near_family_entrance():
             _hint.text="E: enter your home · F: life choices"
@@ -259,6 +264,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and not _cafe_station().is_empty() and not _action_panel.visible:
+                _cafe_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
             elif event.keycode == KEY_E and _near_grocery_counter() and not _action_panel.visible:
                 _grocery_menu=true
                 _render_actions()
@@ -270,6 +281,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_F:
                 _grocery_menu=false
+                _cafe_menu=false
                 _render_actions()
                 _action_panel.visible = not _action_panel.visible
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
@@ -825,6 +837,8 @@ func _generate_chunk(place_id: String) -> void:
             _build_centro()
         "PARK":
             _build_park()
+        "CAFE":
+            _build_cafe()
         "BAKERY":
             _build_bakery()
         "MARKET":
@@ -1897,6 +1911,55 @@ func _sync_orchard() -> void:
         var fruit := tree.get_node("Fruit") as Node3D
         fruit.visible = bool(data.get("ready",false))
 
+func _build_cafe() -> void:
+    var cafe := Node3D.new()
+    cafe.name="BarCentrale"
+    _scenery.add_child(cafe)
+    var wall := Color("#d9c2a2")
+    var stone := Color("#d6cbb8")
+    var wood := Color("#715342")
+    for part in [[Vector3(-13,0,7),Vector2(0.24,8.0)],
+            [Vector3(-8.5,0,3),Vector2(9.0,0.24)],
+            [Vector3(-8.5,0,11),Vector2(9.0,0.24)],
+            [Vector3(-4,0,4.45),Vector2(0.24,2.9)],
+            [Vector3(-4,0,9.55),Vector2(0.24,2.9)]]:
+        _room_wall(cafe,part[0],part[1],wall)
+    _box(cafe,Vector3(9,0.07,8),Color("#bca994"),Vector3(-8.5,0.025,7))
+    _box(cafe,Vector3(9,3.2,8),wall,Vector3(-8.5,4.6,7))
+    _box(cafe,Vector3(9.35,0.3,8.35),Color("#91563e"),Vector3(-8.5,6.35,7))
+    _box(cafe,Vector3(0.22,0.50,2.1),wood,Vector3(-4,2.75,7))
+    _box(cafe,Vector3(1.45,0.14,2.4),Color("#537569"),Vector3(-3.4,3.0,7))
+    _sign(cafe,"Bar Centrale",Vector3(-3.0,3.4,7))
+    for z in [4.5,9.5]:
+        _box(cafe,Vector3(0.12,1.55,1.85),Color("#536e75"),Vector3(-3.82,1.45,z))
+        _box(cafe,Vector3(0.16,1.3,1.1),Color("#4e6352"),Vector3(-3.84,4.6,z))
+    var bar := Node3D.new()
+    bar.name="CafeCounter"
+    cafe.add_child(bar)
+    _room_furniture(bar,Vector3(-8.6,0,5.4),Vector3(1.2,0.98,3.4),wood)
+    _box(bar,Vector3(1.32,0.10,3.5),stone,Vector3(-8.6,1.02,5.4))
+    _box(bar,Vector3(0.65,0.55,0.95),Color("#676f70"),Vector3(-8.6,1.36,4.5))
+    _box(bar,Vector3(0.07,0.22,0.85),Color("#282f32"),Vector3(-8.24,1.31,4.5))
+    for z in [4.25,4.75,5.6]:
+        _cylinder(bar,0.085,0.13,Color("#f3efe4"),Vector3(-8.0,1.14,z))
+    _sign(bar,"Caffè · E",Vector3(-7.9,2.0,5.4))
+    var tables := Node3D.new()
+    tables.name="CafeTables"
+    cafe.add_child(tables)
+    for x in [-10.8,-5.8]:
+        _room_furniture(tables,Vector3(x,0,9.0),Vector3(0.94,0.76,0.94),wood)
+        for z in [7.95,10.05]:
+            _room_furniture(tables,Vector3(x,0,z),Vector3(0.48,0.45,0.48),Color("#698379"))
+            _box(tables,Vector3(0.48,0.43,0.07),wood,Vector3(x,0.66,z+0.20*signf(z-9.0)))
+    _sign(tables,"Take a break · E",Vector3(-7,2.1,9))
+    for at in [Vector3(-7,2.6,5.4),Vector3(-8.3,2.6,9)]:
+        var light := OmniLight3D.new()
+        light.position=at
+        light.light_color=Color("#ffe1b5")
+        light.light_energy=1.4
+        light.omni_range=6
+        cafe.add_child(light)
+
 func _build_bakery() -> void:
     var bakery := Node3D.new()
     bakery.name="PanetteriaDelBorgo"
@@ -2794,6 +2857,38 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _cafe_station() -> String:
+    if _apartment_active or _current_place!="CAFE" or str(_last_snapshot.get("rebirth",{}).get("phase",""))!="LINKED_ADULT" or not _last_snapshot.get("rebirth",{}).get("cafe") is Dictionary:
+        return ""
+    if _avatar.position.distance_to(CAFE_COUNTER)<1.4:return "counter"
+    if _avatar.position.distance_to(CAFE_TABLE)<1.4:return "table"
+    return ""
+
+func _close_cafe() -> void:
+    _cafe_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_cafe() -> void:
+    var cafe: Dictionary = _last_snapshot["rebirth"]["cafe"]
+    _action_title.text=str(cafe.get("name","Bar Centrale"))
+    var info := Label.new()
+    info.text="%s · %s" % [cafe.get("hours","07:00–21:00"),"Open" if cafe.get("open",false) else "Closed"]
+    _action_choices.add_child(info)
+    if _cafe_station()=="counter":
+        for order in cafe.get("orders",[]):
+            var button := _button("%s · %s EUR" % [order.get("label",""),order.get("price",0)],_garden_action.bind("rebirth-cafe-"+str(order.get("id",""))))
+            button.disabled=not bool(order.get("available",false))
+            _action_choices.add_child(button)
+    else:
+        var rest := _button("Rest at table · 20 min",_garden_action.bind("rebirth-cafe-rest"))
+        rest.disabled=not bool(cafe.get("canRest",false))
+        _action_choices.add_child(rest)
+        for guest in cafe.get("guests",[]):
+            _action_choices.add_child(_button("Talk with "+str(guest.get("name","")),_garden_action.bind("rebirth-cafe-chat-"+str(guest.get("id","")))))
+    _action_choices.add_child(_button("Leave",_close_cafe))
+
 func _near_grocery_counter() -> bool:
     var counter := BAKERY_COUNTER if _current_place=="BAKERY" else GROCERY_COUNTER
     return not _apartment_active and _current_place in ["PORTICI","BAKERY"] and str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT" and _avatar.position.distance_to(counter)<1.5 and _last_snapshot.get("rebirth",{}).get("grocery") is Dictionary
@@ -2806,6 +2901,10 @@ func _close_grocery() -> void:
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _cafe_menu and not _cafe_station().is_empty():
+        _render_cafe()
+        return
+    _cafe_menu=false
     if _grocery_menu and _near_grocery_counter():
         var grocery: Dictionary = _last_snapshot["rebirth"]["grocery"]
         _action_title.text = str(grocery.get("name","Bottega Alimentare"))
@@ -3544,6 +3643,10 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("rebirth-cafe-"):
+        var station := _cafe_station()
+        var table_action := action=="rebirth-cafe-rest" or action.begins_with("rebirth-cafe-chat-")
+        if station!=("table" if table_action else "counter"):return
     if action.begins_with("rebirth-grocery-") and not _near_grocery_counter():
         return
     if action.begins_with("rebirth-"):
@@ -3726,6 +3829,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _cafe_menu=false
         _grocery_menu=false
         if _apartment_active:
             _set_apartment(false)

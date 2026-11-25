@@ -599,7 +599,48 @@ final class RebirthLife {
         t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(c.place)+1);
         return "Bought "+item.label()+" for EUR "+item.price()+".";
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery){}
+    record CafeOption(String id,String label,int price,int minutes,boolean available){}
+    record Cafe(String name,String hours,boolean open,List<CafeOption> orders,boolean canRest,List<Conversation> guests){}
+    static Cafe cafe(TownLife.Town t,int day,int minute){
+        var c=child(t);
+        if(!linkedAdult(t,c)||c.place!=TownLife.Place.CAFE||!awakePresent(c)||atHome(c))return null;
+        boolean open=minute>=420&&minute<1260&&!EmploymentLife.sick(c,day);
+        var orders=List.of(
+                new CafeOption("espresso","Espresso",1,5,open&&minute+5<=1260&&c.money>=1&&c.fatigue>0),
+                new CafeOption("water","Bottled water",1,5,open&&minute+5<=1260&&c.money>=1&&c.thirst>0&&t.retailStock.getOrDefault("water",0)>0),
+                new CafeOption("bread","Bread snack",3,5,open&&minute+5<=1260&&c.money>=3&&c.hunger>0&&t.retailStock.getOrDefault("bread",0)>0));
+        return new Cafe("Bar Centrale","07:00–21:00",open,orders,
+                open&&minute+20<=1260&&c.fatigue>0&&EducationLife.get(t,c,"last-cafe-rest")<day,
+                open&&minute+10<=1260?conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList():List.of());
+    }
+    static HomeAction cafeAction(TownLife.Town t,int day,int minute,String action){
+        var c=requireAdult(t);var cafe=cafe(t,day,minute);
+        if(cafe==null||!cafe.open())throw new IllegalArgumentException("Visit Bar Centrale during opening hours.");
+        t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(TownLife.Place.CAFE)+1);
+        if("rest".equals(action)){
+            if(!cafe.canRest())throw new IllegalArgumentException("Rest is available once a day while the cafe is open.");
+            c.fatigue=Math.max(0,c.fatigue-8);
+            EducationLife.set(t,c,"last-cafe-rest",day);
+            return new HomeAction(20,"Rested at a cafe table.");
+        }
+        if(action.startsWith("chat-")){
+            String id=action.substring(5);
+            if(cafe.guests().stream().noneMatch(p->p.id().equals(id)))throw new IllegalArgumentException("This guest is not available.");
+            return new HomeAction(10,chat(t,day,id));
+        }
+        var order=cafe.orders().stream().filter(p->p.id().equals(action)&&p.available()).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("This order is not available."));
+        int funds=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),order.price());
+        c.money-=order.price();t.employerFunds.put("shop-assistant",funds);
+        switch(action){
+            case "espresso" -> c.fatigue=Math.max(0,c.fatigue-5);
+            case "water" -> {t.retailStock.merge("water",-1,Integer::sum);c.thirst=Math.max(0,c.thirst-40);}
+            case "bread" -> {t.retailStock.merge("bread",-1,Integer::sum);c.hunger=Math.max(0,c.hunger-35);}
+            default -> throw new IllegalArgumentException("Unknown order.");
+        }
+        return new HomeAction(order.minutes(),"Enjoyed "+order.label()+" for EUR "+order.price()+".");
+    }
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery,Cafe cafe){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
     static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
@@ -609,6 +650,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day),grocery(t,day,minute));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day),grocery(t,day,minute),cafe(t,day,minute));
     }
 }

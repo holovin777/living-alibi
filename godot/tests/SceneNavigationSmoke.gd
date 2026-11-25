@@ -973,6 +973,22 @@ func _exercise() -> void:
     if not _check(world._near_grocery_counter() and world._action_title.text=="Panetteria del Borgo" and _has_button(world._action_choices,"Bread · 3 EUR"),"bakery has distinct name and live stock"):
         return
     world._close_grocery()
+    var cafe := _world("CAFE","Cafe")
+    cafe["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","cafe":{"name":"Bar Centrale","hours":"07:00–21:00","open":true,"orders":[{"id":"espresso","label":"Espresso","price":1,"available":true}],"canRest":true,"guests":[{"id":"resident-0002","name":"Marco"}]}}
+    world._on_world_updated(cafe)
+    var cafe_walk: Vector3 = world._move_on_ground(Vector3(-2,0,7),Vector3(-5,0,0),world.WALKER_RADIUS)
+    if not _check(cafe_walk.x < -6.9 and world._scenery.has_node("BarCentrale/CafeTables") and not world._can_stand(Vector3(-4,0,4.45),world.WALKER_RADIUS),"cafe walkable doorway, tables and solid facade"):
+        return
+    world._avatar.position=Vector3(-7,0,5.9)
+    world._cafe_menu=true
+    world._render_actions()
+    if not _check(world._cafe_station()=="counter" and _has_button(world._action_choices,"Espresso · 1 EUR"),"cafe order menu at counter"):
+        return
+    world._avatar.position=Vector3(-7,0,9)
+    world._render_actions()
+    if not _check(world._cafe_station()=="table" and _has_button(world._action_choices,"Rest at table") and _has_button(world._action_choices,"Talk with Marco"),"cafe table rest and actual guests"):
+        return
+    world._close_cafe()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 
