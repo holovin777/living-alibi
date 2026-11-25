@@ -38,6 +38,7 @@ final class GardenLife {
     }
     static String act(TownLife.Town t,String action,int day,int minute) {
         if("sell-vegetables".equals(action))return RetailLife.buyProduce(t,minute);
+        if(action!=null&&action.startsWith("election-"))return ElectionLife.act(t,action,day,minute);
         if(action!=null&&action.startsWith("construction-"))return ConstructionLife.act(t,action,minute);
         if(action!=null&&action.startsWith("rental-"))return RentalLife.act(t,action,minute);
         if(action!=null&&action.startsWith("bank-"))return BankLife.act(t,action,day,minute);

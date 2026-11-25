@@ -55,9 +55,14 @@ final class MunicipalLife {
         }
         upkeep(t,"water-pump","spare-parts",8);
         upkeep(t,"street-lights","steel",5);
-        grant(t,"school",6,EDUCATION);
-        grant(t,"library",4,EDUCATION);
-        grant(t,CLINIC,8,HEALTH);
+        int policy=ElectionLife.policy(t);
+        if(policy==ElectionLife.INFRASTRUCTURE){
+            upkeep(t,"water-pump","spare-parts",8);
+            upkeep(t,"street-lights","steel",5);
+        }
+        grant(t,"school",switch(policy){case ElectionLife.EDUCATION->10;case ElectionLife.HEALTH->2;case ElectionLife.INFRASTRUCTURE->4;default->6;},EDUCATION);
+        grant(t,"library",policy==ElectionLife.INFRASTRUCTURE?2:4,EDUCATION);
+        grant(t,CLINIC,switch(policy){case ElectionLife.EDUCATION,ElectionLife.INFRASTRUCTURE->4;case ElectionLife.HEALTH->12;default->8;},HEALTH);
         int closing=balance(t,CITY);
         if(opening>RESERVE&&closing<=RESERVE)ArchiveLife.record(t,"budget-low:"+week,day,minute,"Municipality","Municipal cash reached its minimum reserve; discretionary grants paused.");
         else if(opening<=RESERVE&&closing>RESERVE)ArchiveLife.record(t,"budget-recovery:"+week,day,minute,"Municipality","Municipal cash recovered above its minimum reserve.");

@@ -2918,6 +2918,25 @@ func _render_actions() -> void:
             school_info.text = "Scuola · Pupils %s | Lessons %s | Graduates %s" % [education.get("pupils",0),education.get("lessons",0),education.get("graduates",0)]
             school_info.text += "\nSchool reserve %s EUR | Work experience days %s" % [education.get("schoolFunds",0),education.get("workDays",0)]
             _action_choices.add_child(school_info)
+            var election: Dictionary = _last_snapshot.get("election",{})
+            var mayor := Label.new()
+            mayor.text = "Sindaco · %s | %s | Next election: day %s" % [election.get("mayor","Caretaker"),election.get("programme","Balanced"),election.get("nextDay",0)]
+            mayor.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+            _action_choices.add_child(mayor)
+            var plans := ["Balanced","Education","Healthcare","Infrastructure"]
+            if bool(election.get("campaigning",false)):
+                if not bool(election.get("registered",false)):
+                    for i in range(1,4):
+                        _action_choices.add_child(_button("Run for mayor · "+plans[i],_garden_action.bind("election-register-%s" % i)))
+                for candidate in election.get("candidates",[]):
+                    var candidate_label := Label.new()
+                    candidate_label.text = "%s · %s" % [candidate.get("name",""),candidate.get("programme","")]
+                    _action_choices.add_child(candidate_label)
+                    if not bool(election.get("voted",false)):
+                        _action_choices.add_child(_button("Vote for "+str(candidate.get("name","")),_garden_action.bind("election-vote-%s" % candidate.get("slot",0))))
+            if bool(election.get("playerMayor",false)):
+                for i in range(4):
+                    _action_choices.add_child(_button("Budget programme · "+plans[i],_garden_action.bind("election-policy-%s" % i)))
             var opinion: Dictionary = _last_snapshot.get("opinion",{})
             var poll := Label.new()
             poll.text = "Opinione pubblica · Comune trust %s/100 | Stall %s/100" % [opinion.get("cityTrust",50),opinion.get("stallTrust",50)]
@@ -3159,7 +3178,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if ((action.begins_with("archive-year-") and _current_place=="LIBRARY" and _near_kiosk()) or ((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if ((action.begins_with("archive-year-") and _current_place=="LIBRARY" and _near_kiosk()) or ((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-") or action.begins_with("election-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:
