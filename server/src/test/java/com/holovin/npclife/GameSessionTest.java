@@ -133,6 +133,29 @@ class GameSessionTest {
             var routine=game.gardenAction("rebirth-routine").world();
             assertFalse(routine.rebirth().homeOptions().stayingHome());
         }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var a=town.get(id);
+            a.activity="AT_HOME";a.place=a.home;a.destination=a.home;a.travelRemaining=0;
+            state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-road-CLINIC"));
+            var outside=game.gardenAction("rebirth-home-exit").world();
+            assertFalse(outside.rebirth().homeOptions().atHome());
+            assertTrue(outside.rebirth().homeOptions().outsideHome());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-home-meal"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-road-QUARRY"));
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().homeOptions().outsideHome());
+            var road=game.gardenAction("rebirth-road-CLINIC").world();
+            assertEquals("CLINIC",road.player().placeId());
+            assertFalse(road.rebirth().homeOptions().outsideHome());
+            var back=game.gardenAction("rebirth-road-NORTH_RESIDENCES").world();
+            assertTrue(back.rebirth().homeOptions().outsideHome());
+            assertTrue(game.gardenAction("rebirth-home-go").world().rebirth().homeOptions().atHome());
+        }
     }
     @Test
     void orchardIsPerennialSeasonalAndConservesFruitOnSale() throws Exception {

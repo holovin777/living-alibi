@@ -131,10 +131,38 @@ final class RebirthLife {
         int index=PlayerLife.publicPlaces().indexOf(destination);
         if(index<0)throw new IllegalArgumentException("Choose a public destination.");
         t.industryStocks.put(TRAVEL,index+1);
-        if(c.place==destination)return 0;
+        if(c.place==destination){if(destination==c.home)c.activity="OUTSIDE_HOME";return 0;}
         c.destination=destination;c.travelRemaining=TownLife.travelTime(c.place,destination);
         c.activity="TRAVELING";
         return c.travelRemaining;
+    }
+    // Same public grid as Godot TownMap, validated independently of visual input.
+    private static final List<List<String>> ROAD_GRID=List.of(
+            List.of("NORTH_RESIDENCES","CLINIC","SCHOOL","OFFICE","FACTORY"),
+            List.of("MARKET","CENTRO","PARK","LIBRARY","WORKSHOP"),
+            List.of("SOUTH_RESIDENCES","PORTICI","RIVER","WOODS","QUARRY"),
+            List.of("CAFE","BAKERY","FARM","LOGISTICS_DEPOT","FUEL_STATION"));
+    static boolean adjacent(TownLife.Place a,TownLife.Place b){
+        int ax=-1,ay=-1,bx=-1,by=-1;
+        for(int y=0;y<ROAD_GRID.size();y++){
+            int x=ROAD_GRID.get(y).indexOf(a.name());if(x>=0){ax=x;ay=y;}
+            x=ROAD_GRID.get(y).indexOf(b.name());if(x>=0){bx=x;by=y;}
+        }
+        return ax>=0&&bx>=0&&Math.abs(ax-bx)+Math.abs(ay-by)==1;
+    }
+    static int roadTravel(TownLife.Town t,TownLife.Place destination,int day){
+        var c=requireAdult(t);
+        if(atHome(c)||!adjacent(c.place,destination))throw new IllegalArgumentException("Leave your home and follow an adjacent road.");
+        return travel(t,destination,day);
+    }
+    static boolean outsideHome(TownLife.Town t,TownLife.Citizen c){
+        return linkedAdult(t,c)&&c.place==c.home&&manualDestination(t,c)==c.home&&!stayingHome(t,c);
+    }
+    static String leaveHome(TownLife.Town t,int day){
+        var c=requireAdult(t);
+        if(!atHome(c)||EmploymentLife.sick(c,day))throw new IllegalArgumentException("You must be awake at home and well enough to leave.");
+        travel(t,c.home,day);
+        return "Left the building for the public street.";
     }
     private static final int HOME_DESTINATION=1000;
     static boolean stayingHome(TownLife.Town t,TownLife.Citizen c){
@@ -150,7 +178,7 @@ final class RebirthLife {
         return duration;
     }
     static boolean atHome(TownLife.Citizen c){
-        return awakePresent(c)&&c.place==c.home;
+        return awakePresent(c)&&c.place==c.home&&c.currentSpace().equals(c.homeUnit);
     }
     static List<TownLife.Citizen> homeFamily(TownLife.Town t,TownLife.Citizen c){
         if(!atHome(c))return List.of();
@@ -166,7 +194,7 @@ final class RebirthLife {
         return Math.max(0,Math.min(2,EducationLife.get(t,c,"furniture-level")));
     }
     static int furniturePrice(int level){return level==0?80:level==1?180:0;}
-    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions,int hygiene,int furnitureLevel,int upgradePrice){} 
+    record HomeOptions(String district,boolean atHome,boolean stayingHome,int food,int water,List<String> family,List<String> actions,int hygiene,int furnitureLevel,int upgradePrice,boolean outsideHome){} 
     static HomeOptions homeOptions(TownLife.Town t,int day){
         var c=child(t);
         if(!linkedAdult(t,c))return null;
@@ -183,7 +211,7 @@ final class RebirthLife {
             if(!family.isEmpty()&&EducationLife.get(t,c,"last-family-time")<day)actions.add("family");
         }
         return new HomeOptions(c.home.label,atHome(c),stayingHome(t,c),c.food,c.water,
-                family.stream().map(p->p.name).toList(),List.copyOf(actions),hygiene(t,c),furnitureLevel(t,c),furniturePrice(furnitureLevel(t,c)));
+                family.stream().map(p->p.name).toList(),List.copyOf(actions),hygiene(t,c),furnitureLevel(t,c),furniturePrice(furnitureLevel(t,c)),outsideHome(t,c));
     }
     record HomeAction(int minutes,String message){}
     static HomeAction homeAction(TownLife.Town t,int day,String action){

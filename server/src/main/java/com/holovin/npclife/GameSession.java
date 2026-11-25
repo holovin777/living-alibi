@@ -337,6 +337,14 @@ public final class GameSession implements AutoCloseable {
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
             }
+            if(action.equals("rebirth-home-exit")){
+                return applyInternal(copy,0,RebirthLife.leaveHome(copy,state.day),true);
+            }
+            if(action.startsWith("rebirth-road-")){
+                var destination=PlayerLife.destination(action.substring("rebirth-road-".length()));
+                int duration=RebirthLife.roadTravel(copy,destination,state.day);
+                return applyInternal(copy,duration,"Walked along the road to "+destination.label+".",true);
+            }
             if(action.equals("rebirth-home-go")){
                 int duration=RebirthLife.goHome(copy);
                 return applyInternal(copy,duration,"Returned to your own home.",true);

@@ -42,6 +42,8 @@ const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
 var _apartment: Node3D
 var _apartment_active := false
+var _home_entrance: Node3D
+var _home_transition := false
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
@@ -165,11 +167,11 @@ func _process(delta: float) -> void:
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
         var before := _avatar.position
         _avatar.position = _move_on_ground(_avatar.position,
-                relative_motion * delta * _movement_speed(), WALKER_RADIUS, not _rebirth_active())
+                relative_motion * delta * _movement_speed(), WALKER_RADIUS, _can_walk_roads())
         if _movement_speed() == CYCLE_SPEED:
             _bike_wheel_angle += before.distance_to(_avatar.position)/0.35
         _follow_player()
-        if not _rebirth_active():
+        if _can_walk_roads():
             _try_road_crossing(relative_motion)
 
     if _apartment_active:
@@ -185,7 +187,12 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
-        _hint.text = "F: life choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
+        if _near_family_entrance():
+            _hint.text="E: enter your home · F: life choices"
+        elif _can_walk_roads() and not _road_destination(_avatar.position,ROAD_TRIGGER).is_empty():
+            _hint.text="Walk forward to the next district"
+        else:
+            _hint.text = "F: life choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
         return
     _tick_live_clock(delta)
     if not _near_gate():
@@ -243,10 +250,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 if action=="door":
                     _apartment.toggle_entrance(_avatar.position)
                 elif action=="exit":
-                    _action_panel.visible=true
-                    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                    _request_home_transition("rebirth-home-exit")
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and _near_family_entrance() and not _action_panel.visible:
+                _request_home_transition("rebirth-home-go")
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_F:
                 _action_panel.visible = not _action_panel.visible
@@ -1099,7 +1108,10 @@ func _try_road_crossing(motion: Vector3) -> void:
     _road_pending = destination
     var lateral := _avatar.position - direction * _avatar.position.dot(direction)
     _road_arrival = lateral - direction * 23.0
-    _api.go_to(destination)
+    if _rebirth_active():
+        _api.garden_action("rebirth-road-"+destination)
+    else:
+        _api.go_to(destination)
 
 # A flat, client-side collision layer. The Java server owns district travel
 # and never trusts these local visual positions as proof of an action.
@@ -3457,6 +3469,30 @@ func _wait_one_hour() -> void:
     if not _api.is_busy():
         _api.wait_for(60)
 
+func _can_walk_roads() -> bool:
+    return not _apartment_active and (not _rebirth_active() or str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT")
+
+func _near_family_entrance() -> bool:
+    return is_instance_valid(_home_entrance) and _home_entrance.visible and not _apartment_active and _avatar.position.distance_to(_home_entrance.position)<2.0
+
+func _request_home_transition(action: String) -> void:
+    if _connected and not _api.is_busy():
+        _home_transition=true
+        _api.garden_action(action)
+
+func _sync_family_entrance(home) -> void:
+    if is_instance_valid(_home_entrance):
+        _home_entrance.queue_free()
+        _home_entrance=null
+    if not home is Dictionary or not home.get("outsideHome",false) or _apartment_active:
+        return
+    _home_entrance=Node3D.new()
+    _home_entrance.name="FamilyHomeEntrance"
+    add_child(_home_entrance)
+    _home_entrance.position=_open_anchor(Vector3(0,0,6))
+    _box(_home_entrance,Vector3(1.25,2.25,0.16),Color("#987653"),Vector3(0,1.125,-0.65))
+    _sign(_home_entrance,"Your home",Vector3(0,2.45,-0.65))
+
 func _apartment_action() -> String:
     if not _apartment_active:
         return ""
@@ -3497,6 +3533,8 @@ func _set_apartment(active: bool) -> void:
 
 func _on_world_updated(snapshot: Dictionary) -> void:
     var clock_update := _clock_pending
+    var walking_transition := _home_transition or not _road_pending.is_empty()
+    _home_transition=false
     _clock_pending = false
     _connected = true
     var old_car_place := _car_place()
@@ -3563,6 +3601,9 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
         _apartment.set_furniture_level(int(home.get("furnitureLevel",0)))
+    _sync_family_entrance(home)
+    if walking_transition and is_instance_valid(_home_entrance) and not road_arrival:
+        _avatar.position=_home_entrance.position
     _sync_guest_room()
     _sync_garden()
     _sync_coop()
@@ -3590,8 +3631,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _travel_panel.visible = false
         _map_panel.visible = false
         _close_dialog()
-        _action_panel.visible = true
-        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+        _action_panel.visible = not walking_transition
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
     if _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 
@@ -3755,6 +3796,7 @@ func _set_request_busy(busy: bool) -> void:
         _update_bag()
 
 func _on_request_failed(message: String) -> void:
+    _home_transition=false
     if _drive_pending:
         _end_driving(true)
         _connected = false

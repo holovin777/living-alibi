@@ -79,7 +79,7 @@ final class TownLife {
         boolean presentAt(Place p) {return alive && travelRemaining==0 && place==p;}
         /** A shared neighborhood does not imply a shared apartment or line of sight. */
         String currentSpace() {
-            return place==home ? homeUnit : publicSpace(place);
+            return place==home && !"OUTSIDE_HOME".equals(activity) ? homeUnit : publicSpace(place);
         }
         String locationText() {
             if(!alive)return place.label+" (deceased)";

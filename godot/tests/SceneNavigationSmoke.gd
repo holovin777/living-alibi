@@ -915,6 +915,23 @@ func _exercise() -> void:
     world._avatar.position=lobby_pos
     if not _check(world._apartment_action()=="exit","building exit offers travel choices"):
         return
+    var outside := apartment.duplicate(true)
+    outside["rebirth"]["homeOptions"]["atHome"]=false
+    outside["rebirth"]["homeOptions"]["outsideHome"]=true
+    outside["residents"]=[]
+    world._home_transition=true
+    world._on_world_updated(outside)
+    if not _check(not world._apartment_active and world._near_family_entrance() and world._can_walk_roads() and not world._action_panel.visible,
+            "confirmed exit opens public street and continuous walking without menu"):
+        return
+    world._road_pending="CLINIC"
+    world._road_arrival=Vector3(-23,0,0)
+    var next_street := _world("CLINIC","Clinic")
+    next_street["rebirth"]=outside["rebirth"].duplicate(true)
+    next_street["rebirth"]["homeOptions"]["outsideHome"]=false
+    world._on_world_updated(next_street)
+    if not _check(world._avatar.position.x < -22 and not world._action_panel.visible,"linked adult road arrival preserves walking direction"):
+        return
     world._on_world_updated(_world("PARK","Park"))
     if not _check(not world._apartment_active and not world._apartment.visible and world._scenery.visible,
             "authoritative departure restores outdoor scenery"):

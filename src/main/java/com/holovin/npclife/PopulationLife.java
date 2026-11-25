@@ -53,6 +53,9 @@ final class PopulationLife {
                 && town.cleanWater>0;
         TownLife.Place desired;
         TownLife.Place manual=child?RebirthLife.childOuting(town,c,clock.day,minute):RebirthLife.manualDestination(town,c);
+        if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
+            RebirthLife.resumeRoutine(town);manual=null;
+        }
         if(sick)desired=c.home;
         else if(manual!=null)desired=manual;
         else if(freightRun)desired=freightDestination;
@@ -118,6 +121,7 @@ final class PopulationLife {
         if(sleeping)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
         else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":c.place==c.home?"AT_HOME":"FREE_TIME";
+        else if(RebirthLife.outsideHome(town,c))c.activity="OUTSIDE_HOME";
         else if(RebirthLife.stayingHome(town,c)&&c.place==c.home)c.activity="AT_HOME";
         else if(retired)c.activity="RETIRED";
         else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
