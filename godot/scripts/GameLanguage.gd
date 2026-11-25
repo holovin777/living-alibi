@@ -313,7 +313,23 @@ const IT := {
     "Sensei": "Sensei",
     "Student": "Allievo",
     "Rei · Greet sensei": "Rei · Saluta il sensei",
-    "Exchanged a respectful dojo greeting.": "Saluto rispettoso nel dojo."
+    "Exchanged a respectful dojo greeting.": "Saluto rispettoso nel dojo.",
+    "Controlled kumite · %s : %s": "Kumite controllato · %s : %s",
+    "Exchange %s/5 · %s": "Scambio %s/5 · %s",
+    "Partner approaches": "Il compagno si avvicina",
+    "Partner keeps distance": "Il compagno mantiene la distanza",
+    "Scoring opportunity": "Occasione per un punto",
+    "Guard": "Guardia",
+    "Adjust distance": "Regola distanza",
+    "Controlled point": "Punto controllato",
+    "End practice": "Termina allenamento",
+    "Practice with %s · 5 EUR": "Allenati con %s · 5 EUR",
+    "Practice completed": "Allenamento completato",
+    "Started supervised non-contact kumite.": "Kumite senza contatto iniziato.",
+    "Completed five controlled practice exchanges.": "Completati cinque scambi controllati.",
+    "Controlled response scored a point.": "Risposta controllata: un punto.",
+    "Partner scored a point. Reset safely.": "Punto al compagno. Riprendi in sicurezza.",
+    "Ended practice without completing the round.": "Allenamento terminato prima della conclusione."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
