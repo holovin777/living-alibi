@@ -2993,6 +2993,8 @@ func _create_interface() -> void:
 func _on_language_selected(index: int) -> void:
     GameLanguage.select_locale("it" if index==1 else "en")
     _refresh_localized_hud()
+    if _software_menu:
+        _render_actions()
 
 func _refresh_localized_hud() -> void:
     if _last_snapshot.is_empty():return
@@ -3297,7 +3299,7 @@ func _render_office_app(workspace: Dictionary) -> void:
 
 func _render_software() -> void:
     var station := _office_station()
-    _action_title.text="Borgo Digital · "+("Java team" if station=="java" else ("Server room" if station=="devops" else "Meeting room"))
+    _action_title.text="Borgo Digital · "+(tr("Java team") if station=="java" else (tr("Server room") if station=="devops" else tr("Meeting room")))
     var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
     _render_office_apps(station)
     if _office_app!="work":
@@ -4552,7 +4554,7 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
     ]
     if _rebirth_active():
         var child: Dictionary = snapshot.get("rebirth",{})
-        _status.text = "Choose a new family" if str(child.get("phase","")) == "CHOICE" else "%s | Age %s | %s" % [child.get("childName",""),child.get("age",0),"Adult" if str(child.get("phase","")) == "LINKED_ADULT" else "Childhood"]
+        _status.text = tr("Choose a new family") if str(child.get("phase","")) == "CHOICE" else tr("%s | Age %s | %s") % [child.get("childName",""),child.get("age",0),tr("Adult") if str(child.get("phase","")) == "LINKED_ADULT" else tr("Childhood")]
     var climate: Dictionary = snapshot.get("weather", {})
     _weather.text = tr("Day %s  %s:%02d | %s | %s  %s °C") % [
         str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,
@@ -4568,8 +4570,8 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
     var utilities: Dictionary = snapshot.get("services", {})
     var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
     var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
-    _needs.text += "\nPark fountain: %s (%s clean units) | Street lights: %s" % [
-        fountain, str(utilities.get("cleanWater", 0)), lighting
+    _needs.text += tr("\nPark fountain: %s (%s clean units) | Street lights: %s") % [
+        tr(fountain), str(utilities.get("cleanWater", 0)), tr(lighting)
     ]
     _needs.text += tr("\nResidents present in this district: %s") % [
         str(snapshot.get("residents", []).size())
