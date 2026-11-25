@@ -12,10 +12,10 @@ final class EmploymentLife {
     record Event(int day,int minute,String residentId,Kind kind,String detail) { }
 
     private static final String[] JOBS={"Teacher","Mechanic","Librarian","Barista",
-            "Office clerk","Nurse","Baker","Market vendor"};
+            "Office clerk","Nurse","Baker","Market vendor","Miner","Factory machinist","Transport driver"};
     private static final TownLife.Place[] WORK={TownLife.Place.SCHOOL,TownLife.Place.WORKSHOP,
             TownLife.Place.LIBRARY,TownLife.Place.CAFE,TownLife.Place.OFFICE,
-            TownLife.Place.CLINIC,TownLife.Place.BAKERY,TownLife.Place.MARKET};
+            TownLife.Place.CLINIC,TownLife.Place.BAKERY,TownLife.Place.MARKET,TownLife.Place.QUARRY,TownLife.Place.FACTORY,TownLife.Place.QUARRY};
 
     static boolean sick(TownLife.Citizen person,int day) {
         return person.sickUntilDay>=day;
@@ -58,12 +58,12 @@ final class EmploymentLife {
                         p.unemploymentDays>=2) {
                     // Simplified emergency placement after a factory closure:
                     // the old industrial career and physical production end.
-                    hire(town,clock,p,roll(p,clock.day,0xC2L,JOBS.length));
+                    seekSuitableJob(town,clock,p);
                 } else {
                     // Other job seekers retain the slower independent search.
                     int threshold=p.unpaidBills>0 || p.money<80?225:145;
                     if(p.unemploymentDays>=5 && roll(p,clock.day,0xB1L,1000)<threshold)
-                        hire(town,clock,p,roll(p,clock.day,0xC2L,JOBS.length));
+                        seekSuitableJob(town,clock,p);
                 }
             } else if((p.lastHiredDay==0 || clock.day-p.lastHiredDay>=14) &&
                     roll(p,clock.day,0xA3L,1000)<17) {
@@ -75,6 +75,11 @@ final class EmploymentLife {
                 startIllness(town,clock,p,duration,cost,truth,observations);
             }
         }
+    }
+
+    private static void seekSuitableJob(TownLife.Town town,WorldState clock,TownLife.Citizen p){
+        int role=EducationLife.preferredRole(town,p,JOBS);
+        if(role>=0)hire(town,clock,p,role);
     }
 
     static void loseJob(TownLife.Town town,WorldState clock,TownLife.Citizen p) {

@@ -65,6 +65,7 @@ final class DemographyLife {
         c.home=a.home;c.homeUnit=a.homeUnit;c.workplace=TownLife.Place.SCHOOL;
         a.money-=10;b.money-=10;t.people.put(id,c);
         ensure(t);
+        EducationLife.ensureResident(t,c);
         set(t,c,"parent-a",a.generationIndex);set(t,c,"parent-b",b.generationIndex);set(t,c,"born",day);
         for(var p:List.of(a,b)){set(t,p,"children",get(t,p,"children")+1);set(t,p,"last-birth",day);}
         set(t,BIRTHS,Math.addExact(get(t,BIRTHS),1));
@@ -117,6 +118,7 @@ final class DemographyLife {
                 if((born>0&&day>born&&(day-born)%365==0)||(born==0&&day>1&&(day-1)%365==0)){
                     c.age++;
                     if(c.age==18){
+                        EducationLife.graduate(t,c);
                         c.occupation="Job seeker";c.employed=false;c.unemploymentDays=0;
                         RentalLife.moveHome(t,c,c.home,TownLife.privateUnit(c.id));
                     }
