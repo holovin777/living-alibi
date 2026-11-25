@@ -29,6 +29,8 @@ final class PlayerLife {
         boolean ownsBicycle;
         boolean cycling;
         TownLife.Place bicycleParked;
+        TownLife.Place carPlace;
+        int carFuel,carCondition;
         int storedBread,storedWater;
         final Map<String,Integer> bagItems=new LinkedHashMap<>();
         final Map<String,Integer> pantryItems=new LinkedHashMap<>();
@@ -53,6 +55,7 @@ final class PlayerLife {
             p.money=money;
             p.bread=bread;p.bottledWater=bottledWater;p.roomUntil=roomUntil;
             p.ownsBicycle=ownsBicycle;p.cycling=cycling;p.bicycleParked=bicycleParked;
+            p.carPlace=carPlace;p.carFuel=carFuel;p.carCondition=carCondition;
             p.storedBread=storedBread;p.storedWater=storedWater;p.hygiene=hygiene;
             p.bagItems.putAll(bagItems);p.pantryItems.putAll(pantryItems);
             p.jobId=jobId;

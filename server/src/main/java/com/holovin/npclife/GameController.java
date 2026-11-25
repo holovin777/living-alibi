@@ -178,6 +178,17 @@ public class GameController {
         return session.washInRoom();
     }
 
+    public record CarRequest(String action) { }
+    public record DriveRequest(String destination) { }
+    @PostMapping("/actions/car")
+    public GameSession.ActionView car(@RequestBody CarRequest request) throws SQLException {
+        return session.carAction(request.action());
+    }
+    @PostMapping("/actions/drive")
+    public GameSession.ActionView drive(@RequestBody DriveRequest request) throws SQLException {
+        return session.drive(request.destination());
+    }
+
     public record TransportRequest(String mode) { }
     @PostMapping("/actions/buy-bicycle")
     public GameSession.ActionView buyBicycle() throws SQLException {

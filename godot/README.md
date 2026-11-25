@@ -412,6 +412,23 @@ or Java-managed transport: cars respawn after a short delay at the
 ends of each road segment. No junction routing, accidents, player
 driving or persistent traffic state yet.
 
+## First privately owned compact car
+
+The workshop sells a used compact car for 180 EUR (6/12 fuel,
+80/100 condition). Refuel up to three units for 2 EUR per unit;
+service for 15 EUR restores up to 30 condition. Payments transfer
+to the workshop account. Public parking spaces exist in all five
+motor districts. Approach your parked car and press F for adjacent
+motor destinations. Each server-validated trip takes three game
+minutes, one fuel unit and three condition points; arrival parks
+the car at the destination. Walking away leaves it behind. Park a
+portable bicycle before driving. Car state survives SQLite restart.
+Historic pedestrian districts are excluded. This is route-based
+travel, not manual steering or a driving physics simulation.
+Fuel is abstract and available only at the workshop; plan enough
+fuel/condition for the return trip. No towing or roadside refuelling
+yet, and no fuel wholesaler inventory.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

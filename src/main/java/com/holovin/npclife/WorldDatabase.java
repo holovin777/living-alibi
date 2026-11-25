@@ -222,6 +222,9 @@ final class WorldDatabase implements AutoCloseable {
         playerColumns.put("owns_bicycle","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("cycling","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("bicycle_parked","TEXT");
+        playerColumns.put("car_place","TEXT");
+        playerColumns.put("car_fuel","INTEGER NOT NULL DEFAULT 0");
+        playerColumns.put("car_condition","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("job_id","TEXT");
         playerColumns.put("engineering_skill","INTEGER NOT NULL DEFAULT 0");
         playerColumns.put("investigation_skill","INTEGER NOT NULL DEFAULT 0");
@@ -969,6 +972,9 @@ final class WorldDatabase implements AutoCloseable {
                 town.player.storedWater=rs.getInt("stored_water");
                 town.player.hygiene=rs.getInt("hygiene");
                 town.player.ownsBicycle=rs.getInt("owns_bicycle")!=0;
+                String carPlace=rs.getString("car_place");
+                if(carPlace!=null)town.player.carPlace=TownLife.Place.valueOf(carPlace);
+                town.player.carFuel=rs.getInt("car_fuel");town.player.carCondition=rs.getInt("car_condition");
                 String parked=rs.getString("bicycle_parked");
                 if(town.player.ownsBicycle && parked!=null)town.player.bicycleParked=TownLife.Place.valueOf(parked);
                 town.player.cycling=town.player.ownsBicycle && town.player.bicycleParked==null && rs.getInt("cycling")!=0;
@@ -1209,8 +1215,8 @@ final class WorldDatabase implements AutoCloseable {
                 INSERT INTO player_state(id,place,destination,travel_remaining,private_name,
                                          hunger,thirst,fatigue,health,alive,incarnation,
                                          money,job_id,engineering_skill,investigation_skill,last_work_day,
-                                         last_technical_day,bread,bottled_water,room_until,stored_bread,stored_water,hygiene,owns_bicycle,cycling,bicycle_parked)
-                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                                         last_technical_day,bread,bottled_water,room_until,stored_bread,stored_water,hygiene,owns_bicycle,cycling,bicycle_parked,car_place,car_fuel,car_condition)
+                VALUES(1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                 place=excluded.place,destination=excluded.destination,
                 travel_remaining=excluded.travel_remaining,private_name=excluded.private_name,
                 hunger=excluded.hunger,thirst=excluded.thirst,
@@ -1223,7 +1229,8 @@ final class WorldDatabase implements AutoCloseable {
                 last_technical_day=excluded.last_technical_day,
                 bread=excluded.bread,bottled_water=excluded.bottled_water,room_until=excluded.room_until,
                 stored_bread=excluded.stored_bread,stored_water=excluded.stored_water,hygiene=excluded.hygiene,
-                owns_bicycle=excluded.owns_bicycle,cycling=excluded.cycling,bicycle_parked=excluded.bicycle_parked
+                owns_bicycle=excluded.owns_bicycle,cycling=excluded.cycling,bicycle_parked=excluded.bicycle_parked,
+                car_place=excluded.car_place,car_fuel=excluded.car_fuel,car_condition=excluded.car_condition
                 """)) {
             p.setString(1,player.place.name());
             p.setString(2,player.destination.name());
@@ -1246,6 +1253,8 @@ final class WorldDatabase implements AutoCloseable {
             p.setInt(20,player.storedBread);p.setInt(21,player.storedWater);p.setInt(22,player.hygiene);
             p.setInt(23,player.ownsBicycle?1:0);p.setInt(24,player.cycling?1:0);
             p.setString(25,player.bicycleParked==null?null:player.bicycleParked.name());
+            p.setString(26,player.carPlace==null?null:player.carPlace.name());
+            p.setInt(27,player.carFuel);p.setInt(28,player.carCondition);
             p.executeUpdate();
         }
         String contactSql=player.incarnation==1 ? """

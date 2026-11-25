@@ -47,7 +47,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
                              int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
-                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked) { }
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -82,7 +82,9 @@ public final class GameSession implements AutoCloseable {
                 p.hunger,p.thirst,p.fatigue,p.health,p.alive,
                 p.money,p.jobId,p.engineeringSkill,p.investigationSkill,p.bread,p.bottledWater,p.roomUntil,
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,p.hygiene,
-                FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name());
+                FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
+                p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
+                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of());
         var residents=PlayerLife.visible(town).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
@@ -249,6 +251,23 @@ public final class GameSession implements AutoCloseable {
         int minutes=PlayerLife.startTravel(copy.player,place);
         if(minutes==0)return new ActionView("Already at "+place.label+".",snapshot());
         return apply(copy,minutes,(copy.player.cycling?"Cycled to ":"Walked to ")+place.label+".");
+    }
+
+    public synchronized ActionView carAction(String action) throws SQLException {
+        var copy=town.copy();
+        String message=switch(action==null?"":action) {
+            case "buy" -> MotorLife.buy(copy,state.minute);
+            case "refuel" -> MotorLife.refuel(copy,state.minute);
+            case "repair" -> MotorLife.repair(copy,state.minute);
+            default -> throw new IllegalArgumentException("Unknown car action.");
+        };
+        return apply(copy,action.equals("repair")?30:5,message);
+    }
+    public synchronized ActionView drive(String destination) throws SQLException {
+        var copy=town.copy();
+        var place=PlayerLife.destination(destination);
+        int minutes=MotorLife.drive(copy.player,place);
+        return apply(copy,minutes,"Drove to "+place.label+". Your car is parked there.");
     }
 
     public synchronized ActionView buyBicycle() throws SQLException {

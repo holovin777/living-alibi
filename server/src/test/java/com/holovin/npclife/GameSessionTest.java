@@ -13,6 +13,45 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void carTripsConserveMoneyFuelAndLocationAcrossRestart() throws Exception {
+        Path file=directory.resolve("car.db");
+        try(var game=new GameSession(file)) {
+            game.move("workshop");game.waitMinutes(60);
+            assertThrows(IllegalArgumentException.class,()->game.carAction("buy"));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            town.player.money=250;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            game.carAction("buy");
+            assertEquals(70,game.snapshot().player().money());
+            game.carAction("refuel");game.carAction("repair");
+            assertEquals(49,game.snapshot().player().money());
+            assertEquals(9,game.snapshot().player().carFuel());
+            assertEquals(100,game.snapshot().player().carCondition());
+            assertThrows(IllegalArgumentException.class,()->game.drive("centro"));
+            int minute=game.snapshot().minute();
+            game.drive("library");
+            assertEquals(minute+3,game.snapshot().minute());
+            assertEquals("LIBRARY",game.snapshot().player().carPlace());
+            assertEquals(8,game.snapshot().player().carFuel());
+            assertEquals(97,game.snapshot().player().carCondition());
+            game.move("park");
+            assertThrows(IllegalArgumentException.class,()->game.drive("workshop"));
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals("LIBRARY",game.snapshot().player().carPlace());
+            assertEquals(8,game.snapshot().player().carFuel());
+            game.move("library");game.drive("workshop");
+            assertEquals("WORKSHOP",game.snapshot().player().carPlace());
+            assertEquals(7,game.snapshot().player().carFuel());
+        }
+    }
+
+    @Test
     void parkedBicycleCannotTeleportAndSurvivesRestart() throws Exception {
         Path file=directory.resolve("parking.db");
         try(var game=new GameSession(file)) {

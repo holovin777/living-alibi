@@ -265,6 +265,29 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    var driver := _world("WORKSHOP","Workshop")
+    driver["player"]["carPlace"] = "WORKSHOP"
+    driver["player"]["carFuel"] = 6
+    driver["player"]["carCondition"] = 80
+    driver["player"]["carDestinations"] = ["LIBRARY","FACTORY","QUARRY"]
+    world._on_world_updated(driver)
+    world._avatar.position = world.CAR_ARRIVAL
+    world._render_actions()
+    var owned_car := world._scenery.get_node("PublicCarPark/OwnedCar") as Node3D
+    if not _check(owned_car.visible and world._near_car()
+            and _has_button(world._action_choices,"Drive to Library")
+            and not world._can_stand(world.CAR_PARK,world.WALKER_RADIUS),
+            "owned car is parked physically and offers nearby motor routes"):
+        return
+    driver["player"]["carPlace"] = "LIBRARY"
+    driver["player"]["placeId"] = "LIBRARY"
+    driver["player"]["place"] = "Library"
+    world._on_world_updated(driver)
+    if not _check(world._avatar.position==world.CAR_ARRIVAL and world._near_car(),
+            "confirmed car trip arrives at destination parking"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)

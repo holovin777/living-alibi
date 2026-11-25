@@ -87,6 +87,12 @@ func prospect() -> void:
 func speak_to(resident_id: String, message: String) -> void:
     _send("/actions/speak", HTTPClient.METHOD_POST, {"residentId": resident_id, "message": message})
 
+func car_action(action: String) -> void:
+    _send("/actions/car",HTTPClient.METHOD_POST,{"action":action})
+
+func drive_to(destination: String) -> void:
+    _send("/actions/drive",HTTPClient.METHOD_POST,{"destination":destination})
+
 func buy_bicycle() -> void:
     _send("/actions/buy-bicycle",HTTPClient.METHOD_POST,{})
 

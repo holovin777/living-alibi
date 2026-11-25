@@ -10,6 +10,8 @@ const INTERACTION_RADIUS := 3.5
 const WALK_SPEED := 4.5
 const CYCLE_SPEED := 8.0
 const RACK_POSITION := Vector3(6.0,0,-10.0)
+const CAR_PARK := Vector3(11.0,0,-10.0)
+const CAR_ARRIVAL := Vector3(11.0,0,-7.5)
 const RACK_DISTRICTS := ["PARK","WORKSHOP","NORTH_RESIDENCES"]
 const WALKER_RADIUS := 0.32
 const COLLISION_STEP := 0.12
@@ -73,6 +75,7 @@ var _hint: Label
 var _view_button: Button
 var _transport_button: Button
 var _parking_button: Button
+var _car_label: Label
 var _bike_model: Node3D
 var _bike_wheel_angle := 0.0
 var _jobs: Label
@@ -144,12 +147,14 @@ func _process(delta: float) -> void:
     _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
-    if not _near_kiosk() and not _near_home_station():
+    if not _near_kiosk() and not _near_home_station() and not _near_car():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
+    elif _near_car():
+        _hint.text = "F: choose a route with your parked car."
     elif _near_rack() and bool(_last_snapshot.get("player",{}).get("ownsBicycle",false)):
         _hint.text = "P: park or retrieve your bicycle · B: ride/walk."
     elif _near_home_station():
@@ -202,7 +207,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
         elif event.keycode == KEY_E and _near_gate() and not _map_panel.visible:
             _toggle_travel()
             get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_F and (_near_kiosk() or _near_home_station()) and not _map_panel.visible:
+        elif event.keycode == KEY_F and (_near_kiosk() or _near_home_station() or _near_car()) and not _map_panel.visible:
             _toggle_actions()
             get_viewport().set_input_as_handled()
 
@@ -253,6 +258,31 @@ func _movement_speed() -> float:
     var at := _avatar.position
     var in_shop := _current_place == "PORTICI" and Rect2(4.4,2.15,6.1,5.7).has_point(Vector2(at.x,at.z))
     return CYCLE_SPEED if _cycling() and not _inside_guest_room() and not in_shop else WALK_SPEED
+
+func _car_place() -> String:
+    var value = _last_snapshot.get("player",{}).get("carPlace")
+    return "" if value==null else str(value)
+
+func _near_car() -> bool:
+    return _car_place()==_current_place and _current_place in TownLayout.MOTOR_DISTRICTS and _avatar.position.distance_to(CAR_PARK)<3.3
+
+func _car_action(action: String) -> void:
+    if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():
+        _api.car_action(action)
+
+func _drive_to(destination: String) -> void:
+    if _near_car() and _connected and not _api.is_busy():
+        _action_panel.visible = false
+        _api.drive_to(destination)
+
+func _sync_owned_car() -> void:
+    for id in TownLayout.MOTOR_DISTRICTS:
+        if not _chunks.has(id):
+            continue
+        var root: Node3D = _chunks[id]["root"]
+        var car := root.get_node_or_null("PublicCarPark/OwnedCar") as Node3D
+        if car!=null:
+            car.visible = _car_place()==id
 
 func _parked_district() -> String:
     var value = _last_snapshot.get("player",{}).get("bicycleParked")
@@ -505,6 +535,8 @@ func _generate_chunk(place_id: String) -> void:
 
     if place_id in RACK_DISTRICTS:
         _build_bicycle_rack()
+    if place_id in TownLayout.MOTOR_DISTRICTS:
+        _build_public_car_park()
     _build_road_links(place_id)
     _chunks[place_id] = {
         "root": _scenery, "residents": _residents_root,
@@ -565,7 +597,7 @@ func _build_traffic_signal(lane: Node3D) -> void:
     _box(signal_root,Vector3(0.45,1.04,0.34),Color("#303639"),Vector3(0,2.8,0))
     var colors := [Color("#f74c43"),Color("#ffbd3c"),Color("#51d879")]
     for i in range(3):
-        var dark := colors[i].darkened(0.80)
+        var dark: Color = colors[i].darkened(0.80)
         var at := Vector3(0,3.12-float(i)*0.32,0)
         _sphere(signal_root,0.115,dark,at+Vector3(0,0,-0.18))
         _sphere(signal_root,0.115,dark,at+Vector3(0,0,0.18))
@@ -750,6 +782,9 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         var nearest := p.clamp(obstacle.position, obstacle.end)
         if p.distance_squared_to(nearest) < radius * radius:
             return false
+    if _car_place()==_current_place and _current_place in TownLayout.MOTOR_DISTRICTS:
+        if Rect2(Vector2(CAR_PARK.x-0.94,CAR_PARK.z-1.81),Vector2(1.88,3.62)).grow(radius).has_point(p):
+            return false
     for edge in _traffic_edges.values():
         for record in edge["cars"]:
             var car: Node3D = record["node"]
@@ -856,6 +891,20 @@ func _build_bicycle_rack() -> void:
     parked.rotation.y = PI/2.0
     parked.visible = false
     _sign(rack,"Bici · P",Vector3(0,1.5,0))
+
+func _build_public_car_park() -> void:
+    var lot := Node3D.new()
+    lot.name = "PublicCarPark"
+    lot.position = CAR_PARK
+    _scenery.add_child(lot)
+    _box(lot,Vector3(3.2,0.05,5.0),Color("#4b5153"),Vector3.ZERO)
+    for x in [-1.5,1.5]:
+        _box(lot,Vector3(0.08,0.018,4.8),Color("#e7e0cd"),Vector3(x,0.04,0))
+    _box(lot,Vector3(3,0.018,0.08),Color("#e7e0cd"),Vector3(0,0.04,-2.4))
+    _sign(lot,"Parcheggio · F",Vector3(0,2.1,-2.4))
+    var car := _make_city_car(lot,Color("#496e50"))
+    car.name = "OwnedCar"
+    car.visible = false
 
 func _build_motor_court() -> void:
     var court := Node3D.new()
@@ -1508,6 +1557,9 @@ func _create_interface() -> void:
     _housing_label = Label.new()
     _housing_label.text = "Housing: no room"
     column.add_child(_housing_label)
+    _car_label = Label.new()
+    _car_label.text = "Car: none"
+    column.add_child(_car_label)
     var bag_row := HBoxContainer.new()
     column.add_child(bag_row)
     _eat_button = _button("Eat bread",_consume_product.bind("bread"))
@@ -1764,7 +1816,7 @@ func _travel_to(destination: String) -> void:
     _api.go_to(destination)
 
 func _toggle_actions() -> void:
-    if (not _near_kiosk() and not _near_home_station()) or not _connected:
+    if (not _near_kiosk() and not _near_home_station() and not _near_car()) or not _connected:
         _message.text = "Approach a local kiosk or your rented bed."
         return
     _close_dialog()
@@ -1783,6 +1835,11 @@ func _render_actions() -> void:
     _action_title.text = "Local actions — " + _current_place.capitalize()
     var player: Dictionary = _last_snapshot.get("player", {})
     var employed := str(player.get("jobId", ""))
+    if _near_car():
+        _action_title.text = "Your car · choose adjacent destination"
+        for id in player.get("carDestinations",[]):
+            _action_choices.add_child(_button("Drive to %s · 3m / 1 fuel" % str(id).capitalize(),_drive_to.bind(str(id))))
+        return
     match _current_place:
         "FARM":
             var report: Dictionary = _last_snapshot.get("farm",{})
@@ -1846,6 +1903,11 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Apply: market assistant",
                         _apply_job.bind("shop-assistant")))
         "WORKSHOP":
+            if _car_place().is_empty():
+                _action_choices.add_child(_button("Buy used car · 180 EUR",_car_action.bind("buy")))
+            elif _car_place()=="WORKSHOP":
+                _action_choices.add_child(_button("Refuel · up to 3 units / 2 EUR each",_car_action.bind("refuel")))
+                _action_choices.add_child(_button("Service car · 15 EUR",_car_action.bind("repair")))
             if not bool(player.get("ownsBicycle",false)):
                 _action_choices.add_child(_button("Buy used bicycle · 45 EUR",_buy_bicycle))
             _action_choices.add_child(_button("Apply: technician",
@@ -2095,6 +2157,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     var clock_update := _clock_pending
     _clock_pending = false
     _connected = true
+    var old_car_place := _car_place()
     _last_snapshot = snapshot
     var player: Dictionary = snapshot.get("player", {})
     var new_place := str(player.get("placeId", "PARK"))
@@ -2106,7 +2169,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _close_dialog()
         _current_place = new_place
         _render_place(new_place)
-        _avatar.position = _road_arrival if road_arrival else Vector3.ZERO
+        var car_arrival := not old_car_place.is_empty() and old_car_place!=_car_place() and _car_place()==new_place
+        _avatar.position = CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO)
         if not _can_stand(_avatar.position, WALKER_RADIUS, true):
             _avatar.position = Vector3.ZERO
         _locations.clear() # Previous-origin travel estimates are now stale.
@@ -2142,6 +2206,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         str(snapshot.get("residents", []).size())
     ]
     _sync_guest_room()
+    _sync_owned_car()
+    _car_label.text = "Car: none" if _car_place().is_empty() else "Car: %s | Fuel %s/12 | Condition %s%%" % [_car_place().capitalize(),player.get("carFuel",0),player.get("carCondition",0)]
     _refresh_transport_buttons(false)
     _sync_bicycle()
     _follow_player()
