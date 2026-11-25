@@ -8,8 +8,7 @@ grant itself money, skills, employment, or instant travel by moving a mesh.
 ## Run the game preview from an entirely new world
 
 On **Arch Linux**, install Java 21+, Maven 3.9+, curl and Godot 4 first.
-From the repository root, in the `feat/player-needs-persistence-v1.16`
-branch, run:
+From the repository root, on the `main` branch, run:
 
 ```bash
 bash play.sh --check
@@ -22,7 +21,8 @@ cache on first launch, and opens the Godot window. Exit the game window to
 stop the server. The world is automatically created at `data/world.db`
 when no save exists; otherwise the same world resumes. The script **never
 deletes a save**. A brand-new game starts in the park with 50 EUR, no
-profession, Marco, Elena, and 12 additional NPCs.
+profession, Marco, Elena, and 28 additional NPCs by default (30 total).
+Existing worlds are expanded once to the configured population target, preserving all existing residents and saves. The server property `living-alibi.population` accepts 12–40 generated residents. Natural deaths do not trigger automatic replenishment.
 
 If you prefer manual debugging, run the server in one terminal:
 
