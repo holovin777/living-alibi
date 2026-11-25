@@ -43,7 +43,7 @@ final class EconomyLife {
         if(minute==480) {
             for(var person:town.people.values()) {
                 if(!person.alive || person.generationIndex<=0)continue;
-                if(Math.floorMod(clock.day+person.generationIndex*3,7)==0) {
+                if(Math.floorMod(clock.day+person.generationIndex*3,7)==0&&!RentalLife.housed(town,person,clock.day)) {
                     int rent=155 + Math.floorMod((int)person.personalSeed,5)*9;
                     addBill(town,clock,person,rent,"housing and utilities",truth,observations);
                 }

@@ -91,6 +91,7 @@ final class PlayerLife {
         HenLife.clear(town);
         OrchardLife.clear(town);
         BankLife.clear(town);
+        RentalLife.estate(town);
         MarketStallLife.clear(town);
         Player next=new Player();
         next.incarnation=previous.incarnation+1;
