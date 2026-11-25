@@ -127,7 +127,7 @@ final class RebirthLife {
     }
     static int travel(TownLife.Town t,TownLife.Place destination,int day){
         var c=requireAdult(t);
-        if(c.travelRemaining>0||EmploymentLife.sick(c,day))throw new IllegalArgumentException("Finish traveling or recover first.");
+        if(c.travelRemaining>0||(EmploymentLife.sick(c,day)&&destination!=TownLife.Place.CLINIC))throw new IllegalArgumentException("Finish traveling or visit the clinic while ill.");
         int index=PlayerLife.publicPlaces().indexOf(destination);
         if(index<0)throw new IllegalArgumentException("Choose a public destination.");
         t.industryStocks.put(TRAVEL,index+1);
@@ -640,7 +640,45 @@ final class RebirthLife {
         }
         return new HomeAction(order.minutes(),"Enjoyed "+order.label()+" for EUR "+order.price()+".");
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery,Cafe cafe){}
+    record Medical(int health,boolean ill,int sickUntilDay,boolean canVisit,boolean atClinic,boolean open,
+                   boolean canConsult,boolean canFirstAid,int consultPrice,int firstAidPrice){}
+    static Medical medical(TownLife.Town t,int day,int minute){
+        var c=child(t);
+        if(!linkedAdult(t,c))return null;
+        boolean ill=EmploymentLife.sick(c,day),awake=awakePresent(c);
+        boolean present=awake&&c.place==TownLife.Place.CLINIC&&!atHome(c);
+        boolean open=minute>=480&&minute<1140;
+        return new Medical(c.health,ill,c.sickUntilDay,awake&&!present&&open&&(ill||c.health<100),present,open,
+                present&&open&&minute+30<=1140&&(ill||c.health<100)&&c.money>=15&&EducationLife.get(t,c,"last-consult")<day,
+                present&&open&&minute+10<=1140&&c.health<100&&c.money>=5&&EducationLife.get(t,c,"last-first-aid")<day,15,5);
+    }
+    static int medicalVisit(TownLife.Town t,int day,int minute){
+        var m=medical(t,day,minute);
+        if(m==null||!m.canVisit())throw new IllegalArgumentException("No medical visit available.");
+        return travel(t,TownLife.Place.CLINIC,day);
+    }
+    static HomeAction medicalAction(TownLife.Town t,int day,int minute,String action){
+        var c=requireAdult(t);var m=medical(t,day,minute);
+        if("consult".equals(action)&&m.canConsult()){
+            int funds=Math.addExact(t.employerFunds.getOrDefault("city-maintenance",0),15);
+            c.money-=15;t.employerFunds.put("city-maintenance",funds);
+            c.health=Math.min(100,c.health+10);
+            if(m.ill()&&c.sickUntilDay>day)c.sickUntilDay--;
+            EducationLife.set(t,c,"last-consult",day);
+            t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(TownLife.Place.CLINIC)+1);
+            return new HomeAction(30,"Completed a medical consultation.");
+        }
+        if("first-aid".equals(action)&&m.canFirstAid()){
+            int funds=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),5);
+            c.money-=5;t.employerFunds.put("shop-assistant",funds);
+            c.health=Math.min(100,c.health+4);
+            EducationLife.set(t,c,"last-first-aid",day);
+            t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(TownLife.Place.CLINIC)+1);
+            return new HomeAction(10,"Received basic pharmacy care.");
+        }
+        throw new IllegalArgumentException("This medical service is unavailable.");
+    }
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery,Cafe cafe,Medical medical){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
     static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
@@ -650,6 +688,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day),grocery(t,day,minute),cafe(t,day,minute));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute));
     }
 }

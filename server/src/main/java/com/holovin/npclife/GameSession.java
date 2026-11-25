@@ -337,6 +337,14 @@ public final class GameSession implements AutoCloseable {
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);
             }
+            if(action.equals("rebirth-medical-visit")){
+                int duration=RebirthLife.medicalVisit(copy,state.day,state.minute);
+                return applyInternal(copy,duration,"Went to the medical district.",true);
+            }
+            if(action.startsWith("rebirth-medical-")){
+                var service=RebirthLife.medicalAction(copy,state.day,state.minute,action.substring("rebirth-medical-".length()));
+                return applyInternal(copy,service.minutes(),service.message(),true);
+            }
             if(action.startsWith("rebirth-cafe-")){
                 var visit=RebirthLife.cafeAction(copy,state.day,state.minute,action.substring("rebirth-cafe-".length()));
                 return applyInternal(copy,visit.minutes(),visit.message(),true);

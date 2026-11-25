@@ -185,6 +185,45 @@ class GameSessionTest {
         }
     }
     @Test
+    void sickLinkedAdultCanVisitClinicAndReceiveBoundedCare() throws Exception {
+        Path file=directory.resolve("linked-medical.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();
+            c.age=30;c.money=40;c.health=70;c.fatigue=30;c.hunger=10;c.thirst=10;c.food=5;c.water=5;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=c.home;c.destination=c.home;c.activity="SICK_LEAVE";
+            c.sickUntilDay=4;c.employed=false;town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            state.day=2;state.minute=800;
+            assertFalse(EducationLife.availableRole(town,c,"Doctor"));
+            EducationLife.set(town,c,"academic",70);EducationLife.set(town,c,"social",40);
+            assertTrue(EducationLife.availableRole(town,c,"Doctor"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().rebirth().medical().canVisit());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-medical-consult"));
+            var arrival=game.gardenAction("rebirth-medical-visit").world();
+            assertEquals("CLINIC",arrival.player().placeId());
+            assertTrue(arrival.rebirth().medical().atClinic());
+            var consult=game.gardenAction("rebirth-medical-consult").world();
+            assertEquals(25,consult.player().money());
+            assertEquals(3,consult.rebirth().medical().sickUntilDay());
+            assertTrue(consult.player().health()>=80);
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-medical-consult"));
+            var aid=game.gardenAction("rebirth-medical-first-aid").world();
+            assertEquals(20,aid.player().money());
+            assertFalse(aid.rebirth().medical().canFirstAid());
+        }
+        try(var game=new GameSession(file)){
+            assertFalse(game.snapshot().rebirth().medical().canConsult());
+            assertFalse(game.snapshot().rebirth().medical().canFirstAid());
+            assertTrue(game.gardenAction("rebirth-home-go").world().rebirth().homeOptions().atHome());
+        }
+    }
+    @Test
     void linkedAdultHomeUsesRealSuppliesAndPrivateSpace() throws Exception {
         Path file=directory.resolve("linked-home.db");
         String id;

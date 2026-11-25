@@ -56,7 +56,7 @@ final class PopulationLife {
         if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
             RebirthLife.resumeRoutine(town);manual=null;
         }
-        if(sick)desired=c.home;
+        if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;
         else if(freightRun)desired=freightDestination;
         else if(sleeping)desired=c.home;

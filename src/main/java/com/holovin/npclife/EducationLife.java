@@ -6,7 +6,7 @@ final class EducationLife {
     private EducationLife(){}
     static final String LESSONS="education:lessons", GRADUATES="education:graduates", EXPERIENCE="education:experience", SCHOOL_SERVICE="school-services";
     static final List<String> SUBJECTS=List.of("technical","social","academic","commerce");
-    static final List<String> FIELDS=List.of("technical","social","academic","commerce","school-days","last-school","last-work","graduate","fitness","hobby-days","last-hobby","allowance-week","allowance-total","last-family-time","dirt","furniture-level","last-cafe-rest");
+    static final List<String> FIELDS=List.of("technical","social","academic","commerce","school-days","last-school","last-work","graduate","fitness","hobby-days","last-hobby","allowance-week","allowance-total","last-family-time","dirt","furniture-level","last-cafe-rest","last-consult","last-first-aid");
     static String key(TownLife.Citizen c,String f){return "education:"+c.id+":"+f;}
     static int get(TownLife.Town t,String k){return t.industryStocks.getOrDefault(k,0);}
     static void set(TownLife.Town t,String k,int n){t.industryStocks.put(k,n);}
@@ -20,7 +20,7 @@ final class EducationLife {
         return switch(job){
             case "Mechanic","Miner","Factory machinist","Transport driver","Independent fabricator","Company freight driver" -> "technical";
             case "Nurse","Barista" -> "social";
-            case "Teacher","Librarian" -> "academic";
+            case "Teacher","Librarian","Doctor" -> "academic";
             case "Market vendor","Private stall seller","Office clerk","Baker" -> "commerce";
             default -> "academic";
         };
@@ -69,8 +69,9 @@ final class EducationLife {
     }
     static boolean availableRole(TownLife.Town t,TownLife.Citizen c,String job){
         String f=subject(job);
-        int minimum=switch(job){case "Teacher","Nurse","Journalist" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
+        int minimum=switch(job){case "Doctor" -> 65;case "Teacher","Nurse","Journalist" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
         if(get(t,c,f)<minimum)return false;
+        if("Doctor".equals(job)&&(c.age<25||get(t,c,"social")<35))return false;
         if(NewspaperLife.OCCUPATION.equals(job)&&(t.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY*30||c.money<200))return false;
         String employer=IndustryLife.companyFor(job);
         if(employer!=null&&t.employerFunds.getOrDefault(employer,0)<IndustryLife.HOURLY_WAGE)return false;

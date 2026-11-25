@@ -50,6 +50,9 @@ const BAKERY_COUNTER := Vector3(-6.3,0,7.0)
 const CAFE_COUNTER := Vector3(-7.0,0,5.9)
 const CAFE_TABLE := Vector3(-7.0,0,9.0)
 var _cafe_menu := false
+var _medical_menu := false
+const CLINIC_COUNTER := Vector3(-6.3,0,7)
+const PHARMACY_COUNTER := Vector3(6.3,0,-7)
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
@@ -193,7 +196,9 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
-        if not _cafe_station().is_empty():
+        if not _medical_station().is_empty():
+            _hint.text="E: "+("Farmacia" if _medical_station()=="first-aid" else "Ambulatorio")+" · F: life choices"
+        elif not _cafe_station().is_empty():
             _hint.text="E: Bar Centrale · "+_cafe_station()+" · F: life choices"
         elif _near_grocery_counter():
             _hint.text="E: "+str(_last_snapshot["rebirth"]["grocery"].get("name","Shop"))+" · F: life choices"
@@ -264,6 +269,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_E and not _medical_station().is_empty() and not _action_panel.visible:
+                _medical_menu=true
+                _render_actions()
+                _action_panel.visible=true
+                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                get_viewport().set_input_as_handled()
             elif event.keycode == KEY_E and not _cafe_station().is_empty() and not _action_panel.visible:
                 _cafe_menu=true
                 _render_actions()
@@ -282,6 +293,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
             elif event.keycode == KEY_F:
                 _grocery_menu=false
                 _cafe_menu=false
+                _medical_menu=false
                 _render_actions()
                 _action_panel.visible = not _action_panel.visible
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
@@ -837,6 +849,9 @@ func _generate_chunk(place_id: String) -> void:
             _build_centro()
         "PARK":
             _build_park()
+        "CLINIC":
+            _build_medical_building(false)
+            _build_medical_building(true)
         "CAFE":
             _build_cafe()
         "BAKERY":
@@ -1911,6 +1926,53 @@ func _sync_orchard() -> void:
         var fruit := tree.get_node("Fruit") as Node3D
         fruit.visible = bool(data.get("ready",false))
 
+func _build_medical_building(pharmacy: bool) -> void:
+    var building := Node3D.new()
+    building.name="FarmaciaDelBorgo" if pharmacy else "AmbulatorioCivico"
+    _scenery.add_child(building)
+    var side := 1.0 if pharmacy else -1.0
+    var z := -7.0 if pharmacy else 7.0
+    var wall := Color("#d5d6c1") if pharmacy else Color("#e1d5bf")
+    var trim := Color("#557c68") if pharmacy else Color("#618699")
+    for part in [[Vector3(side*12,0,z),Vector2(0.24,7)],
+            [Vector3(side*8,0,z-3.5),Vector2(8,0.24)],
+            [Vector3(side*8,0,z+3.5),Vector2(8,0.24)],
+            [Vector3(side*4,0,z-2.3),Vector2(0.24,2.4)],
+            [Vector3(side*4,0,z+2.3),Vector2(0.24,2.4)]]:
+        _room_wall(building,part[0],part[1],wall)
+    _box(building,Vector3(8,0.08,7),Color("#c4c7bd"),Vector3(side*8,0.025,z))
+    _box(building,Vector3(8,3.1,7),wall,Vector3(side*8,4.55,z))
+    _box(building,Vector3(8.3,0.3,7.3),Color("#93664c"),Vector3(side*8,6.25,z))
+    _box(building,Vector3(0.24,0.48,2.2),trim,Vector3(side*4,2.76,z))
+    _sign(building,"Farmacia del Borgo" if pharmacy else "Ambulatorio civico",Vector3(side*3.4,3.4,z))
+    _box(building,Vector3(2.1,0.07,3.8),Color("#c4b9a5"),Vector3(side*2.95,0.045,z))
+    for offset in [-2.2,2.2]:
+        _box(building,Vector3(0.13,1.35,1.35),Color("#71929a"),Vector3(side*3.85,1.55,z+offset))
+    _box(building,Vector3(0.12,0.68,0.22),trim,Vector3(side*3.77,3.6,z+2.2))
+    _box(building,Vector3(0.12,0.22,0.68),trim,Vector3(side*3.77,3.6,z+2.2))
+    var counter := Node3D.new()
+    counter.name="ServiceCounter"
+    building.add_child(counter)
+    _room_furniture(counter,Vector3(side*8.1,0,z),Vector3(1.05,0.94,2.6),trim)
+    _box(counter,Vector3(1.15,0.10,2.7),Color("#ece9dd"),Vector3(side*8.1,0.99,z))
+    _sign(counter,"Assistenza · E" if pharmacy else "Visita · E",Vector3(side*7.25,2.0,z))
+    if pharmacy:
+        _room_furniture(building,Vector3(side*11.3,0,z),Vector3(0.65,2.0,4.8),Color("#deded0"))
+        for y in [0.7,1.25,1.8]:
+            for offset in [-1.6,-0.8,0.0,0.8,1.6]:
+                _box(building,Vector3(0.34,0.22,0.42),Color("#809e9e") if int(y*10)%2==0 else Color("#e1c78a"),Vector3(side*11.0,y,z+offset))
+    else:
+        _room_furniture(building,Vector3(side*11.0,0,z-1.7),Vector3(1.0,0.72,2.1),Color("#a7b9b8"))
+        _box(building,Vector3(0.92,0.15,2.0),Color("#f1eee4"),Vector3(side*11.0,0.79,z-1.7))
+        _room_furniture(building,Vector3(side*10.4,0,z+2.0),Vector3(1.5,0.78,0.8),Color("#927e69"))
+        for offset in [-2.1,2.1]:
+            _room_furniture(building,Vector3(side*5.7,0,z+offset),Vector3(0.5,0.45,0.55),trim)
+    var light := OmniLight3D.new()
+    light.position=Vector3(side*7.5,2.6,z)
+    light.light_energy=1.5
+    light.omni_range=7
+    building.add_child(light)
+
 func _build_cafe() -> void:
     var cafe := Node3D.new()
     cafe.name="BarCentrale"
@@ -2857,6 +2919,32 @@ func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
 
+func _medical_station() -> String:
+    var medical = _last_snapshot.get("rebirth",{}).get("medical")
+    if _apartment_active or _current_place!="CLINIC" or not medical is Dictionary or not medical.get("atClinic",false):
+        return ""
+    if _avatar.position.distance_to(CLINIC_COUNTER)<1.4:return "consult"
+    if _avatar.position.distance_to(PHARMACY_COUNTER)<1.4:return "first-aid"
+    return ""
+
+func _close_medical() -> void:
+    _medical_menu=false
+    _action_panel.visible=false
+    _render_actions()
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _render_medical() -> void:
+    var medical: Dictionary = _last_snapshot["rebirth"]["medical"]
+    var clinic := _medical_station()=="consult"
+    _action_title.text="Ambulatorio civico" if clinic else "Farmacia del Borgo"
+    var info := Label.new()
+    info.text="08:00–19:00 · Health %s/100 · %s" % [medical.get("health",100),"Ill" if medical.get("ill",false) else "Not ill"]
+    _action_choices.add_child(info)
+    var service := _button("Consultation · 15 EUR · 30 min" if clinic else "Basic pharmacy care · 5 EUR · 10 min",_garden_action.bind("rebirth-medical-"+_medical_station()))
+    service.disabled=not bool(medical.get("canConsult" if clinic else "canFirstAid",false))
+    _action_choices.add_child(service)
+    _action_choices.add_child(_button("Leave",_close_medical))
+
 func _cafe_station() -> String:
     if _apartment_active or _current_place!="CAFE" or str(_last_snapshot.get("rebirth",{}).get("phase",""))!="LINKED_ADULT" or not _last_snapshot.get("rebirth",{}).get("cafe") is Dictionary:
         return ""
@@ -2901,6 +2989,10 @@ func _close_grocery() -> void:
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _medical_menu and not _medical_station().is_empty():
+        _render_medical()
+        return
+    _medical_menu=false
     if _cafe_menu and not _cafe_station().is_empty():
         _render_cafe()
         return
@@ -3018,6 +3110,13 @@ func _render_actions() -> void:
                 for destination in options.get("destinations",[]):
                     if str(destination) != _current_place:
                         _action_choices.add_child(_button("Walk to "+str(destination).capitalize(),_garden_action.bind("rebirth-travel-"+str(destination))))
+            var medical = rebirth.get("medical")
+            if medical is Dictionary:
+                var health_label := Label.new()
+                health_label.text="Health %s/100 · %s" % [medical.get("health",100),"Ill until day "+str(medical.get("sickUntilDay",0)) if medical.get("ill",false) else "Not ill"]
+                _action_choices.add_child(health_label)
+                if medical.get("canVisit",false):
+                    _action_choices.add_child(_button("Visit medical district",_garden_action.bind("rebirth-medical-visit")))
             var home_options = rebirth.get("homeOptions")
             if home_options is Dictionary:
                 var home_label := Label.new()
@@ -3643,6 +3742,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
     if action.begins_with("rebirth-cafe-"):
         var station := _cafe_station()
         var table_action := action=="rebirth-cafe-rest" or action.begins_with("rebirth-cafe-chat-")
@@ -3829,6 +3929,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _medical_menu=false
         _cafe_menu=false
         _grocery_menu=false
         if _apartment_active:

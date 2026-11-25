@@ -989,6 +989,25 @@ func _exercise() -> void:
     if not _check(world._cafe_station()=="table" and _has_button(world._action_choices,"Rest at table") and _has_button(world._action_choices,"Talk with Marco"),"cafe table rest and actual guests"):
         return
     world._close_cafe()
+    var medical := _world("CLINIC","Clinic")
+    medical["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","medical":{"atClinic":true,"health":75,"ill":true,"canConsult":true,"canFirstAid":true}}
+    world._on_world_updated(medical)
+    if not _check(world._scenery.has_node("AmbulatorioCivico/ServiceCounter") and world._scenery.has_node("FarmaciaDelBorgo/ServiceCounter"),"clinic and pharmacy have distinct interiors"):
+        return
+    var clinic_walk: Vector3 = world._move_on_ground(Vector3(-2,0,7),Vector3(-4.3,0,0),world.WALKER_RADIUS)
+    var pharmacy_walk: Vector3 = world._move_on_ground(Vector3(2,0,-7),Vector3(4.3,0,0),world.WALKER_RADIUS)
+    if not _check(clinic_walk.x < -6 and pharmacy_walk.x > 6,"both medical entrances are walkable"):
+        return
+    world._avatar.position=clinic_walk
+    world._medical_menu=true
+    world._render_actions()
+    if not _check(world._medical_station()=="consult" and _has_button(world._action_choices,"Consultation · 15 EUR"),"clinic contextual menu"):
+        return
+    world._avatar.position=pharmacy_walk
+    world._render_actions()
+    if not _check(world._medical_station()=="first-aid" and _has_button(world._action_choices,"Basic pharmacy care · 5 EUR"),"pharmacy contextual menu"):
+        return
+    world._close_medical()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 
