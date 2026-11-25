@@ -81,7 +81,8 @@ class GameSessionTest {
     void freightCargoAndReservedPayPersistUntilActualDelivery() throws Exception {
         Path file=directory.resolve("freight.db");
         try(var game=new GameSession(file)) {
-            game.move("quarry");game.waitMinutes(60);game.applyJob("freight-driver");
+            // Seed the fixture after the scheduled 09:00 mining step, before 11:00 dispatch.
+            game.move("quarry");game.waitMinutes(90);game.applyJob("freight-driver");
             assertThrows(IllegalArgumentException.class,game::work);
         }
         try(var db=new WorldDatabase(file)) {
