@@ -44,6 +44,11 @@ const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 const TownVisuals = preload("res://scripts/TownVisuals.gd")
 var _sky_material: ProceduralSkyMaterial
 var _surface_textures: Dictionary = {}
+var _graphics_quality := 1
+var _leaf_mesh: SphereMesh
+var _leaf_materials: Array[StandardMaterial3D] = []
+var _foliage_season := ""
+var _graphics_details: Array[Node3D] = []
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
 const GameLanguage = preload("res://scripts/GameLanguage.gd")
 const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
@@ -838,9 +843,58 @@ func _follow_player() -> void:
         _camera.position = _avatar.position + Vector3(0.0,eye + _jump_height,0.0)
         _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
+func _set_graphics_quality(index: int) -> void:
+    _graphics_quality = clampi(index,0,3)
+    # Godot Compatibility supports these MSAA levels; no renderer restart needed.
+    match _graphics_quality:
+        0:
+            get_viewport().msaa_3d = Viewport.MSAA_DISABLED
+        1:
+            get_viewport().msaa_3d = Viewport.MSAA_2X
+        2:
+            get_viewport().msaa_3d = Viewport.MSAA_4X
+        3:
+            get_viewport().msaa_3d = Viewport.MSAA_8X
+    _sun.shadow_enabled = _graphics_quality > 0
+    _sun.directional_shadow_max_distance = [25.0,55.0,80.0,105.0][_graphics_quality]
+    for detail in _graphics_details:
+        if is_instance_valid(detail):
+            detail.visible = _graphics_quality > 0
+
+func _register_graphics_detail(detail: Node3D) -> void:
+    # Visual-only decoration never alters an obstacle or interaction.
+    _graphics_details.append(detail)
+    detail.visible = _graphics_quality > 0
+
+func _update_foliage(season: String, snowy: bool) -> void:
+    var key := season + str(snowy)
+    if key == _foliage_season:
+        return
+    _foliage_season = key
+    var color := Color("#537f3b")
+    match season:
+        "SPRING": color = Color("#659747")
+        "AUTUMN": color = Color("#b17a38")
+        "WINTER": color = Color("#66705a")
+    if snowy:
+        color = color.lerp(Color("#dce4df"),0.50)
+    for i in range(_leaf_materials.size()):
+        _leaf_materials[i].albedo_color = color.lightened(float(i)*0.07)
+
 func _build_world() -> void:
     _environment = Environment.new()
-    _surface_textures={"grass":TownVisuals.texture("grass"),"paving":TownVisuals.texture("paving"),"asphalt":TownVisuals.texture("asphalt")}
+    for kind in ["grass","paving","asphalt","stucco","terracotta","wood"]:
+        _surface_textures[kind] = TownVisuals.texture(kind)
+    _leaf_mesh = SphereMesh.new()
+    _leaf_mesh.radius = 1.0
+    _leaf_mesh.height = 2.0
+    _leaf_mesh.radial_segments = 12
+    _leaf_mesh.rings = 6
+    for i in range(4):
+        var leaf := StandardMaterial3D.new()
+        leaf.roughness = 1.0
+        _leaf_materials.append(leaf)
+    _update_foliage("SPRING",false)
     _sky_material=ProceduralSkyMaterial.new()
     var sky := Sky.new()
     sky.sky_material=_sky_material
@@ -860,6 +914,7 @@ func _build_world() -> void:
     _sun.directional_shadow_max_distance=65.0
     _sun.shadow_blur=1.2
     add_child(_sun)
+    _set_graphics_quality(_graphics_quality)
 
     _avatar = Node3D.new()
     _avatar.name = "OrdinaryVisitor"
@@ -938,6 +993,12 @@ func _render_place(place_id: String) -> void:
             remove_child(old_root)
             old_root.queue_free()
             _chunks.erase(id)
+    # Prune freed scenery references before new chunks are generated.
+    var retained: Array[Node3D] = []
+    for detail in _graphics_details:
+        if is_instance_valid(detail) and detail.is_inside_tree():
+            retained.append(detail)
+    _graphics_details = retained
     for id in wanted:
         if not _chunks.has(id):
             _generate_chunk(str(id))
@@ -1773,8 +1834,8 @@ func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: 
     var shutter := Color("#4c6255")
     var dark := Color("#394c52")
     _add_obstacle(at,Vector2(width,depth))
-    _box(building,Vector3(width,height,depth),wall,at+Vector3(0,height/2,0))
-    _box(building,Vector3(width+0.4,0.35,depth+0.4),Color("#8e503a"),at+Vector3(0,height+0.12,0))
+    _box(building,Vector3(width,height,depth),wall,at+Vector3(0,height/2,0),"stucco")
+    _box(building,Vector3(width+0.4,0.35,depth+0.4),Color("#8e503a"),at+Vector3(0,height+0.12,0),"terracotta")
     _box(building,Vector3(width+0.16,0.45,0.12),stone,Vector3(at.x,0.23,face+0.07))
     for level in range(floors):
         var y := 1.6+float(level)*3.1
@@ -2411,8 +2472,8 @@ func _portici_house(parent: Node3D,side: float,z: float,length: float,height: fl
     var center := side*9.2
     var trim := Color("#dfc9a5")
     _add_obstacle(Vector3(center,0,z),Vector2(9.6,length))
-    _box(parent,Vector3(9.6,height,length),wall,Vector3(center,height*0.5,z))
-    _box(parent,Vector3(9.85,0.32,length+0.2),Color("#744536"),Vector3(center,height+0.12,z))
+    _box(parent,Vector3(9.6,height,length),wall,Vector3(center,height*0.5,z),"stucco")
+    _box(parent,Vector3(9.85,0.32,length+0.2),Color("#91523c"),Vector3(center,height+0.12,z),"terracotta")
     _box(parent,Vector3(0.12,0.18,length),trim,Vector3(front-side*0.06,3.3,z))
     for offset in [-length/3.0,0.0,length/3.0]:
         for y in [4.5,6.5]:
@@ -2568,9 +2629,9 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
     var front := side*11.7
     var trim := Color(0.89,0.78,0.60)
     _add_obstacle(Vector3(back,0,z),Vector2(2.2,12.0))
-    _box(parent,Vector3(2.2,7.1,12),wall,Vector3(back,3.55,z))
-    _box(parent,Vector3(5.2,3.9,12),wall,Vector3(side*14,5.15,z))
-    _box(parent,Vector3(5.5,0.32,12.2),Color(0.48,0.26,0.20),Vector3(side*14,7.25,z))
+    _box(parent,Vector3(2.2,7.1,12),wall,Vector3(back,3.55,z),"stucco")
+    _box(parent,Vector3(5.2,3.9,12),wall,Vector3(side*14,5.15,z),"stucco")
+    _box(parent,Vector3(5.5,0.32,12.2),Color("#95503a"),Vector3(side*14,7.25,z),"terracotta")
     _box(parent,Vector3(5.7,0.14,12.3),trim,Vector3(side*14,7.03,z))
     _box(parent,Vector3(5.2,0.16,12),trim,Vector3(side*14,3.25,z))
     _box(parent,Vector3(0.16,0.16,12),trim,Vector3(side*11.35,5.35,z))
@@ -2578,6 +2639,8 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
         var at := Vector3(front,0,z+offset)
         _add_obstacle(at,Vector2(0.55,0.55))
         _box(parent,Vector3(0.55,1.95,0.55),trim,at+Vector3(0,0.975,0))
+        _box(parent,Vector3(0.70,0.15,0.70),trim.darkened(0.12),at+Vector3(0,0.075,0))
+        _box(parent,Vector3(0.71,0.17,0.71),trim,at+Vector3(0,1.88,0))
     for offset in [-4.0,0.0,4.0]:
         # Segmented semicircular stone arches; the open space below is walkable.
         for i in range(9):
@@ -2590,10 +2653,12 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
         for y in [4.4,6.15]:
             var face := side*11.36
             _box(parent,Vector3(0.08,1.1,0.85),Color(0.19,0.28,0.30),Vector3(face,y,z+offset))
+            _box(parent,Vector3(0.09,1.08,0.055),trim,Vector3(face-side*0.035,y,z+offset))
+            _box(parent,Vector3(0.09,0.05,0.83),trim,Vector3(face-side*0.035,y,z+offset))
             var shutters := Color("#415943") if variant%2 == 0 else Color("#64513f")
             _box(parent,Vector3(0.15,0.12,1.6),trim,Vector3(face-side*0.06,y-0.61,z+offset))
             for shutter in [-0.64,0.64]:
-                _box(parent,Vector3(0.13,1.18,0.35),shutters,Vector3(face-side*0.06,y,z+offset+shutter))
+                _box(parent,Vector3(0.13,1.18,0.35),shutters,Vector3(face-side*0.06,y,z+offset+shutter),"wood")
             if y < 5.0 and (variant == 1 or variant == 3) and offset == 0.0:
                 _centro_balcony(parent,side,face,y,z+offset)
             elif y > 5.0 and variant%2 == 0:
@@ -2657,15 +2722,22 @@ func _build_park() -> void:
         _box(park, Vector3(1.5,0.02,0.11), Color(0.92,0.85,0.61), Vector3(x,0.07,-16))
     for x in [-14.0,-8.0,8.0,14.0]:
         _add_obstacle(Vector3(x,0,-19), Vector2(4.7,2.5))
-        _box(park, Vector3(4.7,4.0,2.5), Color(0.69,0.59,0.47), Vector3(x,2,-19))
+        _box(park, Vector3(4.7,4.0,2.5), Color(0.76,0.64,0.49), Vector3(x,2,-19),"stucco")
+        _box(park,Vector3(5.0,0.22,2.8),Color("#95533e"),Vector3(x,4.07,-19),"terracotta")
+        _box(park,Vector3(4.85,0.12,0.18),Color("#e0c6a0"),Vector3(x,2.05,-17.68))
+        _box(park,Vector3(1.05,1.85,0.12),Color("#71513b"),Vector3(x,0.925,-17.68),"wood")
         for offset in [-1.2,1.2]:
-            _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.7))
+            _box(park,Vector3(0.98,1.28,0.10),Color("#ddc7a6"),Vector3(x+offset,2.8,-17.70))
+            _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.62))
+            _box(park,Vector3(0.055,1.08,0.08),Color("#e0c6a0"),Vector3(x+offset,2.8,-17.56))
 
 func _bench(parent: Node3D, at: Vector3) -> void:
     _add_obstacle(at, Vector2(2.0, 0.66))
     var wood := Color(0.43,0.27,0.14)
-    _box(parent, Vector3(2.0,0.12,0.58), wood, at + Vector3(0,0.52,0))
-    _box(parent, Vector3(2.0,0.42,0.10), wood, at + Vector3(0,0.85,0.25))
+    for z in [-0.20,0.0,0.20]:
+        _box(parent,Vector3(2.0,0.09,0.17),wood,at+Vector3(0,0.52,z),"wood")
+    for y in [0.70,0.86,1.02]:
+        _box(parent,Vector3(2.0,0.13,0.09),wood,at+Vector3(0,y,0.25),"wood")
     for x in [-0.75,0.75]:
         _box(parent, Vector3(0.11,0.50,0.47), Color(0.20,0.23,0.24), at+Vector3(x,0.25,0))
 
@@ -2967,27 +3039,33 @@ func _create_gate_and_kiosk() -> void:
 
 func _tree(at: Vector3) -> void:
     _add_obstacle(at, Vector2(0.45, 0.45))
-    _box(_scenery, Vector3(0.45, 1.8, 0.45), Color(0.33, 0.19, 0.11),
-            at + Vector3(0.0, 0.9, 0.0))
+    var seed := absi(roundi(at.x*43.0+at.z*79.0))
+    var rng := RandomNumberGenerator.new()
+    rng.seed = seed
+    var trunk_height := rng.randf_range(2.0,2.6)
+    var trunk := _cylinder(_scenery,0.22,trunk_height,Color("#70513b"),at+Vector3(0,trunk_height*0.5,0))
+    TownVisuals.surface(trunk.material_override as StandardMaterial3D,_surface_textures["wood"],0.75)
     var crown := Node3D.new()
     crown.name="TreeCrown"
-    crown.position=at
+    crown.position=at+Vector3(0,trunk_height+0.55,0)
     _scenery.add_child(crown)
-    var leaves := Color("#476f39")
-    for offset in [Vector3(-0.55,2.5,0),Vector3(0.55,2.6,0.2),Vector3(0,3.25,-0.1),Vector3(0,2.55,-0.65)]:
-        var mesh := SphereMesh.new()
-        mesh.radius=0.88
-        mesh.height=1.65
-        mesh.radial_segments=10
-        mesh.rings=5
+    for i in range(8):
+        var angle := float(i)*TAU/8.0
         var foliage := MeshInstance3D.new()
-        foliage.mesh=mesh
-        var mat := StandardMaterial3D.new()
-        mat.albedo_color=leaves.lightened(0.06*float(crown.get_child_count()))
-        mat.roughness=1.0
-        foliage.material_override=mat
-        foliage.position=offset
+        foliage.mesh = _leaf_mesh
+        foliage.material_override = _leaf_materials[i%4]
+        var spread := rng.randf_range(0.55,0.95)
+        foliage.position = Vector3(cos(angle)*spread,rng.randf_range(-0.1,0.5),sin(angle)*spread)
+        foliage.scale = Vector3(rng.randf_range(0.77,1.12),rng.randf_range(0.88,1.35),rng.randf_range(0.77,1.12))
         crown.add_child(foliage)
+        if i%2 == 1:
+            _register_graphics_detail(foliage)
+    var top := MeshInstance3D.new()
+    top.mesh = _leaf_mesh
+    top.material_override = _leaf_materials[2]
+    top.position = Vector3(0,1.0,0)
+    top.scale = Vector3(1.08,1.14,1.08)
+    crown.add_child(top)
 
 func _box(parent: Node3D, size: Vector3, color: Color,
         where: Vector3, surface: String = "") -> void:
@@ -3133,6 +3211,17 @@ func _create_interface() -> void:
     audio_toggle.button_pressed = true
     audio_toggle.toggled.connect(_set_weather_audio)
     atmosphere_row.add_child(audio_toggle)
+    var graphics_row := HBoxContainer.new()
+    column.add_child(graphics_row)
+    var graphics_label := Label.new()
+    graphics_label.text = "Graphics quality"
+    graphics_row.add_child(graphics_label)
+    var quality := OptionButton.new()
+    for caption in ["Low","Medium","High","Ultra"]:
+        quality.add_item(caption)
+    quality.select(_graphics_quality)
+    quality.item_selected.connect(_set_graphics_quality)
+    graphics_row.add_child(quality)
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _hint.text = tr("WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.")
@@ -5098,6 +5187,7 @@ func _apply_weather() -> void:
     if _ground_material == null:
         return
     var climate: Dictionary = _last_snapshot.get("weather", {})
+    _update_foliage(str(_last_snapshot.get("season","SPRING")),bool(climate.get("snowing",false)))
     if climate.get("snowing", false):
         _ground_material.albedo_color = Color(0.80, 0.86, 0.88)
         _environment.background_color = Color(0.72, 0.76, 0.83)
@@ -5117,9 +5207,9 @@ func _apply_weather() -> void:
     var daylight := sin(day_progress * PI)
     _sun.rotation_degrees = Vector3(-8.0-65.0*daylight,
             -90.0+180.0*day_progress,0.0)
-    _sun.light_energy = lerpf(0.08,1.18,daylight)
+    _sun.light_energy = lerpf(0.08,1.27,daylight)
     _sun.light_color=Color("#f1bd83").lerp(Color("#fff5df"),smoothstep(0.0,0.65,daylight))
-    _environment.ambient_light_energy = lerpf(0.28,0.72,daylight)
+    _environment.ambient_light_energy = lerpf(0.30,0.66,daylight)
     _environment.background_color = Color(0.07,0.10,0.18).lerp(
             _environment.background_color, smoothstep(0.0,0.35,daylight))
     if climate.get("sky","CLEAR") != "CLEAR":
