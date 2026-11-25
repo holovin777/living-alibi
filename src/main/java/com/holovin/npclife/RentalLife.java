@@ -22,7 +22,7 @@ final class RentalLife {
         return t.people.values().stream().filter(c->c.generationIndex==index).findFirst().orElse(null);
     }
     static boolean housed(TownLife.Town t,TownLife.Citizen c,int day){
-        return c.generationIndex>0&&c.generationIndex==get(t,TENANT)&&day<=get(t,UNTIL)&&UNIT.equals(c.homeUnit);
+        return c.generationIndex>0&&c.generationIndex==get(t,TENANT)&&day<get(t,UNTIL)&&UNIT.equals(c.homeUnit);
     }
     static void moveHome(TownLife.Town t,TownLife.Citizen c,TownLife.Place district,String unit){
         String old=c.homeUnit;
@@ -50,7 +50,7 @@ final class RentalLife {
         return c.alive&&c.generationIndex>0&&c.money>=RENT+LIVING_RESERVE&&c.unpaidBills<100;
     }
     static void tick(TownLife.Town t,int day,int minute){
-        if(minute!=1080||get(t,LAST)>=day)return;
+        if(minute!=360||get(t,LAST)>=day)return;
         set(t,LAST,day);
         var current=tenant(t);
         if(get(t,TENANT)>0){
