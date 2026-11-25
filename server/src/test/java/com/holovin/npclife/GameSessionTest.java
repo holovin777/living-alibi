@@ -13,6 +13,42 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void wardrobePurchasesWearAndComfortSurviveReload() throws Exception {
+        Path file=directory.resolve("wardrobe.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=100;c.place=TownLife.Place.PORTICI;c.activity="FREE_TIME";c.travelRemaining=0;
+            town.player.alive=false;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            int shop=town.employerFunds.getOrDefault("shop-assistant",0);
+            assertThrows(IllegalArgumentException.class,()->WardrobeLife.act(town,"buy-winter",1,400));
+            WardrobeLife.act(town,"buy-winter",1,600);
+            assertEquals(55,c.money);
+            assertEquals(shop+45,town.employerFunds.get("shop-assistant"));
+            assertThrows(IllegalArgumentException.class,()->WardrobeLife.act(town,"wear-winter",1,600));
+            assertEquals(40,WardrobeLife.comfort(town,c,0));
+            c.place=c.home;c.activity="AT_HOME";
+            WardrobeLife.act(town,"wear-winter",1,600);
+            assertEquals(100,WardrobeLife.comfort(town,c,0));
+            assertEquals(10,WardrobeLife.comfort(town,c,30));
+            state.day=2;state.minute=360;
+            WardrobeLife.tick(town,state);WardrobeLife.tick(town,state);
+            assertEquals(99,WardrobeLife.condition(town,c,WardrobeLife.worn(town,c)));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var c=town.get(id);
+            assertEquals("winter",WardrobeLife.worn(town,c).id());
+            assertEquals(99,WardrobeLife.condition(town,c,WardrobeLife.worn(town,c)));
+            assertEquals(55,c.money);
+        }
+    }
+
+    @Test
     void domesticAppliancesConsumeRealSuppliesAndPersist() throws Exception {
         Path file=directory.resolve("domestic-appliances.db");
         String id;
