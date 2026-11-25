@@ -16,6 +16,28 @@ func _exercise() -> void:
     root.add_child(world)
     await process_frame
 
+    # The initial presentation is eye-level first person; V can show the
+    # placeholder avatar without moving the authoritative player in Java.
+    if not _check(world._first_person and not world._avatar.visible
+            and world._camera.position.is_equal_approx(
+                    world._avatar.position + Vector3(0.0, world.EYE_HEIGHT, 0.0)),
+            "visitor starts in first-person at eye height"):
+        return
+    world._toggle_view_mode()
+    if not _check(not world._first_person and world._avatar.visible
+            and world._camera.position.distance_to(world._avatar.position) > 5.0,
+            "third-person toggle shows the local avatar"):
+        return
+    world._toggle_view_mode()
+    world._view_yaw = PI / 2.0
+    world._follow_player()
+    if not _check(world._first_person and not world._avatar.visible
+            and is_equal_approx(world._camera.rotation.y, world._view_yaw),
+            "returning to first-person retains mouse-look orientation"):
+        return
+    world._view_yaw = 0.0
+    world._follow_player()
+
     world._on_world_updated(_world("PARK", "Park"))
     if not _check(world._current_place == "PARK",
             "first scene is the park"):
