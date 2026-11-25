@@ -161,7 +161,8 @@ public final class Main {
                                 (status.registered()?"REGISTERED":"NOT YET OPEN"));
                         System.out.println("Owner: visitor #"+status.ownerIncarnation()+
                                 " | yours: "+status.yours()+" | company cash EUR "+
-                                status.cash()+" | machine: "+status.machine());
+                                status.cash()+" | machine: "+status.machine()+
+                                " | condition: "+status.machineCondition()+"/100");
                         System.out.println("Worker: "+status.employeeName()+
                                 " | spare parts: "+status.spareParts()+
                                 " | paid hours today: "+status.paidHoursToday());
@@ -194,6 +195,14 @@ public final class Main {
                         var candidate=town.copy();
                         String result=BusinessLife.machine(candidate);
                         advanceAndSave(db,state,candidate,30);
+                        town.copyFrom(candidate);
+                        System.out.println(result);
+                        continue;
+                    }
+                    if(lower.equals("business service")) {
+                        var candidate=town.copy();
+                        String result=BusinessLife.service(candidate);
+                        advanceAndSave(db,state,candidate,BusinessLife.SERVICE_MINUTES);
                         town.copyFrom(candidate);
                         System.out.println(result);
                         continue;
@@ -949,6 +958,7 @@ public final class Main {
         System.out.println(" business | business candidates — manage your local fabrication company");
         System.out.println(" business open | business invest <EUR> | business machine");
         System.out.println(" business hire <resident-id> | business withdraw <EUR>");
+        System.out.println(" business service — repair worn machine using 2 finite spare parts");
         System.out.println(" prospect — employed quarry miner can fund a two-hour geological survey");
         System.out.println(" work-orders | diagnose <order-id> | repair <order-id> — city infrastructure tasks");
         System.out.println(" technicians and engineers must finish a technical task before paid work");
