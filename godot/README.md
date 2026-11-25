@@ -226,7 +226,22 @@ a coarse attitude: stranger, acquaintance, familiar, friendly or wary.
 Greetings, introductions and apologies can improve attitude once per
 game day; explicitly dismissing a resident or changing a previously
 disclosed alias can reduce it. Responses use deterministic Java rules.
-There is no global reputation, gossip propagation or romance yet.
+There is no global reputation score or romance yet.
+
+## Visitor news and rumors
+
+An ordinary introduction stays private to the resident. Use **Allow
+sharing my name** after introducing yourself to create an explicitly
+shareable report of that meeting, not proof of the visitor's identity.
+Existing NPC social encounters can relay the report between co-present,
+awake residents with sufficient trust and sociability. Reports retain
+their source, confidence and hop count, and stop spreading after three
+hops or fourteen game days. The existing knowledge tables persist them.
+**Ask for visitor news** reads the resident's own recent report and
+distinguishes first-hand recollection from hearsay. Hearing a name does
+not automatically identify the player or create a personal contact.
+No private name, arbitrary chat transcript or global reputation score
+is propagated. This is a first narrow topic, not general gossip.
 
 ## Boundaries
 

@@ -292,6 +292,9 @@ final class PlayerLife {
             changedAlias=contact.knownName!=null && !contact.knownName.equalsIgnoreCase(disclosed);
             contact.knownName=disclosed;
         }
+        boolean permission=spoken.equalsIgnoreCase("You can tell people my name.");
+        if(permission && contact.knownName==null)
+            throw new IllegalArgumentException("Introduce yourself before sharing your name.");
         boolean rude=spoken.equalsIgnoreCase("Leave me alone!");
         boolean apology=spoken.equalsIgnoreCase("I'm sorry.");
         boolean positive=introduction || spoken.equalsIgnoreCase("Hello") || apology
@@ -305,6 +308,12 @@ final class PlayerLife {
         contact.conversations++;
         contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=spoken;
         String greeting=contact.knownName==null?"stranger":contact.knownName;
+        if(permission) {
+            KnowledgeLife.shareableIntroduction(town,resident,contact.knownName,day,minute);
+            return "All right. I may mention that we met.";
+        }
+        if(spoken.equalsIgnoreCase("Any news about visitors?"))
+            return KnowledgeLife.visitorNews(town,resident,day,minute);
         if(changedAlias)return "I remember a different name. I'll remember "+greeting+" for now.";
         if(rude)return "All right. I'll give you some space.";
         if(apology)return contact.trust<30?"I need a little time.":"Thank you for saying that.";

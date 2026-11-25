@@ -48,6 +48,54 @@ class GameSessionTest {
     }
 
     @Test
+    void publicVisitorNewsUsesActualSocialEncountersAndPersists() throws Exception {
+        Path file=directory.resolve("visitor-news.db");
+        try(var game=new GameSession(file)) { }
+        String key;
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            var speaker=town.get("marco");
+            var listener=town.get("elena");
+            speaker.place=TownLife.Place.PARK;
+            listener.place=TownLife.Place.CAFE;
+            speaker.activity=listener.activity="FREE_TIME";
+            speaker.travelRemaining=listener.travelRemaining=0;
+            speaker.sociability=80;
+            town.relationship.trust=70;
+            PlayerLife.setPrivateName(town.player,"Private identity");
+            PlayerLife.speak(town,speaker.id,"My name is Alex.",state.day,state.minute);
+            assertFalse(town.beliefs.getOrDefault(speaker.id,new java.util.LinkedHashMap<>())
+                    .values().stream().anyMatch(b->b.actorId().startsWith("visitor-")));
+            PlayerLife.speak(town,speaker.id,"You can tell people my name.",state.day,state.minute);
+            var claim=town.beliefs.get(speaker.id).values().stream()
+                    .filter(b->b.actorId().startsWith("visitor-")).findFirst().orElseThrow();
+            key=claim.eventKey();
+            assertFalse(claim.statement().contains("Private identity"));
+            assertTrue(claim.statement().contains("Alex"));
+            KnowledgeLife.exchange(town,state,speaker.id,listener.id);
+            assertFalse(town.beliefs.getOrDefault(listener.id,new java.util.LinkedHashMap<>()).containsKey(key));
+            listener.place=TownLife.Place.PARK;
+            KnowledgeLife.exchange(town,state,speaker.id,listener.id);
+            var heard=town.beliefs.get(listener.id).get(key);
+            assertEquals("HEARD",heard.origin());
+            assertEquals(speaker.id,heard.learnedFrom());
+            assertEquals(1,heard.hops());
+            assertTrue(heard.confidence()<claim.confidence());
+            assertFalse(town.player.contacts.containsKey(listener.id));
+            assertTrue(KnowledgeLife.visitorNews(town,listener,state.day,state.minute).contains("Alex"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            assertEquals("HEARD",town.beliefs.get("elena").get(key).origin());
+            assertTrue(KnowledgeLife.visitorNews(town,town.get("elena"),state.day,state.minute).contains("can't verify"));
+        }
+    }
+
+    @Test
     void socialAttitudeIsPersonalAndCannotBeFarmedInOneDay() throws Exception {
         Path file=directory.resolve("attitude.db");
         try(var game=new GameSession(file)) { }

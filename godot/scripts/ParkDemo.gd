@@ -810,6 +810,8 @@ func _create_interface() -> void:
     dialog_col.add_child(_dialog_reply)
     dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
     dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
+    dialog_col.add_child(_button("Allow sharing my name",_send_dialog.bind("You can tell people my name.")))
+    dialog_col.add_child(_button("Ask for visitor news",_send_dialog.bind("Any news about visitors?")))
     dialog_col.add_child(_button("Apologize",_send_dialog.bind("I'm sorry.")))
     dialog_col.add_child(_button("Leave me alone!",_send_dialog.bind("Leave me alone!")))
     _dialog_input = LineEdit.new()
