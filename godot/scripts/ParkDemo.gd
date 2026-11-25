@@ -561,7 +561,7 @@ func _render_residents() -> void:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("display_name",str(resident.get("name","Resident")))
-        person.set_meta("known_name",resident.get("knownName"))
+        person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
         person.set_meta("conversations",int(resident.get("conversations",0)))
     for child in _residents_root.get_children():
         if not present.has(str(child.get_meta("resident_id", ""))):
@@ -870,8 +870,8 @@ func _open_dialog() -> void:
     _action_panel.visible = false
     _map_panel.visible = false
     _dialog_title.text = str(person.get_meta("display_name","Resident"))
-    var known = person.get_meta("known_name")
-    _dialog_reply.text = "They know you as "+str(known) if known != null else (
+    var known := str(person.get_meta("known_name",""))
+    _dialog_reply.text = "They know you as "+known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     _dialog_input.clear()
     _dialog_panel.visible = true
