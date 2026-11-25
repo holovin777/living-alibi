@@ -339,18 +339,29 @@ class GameSessionTest {
             var onboarding=game.gardenAction("rebirth-java-onboard").world();
             assertTrue(onboarding.rebirth().javaWorkspace().onboarded());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-java-onboard"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-git:merge:water-control"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-java-submit:water-control:return Math.min(requested, Math.min(stock, freeCapacity));"));
+            game.gardenAction("rebirth-git:branch:water-control");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-git:branch:water-control"));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-java-submit:water-control:return requested;"));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-java-submit:water-control:return Runtime.getRuntime().availableProcessors();"));
             var developed=game.gardenAction("rebirth-java-submit:water-control:return Math.min(requested, Math.min(stock, freeCapacity));").world();
-            assertEquals(875,developed.minute());
+            assertEquals(880,developed.minute());
             assertEquals("DEVELOPED",developed.rebirth().softwareProjects().getFirst().phase());
             assertEquals(30,developed.player().money());
         }
         try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-software-water-control"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-git:pr:water-control"));
+            game.gardenAction("rebirth-git:commit:water-control");
+            game.gardenAction("rebirth-git:pr:water-control");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-git:merge:water-control"));
             var tested=game.gardenAction("rebirth-software-water-control").world();
             assertEquals("TESTED",tested.rebirth().softwareProjects().getFirst().phase());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-software-water-control"));
+            game.gardenAction("rebirth-git:merge:water-control");
             var deployed=game.gardenAction("rebirth-software-water-control").world();
-            assertEquals(965,deployed.minute());
+            assertEquals(990,deployed.minute());
             assertEquals(75,deployed.player().money());
             assertTrue(deployed.rebirth().softwareProjects().getFirst().deployed());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-software-water-control"));
@@ -358,6 +369,7 @@ class GameSessionTest {
         try(var db=new WorldDatabase(file)){
             var state=db.load();var town=db.loadTown(state);
             assertTrue(SoftwareLife.deployed(town,"water-control"));
+            assertEquals(4,SoftwareLife.gitStage(town,"water-control"));
             assertEquals(budget-45,town.employerFunds.get("city-maintenance").intValue());
             assertEquals(75,town.get(id).money);
             town.technicalOrders.get("water-pump").condition=100;

@@ -1052,6 +1052,15 @@ func _exercise() -> void:
     if not _check(_has_button(world._action_choices,"Run tests and submit") and world._action_choices.has_node("Java_water-control"),"Java ticket editor and test submission"):
         return
     world._close_software()
+    office["rebirth"]["softwareProjects"][0]["command"]="branch"
+    office["rebirth"]["softwareProjects"][0]["nextAction"]="Create branch"
+    office["rebirth"]["softwareProjects"][0]["minutes"]=5
+    world._on_world_updated(office)
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Create branch") and not world._action_choices.has_node("Java_water-control"),"Git branch precedes code editor"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

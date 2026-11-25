@@ -26,7 +26,8 @@ final class JavaTicketLife {
         +"A product owner describes a business need in a ticket. Read the acceptance criteria, write the return statement, run tests, then review and deploy. "
         +"Use integer variables, literals, +, -, *, /, %, parentheses and Math.min/Math.max. "
         +"Example: return Math.max(0, value);. The server checks a bounded expression, not arbitrary Java. "
-        +"Successful development, review and deployment advance game time; only a delivered contract pays.";
+        +"Git keeps changes isolated in a feature branch. Commit records changes; a pull request invites review; CI checks the change; merge updates main. Deployment releases it to users. "
+        +"This is an in-game Git workflow, not a connection to a real repository. Only a delivered contract pays.";
     record Workspace(String company,String intro,boolean onboarded,boolean canOnboard,List<Ticket> tickets){}
     static Workspace workspace(TownLife.Town t,int day,int minute){
         var c=RebirthLife.child(t);

@@ -3018,7 +3018,13 @@ func _render_software() -> void:
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         info.text="%s · %s\n%s · Contract %s EUR" % [project.get("title",""),project.get("phase",""),project.get("effect",""),project.get("wage",0)]
         _action_choices.add_child(info)
-        if str(project.get("phase",""))=="OPEN" and workspace is Dictionary:
+        var command := str(project.get("command","code" if str(project.get("phase",""))=="OPEN" else ""))
+        if project.has("explanation"):
+            var guide := Label.new()
+            guide.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            guide.text=str(project.get("explanation",""))
+            _action_choices.add_child(guide)
+        if command=="code" and workspace is Dictionary:
             for ticket in workspace.get("tickets",[]):
                 if str(ticket.get("id",""))!=str(project.get("id","")):continue
                 var spec := Label.new()
@@ -3036,7 +3042,8 @@ func _render_software() -> void:
                 submit.disabled=not bool(project.get("canAdvance",false))
                 _action_choices.add_child(submit)
         elif not project.get("deployed",false):
-            var advance := _button("%s · %s min" % [project.get("nextAction",""),project.get("minutes",0)],_garden_action.bind("rebirth-software-"+str(project.get("id",""))))
+            var request := "rebirth-git:"+command+":"+str(project.get("id","")) if command in ["branch","commit","pr","merge"] else "rebirth-software-"+str(project.get("id",""))
+            var advance := _button("%s · %s min" % [project.get("nextAction",""),project.get("minutes",0)],_garden_action.bind(request))
             advance.disabled=not bool(project.get("canAdvance",false))
             _action_choices.add_child(advance)
     _action_choices.add_child(_button("Leave",_close_software))
@@ -3946,7 +3953,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-")) and not _near_software():return
+    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:")) and not _near_software():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
