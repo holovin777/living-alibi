@@ -31,6 +31,17 @@ final class SoftwareLife {
         }).toList();
     }
     static RebirthLife.HomeAction advance(TownLife.Town t,int day,int minute,String id){
+        if(phase(t,id)==0)throw new IllegalArgumentException("Submit a tested Java solution for this ticket first.");
+        return progress(t,day,minute,id);
+    }
+    static RebirthLife.HomeAction submit(TownLife.Town t,int day,int minute,String id,String code){
+        var c=RebirthLife.requireAdult(t);
+        if(EducationLife.get(t,c,"java-onboarded")==0)throw new IllegalArgumentException("Complete the company onboarding first.");
+        if(phase(t,id)!=0)throw new IllegalArgumentException("Ticket is not awaiting code.");
+        JavaTicketLife.verify(id,code);
+        return progress(t,day,minute,id);
+    }
+    private static RebirthLife.HomeAction progress(TownLife.Town t,int day,int minute,String id){
         var c=RebirthLife.requireAdult(t);
         var view=projects(t,day,minute).stream().filter(v->v.id().equals(id)&&v.canAdvance()).findFirst()
                 .orElseThrow(()->new IllegalArgumentException("Software work unavailable: check qualification, location, hours and client funds."));

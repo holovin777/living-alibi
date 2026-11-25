@@ -32,7 +32,7 @@ final class UtilityLife {
         if(!status(town).fountainWorking() || amount<=0)return 0;
         var source=town.naturalResources.get("river-water");
         if(source==null)return 0;
-        int taken=Math.min(amount,Math.min(source.stock,TANK_CAPACITY-town.cleanWater));
+        int taken=JavaTicketLife.waterUnits(amount,source.stock,TANK_CAPACITY-town.cleanWater);
         if(taken<1)return 0;
         source.stock-=taken;
         town.cleanWater+=taken;

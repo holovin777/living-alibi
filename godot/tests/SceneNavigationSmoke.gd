@@ -1038,6 +1038,20 @@ func _exercise() -> void:
     if not _check(world._near_software() and _has_button(world._action_choices,"Develop · 60 min"),"software project menu"):
         return
     world._close_software()
+    office["rebirth"]["javaWorkspace"]={"intro":"Welcome to the Java team.","onboarded":false,"canOnboard":true,"tickets":[{"id":"water-control","number":"BD-101","requirement":"Respect available stock and free capacity","signature":"int waterUnits(int requested, int stock, int freeCapacity)","examples":"(6,2,9) -> 2"}]}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Complete onboarding"),"java team onboarding"):
+        return
+    office["rebirth"]["javaWorkspace"]["onboarded"]=true
+    world._on_world_updated(office)
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Run tests and submit") and world._action_choices.has_node("Java_water-control"),"Java ticket editor and test submission"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

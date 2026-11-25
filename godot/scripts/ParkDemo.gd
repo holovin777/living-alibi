@@ -3000,17 +3000,50 @@ func _close_software() -> void:
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _render_software() -> void:
-    _action_title.text="Software projects"
+    _action_title.text="Borgo Digital · Java team"
+    var workspace = _last_snapshot.get("rebirth",{}).get("javaWorkspace")
+    if workspace is Dictionary:
+        var intro := Label.new()
+        intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        intro.text=str(workspace.get("intro",""))
+        _action_choices.add_child(intro)
+        if not workspace.get("onboarded",false):
+            var start := _button("Complete onboarding · 15 min",_garden_action.bind("rebirth-java-onboard"))
+            start.disabled=not bool(workspace.get("canOnboard",false))
+            _action_choices.add_child(start)
+            _action_choices.add_child(_button("Leave",_close_software))
+            return
     for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
         var info := Label.new()
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         info.text="%s · %s\n%s · Contract %s EUR" % [project.get("title",""),project.get("phase",""),project.get("effect",""),project.get("wage",0)]
         _action_choices.add_child(info)
-        if not project.get("deployed",false):
+        if str(project.get("phase",""))=="OPEN" and workspace is Dictionary:
+            for ticket in workspace.get("tickets",[]):
+                if str(ticket.get("id",""))!=str(project.get("id","")):continue
+                var spec := Label.new()
+                spec.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                spec.text="%s\n%s\n%s\n%s" % [ticket.get("number",""),ticket.get("requirement",""),ticket.get("signature",""),ticket.get("examples","")]
+                _action_choices.add_child(spec)
+                var editor := LineEdit.new()
+                editor.name="Java_"+str(ticket.get("id",""))
+                editor.placeholder_text="return ...;"
+                editor.text="return 0;"
+                editor.max_length=180
+                editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+                _action_choices.add_child(editor)
+                var submit := _button("Run tests and submit · 60 min",_submit_java.bind(str(ticket.get("id","")),editor))
+                submit.disabled=not bool(project.get("canAdvance",false))
+                _action_choices.add_child(submit)
+        elif not project.get("deployed",false):
             var advance := _button("%s · %s min" % [project.get("nextAction",""),project.get("minutes",0)],_garden_action.bind("rebirth-software-"+str(project.get("id",""))))
             advance.disabled=not bool(project.get("canAdvance",false))
             _action_choices.add_child(advance)
     _action_choices.add_child(_button("Leave",_close_software))
+
+func _submit_java(ticket: String,editor: LineEdit) -> void:
+    if is_instance_valid(editor):
+        _garden_action("rebirth-java-submit:"+ticket+":"+editor.text)
 
 func _near_engineering() -> bool:
     if _apartment_active or not _near_kiosk():return false
@@ -3913,7 +3946,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if action.begins_with("rebirth-software-") and not _near_software():return
+    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-")) and not _near_software():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
