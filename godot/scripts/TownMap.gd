@@ -15,6 +15,7 @@ const DISTRICTS := {
 const LABELS := {
     "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes", "CENTRO": "Centro storico", "PORTICI": "Via dei Portici", "FARM": "Cascina"
 }
+const MOTOR_DISTRICTS := ["OFFICE","LIBRARY","WORKSHOP","FACTORY","QUARRY"]
 const TILE_SPACING := 48.0
 var current_place := "PARK"
 var travel_minutes: Dictionary = {}
@@ -31,6 +32,9 @@ static func adjacent(first: String, second: String) -> bool:
     var a: Vector2i = DISTRICTS[first]
     var b: Vector2i = DISTRICTS[second]
     return absi(a.x-b.x)+absi(a.y-b.y) == 1
+
+static func motor_road(first: String, second: String) -> bool:
+    return adjacent(first,second) and first in MOTOR_DISTRICTS and second in MOTOR_DISTRICTS
 
 func _ready() -> void:
     custom_minimum_size = Vector2(570, 432)
@@ -56,7 +60,10 @@ func _draw() -> void:
     for a in DISTRICTS:
         for b in DISTRICTS:
             if str(a) < str(b) and adjacent(str(a),str(b)):
-                draw_line(_point(str(a)),_point(str(b)),Color("#86948a"),10.0,true)
+                var motor := motor_road(str(a),str(b))
+                draw_line(_point(str(a)),_point(str(b)),Color("#68747a") if motor else Color("#86948a"),14.0 if motor else 10.0,true)
+                if motor:
+                    draw_line(_point(str(a)),_point(str(b)),Color("#d7d5c2"),1.0,true)
     for id in DISTRICTS:
         var center := _point(str(id))
         var rect := Rect2(center-Vector2(50,29),Vector2(100,58))

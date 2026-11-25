@@ -448,6 +448,7 @@ func _generate_chunk(place_id: String) -> void:
                         Vector3(offset, 1.1, 5.0))
         "WORKSHOP":
             _building("Mechanical workshop", Color(0.41, 0.51, 0.59))
+            _build_motor_court()
             _box(_scenery, Vector3(4.0, 1.2, 2.0), Color(0.27, 0.30, 0.32),
                     Vector3(-8.0, 0.7, 7.0))
         "OFFICE":
@@ -515,10 +516,34 @@ func _build_road_links(place_id: String) -> void:
                 TownLayout.world_center(place_id)).normalized()
         _road_links[direction] = str(id)
         var vertical := absf(direction.z) > 0.5
-        var dimensions := Vector3(4.0,0.05,15.0) if vertical else Vector3(15.0,0.05,4.0)
-        _box(roads, dimensions, Color(0.49,0.47,0.42),
+        var motor := TownLayout.motor_road(place_id,str(id))
+        var width := 6.4 if motor else 4.0
+        var dimensions := Vector3(width,0.05,15.0) if vertical else Vector3(15.0,0.05,width)
+        _box(roads, dimensions, Color("#42484b") if motor else Color(0.49,0.47,0.42),
                 direction * 16.5 + Vector3(0,0.025,0))
+        if motor:
+            _mark_motor_road(roads,direction)
         _sign(roads, str(TownLayout.LABELS.get(id,str(id).capitalize())), direction * 19.0 + Vector3(0,2.8,0))
+
+func _mark_motor_road(parent: Node3D,direction: Vector3) -> void:
+    var lane := Node3D.new()
+    lane.name = "MotorLane"
+    lane.rotation.y = atan2(direction.x,direction.z)
+    parent.add_child(lane)
+    var white := Color("#ddd9c7")
+    # Standardise on z-forward in lane-local coordinates. Geometry is
+    # symmetric on both sides of a chunk seam.
+    for x in [-3.0,3.0]:
+        _box(lane,Vector3(0.10,0.018,14.9),white,Vector3(x,0.06,16.5))
+    for z in [13.5,16.5,19.5,22.5]:
+        _box(lane,Vector3(0.10,0.018,1.25),white,Vector3(0,0.06,z))
+    for i in range(9):
+        _box(lane,Vector3(0.34,0.022,1.5),white,Vector3(-2.6+float(i)*0.65,0.065,11.0))
+    # Small roadside crossing markers, outside the road corridor.
+    for x in [-3.7,3.7]:
+        _box(lane,Vector3(0.12,1.8,0.12),Color("#686c70"),Vector3(x,0.9,11.0))
+        _box(lane,Vector3(0.45,0.45,0.12),Color("#416d9c"),Vector3(x,1.8,11.0))
+        _box(lane,Vector3(0.25,0.25,0.14),white,Vector3(x,1.8,11.0))
 
 func _road_destination(at: Vector3, minimum: float) -> String:
     for key in _road_links:
@@ -662,6 +687,71 @@ func _build_bicycle_rack() -> void:
     parked.rotation.y = PI/2.0
     parked.visible = false
     _sign(rack,"Bici · P",Vector3(0,1.5,0))
+
+func _build_motor_court() -> void:
+    var court := Node3D.new()
+    court.name = "OfficinaMotorCourt"
+    _scenery.add_child(court)
+    # Keep the rack, kiosk, main paths and district seams clear.
+    var asphalt := Color("#52585b")
+    var white := Color("#ddd9c7")
+    _box(court,Vector3(11,0.05,8),asphalt,Vector3(-9,0.015,-9))
+    for x in [-14.5,-11.75,-9.0,-6.25,-3.5]:
+        _box(court,Vector3(0.09,0.018,5.3),white,Vector3(x,0.055,-10.0))
+    _box(court,Vector3(11,0.018,0.1),white,Vector3(-9,0.055,-12.65))
+    _sign(court,"Parcheggio",Vector3(-9,2.2,-13.2))
+    var car := _make_city_car(court,Color("#7191a4"))
+    car.position = Vector3(-13.1,0,-10)
+    _add_obstacle(car.position,Vector2(1.85,3.6))
+    # Ground-level two-bay service garage, front open toward z=7.
+    var garage := Node3D.new()
+    garage.name = "ServiceGarage"
+    court.add_child(garage)
+    var plaster := Color("#c3b6a0")
+    _box(garage,Vector3(10,0.08,8),Color("#92918a"),Vector3(10,0.025,11.5))
+    for x in [5.0,10.0,15.0]:
+        _room_wall(garage,Vector3(x,0,11.5),Vector2(0.32,8),plaster)
+    _room_wall(garage,Vector3(10,0,15.5),Vector2(10,0.32),plaster)
+    _box(garage,Vector3(10.5,0.3,8.4),Color("#6f7173"),Vector3(10,3.15,11.5))
+    _box(garage,Vector3(10.5,0.5,0.35),plaster,Vector3(10,2.85,7.45))
+    _sign(garage,"Autorimessa · Officina",Vector3(10,3.7,7.3))
+    _sign(garage,"Bay 1",Vector3(7.5,2.45,7.35))
+    _sign(garage,"Bay 2",Vector3(12.5,2.45,7.35))
+    for at in [Vector3(7.5,2.8,11.5),Vector3(12.5,2.8,11.5)]:
+        var light := OmniLight3D.new()
+        light.position = at
+        light.light_color = Color("#fff0d3")
+        light.light_energy = 1.1
+        light.omni_range = 6.0
+        garage.add_child(light)
+    var service_car := _make_city_car(garage,Color("#ae8771"))
+    service_car.position = Vector3(12.5,0,12)
+    _add_obstacle(service_car.position,Vector2(1.85,3.6))
+
+func _make_city_car(parent: Node3D,paint: Color) -> Node3D:
+    var car := Node3D.new()
+    car.name = "CityCar"
+    parent.add_child(car)
+    var dark := Color("#303638")
+    var glass := Color("#536d79")
+    _box(car,Vector3(1.78,0.60,3.5),paint,Vector3(0,0.62,0))
+    _box(car,Vector3(1.64,0.65,1.9),paint,Vector3(0,1.23,0.22))
+    _box(car,Vector3(1.45,0.45,0.07),glass,Vector3(0,1.23,-0.76))
+    _box(car,Vector3(1.45,0.45,0.07),glass,Vector3(0,1.23,1.2))
+    for side in [-1.0,1.0]:
+        for z in [-0.25,0.69]:
+            _box(car,Vector3(0.07,0.44,0.76),glass,Vector3(side*0.835,1.27,z))
+        for z in [-1.08,1.08]:
+            var wheel := _cylinder(car,0.32,0.20,dark,Vector3(side*0.82,0.34,z))
+            wheel.rotation_degrees.z = 90
+            var hub := _cylinder(car,0.16,0.04,Color("#a6aaa7"),Vector3(side*0.94,0.34,z))
+            hub.rotation_degrees.z = 90
+        _box(car,Vector3(0.34,0.19,0.08),Color("#eee5bb"),Vector3(side*0.60,0.70,-1.79))
+        _box(car,Vector3(0.28,0.18,0.08),Color("#b33b36"),Vector3(side*0.65,0.7,1.79))
+    for z in [-1.77,1.77]:
+        _box(car,Vector3(1.75,0.16,0.13),dark,Vector3(0,0.43,z))
+        _box(car,Vector3(0.40,0.12,0.03),Color("#e7e6de"),Vector3(0,0.60,z*1.035))
+    return car
 
 func _build_farm() -> void:
     var farm := Node3D.new()

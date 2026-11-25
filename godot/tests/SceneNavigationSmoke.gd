@@ -216,6 +216,25 @@ func _exercise() -> void:
             "walking mode restores ordinary movement"):
         return
 
+    if not _check(layout.motor_road("WORKSHOP","FACTORY")
+            and layout.motor_road("FACTORY","WORKSHOP")
+            and not layout.motor_road("PARK","CENTRO"),
+            "motor links are symmetric and historic square remains pedestrian"):
+        return
+    world._on_world_updated(_world("WORKSHOP","Workshop"))
+    if not _check(world._scenery.has_node("OfficinaMotorCourt/ServiceGarage/CityCar")
+            and world._scenery.has_node("DistrictRoads/MotorLane")
+            and not world._can_stand(Vector3(-13.1,0,-10),world.WALKER_RADIUS),
+            "parking court has a solid car and marked motor links"):
+        return
+    var garage_entry: Vector3 = world._move_on_ground(Vector3(7.5,0,5),Vector3(0,0,7),world.WALKER_RADIUS)
+    if not _check(garage_entry.z > 11.9
+            and not world._can_stand(Vector3(10,0,12),world.WALKER_RADIUS)
+            and world._road_destination(Vector3(0,0,-23.9),23.8) == "FACTORY",
+            "open garage bay remains walkable, walls and district seam intact"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)

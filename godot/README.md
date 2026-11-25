@@ -385,6 +385,18 @@ proximity and renders the parked model; exact parking coordinates
 and theft are not simulated. Walking with an unparked bicycle still
 abstracts carrying it. No full rider pose or vehicle steering physics.
 
+## Motor infrastructure
+
+The office/library/workshop/factory/quarry network marks adjacent
+motor-road links symmetrically on the schematic map. Those links have
+6.4-unit asphalt surfaces, centre/edge markings and zebra crossings;
+other connections remain pedestrian-style, including Centro. The
+existing walking seam width is unchanged. Workshop now has a marked
+parking court, two-bay open service garage and two original compact
+car models with solid collision footprints. Garage bay 1 is walkable.
+Cars are static scenery, not owned or driveable; there is no traffic
+AI, signal control, motor-road routing or vehicle physics yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world
