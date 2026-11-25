@@ -135,6 +135,20 @@ func _exercise() -> void:
     if not _check(world._leaf_materials[0].albedo_color != autumn,
             "shared foliage responds to seasons and snow"):
         return
+    var sound = world._town_audio
+    if not _check(sound._streams.size()==10 and sound.water is AudioStreamPlayer3D
+            and sound.traffic is AudioStreamPlayer3D,
+            "town has original sound streams and positional audio sources"):
+        return
+    sound.footstep(0.9,"grass",false,true,true)
+    if not _check(sound.steps.stream==sound._streams["grass"],
+            "walking distance triggers surface-specific footsteps"):
+        return
+    sound.set_enabled(false)
+    if not _check(not sound.enabled and not sound.steps.playing and not sound.water.playing,
+            "town sound can be muted independently"):
+        return
+    sound.set_enabled(true)
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
     var park_root: Node3D = world._chunks["PARK"]["root"]
     if not _check(school_root.position == Vector3(0,0,-48)
