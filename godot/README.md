@@ -192,6 +192,19 @@ commit; refresh the world and select a speed again. Speed is a session
 setting, not a new database field. This is active-client time, not a
 server-side clock that keeps running when the game is closed.
 
+## Weather atmosphere
+
+Java supplies CLEAR, CLOUDY, RAIN or SNOW. Godot adds a single
+player-following CPU precipitation system (360 rain particles or 220
+snow particles), depth fog, cloudier daylight and original synthesized
+rain/wind ambience. Compatibility rendering is retained. The Weather FX
+and Weather sound switches are independent session preferences; turning
+them off never changes temperature, health or resource rules.
+Fog is a presentation effect rather than an additional weather state.
+No outdoor sound files, network resources or new database fields are
+required. Indoor precipitation occlusion and detailed street sounds
+are not implemented yet.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

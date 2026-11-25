@@ -17,6 +17,7 @@ const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
 const LiveClock = preload("res://scripts/LiveClock.gd")
+const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _first_person := true
@@ -34,6 +35,7 @@ var _fountain_water: MeshInstance3D
 var _sun: DirectionalLight3D
 var _ground_material: StandardMaterial3D
 var _environment: Environment
+var _weather_fx: Node3D
 var _api
 var _current_place := ""
 var _road_links: Dictionary = {}
@@ -106,6 +108,7 @@ func _process(delta: float) -> void:
         _try_road_crossing(relative_motion)
 
     _animate_residents(delta)
+    _weather_fx.follow(_avatar.position)
     _tick_live_clock(delta)
     if not _near_gate():
         _travel_panel.visible = false
@@ -204,6 +207,9 @@ func _build_world() -> void:
         _box(_avatar, Vector3(0.2, 0.65, 0.23), Color(0.19, 0.24, 0.29),
                 Vector3(x_offset, 0.33, 0.0))
 
+    _weather_fx = WeatherEffects.new()
+    add_child(_weather_fx)
+    _weather_fx.follow(_avatar.position)
     _camera = Camera3D.new()
     _camera.current = true
     add_child(_camera)
@@ -718,6 +724,18 @@ func _create_interface() -> void:
     _clock_selector.select(3)
     _clock_selector.item_selected.connect(_on_clock_speed_selected)
     clock_row.add_child(_clock_selector)
+    var atmosphere_row := HBoxContainer.new()
+    column.add_child(atmosphere_row)
+    var effects_toggle := CheckButton.new()
+    effects_toggle.text = "Weather FX"
+    effects_toggle.button_pressed = true
+    effects_toggle.toggled.connect(_set_weather_visuals)
+    atmosphere_row.add_child(effects_toggle)
+    var audio_toggle := CheckButton.new()
+    audio_toggle.text = "Weather sound"
+    audio_toggle.button_pressed = true
+    audio_toggle.toggled.connect(_set_weather_audio)
+    atmosphere_row.add_child(audio_toggle)
     _hint = Label.new()
     _hint.text = "WASD: walk · click scene: mouse look · V: camera · Esc: cursor."
     column.add_child(_hint)
@@ -1100,6 +1118,14 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 
+func _set_weather_visuals(enabled: bool) -> void:
+    _weather_fx.visual_enabled = enabled
+    _apply_weather()
+
+func _set_weather_audio(enabled: bool) -> void:
+    _weather_fx.audio_enabled = enabled
+    _apply_weather()
+
 func _apply_weather() -> void:
     if _ground_material == null:
         return
@@ -1110,6 +1136,9 @@ func _apply_weather() -> void:
     elif climate.get("raining", false):
         _ground_material.albedo_color = Color(0.22, 0.37, 0.23)
         _environment.background_color = Color(0.44, 0.50, 0.57)
+    elif climate.get("sky", "CLEAR") == "CLOUDY":
+        _ground_material.albedo_color = Color(0.27,0.45,0.25)
+        _environment.background_color = Color(0.60,0.65,0.71)
     else:
         _ground_material.albedo_color = Color(0.27, 0.49, 0.26)
         _environment.background_color = Color(0.63, 0.80, 0.96)
@@ -1124,6 +1153,10 @@ func _apply_weather() -> void:
     _environment.ambient_light_energy = lerpf(0.25,1.0,daylight)
     _environment.background_color = Color(0.07,0.10,0.18).lerp(
             _environment.background_color, smoothstep(0.0,0.35,daylight))
+    if climate.get("sky","CLEAR") != "CLEAR":
+        _sun.light_energy *= 0.65
+    _weather_fx.follow(_avatar.position)
+    _weather_fx.apply(climate,_environment)
     var services: Dictionary = _last_snapshot.get("services", {})
     # Weather and city services affect every loaded chunk, not just the
     # one containing the visitor. Only the active chunk gets NPC data.

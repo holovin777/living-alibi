@@ -206,6 +206,40 @@ func _exercise() -> void:
     if not _check(world._residents_root.get_node("Resident_marco") == marco,
             "refresh retains the same resident model and animation state"):
         return
+    var rainy := _world("PARK", "Park")
+    rainy["weather"] = {"sky":"RAIN","raining":true,"snowing":false}
+    world._on_world_updated(rainy)
+    if not _check(world._weather_fx.rain.emitting and not world._weather_fx.snow.emitting
+            and world._environment.fog_enabled and world._weather_fx.ambience.stream != null,
+            "rain starts particles, visibility fog and synthetic rain ambience"):
+        return
+    world._set_weather_visuals(false)
+    if not _check(not world._weather_fx.rain.emitting and not world._environment.fog_enabled
+            and world._last_snapshot["weather"]["raining"],
+            "visual toggle does not change authoritative weather"):
+        return
+    world._set_weather_visuals(true)
+    world._set_weather_audio(false)
+    if not _check(world._weather_fx.rain.emitting and world._weather_fx.ambience.stream == null,
+            "weather audio can be muted independently"):
+        return
+    var snowy := _world("PARK", "Park")
+    snowy["weather"] = {"sky":"SNOW","raining":false,"snowing":true}
+    world._on_world_updated(snowy)
+    if not _check(world._weather_fx.snow.emitting and not world._weather_fx.rain.emitting,
+            "snow switches precipitation without overlapping rain"):
+        return
+    world._weather_fx.follow(Vector3(3,0,4))
+    if not _check(world._weather_fx.position == Vector3(3,9,4),
+            "one precipitation emitter follows the player across chunks"):
+        return
+    world._on_world_updated(_world("PARK", "Park"))
+    if not _check(not world._weather_fx.rain.emitting and not world._weather_fx.snow.emitting
+            and not world._environment.fog_enabled,
+            "clear weather removes precipitation and fog"):
+        return
+    world._set_weather_audio(true)
+
     var noon := _world("PARK", "Park")
     noon["minute"] = 720
     world._on_world_updated(noon)
