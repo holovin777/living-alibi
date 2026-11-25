@@ -2749,6 +2749,7 @@ func _render_actions() -> void:
                 else:
                     var stall_info := Label.new()
                     stall_info.text = "Bottega · Stock %s/12 | Sold %s | Revenue %s EUR" % [stall.get("stocked",0),stall.get("sales",0),stall.get("revenue",0)]
+                    stall_info.text += "\nCustomers %s | Regulars %s | Referred %s" % [stall.get("customers",0),stall.get("regularCustomers",0),stall.get("recommendedCustomers",0)]
                     _action_choices.add_child(stall_info)
                     if bool(stall.get("open",false)):
                         _action_choices.add_child(_button("Close stall",_garden_action.bind("stall-close")))

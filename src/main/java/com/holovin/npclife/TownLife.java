@@ -300,6 +300,13 @@ final class TownLife {
         for(int i=before;i<interactions.size();i++) {
             var conversation=interactions.get(i);
             KnowledgeLife.exchange(town,marco,conversation.firstId(),conversation.secondId());
+            if(conversation.kind()==SocialLife.Kind.FRIENDLY_CHAT) {
+                var a=town.people.get(conversation.firstId());var b=town.people.get(conversation.secondId());
+                if(MarketStallLife.recommend(town,a,b))
+                    publish(town,marco,a.id,a.place,a.name+" recommended the private market stall to "+b.name+".",truth,observations);
+                if(MarketStallLife.recommend(town,b,a))
+                    publish(town,marco,b.id,b.place,b.name+" recommended the private market stall to "+a.name+".",truth,observations);
+            }
         }
     }
 
