@@ -876,6 +876,32 @@ func _exercise() -> void:
             "business dashboard exposes real funds and machine wear"):
         return
 
+    var apartment := _world("NORTH_RESIDENCES","North residences")
+    apartment["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","homeOptions":{"atHome":true,"district":"North residences","food":3,"water":3,"actions":["go","meal","rest","family"]}}
+    apartment["residents"]=[{"id":"resident-0099","name":"Family member","activity":"AT_HOME"}]
+    world._on_world_updated(apartment)
+    if not _check(world._apartment_active and world._apartment.visible
+            and world._apartment.has_node("BedFrame") and world._apartment.has_node("KitchenCounter")
+            and world._residents_root.has_node("Resident_resident-0099")
+            and not world._scenery.visible,
+            "private home snapshot activates furnished apartment and actual resident"):
+        return
+    if not _check(world._can_stand(Vector3(-3,0,0),world.WALKER_RADIUS)
+            and world._can_stand(Vector3(3,0,0),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(0,0,-2),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(4.7,0,-3.9),world.WALKER_RADIUS),
+            "room doorways are open but partitions and furniture are solid"):
+        return
+    world._avatar.position=Vector3(3.3,0,-2.6)
+    world._follow_player()
+    if not _check(world._apartment_action()=="meal" and world._camera.position.is_equal_approx(world._avatar.position+Vector3(0,world.EYE_HEIGHT,0)),
+            "kitchen contextual action and first-person camera"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+    if not _check(not world._apartment_active and not world._apartment.visible and world._scenery.visible,
+            "authoritative departure restores outdoor scenery"):
+        return
+
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

@@ -39,6 +39,9 @@ const LiveClock = preload("res://scripts/LiveClock.gd")
 const DriveControls = preload("res://scripts/DriveControls.gd")
 const DRIVER_EYE := Vector3(-0.33,1.24,0.08)
 const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
+const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
+var _apartment: Node3D
+var _apartment_active := false
 
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
@@ -169,11 +172,18 @@ func _process(delta: float) -> void:
         if not _rebirth_active():
             _try_road_crossing(relative_motion)
 
+    if _apartment_active:
+        _animate_residents(delta)
+        _weather_fx.follow(_avatar.position)
+        _weather_fx.set_sheltered(true,_environment)
+        var action := _apartment_action()
+        _hint.text = "E: "+action.capitalize()+" · F: home / life choices" if not action.is_empty() else "WASD: walk indoors · F: life choices"
+        return
     _sync_bicycle()
     _advance_traffic(delta)
     _animate_residents(delta)
     _weather_fx.follow(_avatar.position)
-    _weather_fx.set_sheltered(_inside_guest_room(),_environment)
+    _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
         _hint.text = "F: life choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
         return
@@ -228,7 +238,12 @@ func _unhandled_input(event: InputEvent) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
     if _rebirth_active():
         if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
-            if event.keycode == KEY_F:
+            if event.keycode == KEY_E and _apartment_active and not _action_panel.visible:
+                var action := _apartment_action()
+                if not action.is_empty():
+                    _garden_action("rebirth-home-"+action)
+                get_viewport().set_input_as_handled()
+            elif event.keycode == KEY_F:
                 _action_panel.visible = not _action_panel.visible
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
                 get_viewport().set_input_as_handled()
@@ -293,7 +308,7 @@ func _has_room_lease() -> bool:
     return _owns_house() if _current_place=="SOUTH_RESIDENCES" else bool(_last_snapshot.get("player",{}).get("roomActive",false))
 
 func _inside_guest_room() -> bool:
-    return _current_place in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"] and ROOM_BOUNDS.has_point(
+    return not _apartment_active and _current_place in ["NORTH_RESIDENCES","SOUTH_RESIDENCES"] and ROOM_BOUNDS.has_point(
             Vector2(_avatar.position.x,_avatar.position.z))
 
 func _near_room_bed() -> bool:
@@ -1087,6 +1102,8 @@ func _add_obstacle(center: Vector3, size: Vector2) -> void:
     _obstacles.append(Rect2(Vector2(center.x, center.z) - size * 0.5, size))
 
 func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
+    if _apartment_active:
+        return _apartment.can_stand(at,radius)
     if absf(at.x) > 17.0 or absf(at.z) > 17.0:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
@@ -2127,6 +2144,8 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     person.name = "Resident_" + id
     person.set_meta("resident_id", id)
     var anchor := Vector3((float(index % 8)-3.5)*3.0, 0, -4.0-float(index / 8)*2.5)
+    if _apartment_active:
+        anchor = FamilyApartment.ANCHORS[index % FamilyApartment.ANCHORS.size()]
     anchor.z = maxf(anchor.z, -13.0)
     anchor = _open_anchor(anchor)
     person.position = anchor
@@ -3432,6 +3451,41 @@ func _wait_one_hour() -> void:
     if not _api.is_busy():
         _api.wait_for(60)
 
+func _apartment_action() -> String:
+    if not _apartment_active:
+        return ""
+    var home = _last_snapshot.get("rebirth",{}).get("homeOptions")
+    return _apartment.nearby_action(_avatar.position,home.get("actions",[])) if home is Dictionary else ""
+
+func _set_apartment(active: bool) -> void:
+    if active == _apartment_active:
+        return
+    _apartment_active=active
+    if active:
+        if not is_instance_valid(_apartment):
+            _apartment=FamilyApartment.new()
+            add_child(_apartment)
+        _apartment.show()
+        for chunk in _chunks.values():
+            chunk["root"].hide()
+        _traffic_root.hide()
+        _bike_model.hide()
+        _residents_root=_apartment.get("residents")
+        _avatar.position=FamilyApartment.SPAWN
+        _view_yaw=0.0
+        _view_pitch=0.0
+    else:
+        _apartment.hide()
+        for resident in _apartment.get("residents").get_children():
+            _apartment.get("residents").remove_child(resident)
+            resident.queue_free()
+        for chunk in _chunks.values():
+            chunk["root"].show()
+        _traffic_root.show()
+        _activate_chunk(_current_place)
+        _avatar.position=Vector3.ZERO
+    _follow_player()
+
 func _on_world_updated(snapshot: Dictionary) -> void:
     var clock_update := _clock_pending
     _clock_pending = false
@@ -3450,6 +3504,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        if _apartment_active:
+            _set_apartment(false)
         _close_dialog()
         _current_place = new_place
         _render_place(new_place)
@@ -3494,6 +3550,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _needs.text += "\nResidents present in this district: %s" % [
         str(snapshot.get("residents", []).size())
     ]
+    var home = snapshot.get("rebirth",{}).get("homeOptions")
+    _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     _sync_guest_room()
     _sync_garden()
     _sync_coop()
@@ -3564,7 +3622,7 @@ func _apply_weather() -> void:
     if climate.get("sky","CLEAR") != "CLEAR":
         _sun.light_energy *= 0.65
     _weather_fx.follow(_avatar.position)
-    _weather_fx.set_sheltered(_inside_guest_room(),_environment)
+    _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     _weather_fx.apply(climate,_environment)
     var services: Dictionary = _last_snapshot.get("services", {})
     # Weather and city services affect every loaded chunk, not just the
