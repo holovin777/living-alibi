@@ -193,8 +193,12 @@ The eventual game is an emergent detective simulation. The player investigates e
 - The founder can invest and withdraw real cash; losing ownership on
   death does **not** erase company assets. A future visitor can purchase
   the existing company for a new license fee; no automatic inheritance.
+- Manufacturing now wears the machine, stopping production below 20/100.
+  The owner can service it with two real spare parts and company cash.
+  The shop also honors fixed NPC shifts and persists an idempotent wage
+  receipt to prevent double pay after restarting at the same minute.
 - One local workshop is the current limit; competing owners, realistic
-  employer negotiations, business loans, equipment wear, taxes and
+  employer negotiations, business loans, taxes and
   a detailed construction economy remain future work.
   See [Player Business](PLAYER_BUSINESS.md).
 
