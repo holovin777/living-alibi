@@ -27,7 +27,7 @@ final class FarmLife {
     static int harvest(TownLife.Town t,int perCrop) {
         int total=0;
         for(String crop:CROPS) {
-            int n=Math.min(perCrop,Math.min(stock(t,field(crop)),24-stock(t,barn(crop))-FreightLife.reservedCrop(t,crop)));
+            int n=Math.min(perCrop,Math.min(stock(t,field(crop)),24-stock(t,barn(crop))-FreightLife.reservedCrop(t,crop)-(crop.equals("vegetables")?StallSupplyLife.reserved(t):0)));
             if(n<=0)continue;
             set(t,field(crop),stock(t,field(crop))-n);
             set(t,barn(crop),stock(t,barn(crop))+n);

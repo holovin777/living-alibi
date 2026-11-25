@@ -165,6 +165,58 @@ class GameSessionTest {
     }
 
     @Test
+    void standingFarmOrderReservesCargoAndMoneyAcrossRestart() throws Exception {
+        Path file=directory.resolve("stall-supply.db");
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            p.place=TownLife.Place.MARKET;p.destination=p.place;p.travelRemaining=0;p.money=100;
+            MarketStallLife.act(town,"stall-register",1,480);
+            MarketStallLife.act(town,"stall-supply-fund",1,480);
+            MarketStallLife.act(town,"stall-supply-fund",1,480);
+            MarketStallLife.act(town,"stall-supply-enable",1,480);
+            assertEquals(60,p.money);
+            FarmLife.set(town,FarmLife.barn("vegetables"),8);
+            int fuel=FuelLife.stock(town),farm=town.employerFunds.getOrDefault(FarmLife.ACCOUNT,0);
+            StallSupplyLife.tick(town,1,540);StallSupplyLife.tick(town,1,540);
+            assertEquals(4,StallSupplyLife.reserved(town));
+            assertEquals(4,FarmLife.stock(town,FarmLife.barn("vegetables")));
+            assertEquals(fuel-1,FuelLife.stock(town));
+            assertEquals(farm,town.employerFunds.getOrDefault(FarmLife.ACCOUNT,0));
+            assertEquals(9,StallSupplyLife.report(town).reserve());
+            assertEquals(0,MarketStallLife.total(town));
+            FoodLife.change(p,"bread",false,9);
+            for(int i=0;i<8;i++)MarketStallLife.act(town,"stall-stock-bread",1,550);
+            assertThrows(IllegalArgumentException.class,()->MarketStallLife.act(town,"stall-stock-bread",1,550));
+            assertEquals(1,FoodLife.quantity(p,"bread",false));
+            MarketStallLife.act(town,"stall-supply-disable",1,550);
+            p.place=TownLife.Place.PARK;p.destination=p.place;
+            state.day=1;state.minute=550;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            assertFalse(StallSupplyLife.report(town).enabled());
+            assertEquals(4,StallSupplyLife.reserved(town));
+            int farm=town.employerFunds.getOrDefault(FarmLife.ACCOUNT,0);
+            StallSupplyLife.tick(town,1,599);
+            assertEquals(8,MarketStallLife.total(town));
+            StallSupplyLife.tick(town,1,600);StallSupplyLife.tick(town,1,600);
+            assertEquals(12,MarketStallLife.total(town));
+            assertEquals(4,MarketStallLife.get(town,MarketStallLife.stock("vegetables")));
+            assertEquals(0,StallSupplyLife.reserved(town));
+            assertEquals(farm+8,town.employerFunds.getOrDefault(FarmLife.ACCOUNT,0));
+            assertEquals(4,StallSupplyLife.report(town).delivered());
+            StallSupplyLife.tick(town,2,540);
+            assertEquals(0,StallSupplyLife.reserved(town));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(4,game.snapshot().stall().supply().delivered());
+            assertEquals(12,game.snapshot().stall().stocked());
+        }
+    }
+
+    @Test
     void sellerWorksOnlyPaidHoursAndPayrollSurvivesRestart() throws Exception {
         Path file=directory.resolve("stall-seller.db");
         String sellerId,buyerId;
