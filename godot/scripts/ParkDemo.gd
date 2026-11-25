@@ -19,6 +19,7 @@ var _view_pitch := 0.0
 var _avatar: Node3D
 var _camera: Camera3D
 var _scenery: Node3D
+var _residents_root: Node3D
 var _ground_material: StandardMaterial3D
 var _environment: Environment
 var _api
@@ -135,6 +136,7 @@ func _toggle_view_mode() -> void:
 func _follow_player() -> void:
     # Hide the mesh at eye height to prevent looking through your own head.
     _avatar.visible = not _first_person
+    _avatar.rotation.y = _view_yaw
     if _first_person:
         _camera.position = _avatar.position + Vector3(0.0, EYE_HEIGHT, 0.0)
         _camera.rotation = Vector3(_view_pitch, _view_yaw, 0.0)
@@ -198,6 +200,9 @@ func _render_place(place_id: String) -> void:
     _box(_scenery, Vector3(3.0, 0.05, 35.0), Color(0.63, 0.57, 0.45),
             Vector3(0.0, -0.015, 0.0))
     _create_gate_and_kiosk()
+    _residents_root = Node3D.new()
+    _residents_root.name = "VisibleResidents"
+    _scenery.add_child(_residents_root)
 
     match place_id:
         "PARK":
@@ -262,6 +267,43 @@ func _render_place(place_id: String) -> void:
             _tree(Vector3(11.0, 0.0, 7.0))
 
     _apply_weather()
+
+func _render_residents() -> void:
+    # Draw only people the Java world reports as present in this public scene.
+    # These grid positions are visual placeholders, NOT authoritative coordinates.
+    if _residents_root == null:
+        return
+    for child in _residents_root.get_children():
+        _residents_root.remove_child(child)
+        child.queue_free()
+
+    var residents: Array = _last_snapshot.get("residents", [])
+    for i in range(residents.size()):
+        if typeof(residents[i]) != TYPE_DICTIONARY:
+            continue
+        var resident: Dictionary = residents[i]
+        var person := Node3D.new()
+        person.name = "Resident_" + str(resident.get("id", i))
+        person.position = Vector3(
+                (float(i % 8) - 3.5) * 3.0,
+                0.0, -4.0 - float(int(i / 8)) * 2.5)
+        _residents_root.add_child(person)
+        var jacket := Color(0.25 + float(i % 3) * 0.14,
+                0.35 + float(i % 4) * 0.11, 0.38 + float(i % 2) * 0.23)
+        _box(person, Vector3(0.65, 1.05, 0.35), jacket,
+                Vector3(0.0, 1.1, 0.0))
+        _sphere(person, 0.27, Color(0.86, 0.68, 0.51),
+                Vector3(0.0, 1.85, 0.0))
+        for offset in [-0.17, 0.17]:
+            _box(person, Vector3(0.22, 0.7, 0.25),
+                    Color(0.20, 0.25, 0.30), Vector3(offset, 0.35, 0.0))
+        var name_tag := Label3D.new()
+        name_tag.text = str(resident.get("name", "Resident"))
+        name_tag.position = Vector3(0.0, 2.45, 0.0)
+        name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+        name_tag.font_size = 26
+        name_tag.pixel_size = 0.006
+        person.add_child(name_tag)
 
 func _building(_title: String, wall_color: Color) -> void:
     _box(_scenery, Vector3(11.0, 4.5, 7.0), wall_color,
@@ -676,6 +718,10 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _needs.text += "\nPark fountain: %s (%s clean units) | Street lights: %s" % [
         fountain, str(utilities.get("cleanWater", 0)), lighting
     ]
+    _needs.text += "\nResidents present in this district: %s" % [
+        str(snapshot.get("residents", []).size())
+    ]
+    _render_residents()
     _apply_weather()
     _render_actions()
     if _api != null and not _api.is_busy():
