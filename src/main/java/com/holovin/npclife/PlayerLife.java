@@ -90,6 +90,7 @@ final class PlayerLife {
         GardenLife.clear(town);
         HenLife.clear(town);
         OrchardLife.clear(town);
+        BankLife.clear(town);
         MarketStallLife.clear(town);
         Player next=new Player();
         next.incarnation=previous.incarnation+1;
