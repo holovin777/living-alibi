@@ -277,6 +277,8 @@ final class PlayerLife {
         String greeting=contact.knownName==null?"stranger":contact.knownName;
         if(spoken.regionMatches(true,0,"My name is ",0,11))
             return "Nice to meet you, "+greeting+".";
+        if(spoken.equalsIgnoreCase("What do you do?"))
+            return resident.employed?"I work as "+resident.occupation+".":"I'm currently looking for work.";
         if(resident.sociability<40)return "Hello. I'm having a quiet day.";
         if(spoken.contains("?"))return "I'm not sure, "+greeting+". I can only tell you what I know.";
         if(contact.conversations==1)return "Hello, "+greeting+". Nice to meet someone around here.";

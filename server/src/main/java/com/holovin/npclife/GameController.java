@@ -31,6 +31,7 @@ public class GameController {
     public record OrderRequest(String orderId) { }
     public record AmountRequest(int amount) { }
     public record ResidentRequest(String residentId) { }
+    public record SpeakRequest(String residentId,String message) { }
     @GetMapping("/world")
     public GameSession.WorldView world() {
         return session.snapshot();
@@ -136,6 +137,11 @@ public class GameController {
     @PostMapping("/actions/work")
     public GameSession.ActionView work() throws SQLException {
         return session.work();
+    }
+
+    @PostMapping("/actions/speak")
+    public GameSession.ActionView speak(@RequestBody SpeakRequest request) throws SQLException {
+        return session.speak(request.residentId(),request.message());
     }
 
     @PostMapping("/actions/wait")

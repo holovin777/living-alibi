@@ -205,6 +205,18 @@ No outdoor sound files, network resources or new database fields are
 required. Indoor precipitation occlusion and detailed street sounds
 are not implemented yet.
 
+## Conversations
+
+Approach a resident within 2.5 local units and press **T**. Say hello,
+ask their occupation or enter a message; "My name is Alex." introduces
+an alias to that resident. Java validates public-space co-presence,
+uses the existing deterministic conversation rules and saves individual
+contact memory, advancing one game minute per accepted message. Godot
+shows the server reply and the name the resident remembers. The local
+proximity check is client-side; exact server-owned coordinates are
+not implemented. There is no language model, arbitrary natural-language
+understanding, or promise of a job. Ambient clock pauses in conversation.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

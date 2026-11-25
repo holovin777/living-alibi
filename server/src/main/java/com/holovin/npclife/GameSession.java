@@ -57,7 +57,7 @@ public final class GameSession implements AutoCloseable {
                                 String phase,int condition,int completedDay,
                                 String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
-    public record ResidentView(String id,String name,String activity) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations) { }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
     public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
     public record ServicesView(int pumpCondition,boolean fountainWorking,int cleanWater,
@@ -79,7 +79,12 @@ public final class GameSession implements AutoCloseable {
                 p.hunger,p.thirst,p.fatigue,p.health,p.alive,
                 p.money,p.jobId,p.engineeringSkill,p.investigationSkill);
         var residents=PlayerLife.visible(town).stream()
-                .map(c->new ResidentView(c.id,c.name,c.activity)).toList();
+                .map(c->{
+                    var contact=p.contacts.get(c.id);
+                    return new ResidentView(c.id,c.name,c.activity,
+                            contact==null?null:contact.knownName,
+                            contact==null?0:contact.conversations);
+                }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
         var weather=WeatherLife.at(state.day,state.minute);
@@ -213,6 +218,16 @@ public final class GameSession implements AutoCloseable {
         var copy=town.copy();
         String message=IndustryLife.prospectPlayer(copy,state.minute);
         return apply(copy,120,message);
+    }
+
+    /** Reuses the existing per-visitor, per-resident memory and atomic save. */
+    public synchronized ActionView speak(String residentId,String message) throws SQLException {
+        if(residentId==null || message==null)
+            throw new IllegalArgumentException("Resident and message are required.");
+        var copy=town.copy();
+        var resident=PlayerLife.nearby(copy,residentId);
+        String reply=PlayerLife.speak(copy,residentId,message,state.day,state.minute);
+        return apply(copy,1,resident.name+": "+reply);
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {

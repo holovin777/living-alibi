@@ -13,6 +13,39 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void conversationIsLocalAndMemorySurvivesRestart() throws Exception {
+        Path file=directory.resolve("conversation.db");
+        try(var game=new GameSession(file)) { }
+        String id;
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            var resident=town.people.values().iterator().next();
+            id=resident.id;
+            resident.place=TownLife.Place.PARK;
+            resident.travelRemaining=0;
+            resident.activity="FREE_TIME";
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertThrows(IllegalArgumentException.class,()->game.speak("missing","Hello"));
+            int before=game.snapshot().minute();
+            assertTrue(game.speak(id,"My name is Alex.").message().contains("Alex"));
+            assertEquals((before+1)%1440,game.snapshot().minute());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var town=db.loadTown(db.load());
+            assertEquals("Alex",town.player.contacts.get(id).knownName);
+            assertEquals(1,town.player.contacts.get(id).conversations);
+        }
+        try(var game=new GameSession(file)) {
+            game.move("quarry");
+            assertThrows(IllegalArgumentException.class,()->game.speak(id,"Hello"));
+        }
+    }
+
+    @Test
     void businessMachineServiceConsumesRealCityPartsAndSurvivesServerRestart() throws Exception {
         Path file=directory.resolve("worn-machine.db");
         try(var game=new GameSession(file)) {

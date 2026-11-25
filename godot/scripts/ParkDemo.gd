@@ -66,6 +66,12 @@ var _town_map
 var _travel_panel: PanelContainer
 var _travel_choices: GridContainer
 var _action_panel: PanelContainer
+var _dialog_panel: PanelContainer
+var _dialog_title: Label
+var _dialog_reply: Label
+var _dialog_input: LineEdit
+var _dialog_target := ""
+var _dialog_pending := false
 var _action_title: Label
 var _action_choices: VBoxContainer
 
@@ -90,7 +96,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     var direction := Vector3.ZERO
     # Do not move away from an open clickable interaction menu.
-    if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible:
+    if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
             direction.z -= 1.0
         if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -118,6 +124,8 @@ func _process(delta: float) -> void:
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
+    elif not _nearest_resident().is_empty():
+        _hint.text = "T: talk to nearby resident · V: camera · Esc: cursor."
     elif _near_gate():
         _hint.text = "E: travel gate (game time). V: camera. Esc: cursor."
     elif _near_kiosk():
@@ -132,7 +140,7 @@ func _unhandled_input(event: InputEvent) -> void:
         _follow_player()
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # UI consumes its own clicks before they reach this handler.
-        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible:
+        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -142,6 +150,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
             _travel_panel.visible = false
             _action_panel.visible = false
             _map_panel.visible = false
+            _close_dialog()
+            get_viewport().set_input_as_handled()
+        elif event.keycode == KEY_T and not _dialog_panel.visible:
+            _open_dialog()
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_M:
             _toggle_map()
@@ -548,6 +560,9 @@ func _render_residents() -> void:
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
+        person.set_meta("display_name",str(resident.get("name","Resident")))
+        person.set_meta("known_name",resident.get("knownName"))
+        person.set_meta("conversations",int(resident.get("conversations",0)))
     for child in _residents_root.get_children():
         if not present.has(str(child.get_meta("resident_id", ""))):
             _residents_root.remove_child(child)
@@ -594,6 +609,8 @@ func _animate_residents(delta: float) -> void:
         var activity := str(person.get_meta("activity", ""))
         var walking := activity in ["WALKING", "WANDERING", "STROLLING", "FREE_TIME", "SHOPPING", "JOB_SEARCH"]
         var phase := float(person.get_meta("phase", 0.0))
+        if _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target:
+            walking = false
         if walking:
             phase += delta * 0.65
             person.set_meta("phase", phase)
@@ -774,6 +791,32 @@ func _create_interface() -> void:
     _travel_choices.columns = 2
     travel_col.add_child(_travel_choices)
 
+    _dialog_panel = PanelContainer.new()
+    _dialog_panel.position = Vector2(480,15)
+    _dialog_panel.custom_minimum_size = Vector2(410,0)
+    _dialog_panel.visible = false
+    canvas.add_child(_dialog_panel)
+    var dialog_col := VBoxContainer.new()
+    _dialog_panel.add_child(dialog_col)
+    _dialog_title = Label.new()
+    dialog_col.add_child(_dialog_title)
+    _dialog_reply = Label.new()
+    _dialog_reply.custom_minimum_size = Vector2(400,0)
+    _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    dialog_col.add_child(_dialog_reply)
+    dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
+    dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
+    _dialog_input = LineEdit.new()
+    _dialog_input.placeholder_text = "My name is ... / Say something"
+    _dialog_input.max_length = 1000
+    _dialog_input.text_submitted.connect(_send_dialog)
+    dialog_col.add_child(_dialog_input)
+    dialog_col.add_child(_button("Speak",_send_typed_dialog))
+    var close := Button.new()
+    close.text = "Close conversation"
+    close.pressed.connect(_close_dialog)
+    dialog_col.add_child(close)
+
     _action_panel = PanelContainer.new()
     _action_panel.position = Vector2(480.0, 15.0)
     _action_panel.custom_minimum_size = Vector2(430.0, 0.0)
@@ -799,7 +842,63 @@ func _replace_choices(parent: Control, keep_header: bool = false) -> void:
         parent.remove_child(children[i])
         children[i].queue_free()
 
+func _nearest_resident() -> String:
+    if not is_instance_valid(_residents_root):
+        return ""
+    var nearest := ""
+    var best := 2.5
+    for child in _residents_root.get_children():
+        var person := child as Node3D
+        if person == null or str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:
+            continue
+        var distance := _avatar.position.distance_to(person.position)
+        if distance < best:
+            best = distance
+            nearest = str(person.get_meta("resident_id",""))
+    return nearest
+
+func _open_dialog() -> void:
+    if not _connected or _api.is_busy() or _dialog_pending:
+        return
+    var id := _nearest_resident()
+    if id.is_empty():
+        _message.text = "Approach a resident to talk."
+        return
+    var person := _residents_root.get_node_or_null("Resident_"+id) as Node3D
+    _dialog_target = id
+    _travel_panel.visible = false
+    _action_panel.visible = false
+    _map_panel.visible = false
+    _dialog_title.text = str(person.get_meta("display_name","Resident"))
+    var known = person.get_meta("known_name")
+    _dialog_reply.text = "They know you as "+str(known) if known != null else (
+            "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
+    _dialog_input.clear()
+    _dialog_panel.visible = true
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _close_dialog() -> void:
+    _dialog_panel.visible = false
+    _dialog_target = ""
+    _dialog_input.release_focus()
+
+func _send_typed_dialog() -> void:
+    _send_dialog(_dialog_input.text)
+
+func _send_dialog(message: String) -> void:
+    if not _dialog_panel.visible or _dialog_pending or _api.is_busy() or not _connected:
+        return
+    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    if person == null or _avatar.position.distance_to(person.position) >= 2.5:
+        _close_dialog()
+        return
+    if message.strip_edges().is_empty():
+        return
+    _dialog_pending = true
+    _api.speak_to(_dialog_target,message)
+
 func _toggle_map() -> void:
+    _close_dialog()
     _map_panel.visible = not _map_panel.visible
     if _map_panel.visible:
         _travel_panel.visible = false
@@ -813,6 +912,7 @@ func _toggle_travel() -> void:
     if not _near_gate() or not _connected:
         _message.text = "Approach the yellow gate with the Java server running."
         return
+    _close_dialog()
     _action_panel.visible = false
     _travel_panel.visible = not _travel_panel.visible
     if _travel_panel.visible:
@@ -843,6 +943,7 @@ func _toggle_actions() -> void:
     if not _near_kiosk() or not _connected:
         _message.text = "Approach the blue kiosk with the Java server running."
         return
+    _close_dialog()
     _travel_panel.visible = false
     _action_panel.visible = not _action_panel.visible
     if _action_panel.visible:
@@ -1053,7 +1154,7 @@ func _tick_live_clock(delta: float) -> void:
         return
     var eligible: bool = _connected and not _api.is_busy() and not _clock_pending \
             and _road_pending.is_empty() and not _travel_panel.visible \
-            and not _action_panel.visible and not _map_panel.visible
+            and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible
     if _clock.advance(delta, eligible):
         _clock_pending = true
         # The existing atomic Java action advances needs, NPCs and SQLite.
@@ -1075,6 +1176,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _close_dialog()
         _current_place = new_place
         _render_place(new_place)
         _avatar.position = _road_arrival if road_arrival else Vector3.ZERO
@@ -1113,6 +1215,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     ]
     _town_map.update_world(_current_place, _locations)
     _render_residents()
+    if _dialog_panel.visible and not _residents_root.has_node("Resident_"+_dialog_target):
+        _close_dialog()
     _apply_weather()
     _render_actions()
     if _api != null and not _api.is_busy() and not clock_update:
@@ -1241,6 +1345,11 @@ func _on_work_orders_updated(orders: Array) -> void:
         _render_actions()
 
 func _on_action_feedback(message: String) -> void:
+    if _dialog_pending:
+        _dialog_pending = false
+        if _dialog_panel.visible:
+            _dialog_reply.text = message
+            _dialog_input.clear()
     if not _clock_pending:
         _message.text = message
 
@@ -1260,6 +1369,10 @@ func _set_request_busy(busy: bool) -> void:
             node.disabled = busy or same_place
 
 func _on_request_failed(message: String) -> void:
+    if _dialog_pending:
+        _dialog_pending = false
+        if _dialog_panel.visible:
+            _dialog_reply.text = message
     if _clock_pending:
         # The server might have committed before a connection failure.
         # Pause rather than automatically retry a potentially committed write.

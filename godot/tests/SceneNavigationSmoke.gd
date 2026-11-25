@@ -240,6 +240,22 @@ func _exercise() -> void:
         return
     world._set_weather_audio(true)
 
+    var social := _world("PARK", "Park")
+    social["residents"] = [{"id":"marco","name":"Marco","activity":"FREE_TIME",
+            "knownName":"Alex","conversations":2}]
+    world._on_world_updated(social)
+    var social_person = world._residents_root.get_node("Resident_marco")
+    world._avatar.position = social_person.position
+    if not _check(world._nearest_resident() == "marco"
+            and social_person.get_meta("known_name") == "Alex",
+            "nearby resident carries server-owned conversation memory"):
+        return
+    world._avatar.position = Vector3(16,0,16)
+    if not _check(world._nearest_resident().is_empty(),
+            "distant residents cannot be selected for conversation"):
+        return
+    world._avatar.position = Vector3.ZERO
+
     var noon := _world("PARK", "Park")
     noon["minute"] = 720
     world._on_world_updated(noon)

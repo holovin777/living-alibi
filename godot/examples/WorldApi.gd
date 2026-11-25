@@ -84,6 +84,9 @@ func work_shift() -> void:
 func prospect() -> void:
     _send("/actions/prospect", HTTPClient.METHOD_POST, {})
 
+func speak_to(resident_id: String, message: String) -> void:
+    _send("/actions/speak", HTTPClient.METHOD_POST, {"residentId": resident_id, "message": message})
+
 func go_to(destination: String) -> void:
     _send("/actions/go", HTTPClient.METHOD_POST, {"destination": destination})
 
