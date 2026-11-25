@@ -2966,6 +2966,48 @@ class GameSessionTest {
     }
 
     @Test
+    void personalLoansConserveMoneyAndPersistOverduePenalty() throws Exception {
+        Path file=directory.resolve("personal-loan.db");
+        String id;
+        try(var game=new GameSession(file)) { }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var lender=town.people.values().iterator().next();
+            id=lender.id;lender.age=35;lender.money=100;lender.place=TownLife.Place.PARK;
+            lender.travelRemaining=0;lender.activity="FREE_TIME";
+            town.player.money=5;
+            assertTrue(PlayerLife.speak(town,id,"Ask for a 10 EUR loan",1,450).contains("cannot lend"));
+            var contact=town.player.contacts.get(id);contact.trust=75;contact.affinity=25;
+            assertTrue(PlayerLife.speak(town,id,"Ask for a 10 EUR loan",1,451).contains("seven days"));
+            assertEquals(15,town.player.money);assertEquals(90,lender.money);
+            assertEquals(10,PersonalLoanLife.outstanding(town,id));assertEquals(8,PersonalLoanLife.dueDay(town,id));
+            PlayerLife.speak(town,id,"Ask for a 10 EUR loan",1,452);
+            assertEquals(15,town.player.money);
+            state.day=9;state.minute=480;PersonalLoanLife.tick(town,state);
+            assertEquals(65,contact.trust);
+            PersonalLoanLife.tick(town,state);
+            assertEquals(65,contact.trust);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var lender=town.get(id);lender.place=TownLife.Place.PARK;
+            lender.travelRemaining=0;lender.activity="FREE_TIME";
+            assertEquals(10,PersonalLoanLife.outstanding(town,id));
+            var contact=town.player.contacts.get(id);
+            PersonalLoanLife.tick(town,state);
+            assertEquals(65,contact.trust);
+            town.player.money=9;
+            assertTrue(PlayerLife.speak(town,id,"Repay personal loan",9,481).contains("not have enough"));
+            town.player.money=15;
+            assertTrue(PlayerLife.speak(town,id,"Repay personal loan",9,482).contains("finally"));
+            assertEquals(5,town.player.money);assertEquals(100,lender.money);
+            assertEquals(0,PersonalLoanLife.outstanding(town,id));assertEquals(67,contact.trust);
+        }
+    }
+
+    @Test
     void residentsHelpFamilyAndFriendsWithoutPlayerInvolvement() throws Exception {
         Path file=directory.resolve("peer-aid.db");
         String donorId,recipientId;

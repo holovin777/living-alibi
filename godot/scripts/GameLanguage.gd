@@ -225,7 +225,18 @@ const IT := {
     "Sorry, I cannot spare supplies right now.": "Mi dispiace, non posso cedere provviste in questo momento.",
     "Bread": "Pane",
     "Water": "Acqua",
-    "%s shared %s with you today.": "Oggi %s ha condiviso con te: %s."
+    "%s shared %s with you today.": "Oggi %s ha condiviso con te: %s.",
+    "Ask for a 10 EUR loan": "Chiedi un prestito di 10 EUR",
+    "Repay personal loan": "Restituisci il prestito personale",
+    "Personal debt: %s EUR · due day %s": "Debito personale: %s EUR · scadenza giorno %s",
+    "Overdue": "Scaduto",
+    "Sorry, I cannot lend you money right now.": "Mi dispiace, non posso prestarti denaro in questo momento.",
+    "Please repay your existing personal loan first.": "Prima restituisci il prestito personale già ricevuto.",
+    "Here are 10 EUR. Please repay me within seven days.": "Ecco 10 EUR. Restituiscimeli entro sette giorni.",
+    "You do not owe me any money.": "Non mi devi denaro.",
+    "You do not have enough money to repay me.": "Non hai abbastanza denaro per restituirmi il prestito.",
+    "Thank you for finally repaying me.": "Grazie per avermi finalmente restituito il prestito.",
+    "Thank you for keeping your promise.": "Grazie per aver mantenuto la promessa."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
