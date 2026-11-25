@@ -59,7 +59,7 @@ final class DemographyLife {
         String id="resident-%04d".formatted(next);
         String[] names={"Anna","Lorenzo","Mia","Tommaso","Emma","Matteo","Giulia","Leo"};
         String surname=a.name.substring(a.name.lastIndexOf(' ')+1);
-        var c=new TownLife.Citizen(id,names[Math.floorMod(next,names.length)]+" "+surname,a.home);
+        var c=new TownLife.Citizen(id,names[Math.floorMod(next,names.length)]+" "+surname,"Child",a.home);
         c.age=0;c.money=20;c.food=2;c.water=2;c.employed=false;c.occupation="Child";c.activity="AT_HOME";
         c.generationIndex=next;c.personalSeed=a.personalSeed^Long.rotateLeft(b.personalSeed,17)^next;
         c.home=a.home;c.homeUnit=a.homeUnit;c.workplace=TownLife.Place.SCHOOL;
