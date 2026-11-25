@@ -55,6 +55,7 @@ var _graphics_details: Array[Node3D] = []
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
 const GameLanguage = preload("res://scripts/GameLanguage.gd")
 const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
+const ResidentAppearance = preload("res://scripts/ResidentAppearance.gd")
 var _guide_label: Label
 var _guide_enabled := true
 var _apartment: Node3D
@@ -1276,7 +1277,9 @@ func _sync_traffic_edges(origin_id: String) -> void:
             if not _traffic_edges.has(key):
                 var cars: Array[Dictionary] = []
                 for i in range(2):
-                    var car := _make_city_car(_traffic_root,Color("#7894aa") if i==0 else Color("#ad7965"))
+                    var colors := [Color("#7894aa"),Color("#ad7965"),Color("#c4c1b7"),Color("#687c64"),Color("#806b7f"),Color("#414d59")]
+                    var palette_index := absi((key+str(i)).hash())%colors.size()
+                    var car := _make_city_car(_traffic_root,colors[palette_index],palette_index%2)
                     car.visible = false
                     cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0})
                 _traffic_edges[key] = {"first":str(first),"second":str(second),"cars":cars}
@@ -1727,26 +1730,55 @@ func _build_motor_court() -> void:
     service_car.position = Vector3(12.5,0,12)
     _add_obstacle(service_car.position,Vector2(1.85,3.6))
 
-func _make_city_car(parent: Node3D,paint: Color) -> Node3D:
+func _make_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
     var car := Node3D.new()
     car.name = "CityCar"
     parent.add_child(car)
+    car.set_meta("body_style",style)
     var dark := Color("#303638")
     var glass := Color("#536d79")
-    _box(car,Vector3(1.78,0.60,3.5),paint,Vector3(0,0.62,0))
-    _box(car,Vector3(1.64,0.65,1.9),paint,Vector3(0,1.23,0.22))
-    _box(car,Vector3(1.45,0.45,0.07),glass,Vector3(0,1.23,-0.76))
-    _box(car,Vector3(1.45,0.45,0.07),glass,Vector3(0,1.23,1.2))
+    _box(car,Vector3(1.78,0.50,3.5),paint,Vector3(0,0.62,0))
+    var body := car.get_child(car.get_child_count()-1) as MeshInstance3D
+    var paint_material := body.material_override as StandardMaterial3D
+    paint_material.roughness = 0.29
+    paint_material.metallic = 0.18
+    var roof_height := 1.45 if style==0 else 1.58
+    _box(car,Vector3(1.52,0.10,1.40),paint,Vector3(0,roof_height,0.20))
+    _box(car,Vector3(1.53,0.12,0.95),paint,Vector3(0,0.91,-1.23))
+    _box(car,Vector3(1.53,0.12,0.65),paint,Vector3(0,0.91,1.39))
+    # Tilt the front and rear glass between hood and roof instead of a square cabin.
     for side in [-1.0,1.0]:
-        for z in [-0.25,0.69]:
-            _box(car,Vector3(0.07,0.44,0.76),glass,Vector3(side*0.835,1.27,z))
+        var glass_height := roof_height-0.91
+        var pane := Node3D.new()
+        pane.position = Vector3(0,(roof_height+0.91)*0.5,0.20+side*0.88)
+        pane.rotation.x = side*0.51
+        car.add_child(pane)
+        _box(pane,Vector3(1.44,glass_height/0.87,0.065),glass,Vector3.ZERO)
+    for side in [-1.0,1.0]:
+        for z in [-0.17,0.60]:
+            _box(car,Vector3(0.06,roof_height-1.01,0.67),glass,Vector3(side*0.76,(roof_height+0.98)*0.5,z))
+        _box(car,Vector3(0.06,roof_height-0.91,0.08),dark,Vector3(side*0.79,(roof_height+0.91)*0.5,0.21))
+        _box(car,Vector3(0.06,0.06,0.22),dark,Vector3(side*0.906,0.78,0.31))
+        _box(car,Vector3(0.06,0.06,0.22),dark,Vector3(side*0.906,0.78,-0.48))
+        _box(car,Vector3(0.13,0.10,0.22),paint,Vector3(side*0.87,1.00,-0.74))
         for z in [-1.08,1.08]:
             var wheel := _cylinder(car,0.32,0.20,dark,Vector3(side*0.82,0.34,z))
             wheel.rotation_degrees.z = 90
-            var hub := _cylinder(car,0.16,0.04,Color("#a6aaa7"),Vector3(side*0.94,0.34,z))
+            var hub := _cylinder(car,0.19,0.04,Color("#a6aaa7"),Vector3(side*0.93,0.34,z))
             hub.rotation_degrees.z = 90
-        _box(car,Vector3(0.34,0.19,0.08),Color("#eee5bb"),Vector3(side*0.60,0.70,-1.79))
+            var center := _cylinder(car,0.075,0.04,Color("#4b5151"),Vector3(side*0.953,0.34,z))
+            center.rotation_degrees.z = 90
+            for n in range(5):
+                var spoke := Node3D.new()
+                spoke.position = Vector3(side*0.954,0.34,z)
+                spoke.rotation.x = float(n)*TAU/5.0
+                car.add_child(spoke)
+                _box(spoke,Vector3(0.018,0.14,0.035),Color("#666d6d"),Vector3(0,0.095,0))
+        _box(car,Vector3(0.38,0.18,0.08),Color("#eee5bb"),Vector3(side*0.60,0.70,-1.79))
         _box(car,Vector3(0.28,0.18,0.08),Color("#b33b36"),Vector3(side*0.65,0.7,1.79))
+    _box(car,Vector3(0.69,0.15,0.07),dark,Vector3(0,0.73,-1.78))
+    for y in [0.69,0.75]:
+        _box(car,Vector3(0.62,0.022,0.07),Color("#858b88"),Vector3(0,y,-1.82))
     for z in [-1.77,1.77]:
         _box(car,Vector3(1.75,0.16,0.13),dark,Vector3(0,0.43,z))
         _box(car,Vector3(0.40,0.12,0.03),Color("#e7e6de"),Vector3(0,0.60,z*1.035))
@@ -3043,25 +3075,65 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     person.set_meta("anchor", anchor)
     person.set_meta("phase", float(absi(id.hash()) % 628) / 100.0)
     _residents_root.add_child(person)
-    var seed := absi(id.hash())
-    var jacket := Color.from_hsv(float(seed % 360)/360.0, 0.48, 0.63)
-    var skin := Color(0.82,0.64,0.49)
-    _cylinder(person, 0.24, 0.57, jacket, Vector3(0,1.14,0))
-    _sphere(person, 0.22, skin, Vector3(0,1.66,0))
-    _sphere(person, 0.215, Color(0.22,0.16,0.12), Vector3(0,1.78,0.035))
+    var profile := ResidentAppearance.profile(id)
+    person.set_meta("appearance",profile)
+    person.scale = Vector3(float(profile["build"]),float(profile["height"]),float(profile["build"]))
+    var jacket: Color = profile["jacket"]
+    var skin: Color = profile["skin"]
+    var hair: Color = profile["hair"]
+    var pants: Color = profile["pants"]
+    var torso := _cylinder(person,0.23,0.57,jacket,Vector3(0,1.14,0))
+    torso.scale.z = 0.72
+    var shoulders := _cylinder(person,0.255,0.14,jacket,Vector3(0,1.36,0))
+    shoulders.scale.z = 0.68
+    _cylinder(person,0.10,0.15,skin,Vector3(0,1.48,0))
+    _sphere(person,0.20,skin,Vector3(0,1.66,0))
+    var style: int = profile["style"]
+    if style == 0:
+        _sphere(person,0.195,hair,Vector3(0,1.75,0.04))
+    elif style == 1:
+        _sphere(person,0.21,hair,Vector3(0,1.76,0.055))
+        _sphere(person,0.12,hair,Vector3(0,1.60,0.17))
+    elif style == 2:
+        _sphere(person,0.17,hair,Vector3(0,1.78,0.025))
+    else:
+        _sphere(person,0.20,hair,Vector3(0,1.77,0.05))
+        _sphere(person,0.12,hair,Vector3(0.11,1.79,0.02))
+    for side in [-1.0,1.0]:
+        _sphere(person,0.045,skin,Vector3(side*0.18,1.64,0))
+        _sphere(person,0.025,Color("#e9e3d8"),Vector3(side*0.072,1.69,-0.177))
+        _sphere(person,0.012,Color("#333530"),Vector3(side*0.072,1.69,-0.199))
+    _sphere(person,0.035,skin,Vector3(0,1.635,-0.193))
+    _box(person,Vector3(0.075,0.012,0.012),skin.darkened(0.32),Vector3(0,1.57,-0.178))
+    _box(person,Vector3(0.05,0.46,0.027),jacket.darkened(0.24),Vector3(0,1.16,-0.175))
+    var accessory: int = profile["accessory"]
+    if accessory == 0:
+        for side in [-1.0,1.0]:
+            _box(person,Vector3(0.105,0.06,0.018),Color("#414b51"),Vector3(side*0.068,1.69,-0.213))
+        _box(person,Vector3(0.045,0.014,0.02),Color("#414b51"),Vector3(0,1.69,-0.214))
+    elif accessory == 1:
+        var bag := _cylinder(person,0.19,0.43,jacket.darkened(0.35),Vector3(0,1.14,0.22))
+        bag.scale = Vector3(1.0,1.0,0.62)
+    elif accessory == 2:
+        var cap := _cylinder(person,0.205,0.095,jacket.darkened(0.23),Vector3(0,1.85,0))
+        cap.scale.z = 1.02
+        _box(person,Vector3(0.32,0.035,0.18),jacket.darkened(0.23),Vector3(0,1.82,-0.19))
     for side in [-1,1]:
         var leg := Node3D.new()
         leg.name = "LegLeft" if side < 0 else "LegRight"
         leg.position = Vector3(side*0.13,0.84,0)
         person.add_child(leg)
-        _box(leg,Vector3(0.20,0.70,0.22),Color(0.20,0.25,0.30),Vector3(0,-0.35,0))
-        _box(leg,Vector3(0.22,0.13,0.34),Color(0.14,0.15,0.17),Vector3(0,-0.77,-0.06))
+        var trouser := _cylinder(leg,0.105,0.70,pants,Vector3(0,-0.35,0))
+        trouser.scale.z = 1.08
+        _box(leg,Vector3(0.22,0.13,0.34),Color("#303032"),Vector3(0,-0.77,-0.06))
+        _box(leg,Vector3(0.23,0.035,0.35),Color("#665f55"),Vector3(0,-0.825,-0.06))
         var arm := Node3D.new()
         arm.name = "ArmLeft" if side < 0 else "ArmRight"
-        arm.position = Vector3(side*0.32,1.37,0)
+        arm.position = Vector3(side*0.29,1.37,0)
         person.add_child(arm)
-        _box(arm,Vector3(0.16,0.44,0.17),jacket,Vector3(0,-0.22,0))
-        _sphere(arm,0.085,skin,Vector3(0,-0.48,0))
+        _cylinder(arm,0.083,0.43,jacket,Vector3(0,-0.22,0))
+        _cylinder(arm,0.085,0.065,jacket.darkened(0.18),Vector3(0,-0.425,0))
+        _sphere(arm,0.075,skin,Vector3(0,-0.48,0))
     _sign(person,display_name,Vector3(0,2.1,0))
     var activity_label := Label3D.new()
     activity_label.name="ActivityLabel"
@@ -3081,21 +3153,24 @@ func _animate_residents(delta: float) -> void:
         var activity := str(person.get_meta("activity", ""))
         var walking := activity in ["WALKING", "WANDERING", "STROLLING", "FREE_TIME", "SHOPPING", "JOB_SEARCH"]
         var phase := float(person.get_meta("phase", 0.0))
+        var appearance: Dictionary = person.get_meta("appearance",{})
+        var pace := float(appearance.get("pace",1.0))
+        var stride := float(appearance.get("stride",0.42))
         if _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target:
             walking = false
         if walking:
-            phase += delta * 0.65
+            phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
             var target := anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
-            var next := person.position.move_toward(target,delta*1.5)
+            var next := person.position.move_toward(target,delta*1.5*pace)
             var old := person.position
             person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
             walking = person.position.distance_squared_to(old) > 0.000001
-        var swing := sin(phase*12.0)*0.42 if walking else 0.0
+        var swing := sin(phase*12.0)*stride if walking else 0.0
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
