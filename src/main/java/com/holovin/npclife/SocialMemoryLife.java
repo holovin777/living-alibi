@@ -6,7 +6,7 @@ package com.holovin.npclife;
  */
 final class SocialMemoryLife {
     private SocialMemoryLife() {}
-    enum Kind { SUPPORT, HURT, BROKEN_TRUST, APOLOGY }
+    enum Kind { SUPPORT, HURT, BROKEN_TRUST, APOLOGY, UNRESOLVED }
     private static String key(TownLife.Town town,String resident,Kind kind) {
         return "social-memory:"+town.player.incarnation+":"+resident+":"+kind.name();
     }
@@ -15,10 +15,11 @@ final class SocialMemoryLife {
     }
     static void remember(TownLife.Town town,String resident,Kind kind,int day) {
         town.industryStocks.merge(key(town,resident,kind),day,Math::max);
+        if(kind==Kind.HURT||kind==Kind.BROKEN_TRUST)town.industryStocks.put(key(town,resident,Kind.UNRESOLVED),1);
+        if(kind==Kind.APOLOGY)town.industryStocks.put(key(town,resident,Kind.UNRESOLVED),0);
     }
     static boolean unresolved(TownLife.Town town,String resident) {
-        int harm=Math.max(last(town,resident,Kind.HURT),last(town,resident,Kind.BROKEN_TRUST));
-        return harm>0 && harm>=last(town,resident,Kind.APOLOGY);
+        return last(town,resident,Kind.UNRESOLVED)>0;
     }
     static String recollection(TownLife.Town town,String resident) {
         if(unresolved(town,resident))return "I remember how you treated me. Trust takes time.";
