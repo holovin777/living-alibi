@@ -74,5 +74,5 @@ func _draw() -> void:
         var detail := "YOU" if id == current_place else (
                 "%s min" % travel_minutes[id] if travel_minutes.has(id) else "—")
         draw_string(font,center+Vector2(-49,16),detail,HORIZONTAL_ALIGNMENT_CENTER,98,12,Color("#edcb75"))
-    draw_string(font,Vector2(10,315),"Road layout concept · times supplied by Java · M / Esc to close",
+    draw_string(font,Vector2(10,315),"Walk along roads · times supplied by Java · M / Esc to close",
             HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color.WHITE)

@@ -10,6 +10,10 @@ const INTERACTION_RADIUS := 3.5
 const WALK_SPEED := 4.5
 const WALKER_RADIUS := 0.32
 const COLLISION_STEP := 0.12
+const ROAD_EDGE := 24.0
+const ROAD_HALF_WIDTH := 2.0
+const ROAD_TRIGGER := 23.8
+const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
 
@@ -30,6 +34,10 @@ var _ground_material: StandardMaterial3D
 var _environment: Environment
 var _api
 var _current_place := ""
+var _road_links: Dictionary = {}
+var _road_pending := ""
+var _road_arrival := Vector3.ZERO
+var _road_blocked := ""
 var _last_snapshot: Dictionary = {}
 var _connected := false
 var _locations: Array = []
@@ -75,7 +83,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     var direction := Vector3.ZERO
     # Do not move away from an open clickable interaction menu.
-    if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible:
+    if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
             direction.z -= 1.0
         if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -88,15 +96,20 @@ func _process(delta: float) -> void:
         # The Java world controls district transitions; this is local preview walking.
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
         _avatar.position = _move_on_ground(_avatar.position,
-                relative_motion * delta * WALK_SPEED, WALKER_RADIUS)
+                relative_motion * delta * WALK_SPEED, WALKER_RADIUS, true)
         _follow_player()
+        _try_road_crossing(relative_motion)
 
     _animate_residents(delta)
     if not _near_gate():
         _travel_panel.visible = false
     if not _near_kiosk():
         _action_panel.visible = false
-    if _near_gate():
+    if not _road_pending.is_empty():
+        _hint.text = "Waiting for Java to confirm arrival..."
+    elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
+        _hint.text = "District crossing · walk forward to travel"
+    elif _near_gate():
         _hint.text = "E: travel gate (game time). V: camera. Esc: cursor."
     elif _near_kiosk():
         _hint.text = "F: local interactions. V: camera. Esc: cursor."
@@ -206,7 +219,7 @@ func _render_place(place_id: String) -> void:
     _ground_material = StandardMaterial3D.new()
     _ground_material.albedo_color = Color(0.27, 0.49, 0.26)
     var ground := BoxMesh.new()
-    ground.size = Vector3(40.0, 0.3, 40.0)
+    ground.size = Vector3(48.0, 0.3, 48.0)
     var floor := MeshInstance3D.new()
     floor.mesh = ground
     floor.material_override = _ground_material
@@ -267,9 +280,13 @@ func _render_place(place_id: String) -> void:
                 _box(_scenery, Vector3(2.0, 1.0, 1.6), Color(0.32, 0.38, 0.42),
                         Vector3(offset, 0.5, 2.2))
         "RIVER":
-            _add_obstacle(Vector3(-11.0, 0.0, 0.0), Vector2(10.0, 35.0))
+            # A bridge keeps the east-west public road dry.
+            for z in [-10.0, 10.0]:
+                _add_obstacle(Vector3(-11.0, 0.0, z), Vector2(10.0, 15.0))
             _box(_scenery, Vector3(10.0, 0.11, 35.0), Color(0.12, 0.40, 0.67),
                     Vector3(-11.0, 0.02, 0.0))
+            _box(_scenery, Vector3(10.5, 0.12, 4.8), Color(0.45,0.34,0.23),
+                    Vector3(-11.0, 0.10, 0.0))
             _tree(Vector3(12.0, 0.0, 7.0))
         "WOODS":
             for p in [
@@ -282,16 +299,60 @@ func _render_place(place_id: String) -> void:
             _building("Neighborhood", Color(0.57, 0.61, 0.57))
             _tree(Vector3(11.0, 0.0, 7.0))
 
+    _build_road_links(place_id)
     _apply_weather()
+
+func _build_road_links(place_id: String) -> void:
+    _road_links.clear()
+    var roads := Node3D.new()
+    roads.name = "DistrictRoads"
+    _scenery.add_child(roads)
+    for id in TownLayout.DISTRICTS:
+        if not TownLayout.adjacent(place_id, str(id)):
+            continue
+        var direction := (TownLayout.world_center(str(id)) -
+                TownLayout.world_center(place_id)).normalized()
+        _road_links[direction] = str(id)
+        var vertical := absf(direction.z) > 0.5
+        var dimensions := Vector3(4.0,0.05,15.0) if vertical else Vector3(15.0,0.05,4.0)
+        _box(roads, dimensions, Color(0.49,0.47,0.42),
+                direction * 16.5 + Vector3(0,0.025,0))
+        _sign(roads, str(id).capitalize(), direction * 19.0 + Vector3(0,2.8,0))
+
+func _road_destination(at: Vector3, minimum: float) -> String:
+    for key in _road_links:
+        var direction: Vector3 = key
+        var along := at.dot(direction)
+        var lateral := (at - direction * along).length()
+        if along >= minimum and along <= ROAD_EDGE + 0.001 and lateral <= ROAD_HALF_WIDTH:
+            return str(_road_links[key])
+    return ""
+
+func _try_road_crossing(motion: Vector3) -> void:
+    var destination := _road_destination(_avatar.position, ROAD_TRIGGER)
+    if destination.is_empty():
+        _road_blocked = ""
+        return
+    var direction := (TownLayout.world_center(destination) -
+            TownLayout.world_center(_current_place)).normalized()
+    if motion.dot(direction) <= 0.0 or destination == _road_blocked:
+        return
+    if not _connected or _api.is_busy() or not _road_pending.is_empty():
+        return
+    _road_pending = destination
+    var lateral := _avatar.position - direction * _avatar.position.dot(direction)
+    _road_arrival = lateral - direction * 23.0
+    _api.go_to(destination)
 
 # A flat, client-side collision layer. The Java server owns district travel
 # and never trusts these local visual positions as proof of an action.
 func _add_obstacle(center: Vector3, size: Vector2) -> void:
     _obstacles.append(Rect2(Vector2(center.x, center.z) - size * 0.5, size))
 
-func _can_stand(at: Vector3, radius: float) -> bool:
+func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
     if absf(at.x) > 17.0 or absf(at.z) > 17.0:
-        return false
+        if not allow_roads or _road_destination(at, 17.0).is_empty():
+            return false
     var p := Vector2(at.x, at.z)
     for obstacle in _obstacles:
         var nearest := p.clamp(obstacle.position, obstacle.end)
@@ -299,7 +360,8 @@ func _can_stand(at: Vector3, radius: float) -> bool:
             return false
     return true
 
-func _move_on_ground(from: Vector3, displacement: Vector3, radius: float) -> Vector3:
+func _move_on_ground(from: Vector3, displacement: Vector3, radius: float,
+        allow_roads: bool = false) -> Vector3:
     # Substeps prevent tunnelling even when a frame takes longer than usual.
     # Independent axes permit sliding along walls instead of sticking to them.
     var count := maxi(1, ceili(Vector2(displacement.x, displacement.z).length() / COLLISION_STEP))
@@ -307,14 +369,14 @@ func _move_on_ground(from: Vector3, displacement: Vector3, radius: float) -> Vec
     var at := from
     for i in range(count):
         var candidate := at + step
-        if _can_stand(candidate, radius):
+        if _can_stand(candidate, radius, allow_roads):
             at = candidate
         else:
             candidate = at + Vector3(step.x, 0.0, 0.0)
-            if _can_stand(candidate, radius):
+            if _can_stand(candidate, radius, allow_roads):
                 at = candidate
             candidate = at + Vector3(0.0, 0.0, step.z)
-            if _can_stand(candidate, radius):
+            if _can_stand(candidate, radius, allow_roads):
                 at = candidate
     return at
 
@@ -693,6 +755,7 @@ func _render_destinations() -> void:
 func _travel_to(destination: String) -> void:
     if not _near_gate() or _api.is_busy() or not _connected:
         return
+    _road_blocked = ""
     _travel_panel.visible = false
     _api.go_to(destination)
 
@@ -911,10 +974,16 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _last_snapshot = snapshot
     var player: Dictionary = snapshot.get("player", {})
     var new_place := str(player.get("placeId", "PARK"))
+    var road_arrival := new_place == _road_pending and not _road_pending.is_empty()
+    if not _road_pending.is_empty():
+        _road_blocked = "" if road_arrival else _road_pending
+        _road_pending = ""
     if new_place != _current_place:
         _current_place = new_place
         _render_place(new_place)
-        _avatar.position = Vector3.ZERO
+        _avatar.position = _road_arrival if road_arrival else Vector3.ZERO
+        if not _can_stand(_avatar.position, WALKER_RADIUS, true):
+            _avatar.position = Vector3.ZERO
         _locations.clear() # Previous-origin travel estimates are now stale.
         _follow_player()
         _action_panel.visible = false
@@ -1066,4 +1135,7 @@ func _set_request_busy(busy: bool) -> void:
             node.disabled = busy or same_place
 
 func _on_request_failed(message: String) -> void:
+    if not _road_pending.is_empty():
+        _road_blocked = _road_pending
+        _road_pending = ""
     _message.text = "Java server: " + message

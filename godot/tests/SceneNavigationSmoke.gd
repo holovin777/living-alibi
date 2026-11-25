@@ -88,6 +88,52 @@ func _exercise() -> void:
             "district boundary remains enforced"):
         return
 
+    if not _check(world._road_links.size() == 4
+            and world._road_destination(Vector3(0,0,-23.9),23.8) == "SCHOOL"
+            and world._road_destination(Vector3(23.9,0,0),23.8) == "LIBRARY"
+            and world._road_destination(Vector3(-23.9,0,0),23.8) == "BAKERY"
+            and world._road_destination(Vector3(0,0,23.9),23.8) == "RIVER",
+            "park has four walkable connections matching the town layout"):
+        return
+    var road_end: Vector3 = world._move_on_ground(Vector3(0,0,16),
+            Vector3(0,0,12),world.WALKER_RADIUS,true)
+    if not _check(road_end.z >= 23.8 and road_end.z <= 24.001,
+            "visitor can walk to a road seam"):
+        return
+    var offroad: Vector3 = world._move_on_ground(Vector3(8,0,16),
+            Vector3(0,0,12),world.WALKER_RADIUS,true)
+    if not _check(offroad.z <= 17.0, "off-road district boundary remains solid"):
+        return
+    # Simulate server rejection and committed arrival without a live Java process.
+    world._road_pending = "SCHOOL"
+    world._road_arrival = Vector3(0,0,23)
+    world._on_request_failed("offline test")
+    if not _check(world._road_pending.is_empty() and world._road_blocked == "SCHOOL"
+            and world._current_place == "PARK", "failed crossing keeps the original district"):
+        return
+    world._road_pending = "SCHOOL"
+    world._view_yaw = 0.25
+    world._on_world_updated(_world("SCHOOL", "School"))
+    if not _check(world._current_place == "SCHOOL"
+            and world._avatar.position == Vector3(0,0,23)
+            and is_equal_approx(world._view_yaw,0.25)
+            and world._road_destination(Vector3(0,0,23.9),23.8) == "PARK",
+            "confirmed road arrival preserves orientation and enters opposite edge"):
+        return
+    world._road_pending = "PARK"
+    world._road_arrival = Vector3(0,0,-23)
+    world._on_world_updated(_world("PARK", "Park"))
+    world._avatar.position = Vector3.ZERO
+    world._view_yaw = 0.0
+    world._follow_player()
+    world._on_world_updated(_world("RIVER", "River"))
+    var bridge: Vector3 = world._move_on_ground(Vector3(-5,0,0),
+            Vector3(-12,0,0),world.WALKER_RADIUS,true)
+    if not _check(bridge.x < -16.8 and world._can_stand(bridge,world.WALKER_RADIUS,true),
+            "river crossing has a walkable bridge"):
+        return
+    world._on_world_updated(_world("PARK", "Park"))
+
     var populated_park := _world("PARK", "Park")
     populated_park["residents"] = [
         {"id": "marco", "name": "Marco Bianchi", "activity": "WALKING"},
