@@ -2895,6 +2895,16 @@ func _building(_title: String, wall_color: Color) -> void:
             Vector3(-7.0, 4.85, 7.5))
     _box(_scenery, Vector3(2.1, 3.0, 0.1), Color(0.20, 0.28, 0.32),
             Vector3(-7.0, 1.5, 3.95))
+    _sign(_scenery,_title,Vector3(-7,3.9,3.82))
+    var trim := wall_color.lightened(0.25)
+    for x in [-10.7,-3.3]:
+        for y in [1.5,3.25]:
+            _box(_scenery,Vector3(1.55,1.3,0.12),trim,Vector3(x,y,3.91))
+            _box(_scenery,Vector3(1.28,1.03,0.14),Color("#4a6068"),Vector3(x,y,3.83))
+            _box(_scenery,Vector3(0.065,1.02,0.16),trim,Vector3(x,y,3.74))
+            _box(_scenery,Vector3(1.28,0.065,0.16),trim,Vector3(x,y,3.74))
+            _box(_scenery,Vector3(1.65,0.13,0.24),trim,Vector3(x,y-0.68,3.82))
+    _box(_scenery,Vector3(11.0,0.18,0.14),trim,Vector3(-7,2.42,3.9))
 
 func _create_gate_and_kiosk() -> void:
     # A yellow gate is a map transition — actual travel is authorized by Java.
