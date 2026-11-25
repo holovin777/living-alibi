@@ -15,6 +15,7 @@ func _exercise() -> void:
     var world = packed.instantiate()
     root.add_child(world)
     await process_frame
+    world.GameLanguage.select_locale("en",false)
 
     var clock = preload("res://scripts/LiveClock.gd").new()
     for i in range(5):
@@ -1175,6 +1176,25 @@ func _exercise() -> void:
     world._avatar.position=world.JAVA_DESK
     world._tick_office_joker(60.0)
     if not _check(world._residents_root.get_child_count()==0 and world._office_joker_id=="resident-0002","absent worker is not fabricated or replaced"):
+        return
+    var language = preload("res://scripts/GameLanguage.gd")
+    var personality = preload("res://scripts/ResidentPersonality.gd")
+    var styles := {}
+    for i in range(100):
+        var resident_id := "resident-"+str(i)
+        var style: String = personality.style(resident_id)
+        if not _check(style==personality.style(resident_id),"resident style is deterministic"):
+            return
+        styles[style]=true
+    if not _check(styles.size()==7,"all seven personality styles appear"):
+        return
+    language.select_locale("it",false)
+    world._refresh_localized_hud()
+    if not _check(world._needs.text.begins_with("Fame") and str(TranslationServer.translate("Jobs"))=="Lavoro" and str(TranslationServer.translate(world.OFFICE_JOKE_LINES[0]))=="CHI HA FATTO IL MERGE DI VENERDÌ?!","Italian HUD, buttons and office jokes"):
+        return
+    language.select_locale("en",false)
+    world._refresh_localized_hud()
+    if not _check(world._needs.text.begins_with("Hunger") and str(TranslationServer.translate("Jobs"))=="Jobs","English fallback restores original text"):
         return
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
