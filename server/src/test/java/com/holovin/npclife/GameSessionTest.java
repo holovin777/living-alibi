@@ -165,6 +165,61 @@ class GameSessionTest {
     }
 
     @Test
+    void constructionConsumesRealMaterialsAndPaidLaborAndPersistsCompletedHouse() throws Exception {
+        Path file=directory.resolve("construction.db");
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            p.place=TownLife.Place.OFFICE;p.destination=p.place;p.travelRemaining=0;p.money=200;
+            town.industryStocks.put(IndustryLife.FACTORY_STEEL,3);
+            town.industryStocks.put(IndustryLife.FACTORY_PARTS,2);
+            int factory=town.employerFunds.getOrDefault("machinist",0);
+            ConstructionLife.act(town,"construction-buy",600);
+            assertThrows(IllegalArgumentException.class,()->ConstructionLife.act(town,"construction-buy",600));
+            for(int i=0;i<3;i++)ConstructionLife.act(town,"construction-steel",600);
+            for(int i=0;i<2;i++)ConstructionLife.act(town,"construction-parts",600);
+            assertEquals(factory+22,town.employerFunds.get("machinist"));
+            assertEquals(0,IndustryLife.stock(town,IndustryLife.FACTORY_STEEL));
+            assertEquals(0,IndustryLife.stock(town,IndustryLife.FACTORY_PARTS));
+            ConstructionLife.act(town,"construction-start",600);
+            ConstructionLife.tick(town,1,840);
+            assertEquals(0,ConstructionLife.report(town).stage());
+            for(int i=0;i<3;i++)ConstructionLife.act(town,"construction-fund",600);
+            ConstructionLife.tick(town,2,840);ConstructionLife.tick(town,2,840);
+            assertEquals(1,ConstructionLife.report(town).stage());
+            assertEquals(20,ConstructionLife.report(town).reserve());
+            assertEquals(2,ConstructionLife.report(town).steel());
+            assertEquals(2,ConstructionLife.report(town).parts());
+            assertThrows(IllegalArgumentException.class,()->ConstructionLife.act(town,"construction-sell",600));
+            state.day=2;state.minute=840;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);var p=town.player;
+            assertEquals(1,ConstructionLife.report(town).stage());
+            ConstructionLife.tick(town,2,840);
+            ConstructionLife.tick(town,3,840);
+            assertEquals(2,ConstructionLife.report(town).stage());
+            ConstructionLife.tick(town,4,840);
+            assertEquals(3,ConstructionLife.report(town).stage());
+            assertEquals(0,ConstructionLife.report(town).steel());
+            assertEquals(0,ConstructionLife.report(town).parts());
+            assertEquals(0,ConstructionLife.report(town).reserve());
+            assertEquals(30,town.employerFunds.get(ConstructionLife.CONTRACTOR));
+            assertEquals(88,p.money);
+            ConstructionLife.act(town,"construction-sell",900);
+            assertEquals(238,p.money);
+            assertFalse(ConstructionLife.report(town).owned());
+            assertEquals(3,ConstructionLife.report(town).stage());
+            assertThrows(IllegalArgumentException.class,()->ConstructionLife.act(town,"construction-buy",900));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(3,game.snapshot().construction().stage());
+            assertFalse(game.snapshot().construction().owned());
+        }
+    }
+
+    @Test
     void apartmentLeaseMovesResidentConservesRentAndSurvivesRestart() throws Exception {
         Path file=directory.resolve("rental.db");
         String tenantId;
