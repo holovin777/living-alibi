@@ -22,7 +22,11 @@ uses a separate real company account.
 4. **Buy a fabrication machine** for 25 EUR from an actual
    `equipment-supplier` company account.
 5. **Hire an available resident** who is physically at the Workshop.
-   A contract pays an actual 10 EUR signing bonus from the business
+   Each new 12-resident city includes a real mechanic with a normal
+   morning Workshop commute, so there is an initial potential applicant
+   without spawning an employee from nothing. Applicants may leave for
+   other activities or become unavailable, so recruitment depends on
+   meeting them during work hours. A contract pays an actual 10 EUR signing bonus from the business
    account to that citizen. To hire, the shop must also have enough
    cash to cover at least two hours of wages and a steel purchase
    (36 EUR in total before the bonus is paid).
