@@ -42,6 +42,8 @@ const WeatherEffects = preload("res://scripts/WeatherEffects.gd")
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
 const GameLanguage = preload("res://scripts/GameLanguage.gd")
 const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
+var _guide_label: Label
+var _guide_enabled := true
 var _apartment: Node3D
 var _apartment_active := false
 var _home_entrance: Node3D
@@ -214,6 +216,7 @@ func _process(delta: float) -> void:
             _try_road_crossing(relative_motion)
 
     if _apartment_active:
+        _update_first_steps()
         _animate_residents(delta)
         _weather_fx.follow(_avatar.position)
         _weather_fx.set_sheltered(true,_environment)
@@ -227,6 +230,7 @@ func _process(delta: float) -> void:
     _weather_fx.follow(_avatar.position)
     _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
+        _update_first_steps()
         if _near_software():
             _hint.text="E: Borgo Digital · "+_office_station()+" · F: life choices"
         elif _near_engineering():
@@ -247,6 +251,7 @@ func _process(delta: float) -> void:
             _hint.text = "F: life choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
         return
     _tick_live_clock(delta)
+    _update_first_steps()
     if not _near_gate():
         _travel_panel.visible = false
     if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck():
@@ -271,12 +276,12 @@ func _process(delta: float) -> void:
         _hint.text = "F: use your bed, kitchen or bathroom."
     elif _current_place == "NORTH_RESIDENCES" and _avatar.position.distance_to(ROOM_EXIT) < 2.3:
         _hint.text = "Your room is open." if _has_room_lease() else "Rent a room at reception (blue kiosk)."
+    elif _near_gate():
+        _hint.text = tr("E: travel gate (game time). Esc: cursor.")
+    elif _near_kiosk():
+        _hint.text = tr("F: local interactions. Esc: cursor.")
     elif not _nearest_resident().is_empty():
         _hint.text = "T: talk to nearby resident · Esc: cursor."
-    elif _near_gate():
-        _hint.text = "E: travel gate (game time). Esc: cursor."
-    elif _near_kiosk():
-        _hint.text = "F: local interactions. Esc: cursor."
     else:
         _hint.text = "WASD: walk · click scene: mouse look · Esc: cursor."
 
@@ -396,12 +401,59 @@ func _unhandled_key_input(event: InputEvent) -> void:
         elif event.keycode == KEY_B and not _action_panel.visible and not _travel_panel.visible and not _map_panel.visible and not _dialog_panel.visible:
             _toggle_transport()
             get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_E and _near_gate() and not _map_panel.visible:
-            _toggle_travel()
+        elif event.keycode == KEY_E and not _map_panel.visible:
+            if _near_gate():
+                _toggle_travel()
+            else:
+                _message.text=tr("Find the yellow TRAVEL gate. Follow the distance and direction in First steps.")
             get_viewport().set_input_as_handled()
-        elif event.keycode == KEY_F and (_near_kiosk() or _near_home_station() or _near_car() or _near_truck()) and not _map_panel.visible:
+        elif event.keycode == KEY_F and not _map_panel.visible:
             _toggle_actions()
             get_viewport().set_input_as_handled()
+
+func _set_guide_enabled(enabled: bool) -> void:
+    _guide_enabled=enabled
+    _update_first_steps()
+
+func _guide_direction(target: Vector3) -> String:
+    var offset := target-_avatar.position
+    var distance := Vector2(offset.x,offset.z).length()
+    if distance<INTERACTION_RADIUS:
+        return tr("nearby")
+    var local := Basis(Vector3.UP,-_view_yaw)*offset
+    var angle := atan2(local.x,-local.z)
+    var sector := posmod(roundi(angle/(PI/4.0)),8)
+    var arrows := ["↑","↗","→","↘","↓","↙","←","↖"]
+    return "%s %s m" % [arrows[sector],roundi(distance)]
+
+func _update_first_steps() -> void:
+    if not is_instance_valid(_guide_label):return
+    _guide_label.visible=_guide_enabled and not _drive_active()
+    if not _guide_enabled:return
+    if not _connected:
+        _guide_label.text=tr("First steps: connecting to the world...")
+        return
+    if _rebirth_active():
+        _guide_label.text=tr("Your life: F opens choices. Follow signs to shops, work and home.")
+        return
+    var p: Dictionary=_last_snapshot.get("player",{})
+    var job = p.get("jobId")
+    var guide := ""
+    if job==null or str(job).is_empty():
+        if _current_place=="MARKET":
+            guide=tr("Optional goal: find the blue SERVICES kiosk %s. Press F and choose Apply: market assistant.") % _guide_direction(KIOSK_POSITION)
+        else:
+            guide=tr("Optional goal: earn your first money. Walk to yellow TRAVEL gate %s, press E and choose Market.") % _guide_direction(GATE_POSITION)
+    else:
+        var workplaces := {"shop-assistant":"MARKET","technician":"WORKSHOP","engineer":"OFFICE","investigator":"OFFICE","miner":"QUARRY","machinist":"FACTORY","journalist":"LIBRARY","farm-worker":"FARM","fuel-attendant":"FUEL_STATION"}
+        var site := str(workplaces.get(str(job),""))
+        if site==_current_place:
+            guide=tr("Your job: blue SERVICES kiosk %s. Press F for work actions during working hours.") % _guide_direction(KIOSK_POSITION)
+        elif not site.is_empty():
+            guide=tr("Your job: %s. Travel gate %s (E).") % [str(TownLayout.LABELS.get(site,site)),_guide_direction(GATE_POSITION)]
+        else:
+            guide=tr("Explore freely: use the blue SERVICES kiosk for local actions.")
+    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T") % [_guide_direction(GATE_POSITION),_guide_direction(DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)])
 
 func _near_gate() -> bool:
     return _avatar.position.distance_to(GATE_POSITION) < INTERACTION_RADIUS
@@ -2829,8 +2881,10 @@ func _create_gate_and_kiosk() -> void:
             GATE_POSITION + Vector3(1.6, 1.55, 0.0))
     _box(_scenery, Vector3(3.6, 0.38, 0.45), Color(0.94, 0.69, 0.12),
             GATE_POSITION + Vector3(0.0, 3.2, 0.0))
+    _sign(_scenery,tr("TRAVEL · E"),GATE_POSITION+Vector3(0,3.65,0))
     if _scenery.name != "PublicScene_LOGISTICS_DEPOT":
         # Blue kiosk: only offers actions physically available in this district.
+        _sign(_scenery,tr("SERVICES · F"),KIOSK_POSITION+Vector3(0,2.25,0))
         _box(_scenery, Vector3(2.4, 1.4, 1.6), Color(0.13, 0.39, 0.69),
                 KIOSK_POSITION + Vector3(0.0, 0.7, 0.0))
         _box(_scenery, Vector3(3.2, 0.22, 2.2), Color(0.88, 0.89, 0.89),
@@ -2975,7 +3029,18 @@ func _create_interface() -> void:
     audio_toggle.button_pressed = true
     audio_toggle.toggled.connect(_set_weather_audio)
     atmosphere_row.add_child(audio_toggle)
+    var guide_toggle := CheckButton.new()
+    guide_toggle.text = "First steps / navigation"
+    guide_toggle.button_pressed = true
+    guide_toggle.toggled.connect(_set_guide_enabled)
+    column.add_child(guide_toggle)
+    _guide_label=Label.new()
+    _guide_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _guide_label.custom_minimum_size=Vector2(420,0)
+    _guide_label.text=tr("First steps: connecting to the world...")
+    column.add_child(_guide_label)
     _hint = Label.new()
+    _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _hint.text = "WASD: walk · click scene: mouse look · Esc: cursor."
     column.add_child(_hint)
     _jobs = Label.new()
