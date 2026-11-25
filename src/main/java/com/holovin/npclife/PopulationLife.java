@@ -18,7 +18,7 @@ final class PopulationLife {
     private static void lifeTick(TownLife.Town town,TownLife.Citizen c,WorldState clock,
                                  List<TownLife.Event> events,List<TownLife.Observation> observations) {
         int minute=clock.minute;
-        if(minute==0 && clock.day>1 && (clock.day-1)%365==0)c.age++;
+        boolean child=DemographyLife.child(c),retired="Retired".equals(c.occupation);
         // Keep each resident's need cycles independent of everyone else's.
         int hungerPhase=Math.floorMod(c.generationIndex*7,12);
         int thirstPhase=Math.floorMod(c.generationIndex*3,10);
@@ -35,7 +35,7 @@ final class PopulationLife {
         boolean carrier=LogisticsLife.isDriver(town,c);
         TownLife.Place freightDestination=LogisticsLife.activeDriverDestination(town,c);
         boolean freightRun=carrier && freightDestination!=null && !sick;
-        boolean working=c.employed && !sick && workday &&
+        boolean working=!child&&!retired&&c.employed && !sick && workday &&
                 (carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
@@ -49,6 +49,7 @@ final class PopulationLife {
         if(sick)desired=c.home;
         else if(freightRun)desired=freightDestination;
         else if(sleeping)desired=c.home;
+        else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:c.home;
         else if(carrier && working)desired=c.workplace;
         else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
         else if(stallEmployee && working)desired=TownLife.Place.MARKET;
@@ -72,13 +73,15 @@ final class PopulationLife {
             if(c.travelRemaining>0){c.activity="TRAVELING";return;}
         }
         // During a short illness, essential supplies may be delivered to the private unit.
-        if(sick && c.place==c.home && marketOpen) {
+        if((sick||child) && c.place==c.home && marketOpen) {
             if(c.food<2 && c.money>=12) {
                 c.money-=12;c.food+=3;
+                if(child)town.employerFunds.merge("shop-assistant",12,Math::addExact);
                 TownLife.publish(town,clock,c.id,c.place,c.name+" received groceries at home.",events,observations);
             }
             if(c.water<2 && c.money>=6) {
                 c.money-=6;c.water+=3;
+                if(child)town.employerFunds.merge("shop-assistant",6,Math::addExact);
                 TownLife.publish(town,clock,c.id,c.place,c.name+" received drinking water at home.",events,observations);
             }
         }
@@ -105,6 +108,8 @@ final class PopulationLife {
         }
         if(sleeping)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
+        else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":"AT_HOME";
+        else if(retired)c.activity="RETIRED";
         else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
         else if(freightRun)c.activity="WORKING";
         else if(working && c.place==c.workplace){

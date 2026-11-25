@@ -49,7 +49,7 @@ final class MunicipalLife {
         if(t.player.alive){
             int n=levy(t.player.money);receiveTax(t,n);t.player.money-=n;
         }
-        for(var c:t.people.values())if(c.alive&&c.generationIndex>0){
+        for(var c:t.people.values())if(c.alive&&c.generationIndex>0&&!DemographyLife.child(c)){
             int n=levy(c.money);receiveTax(t,n);c.money-=n;
         }
         upkeep(t,"water-pump","spare-parts",8);

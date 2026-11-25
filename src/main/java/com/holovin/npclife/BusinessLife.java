@@ -88,7 +88,7 @@ final class BusinessLife {
         if(!town.player.alive || town.player.place!=TownLife.Place.WORKSHOP ||
                 town.player.travelRemaining>0)return List.of();
         return town.people.values().stream().filter(c->
-                c.generationIndex>0 && c.alive && c.presentAt(TownLife.Place.WORKSHOP) &&
+                c.generationIndex>0 && DemographyLife.workingAge(c) && c.alive && c.presentAt(TownLife.Place.WORKSHOP) &&
                 !EmploymentLife.sick(c,day) && !LogisticsLife.isDriver(town,c) && !MarketStallLife.isEmployee(town,c) &&
                 !(c.id.equals(town.business.employeeId) && c.employed &&
                         "Independent fabricator".equals(c.occupation))).toList();

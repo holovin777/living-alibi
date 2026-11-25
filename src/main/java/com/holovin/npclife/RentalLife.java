@@ -47,7 +47,7 @@ final class RentalLife {
         set(t,REVENUE,revenue);
     }
     static boolean affordable(TownLife.Citizen c){
-        return c.alive&&c.generationIndex>0&&c.money>=RENT+LIVING_RESERVE&&c.unpaidBills<100;
+        return c.alive&&c.generationIndex>0&&!DemographyLife.child(c)&&c.money>=RENT+LIVING_RESERVE&&c.unpaidBills<100;
     }
     static void tick(TownLife.Town t,int day,int minute){
         if(minute!=360||get(t,LAST)>=day)return;

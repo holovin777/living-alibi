@@ -80,7 +80,7 @@ final class InvestigationLife {
                               TownLife.Place.MARKET,TownLife.Place.LIBRARY)) {
             var people=new ArrayList<TownLife.Citizen>();
             for(var person:town.people.values())
-                if(person.presentAt(place) && person.currentSpace().equals(TownLife.publicSpace(place)) &&
+                if(!DemographyLife.child(person)&&person.presentAt(place) && person.currentSpace().equals(TownLife.publicSpace(place)) &&
                         !person.activity.equals("SLEEPING") && !person.activity.equals("TRAVELING"))
                     people.add(person);
             if(people.size()<3)continue;
@@ -138,7 +138,7 @@ final class InvestigationLife {
                                    MotiveLife.Assessment motive,List<TownLife.Event> truth,
                                    List<TownLife.Observation> observations) {
         PropertyLife.ensureStarterItems(town,clock);
-        if(offender==victim || !offender.presentAt(place) || !victim.presentAt(place) ||
+        if(offender==victim || DemographyLife.child(offender)||DemographyLife.child(victim)|| !offender.presentAt(place) || !victim.presentAt(place) ||
                 !offender.currentSpace().equals(TownLife.publicSpace(place)) ||
                 !victim.currentSpace().equals(TownLife.publicSpace(place)) || victim.money<15 ||
                 PropertyLife.carriedWallet(town,victim)==null)

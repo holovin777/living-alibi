@@ -165,6 +165,78 @@ class GameSessionTest {
     }
 
     @Test
+    void familyBirthSchoolRetirementAndInheritancePersistAcrossRestart() throws Exception {
+        Path file=directory.resolve("demography.db");
+        String firstId,secondId,childId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var adults=PopulationGenerator.add(town,2);
+            var first=adults.get(0);var second=adults.get(1);
+            firstId=first.id;secondId=second.id;
+            first.age=30;second.age=29;first.money=150;second.money=150;
+            var relation=new SocialLife.Relationship(first.id,second.id);
+            relation.affinity=80;relation.trust=80;relation.tension=0;
+            town.peerRelationships.put(SocialNetwork.key(first.id,second.id),relation);
+            assertTrue(DemographyLife.pair(town,first,second,1));
+            assertNull(DemographyLife.birth(town,first,second,270));
+            var child=DemographyLife.birth(town,first,second,271);
+            assertNotNull(child);childId=child.id;
+            assertEquals(280,first.money+second.money);
+            assertEquals(20,child.money);assertEquals(0,child.age);
+            assertEquals(first.homeUnit,child.homeUnit);
+            assertFalse(child.employed);
+            assertNull(DemographyLife.birth(town,first,second,271));
+            assertThrows(IllegalArgumentException.class,()->EmploymentLife.hire(town,state,child,0));
+            assertEquals(1,DemographyLife.report(town).births());
+            first.age=100;first.personalSeed=0;first.money=120;
+            second.age=66;second.money=140;
+            state.day=271;state.minute=360;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var first=town.get(firstId);var second=town.get(secondId);var child=town.get(childId);
+            assertEquals(first.generationIndex,DemographyLife.get(town,child,"parent-a"));
+            assertEquals(second.generationIndex,DemographyLife.get(town,child,"parent-b"));
+            state.day=366;state.minute=360;
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertFalse(first.alive);assertEquals(0,first.money);assertEquals(140,child.money);
+            assertEquals(second.homeUnit,child.homeUnit);
+            assertEquals("Retired",second.occupation);assertFalse(second.employed);
+            assertEquals(120,DemographyLife.report(town).inherited());
+            assertEquals(1,DemographyLife.report(town).deaths());
+            assertThrows(IllegalArgumentException.class,()->EmploymentLife.hire(town,state,second,0));
+            state.day=372;
+            int city=town.employerFunds.get(MunicipalLife.CITY);
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(175,second.money);
+            assertEquals(city-35,town.employerFunds.get(MunicipalLife.CITY));
+            child.age=5;state.day=271+6*365;
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(6,child.age);
+            child.place=TownLife.Place.SCHOOL;child.destination=child.place;child.travelRemaining=0;
+            state.day=2466;state.minute=600;
+            PopulationLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertFalse(child.employed);
+            child.age=17;state.day=271+18*365;state.minute=360;
+            DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+            assertEquals(18,child.age);assertEquals("Job seeker",child.occupation);
+            assertEquals(TownLife.privateUnit(child.id),child.homeUnit);
+            assertFalse(child.employed);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            assertEquals(18,town.get(childId).age);
+            assertFalse(town.get(firstId).alive);
+            assertEquals(1,DemographyLife.report(town).births());
+            assertEquals(1,DemographyLife.report(town).deaths());
+            assertEquals(120,DemographyLife.report(town).inherited());
+        }
+    }
+
+    @Test
     void municipalBudgetTransfersTaxesAndFundsServicesWithoutMintingCash() throws Exception {
         Path file=directory.resolve("comune.db");
         String residentId;

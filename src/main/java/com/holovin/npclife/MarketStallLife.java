@@ -90,7 +90,7 @@ final class MarketStallLife {
     }
     static List<TownLife.Citizen> candidates(TownLife.Town t,int day){
         if(!t.player.alive||t.player.place!=TownLife.Place.MARKET||t.player.travelRemaining>0)return List.of();
-        return t.people.values().stream().filter(c->c.generationIndex>0&&!c.employed&&c.presentAt(TownLife.Place.MARKET)&&!EmploymentLife.sick(c,day)).toList();
+        return t.people.values().stream().filter(c->c.generationIndex>0&&DemographyLife.workingAge(c)&&!c.employed&&c.presentAt(TownLife.Place.MARKET)&&!EmploymentLife.sick(c,day)).toList();
     }
     static boolean active(TownLife.Town t,int day,int minute){
         var p=t.player;
