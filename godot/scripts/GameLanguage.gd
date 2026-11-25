@@ -350,7 +350,9 @@ const IT := {
     "Order coffee · 2 EUR": "Ordina caffè · 2 EUR",
     "Explore the shop: walk through the entrance to the counter %s, press E.": "Entra nel negozio, raggiungi il banco %s e premi E.",
     "Enjoyed a coffee at Bar Centrale.": "Hai preso un caffè al Bar Centrale.",
-    "Visiting": "In visita"
+    "Visiting": "In visita",
+    "Resting on bench": "Riposa sulla panchina",
+    "Chatting": "Chiacchiera"
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:

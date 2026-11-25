@@ -685,6 +685,23 @@ func _exercise() -> void:
     if not _check(world._residents_root.get_node("Resident_marco") == marco,
             "refresh retains the same resident model and animation state"):
         return
+    populated_park["residents"][0]["wantsRest"]=true
+    populated_park["residents"][0]["activity"]="FREE_TIME"
+    world._on_world_updated(populated_park)
+    if not _check(marco.get_meta("leisure_mode")=="bench","tired leisure resident is assigned an available bench"):
+        return
+    marco.position=marco.get_meta("leisure_target")
+    world._animate_residents(0.1)
+    if not _check(marco.get_meta("seated",false) and marco.get_node("LegLeft/Knee").rotation.x<0,
+            "bench arrival triggers seated knee articulation"):
+        return
+    populated_park["residents"][0]["wantsRest"]=false
+    populated_park["residents"][0]["chatPartnerId"]="elena"
+    populated_park["residents"][1]["chatPartnerId"]="marco"
+    world._on_world_updated(populated_park)
+    if not _check(marco.get_meta("leisure_mode")=="chat" and elena.get_meta("leisure_mode")=="chat",
+            "actual mutual social event produces paired visual conversation"):
+        return
     var rainy := _world("PARK", "Park")
     rainy["weather"] = {"sky":"RAIN","raining":true,"snowing":false}
     world._on_world_updated(rainy)

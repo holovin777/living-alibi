@@ -2740,6 +2740,8 @@ func _render_residents() -> void:
         person.set_meta("mood",str(resident.get("mood","CALM")))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
+        person.set_meta("wants_rest",bool(resident.get("wantsRest",false)))
+        person.set_meta("chat_partner",str(resident.get("chatPartnerId","")) if resident.get("chatPartnerId")!=null else "")
         _sync_office_employee(person,id)
         _sync_dojo_member(person,id)
         _sync_shop_resident(person,i)
@@ -2755,6 +2757,7 @@ func _render_residents() -> void:
             _residents_root.remove_child(child)
             child.queue_free()
 
+    _plan_public_leisure()
     _sync_office_joker()
 
 func _sync_office_joker() -> void:
@@ -2949,8 +2952,13 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         leg.name = "LegLeft" if side < 0 else "LegRight"
         leg.position = Vector3(side*0.105*width,0.86,0)
         person.add_child(leg)
-        _resident_capsule(leg,0.09,0.74,trousers,Vector3(0,-0.36,0),Vector3(1,1,0.94),"Trouser")
-        _box(leg,Vector3(0.19,0.13,0.31),Color("#292b2c"),Vector3(0,-0.785,-0.06))
+        _resident_capsule(leg,0.09,0.40,trousers,Vector3(0,-0.18,0),Vector3(1,1,0.94),"Trouser")
+        var knee := Node3D.new()
+        knee.name="Knee"
+        knee.position=Vector3(0,-0.38,0)
+        leg.add_child(knee)
+        _resident_capsule(knee,0.075,0.37,trousers,Vector3(0,-0.18,0),Vector3(1,1,0.94),"Shin")
+        _box(knee,Vector3(0.19,0.13,0.31),Color("#292b2c"),Vector3(0,-0.405,-0.06))
         var arm := Node3D.new()
         arm.name = "ArmLeft" if side < 0 else "ArmRight"
         arm.position = Vector3(side*0.25*width,1.39,0)
@@ -2968,6 +2976,38 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     person.add_child(activity_label)
     return person
 
+func _plan_public_leisure() -> void:
+    var used: Dictionary={}
+    for person in _residents_root.get_children():
+        person.set_meta("leisure_target",Vector3.ZERO)
+        person.set_meta("leisure_mode","")
+    if _apartment_active or _current_place not in ["PARK","CENTRO"]:return
+    var benches: Array = [Vector3(-5,0,3),Vector3(-5,0,7),Vector3(11,0,7)] if _current_place=="PARK" else [Vector3(-7,0,12),Vector3(7,0,12)]
+    for person in _residents_root.get_children():
+        var id := str(person.get_meta("resident_id",""))
+        var partner_id := str(person.get_meta("chat_partner",""))
+        if not partner_id.is_empty():
+            var partner := _residents_root.get_node_or_null("Resident_"+partner_id) as Node3D
+            if partner!=null and str(partner.get_meta("chat_partner",""))==id:
+                # Meet at a clear place near the original anchor, not through walls.
+                var center: Vector3=(person.get_meta("anchor")+partner.get_meta("anchor"))*0.5
+                var target := center+Vector3(-0.6 if id<partner_id else 0.6,0,0)
+                if _can_stand(target,WALKER_RADIUS):
+                    person.set_meta("leisure_mode","chat")
+                    person.set_meta("leisure_target",target)
+                    continue
+        if not bool(person.get_meta("wants_rest",false)):continue
+        for i in range(benches.size()):
+            if used.has(i):continue
+            var bench: Vector3=benches[i]
+            var approach := bench+Vector3(0,0,-0.85)
+            if not _can_stand(approach,WALKER_RADIUS):continue
+            used[i]=true
+            person.set_meta("leisure_mode","bench")
+            person.set_meta("leisure_target",approach)
+            person.set_meta("bench_seat",bench)
+            break
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
@@ -2976,13 +3016,23 @@ func _animate_residents(delta: float) -> void:
         var activity := str(person.get_meta("activity", ""))
         var walking := activity in ["WALKING", "WANDERING", "STROLLING", "FREE_TIME", "SHOPPING", "JOB_SEARCH"]
         var phase := float(person.get_meta("phase", 0.0))
+        var mode := str(person.get_meta("leisure_mode",""))
+        var sitting := false
+        var talking := false
+        var approach: Vector3=person.get_meta("leisure_target",Vector3.ZERO)
+        if mode=="bench" or mode=="chat":
+            walking=person.position.distance_to(approach)>0.12
+            if mode=="bench" and bool(person.get_meta("seated",false)):
+                walking=false
         if _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target:
             walking = false
+            if not bool(person.get_meta("seated",false)):
+                mode=""
         if walking:
             phase += delta * 0.65
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
-            var target := anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
+            var target := approach if not mode.is_empty() else anchor + Vector3(sin(phase)*2.1,0,cos(phase)*1.6)
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
@@ -2990,6 +3040,25 @@ func _animate_residents(delta: float) -> void:
             var old := person.position
             person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
             walking = person.position.distance_squared_to(old) > 0.000001
+        if mode=="bench" and (person.position.distance_to(approach)<=0.14 or bool(person.get_meta("seated",false))):
+            var seat: Vector3=person.get_meta("bench_seat")
+            person.position=seat+Vector3(0,-0.32,0)
+            person.rotation.y=0.0
+            person.set_meta("seated",true)
+            sitting=true
+            walking=false
+        elif bool(person.get_meta("seated",false)):
+            person.position=person.get_meta("bench_seat")+Vector3(0,0,-0.85)
+            person.set_meta("seated",false)
+        if mode=="chat" and not walking:
+            var partner := _residents_root.get_node_or_null("Resident_"+str(person.get_meta("chat_partner",""))) as Node3D
+            if partner!=null and person.position.distance_to(partner.position)<1.8:
+                var offset := partner.position-person.position
+                person.rotation.y=atan2(-offset.x,-offset.z)
+                talking=true
+        var activity_label := person.get_node_or_null("ActivityLabel") as Label3D
+        if activity_label!=null:
+            activity_label.text=tr("Resting on bench" if sitting else "Chatting" if talking else activity.replace("_"," ").capitalize())
         var swing := sin(phase*12.0)*0.36 if walking else 0.0
         var torso := person.get_node_or_null("Torso") as Node3D
         if torso!=null:
@@ -2997,7 +3066,11 @@ func _animate_residents(delta: float) -> void:
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
-            if activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
+            if sitting and limb in ["LegLeft","LegRight"]:
+                angle=PI/2.0
+            elif talking and limb=="ArmRight":
+                angle=-0.25+sin(float(Time.get_ticks_msec())*0.004+phase)*0.22
+            elif activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
                 angle=-0.7
             elif not walking and activity in ["WORKING","STUDYING"] and limb in ["ArmRight","ArmLeft"]:
                 angle=-0.22+sin(float(Time.get_ticks_msec())*0.003+phase)*0.12
@@ -3008,6 +3081,9 @@ func _animate_residents(delta: float) -> void:
                 elif style=="relaxed":
                     angle=-0.10
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
+            var knee := part.get_node_or_null("Knee") as Node3D
+            if knee!=null:
+                knee.rotation.x=lerpf(knee.rotation.x,-PI/2.0 if sitting else 0.0,minf(delta*10.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
     _add_obstacle(Vector3(-7.0, 0.0, 7.5), Vector2(11.0, 7.0))

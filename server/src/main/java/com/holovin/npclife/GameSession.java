@@ -64,7 +64,7 @@ public final class GameSession implements AutoCloseable {
                                 String phase,int condition,int completedDay,
                                 String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
-    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,int age) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,int age,boolean wantsRest,String chatPartnerId) { }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
     public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
     public record ServicesView(int pumpCondition,boolean fountainWorking,int cleanWater,
@@ -101,12 +101,14 @@ public final class GameSession implements AutoCloseable {
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
                 p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
-        var residents=(RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town)).stream()
+        var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
+        var chatting=PublicLeisureLife.recentPartners(town,state,visible);
+        var residents=visible.stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,c.name,c.activity,
                             contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),c.age);
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),c.age,PublicLeisureLife.wantsRest(c),chatting.get(c.id));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
