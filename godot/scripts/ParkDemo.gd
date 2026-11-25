@@ -2754,7 +2754,15 @@ func _render_actions() -> void:
                     var seller = stall.get("sellerName")
                     if seller!=null:
                         stall_info.text += "\nSeller: %s | %s" % [str(seller),"Paid shift" if bool(stall.get("staffed",false)) else "Off duty"]
+                    var supply: Dictionary = stall.get("supply",{})
+                    stall_info.text += "\nFarm supply %s | Reserve %s EUR | Cargo %s | Delivered %s" % ["ON" if bool(supply.get("enabled",false)) else "OFF",supply.get("reserve",0),supply.get("cargo",0),supply.get("delivered",0)]
                     _action_choices.add_child(stall_info)
+                    _action_choices.add_child(_button("Fund supply · 10 EUR",_garden_action.bind("stall-supply-fund")))
+                    _action_choices.add_child(_button("Withdraw supply · 10 EUR",_garden_action.bind("stall-supply-withdraw")))
+                    if bool(supply.get("enabled",false)):
+                        _action_choices.add_child(_button("Pause farm orders",_garden_action.bind("stall-supply-disable")))
+                    else:
+                        _action_choices.add_child(_button("Farm contract · %s veg / %s EUR" % [supply.get("batchUnits",4),supply.get("batchCost",11)],_garden_action.bind("stall-supply-enable")))
                     _action_choices.add_child(_button("Fund payroll · 10 EUR",_garden_action.bind("stall-fund")))
                     _action_choices.add_child(_button("Withdraw payroll · 10 EUR",_garden_action.bind("stall-withdraw")))
                     if seller!=null:

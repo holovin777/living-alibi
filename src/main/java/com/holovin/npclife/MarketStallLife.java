@@ -16,12 +16,14 @@ final class MarketStallLife {
     static int get(TownLife.Town t,String key){return t.industryStocks.getOrDefault(key,0);}
     static void set(TownLife.Town t,String key,int n){t.industryStocks.put(key,n);}
     static void ensure(TownLife.Town t){
+        StallSupplyLife.ensure(t);
         for(String k:List.of(LICENSE,OPEN,SALES,REVENUE,WORKER,RESERVE,PAID_DAY,PAID_HOUR,WAGES))t.industryStocks.putIfAbsent(k,0);
         for(String id:ITEMS){t.industryStocks.putIfAbsent(stock(id),0);t.industryStocks.putIfAbsent(price(id),3);}
         for(var c:t.people.values())if(c.generationIndex>0)
             for(String field:MEMORY_FIELDS)t.industryStocks.putIfAbsent(memory(c.id,field),0);
     }
     static void clear(TownLife.Town t){
+        StallSupplyLife.clear(t);
         release(t);
         t.employerFunds.merge("city-maintenance",get(t,RESERVE),Math::addExact);
         for(String k:List.of(LICENSE,OPEN,SALES,REVENUE,WORKER,RESERVE,PAID_DAY,PAID_HOUR,WAGES))set(t,k,0);
@@ -130,6 +132,7 @@ final class MarketStallLife {
             return "Registered a private market stall.";
         }
         if(get(t,LICENSE)==0)throw new IllegalArgumentException("Register the stall first.");
+        if(action.startsWith("stall-supply-"))return StallSupplyLife.act(t,action);
         if(action.equals("stall-fund")){
             if(p.money<10)throw new IllegalArgumentException("Need 10 EUR to fund the payroll reserve.");
             int reserve=Math.addExact(get(t,RESERVE),10);p.money-=10;set(t,RESERVE,reserve);
@@ -159,7 +162,7 @@ final class MarketStallLife {
         }
         for(String id:ITEMS){
             if(action.equals("stall-stock-"+id)){
-                if(total(t)>=CAPACITY)throw new IllegalArgumentException("Stall shelves are full.");
+                if(total(t)+StallSupplyLife.reserved(t)>=CAPACITY)throw new IllegalArgumentException("Stall shelves are full.");
                 FoodLife.change(p,id,false,-1);set(t,stock(id),get(t,stock(id))+1);
                 return "Placed one "+id+" on the stall shelf.";
             }
@@ -179,12 +182,12 @@ final class MarketStallLife {
     }
     record Item(String id,int stock,int price) {}
     record Candidate(String id,String name) {}
-    record Report(boolean registered,boolean open,boolean active,int licensePrice,int capacity,int stocked,int sales,int revenue,List<Item> items,int customers,int regularCustomers,int recommendedCustomers,String sellerName,boolean staffed,int reserve,int wages,int hourlyWage,List<Candidate> candidates) {}
+    record Report(boolean registered,boolean open,boolean active,int licensePrice,int capacity,int stocked,int sales,int revenue,List<Item> items,int customers,int regularCustomers,int recommendedCustomers,String sellerName,boolean staffed,int reserve,int wages,int hourlyWage,List<Candidate> candidates,StallSupplyLife.Report supply) {}
     static Report report(TownLife.Town t,int day,int minute){
         return new Report(get(t,LICENSE)>0,get(t,OPEN)>0,active(t,day,minute),LICENSE_PRICE,CAPACITY,total(t),get(t,SALES),get(t,REVENUE),
                 ITEMS.stream().map(id->new Item(id,get(t,stock(id)),get(t,price(id)))).toList(),
                 (int)t.people.values().stream().filter(c->c.alive&&remembered(t,c,"purchases")>0).count(),
                 (int)t.people.values().stream().filter(c->c.alive&&regular(t,c)).count(),
-                (int)t.people.values().stream().filter(c->c.alive&&remembered(t,c,"referred")>0).count(),worker(t)==null?null:worker(t).name,staffed(t,day,minute),get(t,RESERVE),get(t,WAGES),WAGE,candidates(t,day).stream().map(c->new Candidate(c.id,c.name)).toList());
+                (int)t.people.values().stream().filter(c->c.alive&&remembered(t,c,"referred")>0).count(),worker(t)==null?null:worker(t).name,staffed(t,day,minute),get(t,RESERVE),get(t,WAGES),WAGE,candidates(t,day).stream().map(c->new Candidate(c.id,c.name)).toList(),StallSupplyLife.report(t));
     }
 }

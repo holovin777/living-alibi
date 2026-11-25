@@ -264,6 +264,7 @@ final class TownLife {
         RetailLife.tick(town,marco.minute);
         FarmLife.tick(town,marco.day,marco.minute);
         FuelLife.tick(town,marco.day,marco.minute);
+        StallSupplyLife.tick(town,marco.day,marco.minute);
         TechnicalWorkLife.tick(town,marco.day,marco.minute);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
