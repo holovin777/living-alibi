@@ -296,7 +296,20 @@ const IT := {
     "Gym training": "Allenamento in palestra",
     "Cycling rental": "Ciclismo con bici a noleggio",
     "%s · %s min · %s EUR": "%s · %s min · %s EUR",
-    "Completed a training session.": "Allenamento completato."
+    "Completed a training session.": "Allenamento completato.",
+    "Shotokan · belt %s · Mon/Wed/Fri 18:00–21:00": "Shotokan · cintura %s · lun/mer/ven 18:00–21:00",
+    "Kihon %s · Kata %s · Kumite %s · next target %s each": "Kihon %s · Kata %s · Kumite %s · prossimo obiettivo %s ciascuno",
+    "Practice %s · 60 min · 5 EUR": "Pratica %s · 60 min · 5 EUR",
+    "Belt exam · %s · 15 EUR": "Esame cintura · %s · 15 EUR",
+    "White": "Bianca",
+    "Yellow": "Gialla",
+    "Orange": "Arancione",
+    "Green": "Verde",
+    "Blue": "Blu",
+    "Brown": "Marrone",
+    "Black": "Nera",
+    "Completed a Shotokan class.": "Lezione di Shotokan completata.",
+    "Passed the dojo belt examination.": "Esame di cintura superato."
 }
 const SETTINGS := "user://language.cfg"
 static func install() -> void:
