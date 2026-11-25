@@ -1,6 +1,8 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.": "WASD: cammina · Spazio: salta · clic: visuale · Esc: cursore.",
+    "Travel E: %s · Services F: %s · Map M · Talk T · Space: jump": "Viaggio E: %s · Servizi F: %s · Mappa M · Parla T · Spazio: salta.",
     "Living Alibi | public park": "Living Alibi | parco pubblico",
     "A visitor with 50 EUR and no assigned profession": "Un visitatore con 50 EUR e nessuna professione assegnata",
     "Connecting to the local Java world...": "Connessione al mondo Java locale...",

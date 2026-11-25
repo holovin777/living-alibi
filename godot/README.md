@@ -55,6 +55,7 @@ clickable action menu opens. WASD movement remains camera-relative.
 - **WASD / arrow keys:** walk relative to the camera inside the visible
   *local public district* (this is a visual preview, not per-meter
   networked gameplay).
+- **Space:** jump while walking with the mouse captured. The eye-level camera follows a gravity-based arc; holding Space cannot repeatedly jump, and bicycles, cars, menus and district transitions prevent new jumps. Horizontal obstacle footprints remain solid even in midair. This is a first local jump, not yet height-aware obstacle traversal.
 - **Walk to the yellow gate, press E:** select a public district. The
   list and travel minutes come from `GET /api/v1/locations`. Confirming
   a destination calls `POST /api/v1/actions/go`, which advances the real
@@ -138,7 +139,7 @@ stop at obstacles rather than walk through them.
 
 This is a deterministic, lightweight planar collision system, not full
 Godot rigid-body physics or pathfinding. It does not yet model stairs,
-jumping, NPC-to-NPC collisions, interiors or continuous connected streets.
+height-aware obstacle traversal, NPC-to-NPC collisions, interiors or continuous connected streets.
 The Java engine still validates actual district transitions and actions.
 
 
@@ -697,3 +698,7 @@ job applications, work and study over HTTP.
 The two test suites cover different parts of the bridge, but they are
 not yet a full automated graphical end-to-end test of clicking a kiosk
 with the Java process running.
+
+## Surface detail and antialiasing
+
+Grass, asphalt and staggered stone paving have shared 256 px procedural textures with mipmaps, and 2× MSAA smooths geometry edges in the Compatibility renderer. No external assets are required. MSAA may increase GPU load on older hardware.

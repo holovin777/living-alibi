@@ -26,6 +26,8 @@ const ROAD_TRIGGER := 23.8
 const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
+const JUMP_GRAVITY := 9.8
+const JUMP_SPEED := 4.0
 const GARDEN_CENTER := Vector3(11,0,11)
 const COOP_CENTER := Vector3(-10,0,-10)
 const ORCHARD_CENTER := Vector3(7.5,0,-9.5)
@@ -87,6 +89,9 @@ const PHARMACY_COUNTER := Vector3(6.3,0,-7)
 # Local presentation only: true movement between districts is Java-authorized.
 var _view_yaw := 0.0
 var _view_pitch := 0.0
+# Vertical presentation is separate from the existing planar collision anchor.
+var _jump_elapsed := -1.0
+var _jump_height := 0.0
 
 var _avatar: Node3D
 var _camera: Camera3D
@@ -187,6 +192,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
     if _drive_active():
+        _reset_jump()
         if not _drive_parked:
             _process_driving(delta)
         else:
@@ -215,8 +221,9 @@ func _process(delta: float) -> void:
         if _movement_speed() == CYCLE_SPEED:
             _bike_wheel_angle += before.distance_to(_avatar.position)/0.35
         _follow_player()
-        if _can_walk_roads():
+        if _can_walk_roads() and _jump_elapsed < 0.0:
             _try_road_crossing(relative_motion)
+    _advance_jump(delta)
 
     if _apartment_active:
         _update_first_steps()
@@ -286,7 +293,7 @@ func _process(delta: float) -> void:
     elif not _nearest_resident().is_empty():
         _hint.text = "T: talk to nearby resident · Esc: cursor."
     else:
-        _hint.text = "WASD: walk · click scene: mouse look · Esc: cursor."
+        _hint.text = tr("WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.")
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -303,6 +310,11 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
+        if _can_jump():
+            _jump_elapsed = 0.0
+            get_viewport().set_input_as_handled()
+        return
     if _rebirth_active():
         if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
             if event.keycode == KEY_E and _apartment_active and not _action_panel.visible:
@@ -456,7 +468,7 @@ func _update_first_steps() -> void:
             guide=tr("Your job: %s. Travel gate %s (E).") % [str(TownLayout.LABELS.get(site,site)),_guide_direction(GATE_POSITION)]
         else:
             guide=tr("Explore freely: use the blue SERVICES kiosk for local actions.")
-    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T") % [_guide_direction(GATE_POSITION),_guide_direction(DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)])
+    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T · Space: jump") % [_guide_direction(GATE_POSITION),_guide_direction(DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)])
 
 func _near_gate() -> bool:
     return _avatar.position.distance_to(GATE_POSITION) < INTERACTION_RADIUS
@@ -505,6 +517,7 @@ func _sync_guest_room() -> void:
         if door != null:
             door.visible = not (_owns_house() if district=="SOUTH_RESIDENCES" else bool(_last_snapshot.get("player",{}).get("roomActive",false)))
     if _inside_guest_room() and not _has_room_lease():
+        _reset_jump()
         _avatar.position = ROOM_EXIT
         _action_panel.visible = false
         _follow_player()
@@ -616,6 +629,7 @@ func _begin_driving(destination: String,freight: bool = false) -> bool:
     _drive_look = 0.0
     _view_pitch = 0.0
     _view_yaw = atan2(-_drive_direction.x,-_drive_direction.z)
+    _reset_jump()
     _avatar.position = start
     _action_panel.visible = false
     _travel_panel.visible = false
@@ -783,6 +797,30 @@ func _buy_bicycle() -> void:
     if _current_place == "WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():
         _api.buy_bicycle()
 
+func _can_jump() -> bool:
+    return _jump_elapsed < 0.0 and not _drive_active() and not _cycling() \
+        and (not _rebirth_active() or _child_can_walk()) \
+        and _road_pending.is_empty() and not _home_transition \
+        and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
+        and not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible)
+
+func _reset_jump() -> void:
+    _jump_elapsed = -1.0
+    _jump_height = 0.0
+
+func _advance_jump(delta: float) -> void:
+    if _jump_elapsed < 0.0:
+        return
+    if _cycling() or not _road_pending.is_empty() or _home_transition:
+        _reset_jump()
+    else:
+        _jump_elapsed += maxf(0.0, delta)
+        # Analytic trajectory: the same height at the same elapsed time regardless of FPS.
+        _jump_height = maxf(0.0, JUMP_SPEED * _jump_elapsed - 0.5 * JUMP_GRAVITY * _jump_elapsed * _jump_elapsed)
+        if _jump_elapsed >= 2.0 * JUMP_SPEED / JUMP_GRAVITY:
+            _reset_jump()
+    _follow_player()
+
 func _follow_player() -> void:
     # Fixed first-person presentation in every district and transport mode.
     _avatar.visible = false
@@ -797,7 +835,7 @@ func _follow_player() -> void:
         var eye := EYE_HEIGHT
         if str(_last_snapshot.get("rebirth",{}).get("phase","ADULT")) == "CHILDHOOD":
             eye = lerpf(0.65,EYE_HEIGHT,clampf(float(_last_snapshot.get("rebirth",{}).get("age",0))/18.0,0.0,1.0))
-        _camera.position = _avatar.position + Vector3(0.0,eye,0.0)
+        _camera.position = _avatar.position + Vector3(0.0,eye + _jump_height,0.0)
         _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
 func _build_world() -> void:
@@ -3097,7 +3135,7 @@ func _create_interface() -> void:
     atmosphere_row.add_child(audio_toggle)
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-    _hint.text = "WASD: walk · click scene: mouse look · Esc: cursor."
+    _hint.text = tr("WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.")
     column.add_child(_hint)
     _jobs = Label.new()
     _jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -4892,6 +4930,7 @@ func _apartment_action() -> String:
 func _set_apartment(active: bool) -> void:
     if active == _apartment_active:
         return
+    _reset_jump()
     _apartment_active=active
     if active:
         if not is_instance_valid(_apartment):
@@ -4977,6 +5016,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
     if new_place != _current_place:
+        _reset_jump()
         _office_app="work"
         _office_joke_hold=0.0
         _office_joke_wait=8.0
@@ -5011,6 +5051,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _apartment.set_room_packages(home.get("furnishings",[]))
     _sync_family_entrance(home)
     if walking_transition and is_instance_valid(_home_entrance) and not road_arrival:
+        _reset_jump()
         _avatar.position=_home_entrance.position
     _sync_guest_room()
     _sync_garden()
