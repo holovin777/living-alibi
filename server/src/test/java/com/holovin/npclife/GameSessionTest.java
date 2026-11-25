@@ -13,6 +13,46 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void businessMachineServiceConsumesRealCityPartsAndSurvivesServerRestart() throws Exception {
+        Path file=directory.resolve("worn-machine.db");
+        try(var game=new GameSession(file)) {
+            game.move("workshop");
+            game.openBusiness();
+            game.investBusiness(25);
+            game.buyBusinessMachine();
+            assertEquals(100,game.business().machineCondition());
+            assertThrows(IllegalArgumentException.class,game::serviceBusinessMachine,
+                    "machine in perfect condition should not waste repair parts");
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();
+            var town=db.loadTown(state);
+            town.business.machineCondition=40;
+            town.business.cash=30;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(40,game.business().machineCondition());
+            int initialCityParts=6;
+            var repaired=game.serviceBusinessMachine();
+            assertTrue(repaired.message().contains("100/100"));
+            assertEquals(100,game.business().machineCondition());
+            assertEquals(20,game.business().cash());
+            // Repaired equipment is a material-consuming transaction.
+            try(var db=new WorldDatabase(file)) {
+                var town=db.loadTown(db.load());
+                assertEquals(initialCityParts-2,town.technicalMaterials.get("spare-parts"));
+            }
+        }
+        try(var game=new GameSession(file)) {
+            assertEquals(100,game.business().machineCondition());
+            assertEquals(20,game.business().cash());
+            assertThrows(IllegalArgumentException.class,game::serviceBusinessMachine);
+        }
+    }
+
+    @Test
     void founderCanOpenCapitalFundedWorkshopWithoutCreatingMoney() throws Exception {
         Path file=directory.resolve("first-workshop.db");
         try(var game=new GameSession(file)) {
