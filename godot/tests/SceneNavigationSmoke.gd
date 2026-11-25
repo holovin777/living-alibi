@@ -397,6 +397,21 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    var carrier := _world("WORKSHOP","Workshop")
+    carrier["logistics"] = {"registered":true,"yours":true,"cash":300,"truck":false}
+    world._on_world_updated(carrier)
+    if not _check(_has_button(world._action_choices,"Logistics: invest 100 EUR")
+            and _has_button(world._action_choices,"Buy company truck"),
+            "owner can manage separate carrier funds and purchase a truck"):
+        return
+    carrier = _world("FACTORY","Factory")
+    carrier["logistics"] = {"registered":true,"yours":true,"cash":80,"truck":true,"truckPlace":"WORKSHOP"}
+    world._on_world_updated(carrier)
+    if not _check(_has_button(world._action_choices,"Company freight contract"),
+            "company owner can accept freight without being an employee"):
+        return
+    world._on_world_updated(_world("PARK","Park"))
+
     # Physical footprints: long steps cannot tunnel through solid objects.
     var kiosk_stop: Vector3 = world._move_on_ground(Vector3(7,0,6),
             Vector3(0,0,-6), world.WALKER_RADIUS)

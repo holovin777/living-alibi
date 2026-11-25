@@ -13,6 +13,49 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void logisticsCompanyOwnsTruckAndReceivesContractRevenueNotPersonalWages() throws Exception {
+        Path file=directory.resolve("logistics.db");
+        try(var game=new GameSession(file)) {
+            game.move("workshop");game.waitMinutes(90);
+            game.freightAction("register",null);
+            assertEquals(30,game.snapshot().player().money());
+            assertThrows(IllegalArgumentException.class,()->game.freightAction("buy-truck",null));
+        }
+        try(var db=new WorldDatabase(file)) {
+            var state=db.load();var town=db.loadTown(state);
+            town.player.money=400;
+            town.industryStocks.put(IndustryLife.FACTORY_PARTS,2);
+            town.industryStocks.put(IndustryLife.FACTORY_STEEL,1);
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)) {
+            for(int k=0;k<3;k++)game.freightAction("invest-100",null);
+            game.freightAction("buy-truck",null);
+            assertEquals(80,game.snapshot().logistics().cash());
+            assertEquals(100,game.snapshot().player().money());
+            assertTrue(game.snapshot().logistics().truck());
+            game.move("factory");game.freightAction("load-company",null);
+            assertTrue(game.snapshot().freight().companyRun());
+            assertEquals(68,game.snapshot().logistics().cash());
+            assertEquals("FACTORY",game.snapshot().logistics().truckPlace());
+            assertEquals(100,game.snapshot().player().money());
+            game.freightAction("drive","workshop");
+        }
+        try(var game=new GameSession(file)) {
+            assertTrue(game.snapshot().logistics().yours());
+            assertTrue(game.snapshot().freight().companyRun());
+            assertEquals("WORKSHOP",game.snapshot().logistics().truckPlace());
+            game.freightAction("unload",null);
+            assertEquals(108,game.snapshot().logistics().cash());
+            assertEquals(100,game.snapshot().player().money());
+            game.freightAction("withdraw-25",null);
+            assertEquals(83,game.snapshot().logistics().cash());
+            assertEquals(125,game.snapshot().player().money());
+            assertThrows(IllegalArgumentException.class,()->game.freightAction("unload",null));
+        }
+    }
+
+    @Test
     void farmFreightReservesMarketCapacityAndDeliversOnlyAtEnd() throws Exception {
         Path file=directory.resolve("farm-freight.db");
         try(var game=new GameSession(file)) {

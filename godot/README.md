@@ -496,6 +496,26 @@ scheduled deliveries still operate using unreserved stock. Fuel
 supplier freight, a self-financing player logistics company and
 distinct truck physics remain future features.
 
+## Owner-operated logistics company
+
+At the Workshop kiosk, register or acquire a carrier for 20 EUR.
+Invest 25 or 100 EUR from personal cash into a separate account,
+buy one used truck for 220 EUR, and withdraw 25 EUR at a time.
+A company contract can be loaded at any of the existing three
+pickup sites without a freight employment job. The buyer reserves
+40 EUR in addition to the goods invoice; the company pays fuel
+at loading, and receives the fee only at unloading. If the truck
+is at another district, an outsourced transfer costs 8 EUR plus
+one fuel unit. Its district, ownership, company cash and active
+contract persist. The same daily work allowance prevents repeated
+instant contracts. Company money never counts as personal wages.
+Death returns cargo and the reserved invoice/fee to the sources;
+the company remains an estate available for paid takeover.
+Only one truck and owner-driven contracts are supported. Empty
+truck relocation is abstract, not manual driving; the physical
+truck is shown during an active manifest. Hiring drivers, fleet
+expansion and maintenance are not implemented.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world

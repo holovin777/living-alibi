@@ -316,7 +316,7 @@ func _near_truck() -> bool:
 func _freight_action(action: String) -> void:
     if not _connected or _api.is_busy():
         return
-    if (action=="load" and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()):
+    if (action in ["load","load-company"] and _current_place in ["QUARRY","FACTORY","FARM"] and _near_kiosk()) or (action=="unload" and _near_truck()) or (action in ["register","invest-25","invest-100","withdraw-25","buy-truck"] and _current_place=="WORKSHOP" and _near_kiosk()):
         _api.freight_action(action)
 
 func _drive_truck(destination: String) -> void:
@@ -2157,13 +2157,18 @@ func _render_actions() -> void:
         if next!=null:
             _action_choices.add_child(_button("Drive truck to "+str(next).capitalize(),_drive_truck.bind(str(next))))
         else:
-            _action_choices.add_child(_button("Unload cargo · earn 32 EUR",_freight_action.bind("unload")))
+            var payout := "Company contract · 40 EUR" if bool(cargo.get("companyRun",false)) else "Earn 32 EUR"
+            _action_choices.add_child(_button("Unload cargo · "+payout,_freight_action.bind("unload")))
         return
     if _near_car():
         _action_title.text = "Your car · choose adjacent destination"
         for id in player.get("carDestinations",[]):
             _action_choices.add_child(_button("Drive to %s · 3m / 1 fuel" % str(id).capitalize(),_drive_to.bind(str(id))))
         return
+    var logistics: Dictionary = _last_snapshot.get("logistics",{})
+    if _current_place in ["FARM","QUARRY","FACTORY"] and bool(logistics.get("yours",false)) and bool(logistics.get("truck",false)) and not bool(_last_snapshot.get("freight",{}).get("active",false)):
+        var relocation := " · relocation 8 EUR + fuel" if str(logistics.get("truckPlace",""))!=_current_place else ""
+        _action_choices.add_child(_button("Company freight contract · 40 EUR"+relocation,_freight_action.bind("load-company")))
     match _current_place:
         "FARM":
             if employed=="freight-driver" and not bool(_last_snapshot.get("freight",{}).get("active",false)):
@@ -2242,6 +2247,17 @@ func _render_actions() -> void:
                     _action_choices.add_child(_button("Refuel · up to 3 units",_car_action.bind("refuel")))
                 _action_choices.add_child(_button("Apply: fuel station attendant",_apply_job.bind("fuel-attendant")))
         "WORKSHOP":
+            if not bool(logistics.get("yours",false)):
+                _action_choices.add_child(_button("Register / acquire logistics company · 20 EUR",_freight_action.bind("register")))
+            else:
+                var carrier := Label.new()
+                carrier.text = "LOGISTICS | Bank: %s EUR | Truck: %s" % [logistics.get("cash",0),str(logistics.get("truckPlace","none"))]
+                _action_choices.add_child(carrier)
+                _action_choices.add_child(_button("Logistics: invest 25 EUR",_freight_action.bind("invest-25")))
+                _action_choices.add_child(_button("Logistics: invest 100 EUR",_freight_action.bind("invest-100")))
+                _action_choices.add_child(_button("Logistics: withdraw 25 EUR",_freight_action.bind("withdraw-25")))
+                if not bool(logistics.get("truck",false)):
+                    _action_choices.add_child(_button("Buy company truck · 220 EUR",_freight_action.bind("buy-truck")))
             if _car_place().is_empty():
                 _action_choices.add_child(_button("Buy used car · 180 EUR",_car_action.bind("buy")))
             elif _car_place()=="WORKSHOP":
