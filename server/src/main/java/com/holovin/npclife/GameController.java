@@ -62,6 +62,11 @@ public class GameController {
         return session.buyBusinessMachine();
     }
 
+    @PostMapping("/actions/business/service")
+    public GameSession.ActionView serviceMachine() throws SQLException {
+        return session.serviceBusinessMachine();
+    }
+
     @PostMapping("/actions/business/hire")
     public GameSession.ActionView hireWorker(@RequestBody ResidentRequest request)
             throws SQLException {
