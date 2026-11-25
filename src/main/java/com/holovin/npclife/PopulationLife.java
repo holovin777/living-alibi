@@ -74,7 +74,7 @@ final class PopulationLife {
         else if(minute>=960 && minute<1200) {
             // The same resident favors a location consistently for a given day.
             // Unlit parks lose visitors at dusk; they choose a covered cafe.
-            int preference=Math.floorMod((int)(c.personalSeed^(clock.day*31L)),4);
+            int preference=RebirthLife.linkedAdult(town,c)?Math.floorMod((int)(c.personalSeed^(clock.day*31L)),4):PersonalityLife.leisurePreference(c,clock.day);
             if(preference==0)desired=TownLife.Place.CAFE;
             else if(preference==1)desired=TownLife.Place.LIBRARY;
             else if(minute>=1080 && !UtilityLife.status(town).lightsWorking())
