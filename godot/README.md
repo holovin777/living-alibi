@@ -114,6 +114,20 @@ for a more technical role. Once qualified and employed, inspect the
 then collect an earned technical wage. The Java engine keeps the
 infrastructure condition and material inventory in SQLite.
 
+## Residents in the scene
+
+The client reads the `residents` list from the Java `GET /api/v1/world`
+snapshot. People who are *actually in the same public place* now appear as
+simple 3D figures with their names above them. When the server reports
+that a resident has left, their placeholder disappears on the next
+snapshot. The HUD shows how many people are nearby.
+
+The figures use **approximate display positions only** because the Java
+world currently stores district-level positions, not real 3D coordinates.
+There are no invented people, no simulated NPC street animations, and
+no new personal data exposed by the client. Fine-grained movement, full
+NPC character models, dialogue proximity and animations are future work.
+
 ## Boundaries
 
 This is an incremental game prototype rather than a finished open-world
