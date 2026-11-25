@@ -1086,6 +1086,14 @@ func _exercise() -> void:
     if not _check(_has_button(world._action_choices,"Run command") and world._action_choices.has_node("DevOpsCommand"),"DevOps training terminal"):
         return
     world._close_software()
+    office["rebirth"]["javaWorkspace"]["companyStatus"]={"registered":true,"cash":40,"rentUntil":8,"contracts":0,"taxPaid":0,"canInvest":true,"canWithdraw":true,"canRent":false,"offers":[{"id":"retail","title":"Retail support","gross":40,"tax":8,"prompt":"Count stock","available":true}]}
+    world._on_world_updated(office)
+    world._avatar.position=world.KIOSK_POSITION
+    world._software_menu=true
+    world._render_actions()
+    if not _check(_has_button(world._action_choices,"Invest 20 EUR") and _has_button(world._action_choices,"Deliver contract") and world._action_choices.has_node("IT_retail"),"IT company account and contract UI"):
+        return
+    world._close_software()
     print("SceneNavigationSmoke: ALL CHECKS PASSED")
     quit(0)
 

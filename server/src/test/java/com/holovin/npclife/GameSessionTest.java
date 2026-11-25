@@ -346,6 +346,57 @@ class GameSessionTest {
         }
     }
     @Test
+    void itCompanyKeepsSeparateFundsAndPaysTax() throws Exception {
+        Path file=directory.resolve("it-company.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=PopulationGenerator.add(town,1).getFirst();id=c.id;
+            c.age=30;c.money=200;c.hunger=10;c.thirst=10;c.fatigue=20;c.food=5;c.water=5;
+            c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.OFFICE;c.destination=c.place;c.activity="FREE_TIME";
+            c.workplace=TownLife.Place.OFFICE;c.occupation="Programmer";c.employed=true;
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+            DemographyLife.set(town,c,"played-incarnation",town.player.incarnation);
+            EducationLife.set(town,c,"technical",70);EducationLife.set(town,c,"diploma-programming",1);
+            EducationLife.set(town,c,"java-onboarded",1);EducationLife.set(town,c,"developer-rank",2);
+            town.industryStocks.put(SoftwareLife.key("retail-api"),3);
+            town.retailStock.put("bread",2);town.retailStock.put("water",3);
+            town.employerFunds.put("shop-assistant",500);
+            state.day=2;state.minute=800;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-it:invest"));
+            game.gardenAction("rebirth-it:register");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-it:register"));
+            game.gardenAction("rebirth-it:invest");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-it:deliver:retail:5"));
+            game.gardenAction("rebirth-it:rent");
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-it:deliver:retail:6"));
+            var done=game.gardenAction("rebirth-it:deliver:retail:5").world();
+            var firm=done.rebirth().javaWorkspace().companyStatus();
+            assertEquals(32,firm.cash());assertEquals(8,firm.taxPaid());assertEquals(1,firm.contracts());
+            assertEquals(130,done.player().money());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-it:deliver:retail:5"));
+            game.gardenAction("rebirth-it:withdraw");
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(150,game.snapshot().player().money());
+            assertEquals(12,game.snapshot().rebirth().javaWorkspace().companyStatus().cash());
+        }
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);var c=town.get(id);
+            assertEquals(460,town.employerFunds.get("shop-assistant").intValue());
+            c.alive=false;
+            ITBusinessLife.liquidate(town,c);
+            assertEquals(162,c.money);
+            ITBusinessLife.liquidate(town,c);
+            assertEquals(162,c.money);
+        }
+    }
+    @Test
     void devopsIncidentBlocksRetailUntilDiagnosedAndRecovered() throws Exception {
         Path file=directory.resolve("devops-incident.db");
         String id;

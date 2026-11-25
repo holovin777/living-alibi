@@ -3057,6 +3057,34 @@ func _render_software() -> void:
             var run := _button("Run command · 5 min",_submit_devops.bind(terminal))
             run.disabled=not bool(ops.get("canRun",false))
             _action_choices.add_child(run)
+    if workspace is Dictionary and workspace.get("companyStatus") is Dictionary:
+        var firm: Dictionary = workspace["companyStatus"]
+        var details := Label.new()
+        details.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        details.text="Your IT consultancy · %s\nCompany cash %s EUR · Rent through day %s · Contracts %s · Tax paid %s EUR\n%s" % ["Registered" if firm.get("registered",false) else "Not registered",firm.get("cash",0),firm.get("rentUntil",0),firm.get("contracts",0),firm.get("taxPaid",0),firm.get("guide","")]
+        _action_choices.add_child(details)
+        if not firm.get("registered",false):
+            var register := _button("Register IT company · 50 EUR",_garden_action.bind("rebirth-it:register"))
+            register.disabled=not bool(firm.get("canRegister",false))
+            _action_choices.add_child(register)
+        else:
+            for choice in [{"label":"Invest 20 EUR","id":"invest","enabled":firm.get("canInvest",false)},{"label":"Withdraw 20 EUR","id":"withdraw","enabled":firm.get("canWithdraw",false)},{"label":"Rent office · 20 EUR / 7 days","id":"rent","enabled":firm.get("canRent",false)}]:
+                var operation := _button(str(choice["label"]),_garden_action.bind("rebirth-it:"+str(choice["id"])))
+                operation.disabled=not bool(choice["enabled"])
+                _action_choices.add_child(operation)
+            for contract in firm.get("offers",[]):
+                var terms := Label.new()
+                terms.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                terms.text="%s · %s EUR gross · %s EUR tax\n%s" % [contract.get("title",""),contract.get("gross",0),contract.get("tax",0),contract.get("prompt","")]
+                _action_choices.add_child(terms)
+                var response := LineEdit.new()
+                response.name="IT_"+str(contract.get("id",""))
+                response.placeholder_text="Enter verified numeric result"
+                response.max_length=10
+                _action_choices.add_child(response)
+                var deliver := _button("Deliver contract · 60 min",_submit_it_contract.bind(str(contract.get("id","")),response))
+                deliver.disabled=not bool(contract.get("available",false))
+                _action_choices.add_child(deliver)
     for project in _last_snapshot.get("rebirth",{}).get("softwareProjects",[]):
         var info := Label.new()
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -3091,6 +3119,10 @@ func _render_software() -> void:
             advance.disabled=not bool(project.get("canAdvance",false))
             _action_choices.add_child(advance)
     _action_choices.add_child(_button("Leave",_close_software))
+
+func _submit_it_contract(contract: String,editor: LineEdit) -> void:
+    if is_instance_valid(editor):
+        _garden_action("rebirth-it:deliver:"+contract+":"+editor.text)
 
 func _submit_devops(editor: LineEdit) -> void:
     if is_instance_valid(editor):
@@ -4005,7 +4037,7 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
-    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-") or action.begins_with("rebirth-devops-")) and not _near_software():return
+    if (action.begins_with("rebirth-software-") or action.begins_with("rebirth-java-") or action.begins_with("rebirth-git:") or action.begins_with("rebirth-developer-") or action.begins_with("rebirth-devops-") or action.begins_with("rebirth-it:")) and not _near_software():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
     if (action=="rebirth-study" or action.begins_with("rebirth-enroll-")) and not _near_college():return
     if action.begins_with("rebirth-medical-") and action!="rebirth-medical-visit" and action!="rebirth-medical-"+_medical_station():return
