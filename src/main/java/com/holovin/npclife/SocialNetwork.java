@@ -61,6 +61,9 @@ final class SocialNetwork {
                 if(relation.nextInt(100)>=chance)continue;
                 int pressure=(first.hunger+second.hunger+first.thirst+second.thirst)/4+
                         relation.tension/2;
+                boolean generatedPair=first.generationIndex>0 && second.generationIndex>0;
+                if(generatedPair)pressure+=PersonalityLife.conflictBias(first,second);
+                int affinityBonus=generatedPair?PersonalityLife.affinityBonus(first,second):0;
                 boolean argue=pressure>85 && relation.nextInt(100)<35;
                 boolean reconcile=!argue && relation.tension>35 && relation.nextInt(100)<45;
                 SocialLife.Kind kind;
@@ -81,13 +84,13 @@ final class SocialNetwork {
                     description=names+" reconciled at "+first.place.label+".";
                 } else if(relation.conversations<2) {
                     kind=SocialLife.Kind.SMALL_TALK;
-                    relation.affinity=clamp(relation.affinity+2);
+                    relation.affinity=clamp(relation.affinity+2+affinityBonus);
                     relation.trust=clamp(relation.trust+1);
                     relation.tension=clamp(relation.tension-1);
                     description=names+" exchanged a few words at "+first.place.label+".";
                 } else {
                     kind=SocialLife.Kind.FRIENDLY_CHAT;
-                    relation.affinity=clamp(relation.affinity+2);
+                    relation.affinity=clamp(relation.affinity+2+affinityBonus);
                     relation.trust=clamp(relation.trust+2);
                     relation.tension=clamp(relation.tension-2);
                     String[] topics={"their neighborhood","work","recent town life","their plans"};

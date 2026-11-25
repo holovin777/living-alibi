@@ -91,6 +91,7 @@ final class EducationLife {
             if("LEARN_SKILLS".equals(c.goal)&&f.equals("academic"))score+=8;
             if("MAKE_FRIENDS".equals(c.goal)&&f.equals("social"))score+=8;
             if("SAVE_MONEY".equals(c.goal)&&f.equals("commerce"))score+=8;
+            score+=PersonalityLife.careerBias(c,f);
             score+=Math.floorMod(c.personalSeed+i*31,7);
             if(score>bestScore){bestScore=score;best=i;}
         }
