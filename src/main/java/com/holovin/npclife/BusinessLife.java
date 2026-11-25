@@ -74,8 +74,7 @@ final class BusinessLife {
     static Status status(TownLife.Town town,int day) {
         Shop b=town.business;
         var worker=town.people.get(b.employeeId);
-        boolean employed=worker!=null && worker.employed &&
-                "Independent fabricator".equals(worker.occupation);
+        boolean employed=worker!=null && isEmployee(town,worker);
         return new Status(b.registered,b.registered &&
                 b.ownerIncarnation==town.player.incarnation,
                 b.ownerIncarnation,b.machine,b.machine?b.machineCondition:0,b.cash,
