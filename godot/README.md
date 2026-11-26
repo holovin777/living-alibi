@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Overheard family dinner conversations
+
+At a committed autonomous dinner, Java records a topic based on family strain, school-age children or sociability (otherwise a quiet evening). During the existing 20-minute dinner window, an invited indoor visitor can see two alternating bilingual lines from the host and a present related resident. The active line is read-only and follows game time; no extra social events or resources are generated. Godot displays anonymous subtitles only within 4.5 local units of the rendered speaker, in the selected English or Italian language. No voice audio, free-form dialogue, conversation history or disclosure outside the apartment. Older meals without a recorded topic have no dialogue.
