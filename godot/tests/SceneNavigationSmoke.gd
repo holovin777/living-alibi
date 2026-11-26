@@ -1061,6 +1061,17 @@ func _exercise() -> void:
             "office offers engineering task rather than magically paying salary"):
         return
 
+    var electric_park := _world("PARK","Park")
+    electric_park["residents"]=[{"id":"electrician-test","activity":"WORKING","workVisual":"ELECTRIC_TOOL"}]
+    world._on_world_updated(electric_park)
+    var electrician_model := world._residents_root.get_node("Resident_electrician-test") as Node3D
+    if not _check(electrician_model.has_node("ArmRight/WorkProp") and electrician_model.position.distance_to(Vector3(-3,0,-9))<1.2 and world._can_stand(electrician_model.position,world.WALKER_RADIUS),"electrician carries a meter beside a park lamp"):
+        return
+    electric_park["residents"][0]["activity"]="FREE_TIME"
+    electric_park["residents"][0]["workVisual"]=""
+    world._on_world_updated(electric_park)
+    if not _check(not electrician_model.has_node("ArmRight/WorkProp"),"electrician puts away tool after work"):
+        return
     var building_site := _world("NORTH_RESIDENCES","North residences")
     building_site["construction"]={"stage":1,"steel":2,"parts":1}
     building_site["residents"]=[{"id":"builder-test","activity":"WORKING","workVisual":"HAMMER"}]
