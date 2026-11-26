@@ -3610,6 +3610,8 @@ func _render_residents() -> void:
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
+        person.set_meta("conversation_minutes",int(resident.get("conversationMinutes",10)))
+        person.set_meta("conversation_reason",str(resident.get("conversationReason","PERSONAL")))
         person.set_meta("mood",str(resident.get("mood","CALM")))
         person.set_meta("walking_companion",str(resident.get("walkingCompanion","")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
@@ -5621,6 +5623,8 @@ func _dialog_world_minute() -> int:
     return (int(_last_snapshot.get("day",1))-1)*1440+int(_last_snapshot.get("minute",0))
 
 func _dialog_patience(person: Node3D) -> int:
+    if person.has_meta("conversation_minutes"):
+        return int(person.get_meta("conversation_minutes"))
     var activity := str(person.get_meta("activity",""))
     if activity in ["SLEEPING","TRAVELING","SICK_LEAVE","RESTING_WHILE_SICK"]:
         return 1
@@ -5647,7 +5651,11 @@ func _tick_dialog_autonomy(delta: float) -> void:
         _finish_dialog_autonomously(tr("They had to leave."))
         return
     if _dialog_world_minute()-_dialog_started_at>=_dialog_patience(person):
-        _finish_dialog_autonomously(tr("They have other things to do. Talk later."))
+        var reason := str(person.get_meta("conversation_reason","PERSONAL"))
+        var farewell := tr("They have other things to do. Talk later.")
+        if reason=="SHIFT":farewell=tr("They have to get back to their shift.")
+        elif reason=="NEEDS":farewell=tr("They need to take care of themselves.")
+        _finish_dialog_autonomously(farewell)
 
 func _close_dialog() -> void:
     var was_open := _dialog_panel.visible
@@ -7588,6 +7596,8 @@ func _sync_host_routine(invitation: Dictionary) -> void:
 # The household list is authoritative and contains only awake, present residents.
 # Guests see models, not automatically learned names or a second copy of the host.
 func _sync_guest_contact(person: Node3D,entry: Dictionary) -> void:
+    person.set_meta("conversation_minutes",int(entry.get("conversationMinutes",10)))
+    person.set_meta("conversation_reason",str(entry.get("conversationReason","PERSONAL")))
     person.set_meta("display_name",str(entry.get("name","Unknown resident")))
     person.set_meta("known_name",str(entry.get("knownName","")) if entry.get("knownName")!=null else "")
     person.set_meta("conversations",int(entry.get("conversations",0)))
