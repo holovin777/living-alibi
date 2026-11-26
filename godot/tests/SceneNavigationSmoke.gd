@@ -901,6 +901,27 @@ func _exercise() -> void:
             and is_equal_approx(marco.get_node("LegLeft/Knee").rotation.x,-PI/2.0),
             "resting residents use distinct bench seats and bend knees"):
         return
+    var saved_marco: Vector3 = marco.position
+    var saved_elena: Vector3 = elena.position
+    var saved_listener: Vector3 = world._avatar.position
+    marco.position=Vector3(0,0,0)
+    elena.position=Vector3(1,0,0)
+    world._avatar.position=Vector3(0,0,1)
+    world._public_speech_slot=""
+    world._public_speech_pair.clear()
+    var audible: Dictionary = world._public_dialogue()
+    if not _check(not audible.is_empty() and audible.get("id") in ["marco","elena"],"ambient conversation uses actual nearby residents"):
+        return
+    world._npc_speech.present(str(audible["key"]),str(audible["text"]),str(audible["id"]),1.0,"en")
+    if not _check(world._npc_speech.last_key==audible["key"],"headless voice fallback records a line without requiring system voices"):
+        return
+    world._avatar.position=Vector3(20,0,20)
+    if not _check(world._public_dialogue().is_empty(),"public conversations are inaudible at a distance"):
+        return
+    world._npc_speech.stop()
+    marco.position=saved_marco
+    elena.position=saved_elena
+    world._avatar.position=saved_listener
     populated_park["residents"][0]["activity"] = "WALKING"
     world._on_world_updated(populated_park)
     world._animate_residents(0.5)
