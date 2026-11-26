@@ -760,6 +760,8 @@ func _exercise() -> void:
     var marco = world._residents_root.get_node("Resident_marco")
     var appearance: Dictionary = marco.get_meta("appearance")
     var elena = world._residents_root.get_node("Resident_elena")
+    if not _check(not marco.get_node("ResidentName").visible and not marco.get_node("ActivityLabel").visible,"resident identity and activity labels hidden"):
+        return
     if not _check(appearance == world.ResidentAppearance.profile("marco")
             and appearance != elena.get_meta("appearance")
             and marco.has_node("LegLeft") and marco.has_node("ArmRight"),
