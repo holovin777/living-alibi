@@ -13,6 +13,31 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void namesRequireIntroductionAndSurviveReload() throws Exception {
+        Path file=directory.resolve("introductions.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=town.get("marco");
+            resident.place=TownLife.Place.PARK;resident.destination=resident.place;resident.travelRemaining=0;
+            resident.activity="FREE_TIME";resident.sociability=65;resident.health=100;resident.fatigue=0;
+            town.player.place=TownLife.Place.PARK;
+            assertEquals("Unknown resident",PlayerLife.displayName(town,resident));
+            assertFalse(PlayerLife.speak(town,resident.id,"What is your name?",1,600).contains(resident.name));
+            var contact=town.player.contacts.get(resident.id);
+            contact.knownName="Visitor";contact.trust=75;
+            assertEquals("My name is "+resident.name+".",PlayerLife.speak(town,resident.id,"What is your name?",1,601));
+            assertEquals(resident.name,PlayerLife.displayName(town,resident));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertTrue(PlayerLife.knowsResident(town,"marco"));
+            town.player.incarnation++;
+            assertFalse(PlayerLife.knowsResident(town,"marco"));
+        }
+    }
+
+    @Test
     void phoneMessagesRespectRelationshipsAndPersistAcrossReload() throws Exception {
         Path file=directory.resolve("phone.db");
         String id;
@@ -27,6 +52,7 @@ class GameSessionTest {
             var contact=new PlayerLife.Contact(id);
             contact.knownName="Visitor";contact.conversations=3;contact.trust=75;contact.affinity=40;
             town.player.contacts.put(id,contact);
+            PlayerLife.learnResident(town,id);
             PhoneLife.tick(town,state);
             assertEquals(1,PhoneLife.report(town).messages().size());
             assertEquals("Coffee tomorrow at 18:00? Let me know.",PhoneLife.report(town).messages().get(0).text());
