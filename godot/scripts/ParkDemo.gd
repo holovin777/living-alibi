@@ -396,6 +396,9 @@ func _process(delta: float) -> void:
         _hint.text = "Your room is open." if _has_room_lease() else "Rent a room at reception (blue kiosk)."
     elif _near_gate():
         _hint.text = tr("E: travel gate (game time). Esc: cursor.")
+    elif _current_place=="CLINIC" and (_avatar.position.distance_to(PHARMACY_COUNTER)<1.5 or _avatar.position.distance_to(CLINIC_COUNTER)<1.5):
+        var kind := "PHARMACY" if _avatar.position.distance_to(PHARMACY_COUNTER)<1.5 else "MEDICAL"
+        _hint.text=tr("Staff on duty · T: talk") if _medical_staff_present(kind) else tr("No staff on duty")
     elif _near_public_counter():
         _hint.text=tr("E / F: use the counter · Esc: close")
     elif _near_kiosk():
@@ -3628,6 +3631,12 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
             _box(prop,Vector3(0.29,0.17,0.23),Color("#99724a"),Vector3.ZERO)
             for x in [-0.08,0.08]:
                 _sphere(prop,0.055,Color("#b94c38"),Vector3(x,0.10,0))
+        "PHARMACY":
+            _box(prop,Vector3(0.14,0.08,0.18),Color("#e7e7d9"),Vector3.ZERO)
+            _box(prop,Vector3(0.145,0.082,0.045),Color("#538b72"),Vector3(0,0,0.04))
+        "MEDICAL":
+            _box(prop,Vector3(0.18,0.035,0.24),Color("#4b626a"),Vector3.ZERO)
+            _box(prop,Vector3(0.15,0.015,0.21),Color("#eae6dc"),Vector3(0,0.025,0))
         "PAPERS":
             _box(prop,Vector3(0.22,0.035,0.30),Color("#a17e53"),Vector3.ZERO)
             _box(prop,Vector3(0.19,0.012,0.26),Color("#f1eee4"),Vector3(0,0.025,0))
@@ -3745,8 +3754,37 @@ func _assign_food_staff() -> void:
             person.position=_open_anchor(previous)
             person.remove_meta("pre_work_anchor")
 
+func _assign_medical_staff() -> void:
+    var pharmacy: Array[Vector3]=[Vector3(9.5,0,-7),Vector3(9.5,0,-8.4)]
+    var clinic: Array[Vector3]=[Vector3(-9.4,0,7),Vector3(-9.4,0,8.5),Vector3(-9.4,0,5.8)]
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b):return str(a.get_meta("resident_id",""))<str(b.get_meta("resident_id","")))
+    for person in people:
+        var kind := str(person.get_meta("work_visual",""))
+        var active: bool=str(person.get_meta("activity",""))=="WORKING" and kind in ["PHARMACY","MEDICAL"]
+        var assigned := false
+        if active:
+            var slots: Array[Vector3]=pharmacy if kind=="PHARMACY" else clinic
+            while not slots.is_empty():
+                var at: Vector3=slots.pop_front()
+                if not _can_stand(at,WALKER_RADIUS):continue
+                if not person.has_meta("pre_work_anchor"):person.set_meta("pre_work_anchor",person.get_meta("anchor",person.position))
+                person.position=at
+                person.set_meta("anchor",at)
+                person.rotation.y=PI/2.0 if kind=="PHARMACY" else -PI/2.0
+                assigned=true
+                break
+        if not assigned and person.has_meta("pre_work_anchor"):
+            var previous: Vector3=person.get_meta("pre_work_anchor")
+            person.set_meta("anchor",previous)
+            person.position=_open_anchor(previous)
+            person.remove_meta("pre_work_anchor")
+
 func _assign_work_stations() -> void:
     if _apartment_active:return
+    if _current_place=="CLINIC":
+        _assign_medical_staff()
+        return
     if _current_place=="CENTRO":
         _assign_food_staff()
         return
@@ -5220,6 +5258,12 @@ func _nearest_resident() -> String:
         return ""
     var nearest := ""
     var best := 2.5
+    if _current_place=="CLINIC":
+        var desk_kind := "PHARMACY" if _avatar.position.distance_to(PHARMACY_COUNTER)<1.5 else ("MEDICAL" if _avatar.position.distance_to(CLINIC_COUNTER)<1.5 else "")
+        if not desk_kind.is_empty():
+            for staff in _residents_root.get_children():
+                if str(staff.get_meta("work_visual",""))==desk_kind and staff.has_meta("pre_work_anchor") and str(staff.get_meta("activity",""))=="WORKING" and _avatar.position.distance_to(staff.position)<4.8:
+                    return str(staff.get_meta("resident_id",""))
     for child in _residents_root.get_children():
         var person := child as Node3D
         if person == null or str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:
@@ -5757,6 +5801,13 @@ func _render_college() -> void:
         lesson.disabled=not bool(college.get("canStudy",false))
         _action_choices.add_child(lesson)
     _action_choices.add_child(_button("Leave",_close_college))
+
+func _medical_staff_present(kind: String) -> bool:
+    if not is_instance_valid(_residents_root):return false
+    for person in _residents_root.get_children():
+        if str(person.get_meta("activity",""))=="WORKING" and str(person.get_meta("work_visual",""))==kind and person.has_meta("pre_work_anchor"):
+            return true
+    return false
 
 func _medical_station() -> String:
     var medical = _last_snapshot.get("rebirth",{}).get("medical")
