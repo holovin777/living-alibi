@@ -13,6 +13,40 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void weekendOutingRequiresARealGuardianAndReturnsForNeeds() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("family-outing.db"))){
+            var state=db.load();var town=db.loadTown(state);
+            var family=PopulationGenerator.add(town,2);
+            var adult=family.get(0);var child=family.get(1);
+            for(var c:family){
+                c.alive=true;c.age=30;c.health=100;c.hunger=20;c.thirst=20;c.fatigue=20;
+                c.home=TownLife.Place.NORTH_RESIDENCES;c.place=c.home;c.destination=c.home;
+                c.homeUnit=adult.homeUnit;c.travelRemaining=0;c.activity="FREE_TIME";
+            }
+            child.age=7;child.activity="AT_HOME";
+            DemographyLife.set(town,child,"parent-a",adult.generationIndex);
+            state.day=5;state.minute=FamilyOutingLife.START;
+            FamilyOutingLife.plan(town,state);
+            assertNull(FamilyOutingLife.destination(town,child,state));
+            state.day=6;
+            FamilyOutingLife.plan(town,state);
+            assertEquals(TownLife.Place.PARK,FamilyOutingLife.destination(town,child,state));
+            assertEquals(TownLife.Place.PARK,FamilyOutingLife.destination(town,adult,state));
+            for(var c:family){c.place=TownLife.Place.PARK;c.destination=c.place;}
+            assertEquals("PLAYING",FamilyOutingLife.role(town,child,6,920));
+            assertEquals("GUARDIAN",FamilyOutingLife.role(town,adult,6,920));
+            adult.travelRemaining=1;
+            assertEquals("",FamilyOutingLife.role(town,child,6,920));
+            adult.travelRemaining=0;child.hunger=80;state.minute=930;
+            assertEquals(adult.home,FamilyOutingLife.destination(town,adult,state));
+            assertEquals(child.home,FamilyOutingLife.destination(town,child,state));
+            child.hunger=20;
+            assertEquals(child.home,FamilyOutingLife.destination(town,child,state));
+            assertEquals("",FamilyOutingLife.role(town,child,6,930));
+        }
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";

@@ -2991,6 +2991,7 @@ func _build_park() -> void:
         _lamp(park, p)
     for at in [Vector3(-8,0,-5),Vector3(-15,0,9),Vector3(10,0,11)]:
         _park_flowers(park,at)
+    _build_playground(park)
     # The pool is decorative; drinking still requires the validated Java action.
     var fountain := Node3D.new()
     fountain.name = "PublicFountain"
@@ -3034,6 +3035,34 @@ func _build_park() -> void:
             _box(park,Vector3(0.98,1.28,0.10),Color("#ddc7a6"),Vector3(x+offset,2.8,-17.70))
             _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.62))
             _box(park,Vector3(0.055,1.08,0.08),Color("#e0c6a0"),Vector3(x+offset,2.8,-17.56))
+
+func _build_playground(park: Node3D) -> void:
+    var play := Node3D.new()
+    play.name="Playground"
+    park.add_child(play)
+    _box(play,Vector3(7.0,0.05,5.0),Color("#c6aa79"),Vector3(4.5,0.035,12))
+    # Swing frame, two seats, and a slide. Equipment is solid scenery.
+    for x in [2.0,4.0]:
+        for z in [10.0,11.2]:
+            _cylinder(play,0.055,2.2,Color("#447d83"),Vector3(x,1.1,z))
+        _box(play,Vector3(0.08,0.08,1.35),Color("#447d83"),Vector3(x,2.2,10.6))
+    _box(play,Vector3(2.15,0.1,0.1),Color("#447d83"),Vector3(3,2.2,10.6))
+    for x in [2.6,3.4]:
+        for dx in [-0.18,0.18]:
+            _cylinder(play,0.014,1.55,Color("#9b9b91"),Vector3(x+dx,1.38,10.6))
+        _box(play,Vector3(0.48,0.09,0.35),Color("#d47f42"),Vector3(x,0.6,10.6))
+    _add_obstacle(Vector3(3,0,10.6),Vector2(2.3,1.6))
+    for x in [6.1,6.9]:
+        _cylinder(play,0.055,1.45,Color("#397b84"),Vector3(x,0.725,10.0))
+        _cylinder(play,0.055,1.45,Color("#397b84"),Vector3(x,0.725,10.8))
+    _box(play,Vector3(1.0,0.12,1.0),Color("#ce9e43"),Vector3(6.5,1.45,10.4))
+    _box(play,Vector3(0.73,0.09,2.35),Color("#ce6a47"),Vector3(6.5,0.76,11.5))
+    var ramp := play.get_child(play.get_child_count()-1) as Node3D
+    ramp.rotation.x=0.62
+    for i in range(4):
+        _box(play,Vector3(0.75,0.07,0.18),Color("#637e8b"),Vector3(6.5,0.3+0.3*i,9.0+0.22*i))
+    _add_obstacle(Vector3(6.5,0,10.8),Vector2(1.1,3.9))
+    _bench(play,Vector3(4.5,0,8.0))
 
 func _add_fountain_spray(water: MeshInstance3D) -> void:
     var spray := CPUParticles3D.new()
@@ -3196,8 +3225,14 @@ func _render_residents() -> void:
         var person := _residents_root.get_node_or_null("Resident_" + id) as Node3D
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
+            person.set_meta("new_public_model",true)
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
+        var age := int(resident.get("age",30))
+        var profile: Dictionary = person.get_meta("appearance",{})
+        var growth := clampf(0.42+0.58*float(age)/18.0,0.42,1.0)
+        person.scale=Vector3(float(profile.get("build",1.0)),float(profile.get("height",1.0)),float(profile.get("build",1.0)))*growth
+        person.set_meta("outing_role",str(resident.get("outingRole","")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
@@ -3218,6 +3253,9 @@ func _render_residents() -> void:
             child.queue_free()
 
     _assign_resident_seats()
+    _assign_playground_stations()
+    for person in _residents_root.get_children():
+        if person.has_meta("new_public_model"):person.remove_meta("new_public_model")
     _assign_work_stations()
     _sync_office_joker()
 
@@ -3526,7 +3564,7 @@ func _assign_resident_seats() -> void:
     for child in people:
         var person := child as Node3D
         var activity := str(person.get_meta("activity",""))
-        var eligible := activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"]
+        var eligible := activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"] and str(person.get_meta("outing_role","")).is_empty()
         var old_index := int(person.get_meta("seat_index",-1))
         var chosen := -1
         if eligible:
@@ -3550,6 +3588,29 @@ func _assign_resident_seats() -> void:
             person.position = _open_anchor(anchor)
             person.set_meta("seat_kind","")
 
+func _assign_playground_stations() -> void:
+    if _current_place!="PARK" or _apartment_active:return
+    var child_spots: Array[Vector3]=[Vector3(2,0,12.5),Vector3(3.5,0,13.6),Vector3(5,0,12.9),Vector3(7.6,0,13.5)]
+    var guardian_spots: Array[Vector3]=[Vector3(3.1,0,8.9),Vector3(4.4,0,9.0),Vector3(5.4,0,8.9)]
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b): return str(a.get_meta("resident_id",""))<str(b.get_meta("resident_id","")))
+    for child in people:
+        var person := child as Node3D
+        var role := str(person.get_meta("outing_role",""))
+        if role=="PLAYING" or role=="GUARDIAN":
+            var slots := child_spots if role=="PLAYING" else guardian_spots
+            if slots.is_empty():continue
+            var target: Vector3=slots.pop_front()
+            if not _can_stand(target,WALKER_RADIUS):continue
+            if not person.has_meta("outing_anchor"):
+                person.set_meta("outing_anchor",person.get_meta("anchor",person.position))
+            person.set_meta("anchor",target)
+            if bool(person.get_meta("new_public_model",false)):
+                person.position=target
+        elif person.has_meta("outing_anchor"):
+            person.set_meta("anchor",person.get_meta("outing_anchor"))
+            person.remove_meta("outing_anchor")
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
@@ -3561,6 +3622,8 @@ func _animate_residents(delta: float) -> void:
         var appearance: Dictionary = person.get_meta("appearance",{})
         var pace := float(appearance.get("pace",1.0))
         var stride := float(appearance.get("stride",0.42))
+        var outing := str(person.get_meta("outing_role","")) if person.has_meta("outing_anchor") else ""
+        if not outing.is_empty():walking=true
         var seated := int(person.get_meta("seat_index",-1)) >= 0
         var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
         if talking or seated:
@@ -3574,10 +3637,12 @@ func _animate_residents(delta: float) -> void:
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
             var target := anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
+            if outing=="GUARDIAN":target=anchor
+            elif outing=="PLAYING":target=anchor+Vector3(sin(phase*2.0)*0.42,0,cos(phase*2.0)*0.42)
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
-            var next := person.position.move_toward(target,delta*1.5*pace)
+            var next := person.position.move_toward(target,delta*(2.0 if outing=="PLAYING" else 1.5)*pace)
             var old := person.position
             person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
             walking = person.position.distance_squared_to(old) > 0.000001

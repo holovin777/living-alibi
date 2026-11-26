@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Family park outings
+
+On weekends at 15:00, autonomous children aged 3–12 and their available co-resident guardian may visit the park in suitable weather. The family plan is stored in the existing persistent stock map and uses ordinary district travel; the return is planned for 17:30, or earlier if a member becomes ill or has urgent needs. A child is shown playing only while their actual guardian is present in the public park. Player-controlled residents are excluded from automatic scheduling. Godot adds a solid swing frame, slide, sand-colored play area and bench, age-scaled public resident models, distinct playground stations and playful local movement. Newly visible outing participants spawn at safe stations; existing models move toward their assigned anchors. Equipment is currently scenery, not rideable; guardians stand nearby, and child-to-child games, full obstacle pathfinding and continuous cross-district group movement are not implemented. No extra people or relationship rewards are created.
