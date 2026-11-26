@@ -216,6 +216,10 @@ func _exercise() -> void:
         return
     if not _check(not world._phone.visible,"phone closes"):
         return
+    var market_root: Node3D = world._chunks["MARKET"]["root"] if world._chunks.has("MARKET") else null
+    if market_root!=null:
+        if not _check(market_root.has_node("PhysicalSign"),"market has a physical facade sign"):
+            return
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
     var park_root: Node3D = world._chunks["PARK"]["root"]
     if not _check(school_root.position == Vector3(0,0,-48)
