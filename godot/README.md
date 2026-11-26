@@ -793,3 +793,20 @@ At a committed autonomous dinner, Java records a topic based on family strain, s
 ### Audible town conversations
 
 Nearby co-present awake residents can exchange short contextual English/Italian lines at parks, cafés, shops and workplaces. A pair must be within 3.5 local units of each other and within 4.5 units of the visitor; one line is selected per six game minutes. This is ambient presentation based on the committed district and resident activities, not a new Java social interaction or relationship update. Family dinner subtitles from the private visit snapshot are also spoken. NPC voices / Voci PNG controls speech independently of Town sound; subtitles remain available. Godot uses installed system text-to-speech voices with a stable per-resident selection and distance-based starting volume. Speech stops on leaving range or opening interaction menus, and the same line is not queued every frame. Linux requires a configured speech service (on Arch, speech-dispatcher and an English/Italian-capable synthesizer such as espeak-ng); if no matching voice is available, only subtitles are shown. Speech is not yet positional stereo, natural recorded dialogue, or a fully simulated public conversation. No external AI API or new save schema is required.
+
+### Positional voices and optional microphone input (Linux)
+
+Install the optional local packages on Arch Linux:
+
+```bash
+sudo pacman -S espeak-ng alsa-utils whisper-cpp
+mkdir -p "$HOME/.local/share/living-alibi"
+curl -fL https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin \
+  -o "$HOME/.local/share/living-alibi/ggml-base.bin"
+export LIVING_ALIBI_WHISPER_MODEL="$HOME/.local/share/living-alibi/ggml-base.bin"
+bash play.sh
+```
+
+Use a multilingual Whisper model (not base.en). The first model download needs internet; voice capture and recognition subsequently run locally. The NPC voice option uses espeak-ng to generate a short WAV asynchronously and an AudioStreamPlayer3D at the actual speaker's position, with distance attenuation and camera-relative stereo. If espeak-ng is not installed the previous system TTS fallback is retained. No real-person voice cloning or audio streaming is used.
+
+Approach an NPC, press T, then click Record 5s. A five-second ALSA default-device recording is transcribed in the selected English or Italian language using whisper-cli. Review/edit the resulting text and click Speak; the existing Java dialogue validates co-presence and returns its usual rule-based response, which can also be spoken. The microphone is never opened automatically; Cancel or Close stops capture/recognition, and temporary audio/text files are removed on completion or normal cancellation/exit. An abnormal process crash may leave temporary files in the Godot user data folder. No cloud speech service is called. Recording requires a working default ALSA input and a downloaded model; typed dialogue remains available without either. Speech recognition may make mistakes. This is a fixed-duration opt-in recording, not continuous listening or unrestricted natural-language NPC intelligence. Actual audio and recognition quality require desktop testing.
