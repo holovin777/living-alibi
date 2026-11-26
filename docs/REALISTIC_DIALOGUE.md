@@ -207,6 +207,24 @@ The UI closes after a farewell, departure, or an elapsed conversation
 window. Explicitly paused time and the existing childhood/linked-life
 time controls are retained; model requests remain serialized.
 
+## Initial combat
+
+Adult visitors on foot in public areas can select empty hands or a training
+baton using Q. The market's F menu offers a training baton for 12 EUR.
+Aim at a nearby resident and press X to strike; ordinary left click remains
+conversation. Java validates ownership and public-scene co-presence, applies
+fictional health loss and fatigue, and writes the event and actual
+co-present witnesses to SQLite. Witnesses lose trust; the victim loses
+more. An on-duty officer present in the scene records the assault,
+confiscates an equipped baton and consumes 30 game minutes for a
+simplified intervention. Without an officer, there is no automatic
+police response yet. Each visitor has separate weapon ownership and
+police report counts. This is a nonlethal prototype for adult targets:
+health is not reduced below 20 by strikes. The client checks local
+proximity; the server still only knows public districts, not precise
+3D coordinates. No firearms, physical NPC counterattacks, arrest,
+prison, or autonomous crime response are implemented yet.
+
 Manual check:
 ```sh
 ollama pull qwen2.5:3b
