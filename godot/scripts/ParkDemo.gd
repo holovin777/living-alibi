@@ -3198,6 +3198,7 @@ func _render_residents() -> void:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
+        person.set_meta("walking_companion",str(resident.get("walkingCompanion","")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
@@ -3526,7 +3527,7 @@ func _assign_resident_seats() -> void:
     for child in people:
         var person := child as Node3D
         var activity := str(person.get_meta("activity",""))
-        var eligible := activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"]
+        var eligible := activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"] and _walking_partner(person)==null
         var old_index := int(person.get_meta("seat_index",-1))
         var chosen := -1
         if eligible:
@@ -3550,6 +3551,15 @@ func _assign_resident_seats() -> void:
             person.position = _open_anchor(anchor)
             person.set_meta("seat_kind","")
 
+# Both endpoints must be present and agree; never fabricate a companion.
+func _walking_partner(person: Node3D) -> Node3D:
+    var id := str(person.get_meta("resident_id",""))
+    var companion := str(person.get_meta("walking_companion",""))
+    if companion.is_empty() or companion==id:return null
+    var partner := _residents_root.get_node_or_null("Resident_"+companion) as Node3D
+    if partner==null or str(partner.get_meta("walking_companion",""))!=id:return null
+    return partner
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
@@ -3563,6 +3573,13 @@ func _animate_residents(delta: float) -> void:
         var stride := float(appearance.get("stride",0.42))
         var seated := int(person.get_meta("seat_index",-1)) >= 0
         var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
+        var partner := _walking_partner(person)
+        var following := false
+        if partner!=null:
+            walking=true
+            following=str(person.get_meta("resident_id",""))>str(partner.get_meta("resident_id",""))
+            if _dialog_panel.visible and str(partner.get_meta("resident_id",""))==_dialog_target:
+                walking=false
         if talking or seated:
             walking = false
         if talking and not seated:
@@ -3574,6 +3591,17 @@ func _animate_residents(delta: float) -> void:
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
             var target := anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
+            if partner!=null:
+                if following:
+                    # Walk alongside the leader where possible, otherwise trail.
+                    var side := Basis(Vector3.UP,partner.rotation.y)*Vector3(0.85,0,0.25)
+                    target=partner.position+side
+                    if not _can_stand(target,WALKER_RADIUS):
+                        target=partner.position+Basis(Vector3.UP,partner.rotation.y)*Vector3(0,0,1.1)
+                    if not _can_stand(target,WALKER_RADIUS):
+                        target=person.position
+                elif person.position.distance_to(partner.position)>2.2:
+                    target=person.position
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
