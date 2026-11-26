@@ -45,6 +45,31 @@ func _ready() -> void:
         plate.material_override=material
         dinner.add_child(plate)
     dinner.hide()
+    var birthday := Node3D.new()
+    birthday.name="BirthdayDecorations"
+    add_child(birthday)
+    var colors := [Color("#d99b50"),Color("#89b8b4"),Color("#d17d86"),Color("#a4a4d6")]
+    for i in range(4):
+        var balloon := MeshInstance3D.new()
+        var mesh := SphereMesh.new()
+        mesh.radius=0.15
+        mesh.height=0.38
+        balloon.mesh=mesh
+        var material := StandardMaterial3D.new()
+        material.albedo_color=colors[i]
+        balloon.material_override=material
+        balloon.position=Vector3(-2.5*side+(i-1.5)*0.34,2.30+0.08*(i%2),-0.8)
+        birthday.add_child(balloon)
+        var ribbon := MeshInstance3D.new()
+        var ribbon_mesh := CylinderMesh.new()
+        ribbon_mesh.top_radius=0.006
+        ribbon_mesh.bottom_radius=0.006
+        ribbon_mesh.height=0.55
+        ribbon.mesh=ribbon_mesh
+        ribbon.position=balloon.position-Vector3(0,0.44,0)
+        ribbon.material_override=material
+        birthday.add_child(ribbon)
+    birthday.hide()
     _furniture("DinnerChair",Vector3(-2.5*side,0,0.48),Vector3(0.54,0.48,0.52),wood)
     _box("DinnerChairBack",Vector3(0.54,0.65,0.10),wood,Vector3(-2.5*side,0.72,0.71))
     _furniture("Sofa",Vector3(2.9*side,0,1.8),Vector3(1.2,0.65,1.9),fabric)
@@ -188,5 +213,6 @@ func host_path(from: Vector3,to: Vector3) -> Array[Vector3]:
 func update_household(household: Dictionary) -> void:
     var dinner := get_node("FamilyDinner") as Node3D
     dinner.visible=bool(household.get("dinnerNow",false))
+    get_node("BirthdayDecorations").visible=bool(household.get("birthdayNow",false))
     for i in range(dinner.get_child_count()):
         dinner.get_child(i).visible=i<mini(4,int(household.get("present",0)))

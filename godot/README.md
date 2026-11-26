@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Family birthdays
+
+The annual birthday follows the same 365-day game calendar as ageing. Between 18:00 and 20:30, an awake resident at home can celebrate with actual present relatives in the same private unit. Once per birthday, a child may receive a EUR 5 gift from an autonomous parent who can retain at least EUR 80. No money is created or taken automatically from a player-controlled adult. The family relationship receives a small positive change and the celebration day, count, and cash gifts persist in SQLite. Linked-life personal history shows birthday and gift information in English and Italian. An invited guest inside the celebrating household can see temporary balloons for 30 game minutes; private celebration status is not exposed outside the apartment. Friend invitations, cake inventory and interactive party actions are not included yet.
