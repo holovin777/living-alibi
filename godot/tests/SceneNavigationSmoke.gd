@@ -246,12 +246,17 @@ func _exercise() -> void:
     var centro_root: Node3D = world._chunks["CENTRO"]["root"]
     world._on_world_updated(_world("CENTRO","Centro Storico"))
     if not _check(world._scenery == centro_root and centro_root.has_node("PiazzaCentrale")
-            and world._road_links.size() == 4 and world._park_lamps.size() == 6,
+            and world._road_links.size() == 4 and world._park_lamps.size() == 4,
             "historic square has cached scenery, four roads and lamps"):
         return
     if not _check(world._can_stand(Vector3(-13,0,-9),world.WALKER_RADIUS)
             and not world._can_stand(Vector3(-15.8,0,-9),world.WALKER_RADIUS),
             "portico is walkable but building back wall is solid"):
+        return
+    if not _check(centro_root.has_node("PiazzaCentrale/PasseggiataDeiTigli")
+            and world._can_stand(Vector3(6,0,18.0),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(6,0,22),world.WALKER_RADIUS),
+            "historic centre promenade expands walkable space without crossing the tile boundary"):
         return
     var square := centro_root.get_node("PiazzaCentrale")
     var paving := square.get_node("StonePaving") as MultiMeshInstance3D
@@ -850,6 +855,12 @@ func _exercise() -> void:
             and world._scenery.has_node("ParkDetails/SouthGardenPromenade")
             and world._can_stand(Vector3(8,0,18.6),world.WALKER_RADIUS),
             "expanded park promenade is walkable but outer boundary remains solid"):
+        return
+    if not _check(world._scenery.has_node("ParkDetails/ParcoGiochi/SwingFrame")
+            and world._scenery.has_node("ParkDetails/ParcoGiochi/Slide")
+            and world._can_stand(Vector3(-7.8,0,17.4),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(-9.5,0,13.9),world.WALKER_RADIUS),
+            "playground has accessible approach and solid equipment footprints"):
         return
     # Simulate server rejection and committed arrival without a live Java process.
     world._road_pending = "SCHOOL"
