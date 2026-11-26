@@ -43,8 +43,9 @@ final class PopulationLife {
         boolean freightRun=carrier && freightDestination!=null && !sick;
         boolean journalist=NewspaperLife.reporter(c);
         boolean builder=ConstructionLife.BUILDER.equals(c.occupation);
+        boolean electrician=ElectricianLife.JOB.equals(c.occupation);
         boolean working=!child&&!retired&&c.employed && !sick && (workday||builder) && (!StreetCareLife.crew(c)||StreetCareLife.funded(town)) &&
-                (builder?ConstructionLife.shift(town,clock.day,minute):itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):
+                (electrician?ElectricianLife.shift(town,minute):builder?ConstructionLife.shift(town,clock.day,minute):itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,clock.day,minute)!=null);
@@ -135,7 +136,7 @@ final class PopulationLife {
         else if(working && c.place==c.workplace){
             c.activity="WORKING";
             if(minute%60==0){
-                if(!builder && !ITStaffLife.OCCUPATION.equals(c.occupation) && !TechnicalWorkLife.linkedEngineer(town,c) && !SoftwareLife.linkedProgrammer(town,c) && !journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
+                if(!builder && !electrician && !ITStaffLife.OCCUPATION.equals(c.occupation) && !TechnicalWorkLife.linkedEngineer(town,c) && !SoftwareLife.linkedProgrammer(town,c) && !journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
                         !IndustryLife.payHourly(town,c,clock,events,observations) && !StreetCareLife.payHourly(town,c,clock,events,observations)) {
                     // Existing unrelated occupations retain their original
                     // placeholder wage model until their companies are modeled.
