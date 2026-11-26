@@ -462,7 +462,10 @@ public final class GameSession implements AutoCloseable {
             reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")
                     ?NewspaperLife.interview(copy,resident,state.day,state.minute)
                     :PlayerLife.speak(copy,residentId,message,state.day,state.minute);
-            if(recall){
+            if(ConversationMemory.importantQuestion(message)){
+                reply=ConversationMemory.firstMeeting(prior,language);
+                rendered=language!=null;
+            } else if(recall){
                 reply=ConversationMemory.recall(prior,language);
                 rendered=language!=null;
             } else if(language!=null&&reply.equals("I'm not sure I understood. Could you ask me in a different way?")){
@@ -473,6 +476,7 @@ public final class GameSession implements AutoCloseable {
         if(understood){
             var contact=copy.player.contacts.computeIfAbsent(resident.id,PlayerLife.Contact::new);
             ConversationMemory.remember(contact,state.day,state.minute,language,message.strip(),reply);
+            ConversationMemory.captureMilestones(town,copy,prior,contact,contact.dialogue.getLast());
         }
         var controlled=RebirthLife.child(copy);
         if(RebirthLife.linkedAdult(copy,controlled)&&!RebirthLife.atHome(controlled)
