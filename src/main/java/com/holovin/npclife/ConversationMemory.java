@@ -12,7 +12,7 @@ final class ConversationMemory {
     private static final int PROMPT_LIMIT=10;
     private static final ObjectMapper JSON=new ObjectMapper();
     record Turn(int day,int minute,String language,String player,String reply) {}
-    enum Milestone { FIRST_MEETING, INTRODUCTION, SUPPORT, HURT, BROKEN_TRUST, APOLOGY, RECEIVED_AID }
+    enum Milestone { FIRST_MEETING, INTRODUCTION, SUPPORT, HURT, BROKEN_TRUST, APOLOGY, RECEIVED_AID, SHARED_MEAL }
     record Important(Milestone kind,Turn turn) {}
     private ConversationMemory(){}
     static void remember(PlayerLife.Contact contact,int day,int minute,String language,String player,String reply){
