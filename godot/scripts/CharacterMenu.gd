@@ -98,7 +98,7 @@ func refresh(data: Dictionary) -> void:
     var occupation=p.get("jobId")
     if linked and life.get("adultOptions") is Dictionary:occupation=life["adultOptions"].get("occupation")
     elif linked:occupation=tr("Student" if int(life.get("age",0))>=6 else "Child")
-    line(pages[0],tr("Location: %s") % str(p.get("place",p.get("placeId","")))
+    line(pages[0],tr("Location: %s") % str(p.get("place",p.get("placeId",""))))
     line(pages[0],tr("Occupation: %s") % (tr("Not employed") if occupation==null or str(occupation).is_empty() else str(occupation)))
     line(pages[0],tr("Money: %s EUR") % (identity.get("savings",p.get("money",0)) if linked and identity is Dictionary else p.get("money",0)))
     section(pages[0],tr("Wellbeing — full bars are good"))
