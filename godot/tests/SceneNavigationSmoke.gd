@@ -1298,7 +1298,7 @@ func _exercise() -> void:
         return
     world._dialog_pending = true
     world._on_action_feedback("Marco: Hello, visitor.")
-    if not _check(not world._dialog_pending and world._dialog_history.text.contains("Hello, visitor."),
+    if not _check(not world._dialog_pending and world._dialog_history.get_parsed_text().contains("Hello, visitor."),
             "NPC's accepted reply appears in text conversation history"):
         return
     world._on_world_updated(reborn_social)
