@@ -1,6 +1,19 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "Wait one hour in custody": "Attendi un'ora in custodia",
+    "Serve one day": "Sconta un giorno",
+    "Detained: waiting for court": "In custodia: in attesa del giudice",
+    "Prison sentence": "Pena detentiva",
+    "Time remaining: %s h %s min": "Tempo rimanente: %s h %s min",
+    "Convictions: %s · Fine outstanding: %s EUR": "Condanne: %s · Multa residua: %s EUR",
+    "The town continues while you serve your sentence.": "La città continua a vivere mentre sconti la pena.",
+    "You have been released.": "Sei stato rilasciato.",
+    "Assault reported to police": "Aggressione segnalata alla polizia",
+    "Pay outstanding fine": "Paga la multa residua",
+    "Fine payment recorded.": "Pagamento della multa registrato.",
+    "Time passed in custody.": "Tempo trascorso in custodia.",
+    "You are in custody. Use the custody controls.": "Sei in custodia. Usa i comandi della detenzione.",
     "Baton": "Bastone da allenamento",
     "Buy training baton · 12 EUR": "Compra bastone da allenamento · 12 EUR",
     "Bought a training baton for 12 EUR.": "Hai comprato un bastone da allenamento per 12 EUR.",
