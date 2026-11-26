@@ -13,6 +13,17 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void typedConversationRecognizesItalianAndEnglishWithoutTriggeringUnrelatedActions(){
+        assertEquals("Hello",PlayerLife.conversationalIntent("Ciao!"));
+        assertEquals("My name is Luca",PlayerLife.conversationalIntent("Mi chiamo Luca"));
+        assertEquals("What do you do?",PlayerLife.conversationalIntent("Che lavoro fai?"));
+        assertEquals("What are you doing?",PlayerLife.conversationalIntent("Cosa stai facendo?"));
+        assertEquals("How are you?",PlayerLife.conversationalIntent("Come va?"));
+        assertEquals("Thank you",PlayerLife.conversationalIntent("Grazie!"));
+        assertEquals("Can you lend me money?",PlayerLife.conversationalIntent("Can you lend me money?"));
+    }
+
+    @Test
     void barberServicePersistsStyleAndConservesMoney() throws Exception {
         Path file=directory.resolve("barber.db");
         try(var db=new WorldDatabase(file)){

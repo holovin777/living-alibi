@@ -323,11 +323,32 @@ final class PlayerLife {
         t.industryStocks.put(introductionKey(t,id),1);
     }
 
+    // Accept common typed variants without interpreting arbitrary text as a financial action.
+    static String conversationalIntent(String input){
+        String text=input.strip();
+        String key=text.toLowerCase(java.util.Locale.ROOT).replace('’','\'').replaceAll("[.!?]+$","").strip();
+        if(key.startsWith("mi chiamo "))return "My name is "+text.substring(10);
+        if(key.startsWith("my name is "))return "My name is "+text.substring(11);
+        return switch(key){
+            case "hi","hey","hello","ciao","salve","buongiorno","buonasera","good morning","good evening" -> "Hello";
+            case "what is your name","what's your name","come ti chiami","qual è il tuo nome" -> "What is your name?";
+            case "how are you","how's it going","come stai","come va","tutto bene" -> "How are you?";
+            case "what do you do","what's your job","where do you work","che lavoro fai","cosa fai di lavoro","dove lavori" -> "What do you do?";
+            case "where do you live","dove abiti","dove vivi" -> "Where do you live?";
+            case "sorry","i'm sorry","mi dispiace","scusa","scusami" -> "I'm sorry.";
+            case "thank you","thanks","grazie","grazie mille" -> "Thank you";
+            case "bye","goodbye","see you later","arrivederci","a presto","ci vediamo" -> "Goodbye";
+            case "are you busy","what are you doing","cosa stai facendo","sei occupato","sei occupata" -> "What are you doing?";
+            default -> text;
+        };
+    }
+
     static String speak(TownLife.Town town,String id,String message,int day,int minute) {
         TownLife.Citizen resident=nearby(town,id);
-        String spoken=message.strip();
-        if(spoken.isEmpty()||spoken.length()>1000)
+        String original=message.strip();
+        if(original.isEmpty()||original.length()>1000)
             throw new IllegalArgumentException("Speak 1–1000 characters.");
+        String spoken=conversationalIntent(original);
         if(resident.activity.equals("SLEEPING")||resident.activity.equals("TRAVELING"))
             throw new IllegalArgumentException(displayName(town,resident)+" is not available for a conversation.");
         Contact contact=town.player.contacts.computeIfAbsent(resident.id,Contact::new);
@@ -390,7 +411,7 @@ final class PlayerLife {
         if(apology && SocialMemoryLife.unresolved(town,id))
             SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.APOLOGY,day);
         contact.conversations++;
-        contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=spoken;
+        contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=original;
         String greeting=contact.knownName==null?"stranger":contact.knownName;
         if(spoken.equalsIgnoreCase("Where do you live?")||spoken.equalsIgnoreCase("Dove abiti?"))return AddressLife.ask(town,resident,contact);
         if(askingName){
@@ -420,8 +441,18 @@ final class PlayerLife {
             return "It's good to see you, "+greeting+"! How have you been?";
         if(spoken.equalsIgnoreCase("What do you do?"))
             return resident.employed?"I work as "+resident.occupation+".":"I'm currently looking for work.";
+        if(spoken.equals("Thank you"))return "You are welcome.";
+        if(spoken.equals("Goodbye"))return "See you around.";
+        if(spoken.equals("What are you doing?"))return switch(resident.activity){
+            case "WORKING" -> "I am working right now.";
+            case "STUDYING" -> "I am studying right now.";
+            case "SHOPPING" -> "I am doing some shopping.";
+            case "JOB_SEARCH" -> "I am looking for work.";
+            default -> "I am taking some time for myself.";
+        };
         if(resident.sociability<40)return "Hello. I'm having a quiet day.";
         if(spoken.contains("?"))return "I'm not sure, "+greeting+". I can only tell you what I know.";
+        if(!spoken.equalsIgnoreCase("Hello"))return "I am not sure what you mean. Could you ask me something else?";
         if(contact.conversations==1)return "Hello, "+greeting+". Nice to meet someone around here.";
         return "Good to see you again, "+greeting+".";
     }
