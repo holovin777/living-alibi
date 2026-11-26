@@ -91,6 +91,8 @@ var _grocery_menu := false
 const GROCERY_COUNTER := Vector3(7.3,0,3.8)
 const BAKERY_COUNTER := Vector3(-6.3,0,7.0)
 const CAFE_COUNTER := Vector3(-7.0,0,5.9)
+const PIZZA_COUNTER := Vector3(-6.0,0,18.0)
+const GELATO_COUNTER := Vector3(6.0,0,18.0)
 const CAFE_TABLE := Vector3(-7.0,0,9.0)
 var _cafe_menu := false
 var _medical_menu := false
@@ -646,12 +648,20 @@ func _near_kiosk() -> bool:
 
 func _near_public_counter() -> bool:
     if _apartment_active or _guest_active or _stairwell_active:return false
+    if _current_place=="CENTRO":return not _centro_food_counter().is_empty()
     var counters := {"PORTICI":GROCERY_COUNTER,"BAKERY":BAKERY_COUNTER,"LIBRARY":LIBRARY_DESK}
     return counters.has(_current_place) and _avatar.position.distance_to(counters[_current_place])<1.5
+
+func _centro_food_counter() -> String:
+    if _current_place!="CENTRO" or _apartment_active or _guest_active or _stairwell_active:return ""
+    if _avatar.position.distance_to(PIZZA_COUNTER)<1.3:return "pizza"
+    if _avatar.position.distance_to(GELATO_COUNTER)<1.3:return "gelato"
+    return ""
 
 func _public_entrances() -> Array:
     # Local positions are registered only for genuinely open geometry.
     return {
+        "CENTRO":[["Pizzeria",Vector3(-6,0,15)],["Gelateria",Vector3(6,0,15)]],
         "PORTICI":[["Alimentari",Vector3(3.2,0,5.3)]],
         "BAKERY":[["Panetteria",Vector3(-2.8,0,7)]],
         "CAFE":[["Bar Centrale",Vector3(-2.8,0,7)]],
@@ -2930,13 +2940,47 @@ func _build_centro_south_walk(parent: Node3D) -> void:
     var stone := Color("#bcb19b")
     for side in [-1.0,1.0]:
         _box(lane,Vector3(7.6,0.045,6.0),stone,Vector3(side*6.3,0.018,18.0),"paving")
-        _bench(lane,Vector3(side*7.5,0,20.0))
+        _bench(lane,Vector3(side*3.3,0,20.0))
         for z in [16.5,19.5]:
             var at := Vector3(side*10,0,z)
             _add_obstacle(at,Vector2(0.85,0.85))
             _box(lane,Vector3(0.85,0.42,0.85),Color("#a36e4a"),at+Vector3(0,0.21,0))
             _sphere(lane,0.48,Color("#5f7547"),at+Vector3(0,0.75,0))
-    _physical_sign(lane,"Passeggiata dei Tigli",Vector3(6.0,2.2,20.4),PI,3.0)
+    _physical_sign(lane,"Passeggiata dei Tigli",Vector3(3.3,2.2,20.4),PI,3.0)
+    _build_centro_food_shop(lane,-6.0,true)
+    _build_centro_food_shop(lane,6.0,false)
+
+func _build_centro_food_shop(parent: Node3D,x: float,pizza: bool) -> void:
+    var shop := Node3D.new()
+    shop.name="Pizzeria" if pizza else "Gelateria"
+    parent.add_child(shop)
+    var wall := Color("#c98b6a") if pizza else Color("#b0c8b2")
+    var trim := Color("#f4e3c8")
+    for part in [[Vector3(x-2.1,0,17.75),Vector2(0.22,4.5)],
+            [Vector3(x+2.1,0,17.75),Vector2(0.22,4.5)],
+            [Vector3(x,0,20.0),Vector2(4.4,0.22)],
+            [Vector3(x-1.6,0,15.5),Vector2(1.0,0.22)],
+            [Vector3(x+1.6,0,15.5),Vector2(1.0,0.22)]]:
+        _room_wall(shop,part[0],part[1],wall)
+    _box(shop,Vector3(4.2,0.08,4.5),trim,Vector3(x,0.04,17.75),"paving")
+    _box(shop,Vector3(4.5,0.22,4.7),Color("#96513d"),Vector3(x,3.1,17.75),"terracotta")
+    _box(shop,Vector3(4.4,0.55,0.23),wall.darkened(0.15),Vector3(x,2.75,15.5))
+    _physical_sign(shop,"Pizzeria del Borgo" if pizza else "Gelateria dei Tigli",Vector3(x,2.72,15.32),PI,3.9)
+    _box(shop,Vector3(4.4,0.09,0.8),wall.darkened(0.22),Vector3(x,2.43,15.1))
+    _room_furniture(shop,Vector3(x,0,19.1),Vector3(3.0,0.9,0.65),wall.darkened(0.2))
+    _box(shop,Vector3(3.05,0.08,0.7),trim,Vector3(x,0.94,19.1))
+    if pizza:
+        for dx in [-0.9,0.0,0.9]:
+            _cylinder(shop,0.30,0.06,Color("#c68b43"),Vector3(x+dx,1.02,19.1))
+            _cylinder(shop,0.24,0.025,Color("#b9543c"),Vector3(x+dx,1.06,19.1))
+            for offset in [-0.09,0.09]:
+                _sphere(shop,0.055,Color("#eee1b7"),Vector3(x+dx+offset,1.07,19.12))
+    else:
+        for dx in [-0.9,-0.3,0.3,0.9]:
+            _box(shop,Vector3(0.48,0.15,0.48),Color("#e9e5db"),Vector3(x+dx,1.05,19.1))
+            _sphere(shop,0.17,Color("#c98b99") if dx<0 else Color("#aebd83"),Vector3(x+dx,1.18,19.1))
+        _box(shop,Vector3(2.7,0.38,0.045),Color("#9eb6bf"),Vector3(x,1.2,18.77))
+    _physical_sign(shop,"11:00–22:00 · F",Vector3(x,1.7,19.65),PI,2.0)
 
 func _build_portici() -> void:
     var street := Node3D.new()
@@ -6075,7 +6119,23 @@ func _render_actions() -> void:
             _action_choices.add_child(_button("Apply: factory machinist",
                     _apply_job.bind("machinist")))
         "CENTRO":
-            _action_choices.add_child(_button("Job noticeboard",_find_jobs))
+            var food_id := _centro_food_counter()
+            if food_id.is_empty():
+                _action_choices.add_child(_button("Job noticeboard",_find_jobs))
+            else:
+                var minute := int(_last_snapshot.get("minute",0))
+                var shop_open := minute>=660 and minute+2<=1320
+                var status := Label.new()
+                status.text=("Open" if shop_open else "Closed")+" · 11:00–22:00"
+                _action_choices.add_child(status)
+                for item in _last_snapshot.get("shop",[]):
+                    if str(item.get("id",""))!=food_id:continue
+                    var buy := _button("Buy %s · %s EUR (%s left)" % [item.get("label",food_id),item.get("price",0),item.get("stock",0)],_buy_product.bind(food_id))
+                    buy.disabled=not shop_open or int(item.get("stock",0))<=0 or int(player.get("money",0))<int(item.get("price",0))
+                    _action_choices.add_child(buy)
+                var food_bag: Dictionary=player.get("bag",{})
+                if int(food_bag.get(food_id,0))>0:
+                    _action_choices.add_child(_button("Eat "+food_id,_consume_product.bind(food_id)))
         "NORTH_RESIDENCES", "SOUTH_RESIDENCES":
             if _near_orchard():
                 var orchard: Dictionary = _last_snapshot.get("orchard",{})
@@ -6662,6 +6722,7 @@ func _sleep_room(hours: int) -> void:
         _api.sleep_in_room(hours)
 
 func _buy_product(id: String) -> void:
+    if id in ["pizza","gelato"] and _centro_food_counter()!=id:return
     if _near_kiosk() and not _api.is_busy() and _connected:
         _api.buy_product(id)
 
