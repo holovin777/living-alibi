@@ -85,7 +85,7 @@ public final class GameSession implements AutoCloseable {
                                 String phase,int condition,int completedDay,
                                 String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
-    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual,String appearanceStage) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual,String appearanceStage,String walkingCompanion) { }
     // Observable equipment, not a disclosure of a stranger's name or private employment record.
     static String workVisual(TownLife.Citizen c){
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
@@ -151,6 +151,36 @@ public final class GameSession implements AutoCloseable {
                 .filter(p->!lowStock||p.stock()<3)
                 .sorted(java.util.Comparator.comparing(RetailView::id)).toList();
     }
+    private record WalkingPair(TownLife.Citizen a,TownLife.Citizen b,int score) { }
+    static java.util.Map<String,String> walkingCompanions(TownLife.Town town,List<TownLife.Citizen> visible,int minute){
+        if(minute<480||minute>=1200)return java.util.Map.of();
+        var candidates=visible.stream().filter(c->leisureEncounter(c)&&c.age>=3&&!RebirthLife.linkedAdult(town,c)
+                &&java.util.Set.of(TownLife.Place.PARK,TownLife.Place.CENTRO,TownLife.Place.PORTICI,TownLife.Place.RIVER).contains(c.place)
+                &&c.currentSpace().equals(TownLife.publicSpace(c.place))&&c.hunger<70&&c.thirst<70&&c.fatigue<80)
+                .sorted(java.util.Comparator.comparing(c->c.id)).toList();
+        var pairs=new ArrayList<WalkingPair>();
+        for(int i=0;i<candidates.size();i++)for(int j=i+1;j<candidates.size();j++){
+            var a=candidates.get(i);var b=candidates.get(j);
+            if(a.place!=b.place||!a.currentSpace().equals(b.currentSpace()))continue;
+            boolean family=a.generationIndex>0&&b.generationIndex>0&&(
+                (a.age<18&&b.age>=18&&(DemographyLife.get(town,a,"parent-a")==b.generationIndex||DemographyLife.get(town,a,"parent-b")==b.generationIndex))
+                ||(b.age<18&&a.age>=18&&(DemographyLife.get(town,b,"parent-a")==a.generationIndex||DemographyLife.get(town,b,"parent-b")==a.generationIndex)));
+            boolean couple=a.age>=18&&b.age>=18&&a.generationIndex>0&&b.generationIndex>0
+                &&DemographyLife.get(town,a,"partner")==b.generationIndex&&DemographyLife.get(town,b,"partner")==a.generationIndex;
+            var r=town.existingRelationship(a.id,b.id);
+            if(family)pairs.add(new WalkingPair(a,b,1000));
+            else if(couple&&(r==null||r.tension<=35))pairs.add(new WalkingPair(a,b,500));
+            else if(a.age>=18&&b.age>=18&&r!=null&&r.conversations>=2&&r.trust>=58&&r.affinity>=65&&r.tension<=25)
+                pairs.add(new WalkingPair(a,b,r.affinity+r.trust-r.tension));
+        }
+        pairs.sort(java.util.Comparator.comparingInt(WalkingPair::score).reversed().thenComparing(p->p.a.id).thenComparing(p->p.b.id));
+        var result=new java.util.LinkedHashMap<String,String>();
+        for(var p:pairs){
+            if(result.containsKey(p.a.id)||result.containsKey(p.b.id))continue;
+            result.put(p.a.id,p.b.id);result.put(p.b.id,p.a.id);
+        }
+        return java.util.Map.copyOf(result);
+    }
     public record PeerEncounterView(String firstId,String secondId,long tick,String tone,String reaction) { }
     private void prunePeerEvents(long now){
         recentPeerEvents.removeIf(e->now-((long)(e.day()-1)*1440L+e.minute())>15);
@@ -207,12 +237,13 @@ public final class GameSession implements AutoCloseable {
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
                 p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
         var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
+        var companions=walkingCompanions(town,visible,state.minute);
         var residents=visible.stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
                             contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c));
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
