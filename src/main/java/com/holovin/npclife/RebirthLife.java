@@ -573,7 +573,7 @@ final class RebirthLife {
         known.sort(java.util.Comparator.comparing(KnownPerson::family).reversed()
                 .thenComparing(KnownPerson::name).thenComparing(KnownPerson::id));
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
-                EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known));
+                EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known),BirthdayLife.memory(t,c,day));
     }
     // Linked residents shop with their actual wallet and the same finite retail stock
     // as first-life visitors. Food is represented by the existing resident portions.
