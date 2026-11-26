@@ -5772,7 +5772,8 @@ func _open_guest(invitation: Dictionary) -> void:
     _guest_host.position = _guest.host_anchor()
     _guest_host.set_meta("activity","AT_HOME")
     var hand := _guest_host.get_node("ArmRight") as Node3D
-    var book := _box(hand,Vector3(0.20,0.025,0.15),Color("#9d6744"),Vector3(0,-0.48,-0.10))
+    _box(hand,Vector3(0.20,0.025,0.15),Color("#9d6744"),Vector3(0,-0.48,-0.10))
+    var book := hand.get_child(hand.get_child_count()-1) as Node3D
     book.name = "ReadingBook"
     book.hide()
     _host_activity = ""
