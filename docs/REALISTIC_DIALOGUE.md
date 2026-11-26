@@ -5,9 +5,24 @@ from the UI language. Choose the language you are actually typing. NPCs do not
 automatically learn languages when you change menus. Quick actions use the
 declared language but still send their existing canonical engine phrases.
 
-All initial townspeople have Italian as their native language. Marco is
-Italian-only; Elena also knows English; other IDs have a stable deterministic
-English ability (roughly 35%). This is a first-pass population model, not
+`WorldSpeechRegion` defines the local language independently of the interface:
+
+| Region | Native speech locale | Native variety |
+| --- | --- | --- |
+| Italy (current Vigevano world) | it-IT | Italian |
+| United States (future world) | en-US | American English |
+| United Kingdom (future world) | en-GB | British English |
+
+All initial Vigevano townspeople have Italian as their native language. Marco
+is Italian-only; Elena knows English at B2; other IDs have a stable deterministic
+English ability (roughly 35%, B1/B2/C1). English as a foreign language currently
+uses the British English convention. The region and level are passed into
+Ollama's prompt; dialogue responses carry both the base language and regional
+locale. The UI prefers a matching regional voice when installed. The levels
+are initial profile metadata and prompt guidance, not a validated language
+assessment or a learning mechanic. Only the Italian map exists today. Future
+maps must select their own regional policy, and immigrant profiles will require
+explicit persistent resident language data. This is a first-pass population model, not
 individual language-learning histories. The skills are not public metadata.
 Ask in Italian “Parli inglese?” to discover a person's ability. If English is
 not understood the NPC answers in Italian and no contact/name disclosure or
