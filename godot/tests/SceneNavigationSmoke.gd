@@ -894,6 +894,22 @@ func _exercise() -> void:
             and is_zero_approx(marco.get_node("LegLeft/Knee").rotation.x),
             "walking releases the seat and restores standing pose"):
         return
+    var outing_world := _world("PARK","Park")
+    outing_world["residents"]=[
+        {"id":"outing-adult","name":"Unknown resident","age":32,"activity":"FREE_TIME","outingRole":"GUARDIAN"},
+        {"id":"outing-child","name":"Unknown resident","age":7,"activity":"FREE_TIME","outingRole":"PLAYING"}]
+    world._on_world_updated(outing_world)
+    var adult_model := world._residents_root.get_node("Resident_outing-adult") as Node3D
+    var child_model := world._residents_root.get_node("Resident_outing-child") as Node3D
+    if not _check(world._scenery.has_node("ParkDetails/Playground") and child_model.scale.y<adult_model.scale.y
+            and adult_model.has_meta("outing_anchor") and child_model.has_meta("outing_anchor")
+            and world._can_stand(child_model.position,world.WALKER_RADIUS)
+            and not child_model.get_node("ResidentName").visible,"real outing participants use distinct safe playground stations and child scale"):
+        return
+    outing_world["residents"][1]["outingRole"]=""
+    world._on_world_updated(outing_world)
+    if not _check(not child_model.has_meta("outing_anchor"),"ending outing restores ordinary resident movement"):
+        return
     var rainy := _world("PARK", "Park")
     rainy["weather"] = {"sky":"RAIN","raining":true,"snowing":false}
     world._on_world_updated(rainy)
