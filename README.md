@@ -60,6 +60,32 @@ bash play.sh
 This is a development preview; distribution as a downloadable standalone
 Linux application (without installing Maven/Godot) is not yet implemented.
 
+## Portable Windows and Linux builds (preview)
+
+The **Portable desktop releases** GitHub Actions workflow builds native x64
+archives with an embedded Godot game and a bundled Java runtime. Start it
+manually from Actions to produce downloadable test artifacts; a pushed
+`v*` tag creates a **draft prerelease** only after both packages pass their
+fresh-world and exported-client connection tests.
+
+- Windows: extract the ZIP and double-click `Play.cmd`.
+- Linux: extract the TAR.GZ and run `./play.sh`.
+
+The player does not need system Java, Maven or the Godot editor. The bundled
+launcher starts its own loopback API on an available port and stops it when
+the game exits. Saves are stored outside the package under
+`%LOCALAPPDATA%/LivingAlibi` on Windows or
+`$XDG_DATA_HOME/living-alibi` (default `~/.local/share/living-alibi`) on
+Linux. A lock prevents two packaged launchers from opening the same save.
+Development saves in `data/world.db` are not automatically imported.
+Archives include SHA-256 checksum files.
+
+This first packaging implementation is independent of the pending voice
+setup branches. It does not yet bundle Whisper or an offline voice model,
+provide a signed Windows installer, AppImage, ARM build or automatic updater.
+The release workflow must successfully run before any build is considered
+available. The draft release can be reviewed before publication.
+
 ## New in v1.16 (draft)
 
 The game still launches **from an empty SQLite file**. A new visitor is anonymous,
