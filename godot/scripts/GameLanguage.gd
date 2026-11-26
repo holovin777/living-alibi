@@ -1,6 +1,19 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "You": "Tu",
+    "Send": "Invia",
+    "Write a message…": "Scrivi un messaggio…",
+    "More topics…": "Altri argomenti…",
+    "Waiting for reply…": "In attesa di risposta…",
+    "You are welcome.": "Prego.",
+    "See you around.": "Ci vediamo.",
+    "I am working right now.": "Sto lavorando.",
+    "I am studying right now.": "Sto studiando.",
+    "I am doing some shopping.": "Sto facendo la spesa.",
+    "I am looking for work.": "Sto cercando lavoro.",
+    "I am taking some time for myself.": "Mi sto prendendo un po' di tempo per me.",
+    "I am not sure what you mean. Could you ask me something else?": "Non sono sicuro di aver capito. Puoi chiedermi qualcos'altro?",
     "Closed · %s": "Chiuso · %s",
     "Walk through the open entrance: %s": "Entra a piedi dalla porta aperta: %s",
     "E / F: use the counter · Esc: close": "E / F: usa il bancone · Esc: chiudi",
