@@ -1682,6 +1682,26 @@ func _exercise() -> void:
     if not _check(world._medical_station()=="first-aid" and _has_button(world._action_choices,"Basic pharmacy care · 5 EUR"),"pharmacy contextual menu"):
         return
     world._close_medical()
+    var class_world := _world("SCHOOL","School")
+    class_world["residents"]=[
+        {"id":"teacher","activity":"WORKING","workVisual":"TEACHER"},
+        {"id":"pupil-a","activity":"STUDYING","appearanceStage":"CHILD"},
+        {"id":"pupil-b","activity":"STUDYING","appearanceStage":"TEEN"}]
+    world._on_world_updated(class_world)
+    var class_teacher: Node3D=world._residents_root.get_node("Resident_teacher")
+    var class_pupil: Node3D=world._residents_root.get_node("Resident_pupil-a")
+    var class_other: Node3D=world._residents_root.get_node("Resident_pupil-b")
+    if not _check(class_teacher.position.x<-4.5
+            and class_pupil.position.x<-4.5 and class_other.position.x<-4.5
+            and str(class_pupil.get_meta("seat_kind",""))=="classroom"
+            and class_pupil.get_meta("seat_index")!=class_other.get_meta("seat_index"),
+            "teacher and studying pupils appear in the actual classroom"):
+        return
+    class_world["residents"][1]["activity"]="FREE_TIME"
+    world._on_world_updated(class_world)
+    if not _check(int(class_pupil.get_meta("seat_index",-1))<0,
+            "pupils leave classroom seats outside lessons"):
+        return
     var campus := _world("SCHOOL","School")
     campus["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","college":{"atCampus":true,"open":true,"enrolled":null,"courses":[{"id":"engineering","label":"Engineering","required":60,"completed":0,"canEnroll":true}]}}
     world._on_world_updated(campus)
