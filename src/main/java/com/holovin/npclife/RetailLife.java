@@ -41,14 +41,17 @@ final class RetailLife {
         if(place==TownLife.Place.BAKERY)return java.util.Set.of("bread","flour","water").contains(product.id());
         return hasCounter(place) && (place!=TownLife.Place.FUEL_STATION || product.id().equals("bread") || product.id().equals("water"));
     }
+    static int opens(TownLife.Place place){return place==TownLife.Place.BAKERY?420:480;}
+    static int closes(TownLife.Place place){return place==TownLife.Place.BAKERY?1080:1200;}
+    static boolean open(TownLife.Place place,int minute){return hasCounter(place)&&minute>=opens(place)&&minute<closes(place);}
     static String buy(TownLife.Town t,String id,int minute) {
         var player=t.player;
         PlayerLife.requireAlive(player);
         var product=product(id);
         if(!availableAt(player.place,product) || player.travelRemaining>0)
             throw new IllegalArgumentException("This product is not available at your local counter.");
-        if(minute<480 || minute>=1200)
-            throw new IllegalArgumentException("Market opens 08:00–20:00.");
+        if(!open(player.place,minute)||minute+2>closes(player.place))
+            throw new IllegalArgumentException("The shop is closed or closing.");
         if(t.retailStock.getOrDefault(id,0)<1)
             throw new IllegalArgumentException("This product is sold out.");
         if(player.money<product.price())throw new IllegalArgumentException("Not enough money.");
