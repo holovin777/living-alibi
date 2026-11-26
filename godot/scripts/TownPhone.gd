@@ -12,6 +12,7 @@ var _call_choice: OptionButton
 var _call_decline: Button
 var _dial_choice: OptionButton
 var _dial_hangup: Button
+var _dial_visit: Button
 var _sms_seen: Dictionary = {}
 var _sms_initialized := false
 var _sms_choice: OptionButton
@@ -113,6 +114,10 @@ func _ready() -> void:
     _dial_hangup.text = tr("End call")
     _dial_hangup.pressed.connect(_send_outgoing.bind("hangup"))
     col.add_child(_dial_hangup)
+    _dial_visit = Button.new()
+    _dial_visit.text = tr("Ask to visit at home")
+    _dial_visit.pressed.connect(_send_outgoing.bind("ask-home-visit"))
+    col.add_child(_dial_visit)
     _action = Button.new()
     _action.pressed.connect(_app_action)
     col.add_child(_action)
@@ -238,6 +243,7 @@ func _refresh_dial_buttons() -> void:
     var connected := bool(entry.get("connected",false))
     _action.text = tr("Invite for coffee") if connected else tr("Call contact")
     _dial_hangup.visible = connected
+    _dial_visit.visible = connected
 
 func _send_call_action(action: String) -> void:
     if _call_choice.selected>=0:
@@ -255,7 +261,7 @@ func _refresh_call_buttons() -> void:
     if _call_choice.selected<0:return
     var entry: Dictionary = _call_choice.get_item_metadata(_call_choice.selected)
     var incoming := str(entry.get("action",""))=="answer"
-    _action.text = tr("Answer call") if incoming else tr("Accept coffee invitation")
+    _action.text = tr("Answer call") if incoming else tr("Accept invitation")
     _call_decline.visible = incoming
 
 func refresh() -> void:
@@ -271,6 +277,7 @@ func refresh() -> void:
     _call_decline.hide()
     _dial_choice.hide()
     _dial_hangup.hide()
+    _dial_visit.hide()
     _alarm_controls.visible = app=="alarm"
     _alarm_cancel.visible = app=="alarm" and alarm_at>=0
     match app:
@@ -349,8 +356,11 @@ func refresh() -> void:
             var phone = _snapshot.get("phone")
             if phone is Dictionary:
                 for meeting in phone.get("meetings",[]):
-                    lines.append("\n"+tr("Coffee with %s · day %s · %s") % [meeting.get("name",""),meeting.get("day",0),format_time(int(meeting.get("minute",1080)))])
-                    lines.append(tr("Cafe") + " · " + tr(str(meeting.get("status","SCHEDULED"))))
+                    var home_visit: bool = meeting.get("place","CAFE")=="HOME"
+                    var heading := tr("Visit with %s · day %s · %s") if home_visit else tr("Coffee with %s · day %s · %s")
+                    lines.append("\n"+heading % [meeting.get("name",""),meeting.get("day",0),format_time(int(meeting.get("minute",1080)))])
+                    var destination := tr("Friend's home") if home_visit else tr("Cafe")
+                    lines.append(destination + " · " + tr(str(meeting.get("status","SCHEDULED"))))
             if alarm_at>=0:
                 lines.append(tr("Alarm: day %s, %s") % [alarm_at/1440+1,format_time(alarm_at%1440)])
         "weather":
