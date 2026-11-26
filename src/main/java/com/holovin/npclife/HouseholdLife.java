@@ -89,7 +89,7 @@ final class HouseholdLife {
             if(mood==EmotionLife.Mood.IRRITATED||mood==EmotionLife.Mood.STRESSED)continue;
             PlayerLife.learnResident(t,member.id);
             var contact=t.player.contacts.computeIfAbsent(member.id,PlayerLife.Contact::new);
-            if(contact.dialogue.isEmpty()&&!contact.important.containsKey(ConversationMemory.Milestone.FIRST_MEETING)){
+            if((prior==null||prior.conversations==0)&&contact.dialogue.isEmpty()&&!contact.important.containsKey(ConversationMemory.Milestone.FIRST_MEETING)){
                 var event=new ConversationMemory.Turn(day,minute,"und","","Introduced by "+host.name);
                 ConversationMemory.mark(contact,ConversationMemory.Milestone.FIRST_MEETING,event);
             }
