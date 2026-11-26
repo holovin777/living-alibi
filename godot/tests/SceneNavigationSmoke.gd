@@ -846,7 +846,10 @@ func _exercise() -> void:
         return
     var offroad: Vector3 = world._move_on_ground(Vector3(8,0,16),
             Vector3(0,0,12),world.WALKER_RADIUS,true)
-    if not _check(offroad.z <= 17.0, "off-road district boundary remains solid"):
+    if not _check(offroad.z > 20.0 and offroad.z <= 21.0
+            and world._scenery.has_node("ParkDetails/SouthGardenPromenade")
+            and world._can_stand(Vector3(8,0,18.6),world.WALKER_RADIUS),
+            "expanded park promenade is walkable but outer boundary remains solid"):
         return
     # Simulate server rejection and committed arrival without a live Java process.
     world._road_pending = "SCHOOL"
