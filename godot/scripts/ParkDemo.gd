@@ -3936,6 +3936,13 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         var thumb := _sphere(fingers,0.017,skin,Vector3(-float(side)*0.041,0.025,-0.019))
         thumb.scale.y=1.65
         thumb.rotation.z=float(side)*0.45
+        if side<0 and str(person.get_meta("personality",""))=="perfectionist":
+            var watch := Node3D.new()
+            watch.name="Wristwatch"
+            elbow.add_child(watch)
+            _cylinder(watch,0.057,0.034,Color("#34383c"),Vector3(0,-0.21,0))
+            _box(watch,Vector3(0.065,0.055,0.019),Color("#a6a8ab"),Vector3(0,-0.21,-0.055))
+            _box(watch,Vector3(0.048,0.04,0.009),Color("#273d43"),Vector3(0,-0.21,-0.069))
     var hand := person.get_node("ArmRight") as Node3D
     var phone := Node3D.new()
     phone.name = "Phone"
