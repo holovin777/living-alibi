@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Walk-in public buildings
+
+First steps now shows direction and distance to real public doorways in Portici, Bakery, Cafe, Library, School, Office and Clinic. Walk through the gap in the wall using WASD; no loading screen or entrance key. The blue kiosk obstructing the Portici checkout is removed; ordinary visitors use E or F at the grocery or bakery counter, and can purchase bread, flour and water in the bakery using existing shared retail stock. The library now has a physical doorway, bookshelves, desks and reception; ordinary visitor library actions are accessible at reception as well as the old kiosk. Other buildings with existing interiors retain linked-adult service requirements. Private houses still require permission or a lease. Decorative facades, factory and market buildings are not all enterable yet; this change does not add closing doors or new clothing visuals. Smoke assertions cover paths and counter access, pending CI and desktop verification.

@@ -6,6 +6,7 @@ extends Node3D
 
 const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
+const LIBRARY_DESK := Vector3(-7,0,6.1)
 const DEPOT_DESK := Vector3(-9.0,0.0,10.0)
 const DEPOT_BAYS := [Vector3(6.5,0,12.0),Vector3(12.5,0,12.0)]
 const INTERACTION_RADIUS := 3.5
@@ -391,6 +392,8 @@ func _process(delta: float) -> void:
         _hint.text = "Your room is open." if _has_room_lease() else "Rent a room at reception (blue kiosk)."
     elif _near_gate():
         _hint.text = tr("E: travel gate (game time). Esc: cursor.")
+    elif _near_public_counter():
+        _hint.text=tr("E / F: use the counter · Esc: close")
     elif _near_kiosk():
         _hint.text = tr("F: local interactions. Esc: cursor.")
     elif not _nearest_resident().is_empty():
@@ -573,6 +576,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
         elif event.keycode == KEY_E and not _map_panel.visible:
             if _near_intercom()>0 and _foot_controls_available():
                 _open_intercom()
+            elif _near_public_counter():
+                _toggle_actions()
             elif _near_gate():
                 _toggle_travel()
             else:
@@ -606,6 +611,7 @@ func _update_first_steps() -> void:
         return
     if _rebirth_active():
         _guide_label.text=tr("Your life: F opens choices. Follow signs to shops, work and home.")
+        if not _entrance_hint().is_empty():_guide_label.text+="\n"+_entrance_hint()
         return
     var p: Dictionary=_last_snapshot.get("player",{})
     var job = p.get("jobId")
@@ -624,14 +630,43 @@ func _update_first_steps() -> void:
             guide=tr("Your job: %s. Travel gate %s (E).") % [str(TownLayout.LABELS.get(site,site)),_guide_direction(GATE_POSITION)]
         else:
             guide=tr("Explore freely: use the blue SERVICES kiosk for local actions.")
-    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch") % [_guide_direction(GATE_POSITION),_guide_direction(DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)])
+    var service_target := GROCERY_COUNTER if _current_place=="PORTICI" else (DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)
+    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch") % [_guide_direction(GATE_POSITION),_guide_direction(service_target)])
+    if not _entrance_hint().is_empty():_guide_label.text+="\n"+_entrance_hint()
 
 func _near_gate() -> bool:
     return _avatar.position.distance_to(GATE_POSITION) < INTERACTION_RADIUS
 
 func _near_kiosk() -> bool:
+    if _current_place=="PORTICI":return _avatar.position.distance_to(GROCERY_COUNTER)<1.5
+    if _near_public_counter():return true
     var target := DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION
     return _avatar.position.distance_to(target) < INTERACTION_RADIUS
+
+func _near_public_counter() -> bool:
+    if _apartment_active or _guest_active or _stairwell_active:return false
+    var counters := {"PORTICI":GROCERY_COUNTER,"BAKERY":BAKERY_COUNTER,"LIBRARY":LIBRARY_DESK}
+    return counters.has(_current_place) and _avatar.position.distance_to(counters[_current_place])<1.5
+
+func _public_entrances() -> Array:
+    # Local positions are registered only for genuinely open geometry.
+    return {
+        "PORTICI":[["Alimentari",Vector3(3.2,0,5.3)]],
+        "BAKERY":[["Panetteria",Vector3(-2.8,0,7)]],
+        "CAFE":[["Bar Centrale",Vector3(-2.8,0,7)]],
+        "LIBRARY":[["Biblioteca comunale",Vector3(-7,0,2.8)]],
+        "SCHOOL":[["Istituto Leonardo",Vector3(-2.8,0,7)],["Dojo Shotokan",Vector3(2.8,0,7)]],
+        "OFFICE":[["Borgo Digital",Vector3(-2.8,0,8)]],
+        "CLINIC":[["Ambulatorio",Vector3(-2.8,0,7)],["Farmacia",Vector3(2.8,0,-7)]]
+    }.get(_current_place,[])
+
+func _entrance_hint() -> String:
+    var entries := _public_entrances()
+    if entries.is_empty():return ""
+    var lines := PackedStringArray()
+    for entry in entries:
+        lines.append("%s · %s" % [entry[0],_guide_direction(entry[1])])
+    return tr("Walk through the open entrance: %s") % " / ".join(lines)
 
 func _owns_house() -> bool:
     return bool(_last_snapshot.get("player",{}).get("ownsHouse",false))
@@ -1298,10 +1333,7 @@ func _generate_chunk(place_id: String) -> void:
             _build_college()
             _build_dojo()
         "LIBRARY":
-            _building("Public library", Color(0.59, 0.48, 0.33))
-            for offset in [-10.0, -7.0, -4.0]:
-                _box(_scenery, Vector3(0.55, 2.0, 2.0), Color(0.40, 0.28, 0.21),
-                        Vector3(offset, 1.1, 5.0))
+            _build_library()
         "WORKSHOP":
             _building("Mechanical workshop", Color(0.41, 0.51, 0.59))
             _build_motor_court()
@@ -2673,6 +2705,39 @@ func _build_cafe() -> void:
         light.omni_range=6
         cafe.add_child(light)
 
+func _build_library() -> void:
+    var library := Node3D.new()
+    library.name="BibliotecaComunale"
+    _scenery.add_child(library)
+    var wall := Color("#d4c3a4")
+    var wood := Color("#87694e")
+    for part in [[Vector3(-12.5,0,7.5),Vector2(0.24,7.0)],
+            [Vector3(-1.5,0,7.5),Vector2(0.24,7.0)],
+            [Vector3(-7,0,11),Vector2(11.0,0.24)],
+            [Vector3(-10.25,0,4),Vector2(4.5,0.24)],
+            [Vector3(-3.75,0,4),Vector2(4.5,0.24)]]:
+        _room_wall(library,part[0],part[1],wall)
+    _box(library,Vector3(11,0.08,7),Color("#b5ab94"),Vector3(-7,0.025,7.5))
+    _box(library,Vector3(11.3,0.35,7.3),Color("#795e49"),Vector3(-7,3.2,7.5))
+    _physical_sign(library,"Biblioteca comunale",Vector3(-7,2.75,3.80),PI,3.6)
+    _room_furniture(library,Vector3(-7,0,7.6),Vector3(2.0,0.9,0.9),wood)
+    _box(library,Vector3(2.1,0.08,1),Color("#d2bf9e"),Vector3(-7,0.94,7.6))
+    _physical_sign(library,"Informazioni · E",Vector3(-7,1.25,7.1),PI,1.5)
+    for x in [-11.6,-2.4]:
+        for z in [6.1,9.1]:
+            _room_furniture(library,Vector3(x,0,z),Vector3(0.55,2.0,2.1),wood)
+            for y in [0.5,1.1,1.7]:
+                for i in range(7):
+                    _box(library,Vector3(0.30,0.28,0.20),[Color("#7c9480"),Color("#a16c5c"),Color("#647b99")][i%3],Vector3(x,y,z-0.84+i*0.27))
+    for x in [-9.5,-4.5]:
+        _room_furniture(library,Vector3(x,0,9.2),Vector3(1.3,0.74,0.9),wood)
+        _room_furniture(library,Vector3(x,0,8.15),Vector3(0.44,0.45,0.44),Color("#67817c"))
+    var light := OmniLight3D.new()
+    light.position=Vector3(-7,2.7,7.5)
+    light.omni_range=10
+    light.light_energy=1.8
+    library.add_child(light)
+
 func _build_bakery() -> void:
     var bakery := Node3D.new()
     bakery.name="PanetteriaDelBorgo"
@@ -2792,7 +2857,7 @@ func _portici_grocery(parent: Node3D) -> void:
     _box(shop,Vector3(6.4,3.8,6),wall,Vector3(7.45,5.3,5))
     _box(shop,Vector3(6.65,0.3,6.25),Color("#794b36"),Vector3(7.45,7.35,5))
     _box(shop,Vector3(0.24,0.45,2.3),Color("#6f4931"),Vector3(4.4,2.85,5.3))
-    _sign(shop,"Alimentari · F",Vector3(4.05,3.1,5.3))
+    _physical_sign(shop,"Alimentari",Vector3(4.05,3.1,5.3),-PI/2.0,2.3)
     for z in [4.5,6.8]:
         var shelf := Vector3(9.8,0,z)
         _add_obstacle(shelf,Vector2(0.6,1.3))
@@ -3647,7 +3712,7 @@ func _create_gate_and_kiosk() -> void:
     # A yellow gate is a map transition — actual travel is authorized by Java.
     for offset in [-1.6, 1.6]:
         _add_obstacle(GATE_POSITION + Vector3(offset, 0.0, 0.0), Vector2(0.4, 0.4))
-    if _scenery.name != "PublicScene_LOGISTICS_DEPOT":
+    if _scenery.name not in ["PublicScene_LOGISTICS_DEPOT","PublicScene_PORTICI"]:
         _add_obstacle(KIOSK_POSITION, Vector2(2.4, 1.6))
     _box(_scenery, Vector3(0.4, 3.1, 0.4), Color(0.94, 0.69, 0.12),
             GATE_POSITION + Vector3(-1.6, 1.55, 0.0))
@@ -3656,7 +3721,7 @@ func _create_gate_and_kiosk() -> void:
     _box(_scenery, Vector3(3.6, 0.38, 0.45), Color(0.94, 0.69, 0.12),
             GATE_POSITION + Vector3(0.0, 3.2, 0.0))
     _sign(_scenery,tr("TRAVEL · E"),GATE_POSITION+Vector3(0,3.65,0))
-    if _scenery.name != "PublicScene_LOGISTICS_DEPOT":
+    if _scenery.name not in ["PublicScene_LOGISTICS_DEPOT","PublicScene_PORTICI"]:
         # Blue kiosk: only offers actions physically available in this district.
         _sign(_scenery,tr("SERVICES · F"),KIOSK_POSITION+Vector3(0,2.25,0))
         _box(_scenery, Vector3(2.4, 1.4, 1.6), Color(0.13, 0.39, 0.69),
@@ -5167,7 +5232,7 @@ func _render_actions() -> void:
                     var instruction := Label.new()
                     instruction.text = "Your room is across the street. Walk to the bed."
                     _action_choices.add_child(instruction)
-        "MARKET", "PORTICI", "FUEL_STATION":
+        "MARKET", "PORTICI", "FUEL_STATION", "BAKERY":
             if _current_place=="MARKET" and employed!="shop-assistant":
                 _action_choices.add_child(_button("Apply: market assistant",_apply_job.bind("shop-assistant")))
             for item in _last_snapshot.get("shop",[]):

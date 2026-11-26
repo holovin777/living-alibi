@@ -35,9 +35,10 @@ final class RetailLife {
                 .orElseThrow(()->new IllegalArgumentException("Unknown retail product."));
     }
     static boolean hasCounter(TownLife.Place place) {
-        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI || place==TownLife.Place.FUEL_STATION;
+        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI || place==TownLife.Place.FUEL_STATION || place==TownLife.Place.BAKERY;
     }
     static boolean availableAt(TownLife.Place place,Product product) {
+        if(place==TownLife.Place.BAKERY)return java.util.Set.of("bread","flour","water").contains(product.id());
         return hasCounter(place) && (place!=TownLife.Place.FUEL_STATION || product.id().equals("bread") || product.id().equals("water"));
     }
     static String buy(TownLife.Town t,String id,int minute) {

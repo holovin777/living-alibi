@@ -1,6 +1,8 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "Walk through the open entrance: %s": "Entra a piedi dalla porta aperta: %s",
+    "E / F: use the counter · Esc: close": "E / F: usa il bancone · Esc: chiudi",
     "Camera motion": "Movimento visuale",
     "WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.": "WASD: cammina · Maiusc: corri · Ctrl: abbassati · Spazio: salta · Esc: cursore.",
     "Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch": "Viaggio E: %s · Servizi F: %s · Mappa M · Parla T · Spazio: salta · Maiusc: corri · Ctrl: abbassati.",
