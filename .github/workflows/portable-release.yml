@@ -1,0 +1,67 @@
+name: Portable desktop releases
+
+on:
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - 'godot/**'
+      - '.github/workflows/portable-release.yml'
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux-x64
+          - os: windows-latest
+            platform: windows-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build and smoke-test portable package
+        run: python packaging/build_release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LivingAlibi-${{ matrix.platform }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+
+  draft-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: LivingAlibi-*
+          merge-multiple: true
+          path: dist
+      - name: Prepare draft release for review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease --title "Living Alibi $TAG" --notes "Portable x64 Windows and Linux development preview. Extract the archive and run Play.cmd or play.sh. Includes Java and Godot; saves are outside the game folder. Unsigned preview."
