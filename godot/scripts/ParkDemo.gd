@@ -6401,6 +6401,15 @@ func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _custody_active:return
     var justice: Dictionary = _last_snapshot.get("player",{}).get("justice",{})
+    var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
+    if _current_place=="OFFICE" and not _rebirth_active():
+        var permit_info := Label.new()
+        permit_info.text = tr("Weapon license: active") if bool(permit.get("valid",false)) else tr("Weapon license: inactive")
+        _action_choices.add_child(permit_info)
+        if not bool(permit.get("valid",false)):
+            var request_permit := _button(tr("Apply for weapon license · 10 EUR"),_weapon_license_action.bind("weapon-license-apply"))
+            request_permit.disabled = not bool(permit.get("canApply",false))
+            _action_choices.add_child(request_permit)
     if _current_place=="OFFICE" and int(justice.get("fineOutstanding",0))>0 and not _rebirth_active():
         _action_choices.add_child(_button(tr("Pay outstanding fine"),_pay_justice_fine))
     if _near_barber() and not _rebirth_active():
@@ -6944,7 +6953,21 @@ func _render_actions() -> void:
                 _action_choices.add_child(choice)
             if _current_place == "MARKET":
                 if not bool(_last_snapshot.get("player",{}).get("ownsBaton",false)):
-                    _action_choices.add_child(_button(tr("Buy training baton · 12 EUR"),_buy_training_baton))
+                    var baton_button := _button(tr("Buy training baton · 12 EUR"),_buy_training_baton)
+                    baton_button.disabled = not bool(permit.get("valid",false)) or not shop_open or int(player.get("money",0))<12
+                    _action_choices.add_child(baton_button)
+                if not bool(permit.get("ownsSportWeapon",false)):
+                    var sport_button := _button(tr("Buy registered sporting weapon · 80 EUR"),_weapon_license_action.bind("weapon-buy-sport"))
+                    sport_button.disabled = not bool(permit.get("canBuySport",false))
+                    _action_choices.add_child(sport_button)
+                else:
+                    var owned_sport := Label.new()
+                    owned_sport.text=tr("Registered sporting weapon: owned")
+                    _action_choices.add_child(owned_sport)
+                if not bool(permit.get("valid",false)):
+                    var license_hint := Label.new()
+                    license_hint.text=tr("A valid weapon license is required. Visit the municipal office.")
+                    _action_choices.add_child(license_hint)
                 var stall: Dictionary = _last_snapshot.get("stall",{})
                 if not bool(stall.get("registered",false)):
                     _action_choices.add_child(_button("Register private stall · 20 EUR",_garden_action.bind("stall-register")))
@@ -7396,6 +7419,11 @@ func _try_strike() -> void:
     if id.is_empty():return
     _hands.strike()
     _api.garden_action("combat-strike:%s:%s" % ["baton" if _hands.held_item=="baton" else "fists",id])
+
+func _weapon_license_action(action: String) -> void:
+    if not _connected or _api.is_busy() or not _near_kiosk():return
+    if (action=="weapon-license-apply" and _current_place=="OFFICE") or (action=="weapon-buy-sport" and _current_place=="MARKET"):
+        _api.garden_action(action)
 
 func _buy_training_baton() -> void:
     if _current_place=="MARKET" and _near_kiosk() and _connected and not _api.is_busy():

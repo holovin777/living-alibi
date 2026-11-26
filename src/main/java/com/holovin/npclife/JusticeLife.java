@@ -23,6 +23,7 @@ final class JusticeLife {
     static void report(TownLife.Town t,WorldState s,boolean officer,boolean armed,
                        List<TownLife.Event> truth,List<TownLife.Observation> observations){
         requireFree(t);
+        WeaponLicenseLife.revoke(t);
         put(t,"assaults",Math.addExact(get(t,"assaults"),1));
         put(t,"pending",Math.addExact(get(t,"pending"),1));
         if(armed)put(t,"armed",1);

@@ -27,6 +27,7 @@ final class CombatLife {
         ready(t,clock);
         if(t.player.place!=TownLife.Place.MARKET||clock.minute<480||clock.minute>=1200)
             throw new IllegalArgumentException("Visit the market during opening hours.");
+        WeaponLicenseLife.requireLicense(t,clock);
         if(ownsBaton(t))throw new IllegalArgumentException("You already own a training baton.");
         if(t.player.money<12)throw new IllegalArgumentException("Need 12 EUR.");
         t.player.money-=12;

@@ -18,8 +18,12 @@ class CombatLifeTest {
             town.player.place=TownLife.Place.MARKET;
             town.player.money=50;
             assertThrows(IllegalArgumentException.class,()->CombatLife.strike(town,clock,"marco","baton",new ArrayList<>(),new ArrayList<>()));
+            assertThrows(IllegalArgumentException.class,()->CombatLife.buyBaton(town,clock));
+            town.player.place=TownLife.Place.OFFICE;
+            WeaponLicenseLife.apply(town,clock);
+            town.player.place=TownLife.Place.MARKET;
             assertTrue(CombatLife.buyBaton(town,clock).contains("12 EUR"));
-            assertEquals(38,town.player.money);
+            assertEquals(28,town.player.money);
             assertThrows(IllegalArgumentException.class,()->CombatLife.buyBaton(town,clock));
             town.player.place=TownLife.Place.PARK;
             var victim=town.get("marco");var officer=town.get("elena");

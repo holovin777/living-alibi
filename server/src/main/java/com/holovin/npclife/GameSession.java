@@ -74,7 +74,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
                              int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
-                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse,boolean ownsBaton,int policeReports,JusticeLife.View justice) { }
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse,boolean ownsBaton,int policeReports,JusticeLife.View justice,WeaponLicenseLife.View weaponLicense) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -278,7 +278,7 @@ public final class GameSession implements AutoCloseable {
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,controlled?RebirthLife.hygiene(town,linked):p.hygiene,
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
-                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse,CombatLife.ownsBaton(town),CombatLife.reports(town),JusticeLife.view(town,state));
+                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse,CombatLife.ownsBaton(town),CombatLife.reports(town),JusticeLife.view(town,state),WeaponLicenseLife.view(town,state));
         var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
         var companions=walkingCompanions(town,visible,state.minute);
         var residents=visible.stream()
@@ -614,6 +614,12 @@ public final class GameSession implements AutoCloseable {
             var copy=town.copy();return apply(copy,1,JusticeLife.payFine(copy));
         }
         JusticeLife.requireFree(town);
+        if("weapon-license-apply".equals(action)){
+            var copy=town.copy();return apply(copy,10,WeaponLicenseLife.apply(copy,state));
+        }
+        if("weapon-buy-sport".equals(action)){
+            var copy=town.copy();return apply(copy,2,WeaponLicenseLife.buySport(copy,state));
+        }
         if("combat-buy-baton".equals(action)){
             var copy=town.copy();
             return apply(copy,2,CombatLife.buyBaton(copy,state));
