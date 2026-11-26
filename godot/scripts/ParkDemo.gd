@@ -69,6 +69,7 @@ var _apartment_active := false
 var _stairwell: Node3D
 var _stairwell_active := false
 var _stairwell_return := Vector3.ZERO
+var _stairwell_hint: Label
 var _home_entrance: Node3D
 var _home_transition := false
 var _grocery_menu := false
@@ -274,7 +275,7 @@ func _process(delta: float) -> void:
     if _stairwell_active:
         _weather_fx.follow(_avatar.position)
         _weather_fx.set_sheltered(true,_environment)
-        _hint.text = tr("G: leave stairwell") if _stairwell.near_exit(_avatar.position) else tr("Stairwell · floor %s · apartment doors locked") % _stairwell.floor_number(_avatar.position)
+        _stairwell_hint.text = tr("G: leave stairwell") if _stairwell.near_exit(_avatar.position) else tr("Stairwell · floor %s · apartment doors locked") % _stairwell.floor_number(_avatar.position)
         _tick_live_clock(delta)
         return
 
@@ -3828,6 +3829,14 @@ func _create_interface() -> void:
     _phone_alert.add_theme_constant_override("shadow_offset_y",2)
     _phone_alert.hide()
     canvas.add_child(_phone_alert)
+    _stairwell_hint = Label.new()
+    _stairwell_hint.position = Vector2(20,20)
+    _stairwell_hint.add_theme_color_override("font_color",Color.WHITE)
+    _stairwell_hint.add_theme_color_override("font_shadow_color",Color.BLACK)
+    _stairwell_hint.add_theme_constant_override("shadow_offset_x",2)
+    _stairwell_hint.add_theme_constant_override("shadow_offset_y",2)
+    _stairwell_hint.hide()
+    canvas.add_child(_stairwell_hint)
     _intercom = PanelContainer.new()
     _intercom.position = Vector2(480,15)
     _intercom.custom_minimum_size = Vector2(350,0)
@@ -5690,6 +5699,7 @@ func _set_stairwell(active: bool) -> void:
         _traffic_root.hide()
         _bike_model.hide()
         _main_panel.hide()
+        _stairwell_hint.show()
         _avatar.position = PublicStairwell.SPAWN
         _view_yaw = 0.0
         _view_pitch = 0.0
@@ -5700,6 +5710,7 @@ func _set_stairwell(active: bool) -> void:
             chunk["root"].show()
         _traffic_root.show()
         _main_panel.show()
+        _stairwell_hint.hide()
         _avatar.position = _stairwell_return
         _view_yaw = PI
         _view_pitch = 0.0
