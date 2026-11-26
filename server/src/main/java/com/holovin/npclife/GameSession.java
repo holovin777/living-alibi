@@ -423,6 +423,15 @@ public final class GameSession implements AutoCloseable {
         var copy=town.copy();
         var resident=PlayerLife.nearby(copy,residentId);
         String reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")?NewspaperLife.interview(copy,resident,state.day,state.minute):PlayerLife.speak(copy,residentId,message,state.day,state.minute);
+        var controlled=RebirthLife.child(copy);
+        if(RebirthLife.linkedAdult(copy,controlled)&&!RebirthLife.atHome(controlled)
+                &&PlayerLife.publicPlaces().contains(controlled.place)) {
+            // The person explicitly chose to stop and talk. Keep their actual
+            // public location under player control during the one-minute tick,
+            // instead of an NPC work/home schedule teleporting them away.
+            // "Resume work and daily routine" restores autonomous scheduling.
+            RebirthLife.holdPublicPlace(copy,controlled);
+        }
         // Conversation is valid in both a visitor life and a born/linked
         // life. The latter must use the rebirth-aware time/commit path.
         return applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+reply,
