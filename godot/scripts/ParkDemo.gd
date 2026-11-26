@@ -3539,6 +3539,9 @@ func _register_resident_seat(at: Vector3, yaw: float, kind: String) -> void:
 func _nearest_public_bench() -> int:
     if not _connected or _public_seat>=0 or _rebirth_active() or _guest_active or _stairwell_active or _apartment_active or _inside_guest_room() or _jump_elapsed>=0.0 or not _foot_controls_available():
         return -1
+    return _find_free_bench()
+
+func _find_free_bench() -> int:
     var seats: Array = _scenery.get_meta("resident_seats",[])
     var used := {}
     for child in _residents_root.get_children():
@@ -3562,6 +3565,9 @@ func _nearest_public_bench() -> int:
 func _sit_public_bench() -> void:
     var index := _nearest_public_bench()
     if index<0:return
+    _occupy_public_bench(index)
+
+func _occupy_public_bench(index: int) -> void:
     var seats: Array = _scenery.get_meta("resident_seats",[])
     var seat: Dictionary = seats[index]
     _public_stand_at=_avatar.position
