@@ -21,7 +21,9 @@ final class RetailLife {
             new Product("grapes","Grapes",3,12,0),
             new Product("honey","Honey",5,8,0),
             new Product("grape-juice","Grape juice",7,8,0),
-            new Product("wine","Wine",10,8,0));
+            new Product("wine","Wine",10,8,0),
+            new Product("pizza","Pizza Margherita",7,16,12),
+            new Product("gelato","Gelato",3,18,14));
     static void ensure(TownLife.Town t) {
         for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),(OrchardLife.isFruit(p.id())||p.id().equals("honey")||p.id().equals("grape-juice")||p.id().equals("wine"))?0:p.capacity());
     }
@@ -35,14 +37,16 @@ final class RetailLife {
                 .orElseThrow(()->new IllegalArgumentException("Unknown retail product."));
     }
     static boolean hasCounter(TownLife.Place place) {
-        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI || place==TownLife.Place.FUEL_STATION || place==TownLife.Place.BAKERY;
+        return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI || place==TownLife.Place.FUEL_STATION || place==TownLife.Place.BAKERY || place==TownLife.Place.CENTRO;
     }
     static boolean availableAt(TownLife.Place place,Product product) {
+        if(place==TownLife.Place.CENTRO)return java.util.Set.of("pizza","gelato").contains(product.id());
+        if(java.util.Set.of("pizza","gelato").contains(product.id()))return false;
         if(place==TownLife.Place.BAKERY)return java.util.Set.of("bread","flour","water").contains(product.id());
         return hasCounter(place) && (place!=TownLife.Place.FUEL_STATION || product.id().equals("bread") || product.id().equals("water"));
     }
-    static int opens(TownLife.Place place){return place==TownLife.Place.BAKERY?420:480;}
-    static int closes(TownLife.Place place){return place==TownLife.Place.BAKERY?1080:1200;}
+    static int opens(TownLife.Place place){return place==TownLife.Place.CENTRO?660:place==TownLife.Place.BAKERY?420:480;}
+    static int closes(TownLife.Place place){return place==TownLife.Place.CENTRO?1320:place==TownLife.Place.BAKERY?1080:1200;}
     static boolean open(TownLife.Place place,int minute){return hasCounter(place)&&minute>=opens(place)&&minute<closes(place);}
     static String buy(TownLife.Town t,String id,int minute) {
         var player=t.player;
@@ -153,6 +157,12 @@ final class RetailLife {
             if(p.hunger==0)throw new IllegalArgumentException("You are not hungry.");
             p.bread--;p.hunger=Math.max(0,p.hunger-35);
             return "Ate bread.";
+        }
+        if(id.equals("pizza")||id.equals("gelato")) {
+            if(p.hunger==0)throw new IllegalArgumentException("You are not hungry.");
+            FoodLife.change(p,id,false,-1);
+            p.hunger=Math.max(0,p.hunger-(id.equals("pizza")?65:20));
+            return id.equals("pizza")?"Ate pizza.":"Ate gelato.";
         }
         if(id.equals("grape-juice")) {
             if(p.thirst==0&&p.hunger==0)throw new IllegalArgumentException("You do not need a drink.");
