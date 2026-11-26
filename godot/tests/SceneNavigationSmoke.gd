@@ -1061,15 +1061,6 @@ func _exercise() -> void:
             "office offers engineering task rather than magically paying salary"):
         return
 
-    world._on_world_updated(_world("QUARRY", "Quarry"))
-    if not _check(world._scenery.name == "PublicScene_QUARRY",
-            "quarry has its own physical district"):
-        return
-    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
-    world._toggle_actions()
-    if not _check(_has_button(world._action_choices, "Apply: quarry miner"),
-            "quarry offers a real paid mining career"):
-        return
     var dirty_square := _world("CENTRO","Centro")
     dirty_square["streetCare"]={"litter":80,"gardenNeglect":30}
     dirty_square["residents"]=[{"id":"cleaner","activity":"WORKING","workVisual":"BROOM"}]
@@ -1081,6 +1072,15 @@ func _exercise() -> void:
     dirty_square["streetCare"]["litter"]=10
     world._on_world_updated(dirty_square)
     if not _check(street_decor.get_child(0).visible and not street_decor.get_child(1).visible,"committed cleanup reduces visible litter"):
+        return
+    world._on_world_updated(_world("QUARRY", "Quarry"))
+    if not _check(world._scenery.name == "PublicScene_QUARRY",
+            "quarry has its own physical district"):
+        return
+    world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
+    world._toggle_actions()
+    if not _check(_has_button(world._action_choices, "Apply: quarry miner"),
+            "quarry offers a real paid mining career"):
         return
     var crew := _world("QUARRY","Quarry")
     crew["residents"]=[{"id":"miner-a","activity":"WORKING","workVisual":"PICK"},{"id":"miner-b","activity":"WORKING","workVisual":"PICK"}]
