@@ -262,8 +262,9 @@ public final class GameSession implements AutoCloseable {
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber) { }
-    public record ActionView(String message,WorldView world,String dialogueLanguage,boolean dialogueRendered,String dialogueLocale) {
-        public ActionView(String message,WorldView world){this(message,world,null,false,null);}
+    public record ActionView(String message,WorldView world,String dialogueLanguage,boolean dialogueRendered,String dialogueLocale,String dialogueFarewell) {
+        public ActionView(String message,WorldView world){this(message,world,null,false,null,null);}
+        public ActionView(String message,WorldView world,String language,boolean rendered,String locale){this(message,world,language,rendered,locale,null);}
         public ActionView(String message,WorldView world,String language,boolean rendered){this(message,world,language,rendered,language==null?null:WorldSpeechRegion.CURRENT.localeFor(language));}
     }
 
@@ -436,6 +437,14 @@ public final class GameSession implements AutoCloseable {
         var resident=PlayerLife.nearby(copy,residentId,state.day,state.minute);
         var region=WorldSpeechRegion.CURRENT;
         String language=spokenLanguage==null?null:ResidentLanguages.normalize(spokenLanguage);
+        if(message.isBlank()||message.strip().length()>1000)
+            throw new IllegalArgumentException("Speak 1–1000 characters.");
+        if(!ConversationAvailability.allowed(copy,resident,state.day,state.minute)){
+            String actual=language!=null&&!ResidentLanguages.speaks(region,resident.id,language)?region.nativeLanguage():language;
+            String farewell=ConversationAvailability.farewell(resident,state.day,state.minute,actual);
+            var refused=applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+farewell,RebirthLife.active(town));
+            return new ActionView(refused.message(),refused.world(),actual,true,actual==null?null:region.localeFor(actual),farewell);
+        }
         String reply=null;
         boolean rendered=false;
         boolean understood=true;
@@ -497,14 +506,18 @@ public final class GameSession implements AutoCloseable {
             // "Resume work and daily routine" restores autonomous scheduling.
             RebirthLife.holdPublicPlace(copy,controlled);
         }
-        // A real conversation occupies the other person's next one-minute
-        // simulation tick. Their schedule resumes as soon as this turn ends.
-        copy.industryStocks.put(TownLife.conversationHoldKey(resident.id),1);
+        boolean ending=ConversationAvailability.record(copy,resident,state.day,state.minute);
+        String farewell=ending?ConversationAvailability.farewell(resident,state.day,state.minute,language):null;
+        // A brief reply never reserves a working or urgently occupied resident.
+        // Only a willing leisure contact may pause for a single simulation minute.
+        if(!ending&&!ConversationAvailability.duty(resident,state.day,state.minute)
+                &&!ConversationAvailability.urgent(resident))
+            copy.industryStocks.put(TownLife.conversationHoldKey(resident.id),1);
         // Conversation is valid in both a visitor life and a born/linked
         // life. The latter must use the rebirth-aware time/commit path.
         ActionView applied=applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+reply,
                 RebirthLife.active(town));
-        return new ActionView(applied.message(),applied.world(),language,rendered,language==null?null:region.localeFor(language));
+        return new ActionView(applied.message(),applied.world(),language,rendered,language==null?null:region.localeFor(language),farewell);
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
