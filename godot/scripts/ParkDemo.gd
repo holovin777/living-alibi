@@ -320,8 +320,10 @@ func _process(delta: float) -> void:
             if _guest.near_exit(_avatar.position):hints += "\n"+tr("G: leave apartment")
             if _guest.near_sofa(_avatar.position):hints += "\n"+tr("E: sit on sofa")
             if _guest.near_table(_avatar.position):hints += "\n"+tr("C: coffee · F: snack · V: dinner")
+        if not _nearest_resident().is_empty():
+            hints += "\n"+tr("T or click: talk to a person")
         if is_instance_valid(_guest_host) and _avatar.position.distance_to(_guest_host.position)<2.5:
-            hints += "\n"+tr("T: talk to host")
+            hints += "\n"+tr("Ask the host to introduce their family.")
         _guest_feedback_time = maxf(0.0,_guest_feedback_time-delta)
         if _guest_feedback_time>0.0:hints += "\n"+_guest_feedback
         _stairwell_hint.text = hints
@@ -452,7 +454,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
             elif event.keycode==KEY_E and not _guest_pending:
                 _toggle_guest_seat()
             elif event.keycode==KEY_T:
-                _guest_action("talk")
+                _open_dialog()
             elif event.keycode==KEY_C:
                 _guest_action("coffee")
             elif event.keycode==KEY_F:
@@ -5472,12 +5474,29 @@ func _replace_choices(parent: Control, keep_header: bool = false) -> void:
         parent.remove_child(children[i])
         children[i].queue_free()
 
+func _dialog_candidates() -> Array:
+    if _guest_active and is_instance_valid(_guest):
+        var people: Array = []
+        if is_instance_valid(_guest_host):
+            people.append(_guest_host)
+        var family := _guest.get_node_or_null("GuestFamily") as Node3D
+        if family!=null:
+            people.append_array(family.get_children())
+        return people
+    return _residents_root.get_children() if is_instance_valid(_residents_root) and not _stairwell_active else []
+
+func _dialog_person(id: String) -> Node3D:
+    for child in _dialog_candidates():
+        if str(child.get_meta("resident_id",""))==id:
+            return child as Node3D
+    return null
+
 func _nearest_resident() -> String:
     if not is_instance_valid(_residents_root):
         return ""
     var nearest := ""
     var best := 2.5
-    for child in _residents_root.get_children():
+    for child in _dialog_candidates():
         var person := child as Node3D
         if person == null or str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:
             continue
@@ -5493,13 +5512,13 @@ func _looked_at_resident() -> String:
     var center := get_viewport().get_visible_rect().size*0.5
     var selected := ""
     var best := 90.0
-    for child in _residents_root.get_children():
+    for child in _dialog_candidates():
         var person := child as Node3D
         if person == null or str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:
             continue
         if _avatar.position.distance_to(person.position) >= 2.5:
             continue
-        var head := person.global_position + Vector3(0,1.35,0)
+        var head := person.global_position + Vector3(0,1.35*person.scale.y,0)
         if _camera.is_position_behind(head):
             continue
         var distance := _camera.unproject_position(head).distance_to(center)
@@ -5523,7 +5542,7 @@ func _open_dialog(preferred_id: String = "") -> void:
     if id.is_empty():
         _message.text = tr("Approach a resident to talk.")
         return
-    var person := _residents_root.get_node_or_null("Resident_"+id) as Node3D
+    var person := _dialog_person(id)
     if person == null or _avatar.position.distance_to(person.position) >= 2.5:
         _message.text = tr("Approach a resident to talk.")
         return
@@ -5564,7 +5583,7 @@ func _reply_translate(source: String) -> String:
     return tr(source)
 
 func _localized_resident_reply(message: String) -> String:
-    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    var person := _dialog_person(_dialog_target)
     if person==null:return message
     var separator := message.find(": ")
     if separator<0:return _reply_translate(message)
@@ -5642,7 +5661,7 @@ func _send_dialog(message: String) -> void:
     if _api.is_busy():
         _dialog_reply.text = tr("The world is updating. Try sending again.")
         return
-    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    var person := _dialog_person(_dialog_target)
     if person == null or _avatar.position.distance_to(person.position) >= 2.5:
         _close_dialog()
         return
@@ -7482,6 +7501,7 @@ func _open_guest(invitation: Dictionary) -> void:
 
 func _close_guest() -> void:
     if not _guest_active:return
+    _close_dialog()
     _guest_active = false
     _guest_sitting = false
     _guest_host = null
@@ -7514,6 +7534,8 @@ func _sync_host_routine(invitation: Dictionary) -> void:
     var household = invitation.get("household",{})
     if household is Dictionary:
         _guest.update_household(household)
+        if household.get("host") is Dictionary:
+            _sync_guest_contact(_guest_host,household["host"])
         _sync_guest_family(household)
     var next := str(invitation.get("activity",""))
     if next==_host_activity:return
@@ -7525,6 +7547,13 @@ func _sync_host_routine(invitation: Dictionary) -> void:
 
 # The household list is authoritative and contains only awake, present residents.
 # Guests see models, not automatically learned names or a second copy of the host.
+func _sync_guest_contact(person: Node3D,entry: Dictionary) -> void:
+    person.set_meta("display_name",str(entry.get("name","Unknown resident")))
+    person.set_meta("known_name",str(entry.get("knownName","")) if entry.get("knownName")!=null else "")
+    person.set_meta("conversations",int(entry.get("conversations",0)))
+    person.set_meta("relationship",str(entry.get("relationship","STRANGER")))
+    person.get_node("ResidentName").hide()
+
 func _sync_guest_family(household: Dictionary) -> void:
     var root := _guest.get_node_or_null("GuestFamily") as Node3D
     if root == null:
@@ -7584,6 +7613,7 @@ func _sync_guest_family(household: Dictionary) -> void:
             var toy := hand.get_child(hand.get_child_count()-1) as Node3D
             toy.name="FamilyToy"
             toy.hide()
+        _sync_guest_contact(person,entry)
         _sync_resident_appearance(person,ResidentAppearance.stage_for_age(int(entry.get("age",18))))
         if not person.has_meta("family_goal") or person.get_meta("family_goal")!=goal:
             var path: Array[Vector3] = _guest.host_path(person.position,goal)
@@ -7603,7 +7633,8 @@ func _animate_guest_family(delta: float) -> void:
         var activity := str(person.get_meta("activity","RESTING"))
         var path: Array = person.get_meta("family_path",[])
         var walking := false
-        if not path.is_empty():
+        var engaged := _dialog_panel.visible and str(person.get_meta("resident_id",""))==_dialog_target
+        if not engaged and not path.is_empty():
             var target: Vector3 = path[0]
             var motion := target-person.position
             if motion.length()>0.025:
@@ -7619,8 +7650,14 @@ func _animate_guest_family(delta: float) -> void:
                 path.pop_front()
         person.set_meta("family_path",path)
         var now := float(Time.get_ticks_msec())*0.001
-        _animate_resident_face(person,delta,now,false)
-        _animate_resident_head(person,delta,now,false,walking)
+        var reply_left := maxf(0.0,float(person.get_meta("reply_remaining",0.0))-delta)
+        person.set_meta("reply_remaining",reply_left)
+        _animate_resident_face(person,delta,now,engaged and reply_left>0.0)
+        if engaged:
+            var toward := _avatar.position-person.position
+            if toward.length_squared()>0.001:
+                person.rotation.y=lerp_angle(person.rotation.y,atan2(-toward.x,-toward.z),minf(delta*4.0,1.0))
+        _animate_resident_head(person,delta,now,engaged,walking)
         var phase := now+float(person.get_meta("phase",0.0))
         var swing := sin(phase*9.0)*0.4 if walking else 0.0
         for limb in ["LegLeft","LegRight"]:
@@ -7641,8 +7678,11 @@ func _animate_guest_host(delta: float) -> void:
     if not is_instance_valid(_guest_host):return
     _animate_guest_family(delta)
     var walking := false
-    var talking := _guest_feedback_time>0.0
-    _animate_resident_face(_guest_host,delta,float(Time.get_ticks_msec())*0.001,talking)
+    var engaged := _dialog_panel.visible and str(_guest_host.get_meta("resident_id",""))==_dialog_target
+    var reply_left := maxf(0.0,float(_guest_host.get_meta("reply_remaining",0.0))-delta)
+    _guest_host.set_meta("reply_remaining",reply_left)
+    var talking := _guest_feedback_time>0.0 or engaged
+    _animate_resident_face(_guest_host,delta,float(Time.get_ticks_msec())*0.001,_guest_feedback_time>0.0 or (engaged and reply_left>0.0))
     _animate_resident_head(_guest_host,delta,float(Time.get_ticks_msec())*0.001,talking,not _host_path.is_empty())
     if not talking and not _host_path.is_empty():
         var target: Vector3 = _host_path[0]
@@ -7881,7 +7921,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _town_map.update_world(_current_place, _locations)
     _render_residents()
     if _dialog_panel.visible:
-        var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+        var person := _dialog_person(_dialog_target)
         if person == null:
             _close_dialog()
         else:
@@ -8139,7 +8179,7 @@ func _on_action_feedback(message: String) -> void:
                 _dialog_reply.text += "\n[Traduzione non disponibile / Translation unavailable]"
             else:
                 _speak_resident_reply(_dialog_reply.text)
-            var speaker := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+            var speaker := _dialog_person(_dialog_target)
             _begin_resident_reply(speaker,_dialog_reply.text)
             _dialog_input.clear()
             _dialog_input.grab_focus()
