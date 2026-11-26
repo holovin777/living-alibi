@@ -43,6 +43,11 @@ final class PhoneLife {
                 &&(get(t,id,"meeting-state")==1||get(t,id,"meeting-state")==2)
                 &&minute>=MEETING_MINUTE&&minute<MEETING_END;
     }
+    static boolean homeVisitWindow(TownLife.Town t,TownLife.Citizen c,WorldState clock){
+        return available(t)&&get(t,c.id,"meeting-kind")==2&&get(t,c.id,"meeting-day")==clock.day
+                &&(get(t,c.id,"meeting-state")==1||get(t,c.id,"meeting-state")==2)
+                &&clock.minute>=DEPART_MINUTE&&clock.minute<1170;
+    }
     static void visitArrived(TownLife.Town t,String id,int day,int minute){
         if(homeInvitation(t,id,day,minute))put(t,id,"meeting-state",2);
     }
