@@ -13,6 +13,36 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void hobbyClubsCreateSharedInterestLinksOnlyForActualAttendees() throws Exception {
+        Path file=directory.resolve("hobby-clubs.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,3);
+            var a=people.get(0);var b=people.get(1);var absent=people.get(2);id=a.id;
+            var club=HobbyLife.CLUBS.get(3); // music, indoor
+            for(var c:people){
+                c.personalSeed=3;c.age=30;c.alive=true;c.health=100;c.fatigue=10;c.hunger=10;c.thirst=10;
+                c.place=club.place();c.travelRemaining=0;c.activity=HobbyLife.marker(club);
+            }
+            absent.place=TownLife.Place.BAKERY;
+            state.day=5;state.minute=1095;
+            assertEquals(club,HobbyLife.scheduled(town,a,state.day,state.minute));
+            HobbyLife.tick(town,state);
+            assertEquals(1,HobbyLife.sessions(town,a,club));assertEquals(1,HobbyLife.sessions(town,b,club));
+            assertEquals(0,HobbyLife.sessions(town,absent,club));
+            assertEquals(52,town.peerRelationships.get(SocialNetwork.key(a.id,b.id)).affinity);
+            HobbyLife.tick(town,state);assertEquals(1,HobbyLife.sessions(town,a,club));
+            assertTrue(HobbyLife.report(town,5,1095).stream().anyMatch(e->e.name().equals("Music")&&e.present()==2));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(1,HobbyLife.sessions(town,town.get(id),HobbyLife.CLUBS.get(3)));
+        }
+    }
+
+    @Test
     void autonomousFamilyCohabitsAndSharesDinnerWithoutCreatingMoney() throws Exception {
         Path file=directory.resolve("autonomous-household.db");
         String id;

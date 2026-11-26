@@ -300,6 +300,7 @@ final class TownLife {
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
         DojoCommunityLife.tick(town,marco);
+        HobbyLife.tick(town,marco);
         DomesticLife.tick(town,marco);
         HouseholdLife.tick(town,marco);
         HomeRoutineLife.tick(town,marco);

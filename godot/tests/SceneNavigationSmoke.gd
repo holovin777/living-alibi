@@ -202,6 +202,10 @@ func _exercise() -> void:
     world._phone.open_app("weather")
     if not _check("12" in world._phone._body.text,"phone displays committed weather"):
         return
+    world._phone.update_data({"day":5,"minute":1435,"player":{"incarnation":2},"hobbyEvents":[{"name":"Music","district":"Central square","day":12,"minute":1080,"present":0,"cancelled":false}]},[],[])
+    world._phone.open_app("calendar")
+    if not _check("18:00" in world._phone._body.text and ("Music" in world._phone._body.text or "Musica" in world._phone._body.text),"community calendar shows upcoming gathering"):
+        return
     world._phone.set_alarm(0,5)
     if not _check(world._phone.alarm_at==5*1440+5,"past hour schedules tomorrow"):
         return

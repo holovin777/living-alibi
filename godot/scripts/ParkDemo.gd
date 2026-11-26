@@ -3511,6 +3511,10 @@ func _animate_residents(delta: float) -> void:
                 angle=0.30+sin(gesture_time*3.3)*0.28
             elif coffee and limb=="ArmRight":
                 angle=0.85+0.50*maxf(0.0,sin(gesture_time*1.4))
+            elif activity=="HOBBY_YOGA" and limb in ["ArmLeft","ArmRight"]:
+                angle=0.7+sin(gesture_time*0.8)*0.25
+            elif activity in ["HOBBY_PAINTING","HOBBY_MUSIC","HOBBY_FISHING"] and limb=="ArmRight":
+                angle=0.65+sin(gesture_time*1.5)*0.2
             elif phone and limb=="ArmRight":
                 angle=1.02
             elif activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
@@ -3830,6 +3834,7 @@ func _create_interface() -> void:
     dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
     dialog_col.add_child(_button("Ask their name",_send_dialog.bind("What is your name?")))
     dialog_col.add_child(_button("Ask their address",_send_dialog.bind("Where do you live?")))
+    dialog_col.add_child(_button("Ask about hobbies",_send_dialog.bind("What are your hobbies?")))
     dialog_col.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
     dialog_col.add_child(_button("Offer support",_send_dialog.bind("I'm here for you.")))
     dialog_col.add_child(_button("Ask about shared memories",_send_dialog.bind("What do you remember about me?")))
@@ -4007,6 +4012,9 @@ func _localized_resident_reply(message: String) -> String:
     var separator := message.find(": ")
     if separator<0:return tr(message)
     var spoken := message.substr(separator+2)
+    if spoken.begins_with("I like ") and spoken.ends_with("."):
+        var hobbies := spoken.substr(7,spoken.length()-8).split(" and ",false,1)
+        if hobbies.size()==2:return tr("I like %s and %s.") % [tr(hobbies[0]),tr(hobbies[1])]
     if spoken.begins_with("I live at ") and spoken.ends_with("."):
         return tr("I live at %s.") % spoken.substr(10,spoken.length()-11)
     if spoken.begins_with("My name is ") and spoken.ends_with("."):
