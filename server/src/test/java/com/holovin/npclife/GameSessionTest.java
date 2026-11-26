@@ -13,6 +13,40 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void walkingPairsRespectFriendshipAndActualPublicPresence() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("walking-pairs.db"))){
+            var state=db.load();var town=db.loadTown(state);
+            var people=PopulationGenerator.add(town,3);
+            var first=people.get(0);var second=people.get(1);var third=people.get(2);
+            for(var c:people){
+                c.alive=true;c.age=30;c.sociability=70;c.hunger=20;c.thirst=20;c.fatigue=20;
+                c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.PARK;
+                c.destination=c.place;c.travelRemaining=0;c.activity="FREE_TIME";
+            }
+            assertTrue(WalkingLife.companions(town,people,960).isEmpty());
+            var close=new SocialLife.Relationship(first.id,second.id);
+            close.affinity=80;close.trust=85;close.conversations=5;
+            town.peerRelationships.put(SocialNetwork.key(first.id,second.id),close);
+            var other=new SocialLife.Relationship(first.id,third.id);
+            other.affinity=45;other.trust=60;other.conversations=3;
+            town.peerRelationships.put(SocialNetwork.key(first.id,third.id),other);
+            var pairs=WalkingLife.companions(town,people,960);
+            assertEquals(java.util.Map.of(first.id,second.id,second.id,first.id),pairs);
+            assertEquals(pairs,WalkingLife.companions(town,people,960));
+            second.activity="WORKING";
+            assertEquals(third.id,WalkingLife.companions(town,people,960).get(first.id));
+            third.travelRemaining=1;
+            assertTrue(WalkingLife.companions(town,people,960).isEmpty());
+            second.activity="FREE_TIME";second.thirst=80;
+            assertTrue(WalkingLife.companions(town,people,960).isEmpty());
+            second.thirst=20;
+            assertTrue(WalkingLife.companions(town,java.util.List.of(first),960).isEmpty());
+            assertTrue(WalkingLife.companions(town,people,1300).isEmpty());
+            assertEquals(5,close.conversations);
+        }
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";
