@@ -300,7 +300,12 @@ func _exercise() -> void:
     world._avatar.position=Vector3(-0.9,0,1)
     if not _check(world._stairwell.near_unit(world._avatar.position)==1,"numbered doorway proximity"):
         return
-    world._open_guest({"unit":1,"level":2,"style":"rosa","name":"Marco"})
+    world._open_guest({"unit":1,"level":2,"style":"rosa","name":"Marco","activity":"COOKING","cleanliness":65})
+    if not _check(world._host_activity=="COOKING" and not world._host_path.is_empty() and world._guest.get_node("Clutter").visible,"server home routine generates a route and cleanliness decor"):
+        return
+    world._sync_host_routine({"activity":"READING","cleanliness":95})
+    if not _check(world._host_activity=="READING" and not world._host_path.is_empty() and not world._guest.get_node("Clutter").visible,"host changes routine and home cleanliness updates"):
+        return
     if not _check(world._guest_active and world._guest.has_node("CoffeeMachine")
             and not world._guest.can_stand(Vector3(-3.1,0,-2.6),world.WALKER_RADIUS)
             and world._guest.can_stand(world._avatar.position,world.WALKER_RADIUS),"furnished guest room has walkable space and solid furniture"):
