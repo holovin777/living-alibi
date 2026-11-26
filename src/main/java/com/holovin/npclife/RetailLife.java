@@ -62,10 +62,41 @@ final class RetailLife {
         if(FoodLife.total(player,false)>=12)
             throw new IllegalArgumentException("Your bag is full (12 units).");
         player.money-=product.price();
-        t.employerFunds.merge("shop-assistant",product.price(),Math::addExact);
+        t.employerFunds.merge(salesAccount(id),product.price(),Math::addExact);
         t.retailStock.merge(id,-1,Integer::sum);
         FoodLife.change(player,id,false,1);
         return "Bought "+product.label()+" for "+product.price()+" EUR.";
+    }
+    static final int FOOD_WAGE=8;
+    static boolean foodRole(String occupation){return "Pizzaiolo".equals(occupation)||"Gelataio".equals(occupation);}
+    static String foodAccount(String occupation){return "Pizzaiolo".equals(occupation)?"pizzeria":"gelateria";}
+    static String salesAccount(String id){return switch(id){case "pizza" -> "pizzeria";case "gelato" -> "gelateria";default -> "shop-assistant";};}
+    static void foodShift(TownLife.Town t,TownLife.Citizen c,WorldState clock,List<TownLife.Event> events,List<TownLife.Observation> observations){
+        if(!foodRole(c.occupation)||!c.employed||!c.alive||c.place!=TownLife.Place.CENTRO||c.travelRemaining>0)return;
+        String account=foodAccount(c.occupation);
+        int funds=t.employerFunds.getOrDefault(account,0);
+        if(funds<FOOD_WAGE)return;
+        t.employerFunds.put(account,funds-FOOD_WAGE);
+        c.money=Math.addExact(c.money,FOOD_WAGE);
+        String id="Pizzaiolo".equals(c.occupation)?"pizza":"gelato";
+        int count=Math.min(2,product(id).capacity()-t.retailStock.getOrDefault(id,0));
+        int cost=count*(id.equals("pizza")?2:1);
+        if(count>0&&funds-FOOD_WAGE>=cost){
+            t.employerFunds.merge(account,-cost,Integer::sum);
+            t.retailStock.merge(id,count,Integer::sum);
+            TownLife.publish(t,clock,c.id,c.place,c.name+" prepared "+count+" portions of "+id+".",events,observations);
+        }
+    }
+    static void foodCustomer(TownLife.Town t,TownLife.Citizen c,WorldState clock,List<TownLife.Event> events,List<TownLife.Observation> observations){
+        if(c.hunger<45||!open(TownLife.Place.CENTRO,clock.minute)||c.place!=TownLife.Place.CENTRO||c.travelRemaining>0)return;
+        String id=c.hunger>=60?"pizza":"gelato";
+        var p=product(id);
+        if(c.money<p.price()+10||t.retailStock.getOrDefault(id,0)<1)return;
+        c.money-=p.price();
+        t.employerFunds.merge(salesAccount(id),p.price(),Math::addExact);
+        t.retailStock.merge(id,-1,Integer::sum);
+        c.hunger=Math.max(0,c.hunger-(id.equals("pizza")?65:20));
+        TownLife.publish(t,clock,c.id,c.place,c.name+" bought and ate "+id+".",events,observations);
     }
     static final int PRODUCE_PRICE=2;
     static int produceSpace(TownLife.Town t) {

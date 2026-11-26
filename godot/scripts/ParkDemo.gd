@@ -2956,14 +2956,14 @@ func _build_centro_food_shop(parent: Node3D,x: float,pizza: bool) -> void:
     parent.add_child(shop)
     var wall := Color("#c98b6a") if pizza else Color("#b0c8b2")
     var trim := Color("#f4e3c8")
-    for part in [[Vector3(x-2.1,0,17.75),Vector2(0.22,4.5)],
-            [Vector3(x+2.1,0,17.75),Vector2(0.22,4.5)],
-            [Vector3(x,0,20.0),Vector2(4.4,0.22)],
+    for part in [[Vector3(x-2.1,0,18.15),Vector2(0.22,5.3)],
+            [Vector3(x+2.1,0,18.15),Vector2(0.22,5.3)],
+            [Vector3(x,0,20.8),Vector2(4.4,0.22)],
             [Vector3(x-1.6,0,15.5),Vector2(1.0,0.22)],
             [Vector3(x+1.6,0,15.5),Vector2(1.0,0.22)]]:
         _room_wall(shop,part[0],part[1],wall)
-    _box(shop,Vector3(4.2,0.08,4.5),trim,Vector3(x,0.04,17.75),"paving")
-    _box(shop,Vector3(4.5,0.22,4.7),Color("#96513d"),Vector3(x,3.1,17.75),"terracotta")
+    _box(shop,Vector3(4.2,0.08,5.3),trim,Vector3(x,0.04,18.15),"paving")
+    _box(shop,Vector3(4.5,0.22,5.5),Color("#96513d"),Vector3(x,3.1,18.15),"terracotta")
     _box(shop,Vector3(4.4,0.55,0.23),wall.darkened(0.15),Vector3(x,2.75,15.5))
     _physical_sign(shop,"Pizzeria del Borgo" if pizza else "Gelateria dei Tigli",Vector3(x,2.72,15.32),PI,3.9)
     _box(shop,Vector3(4.4,0.09,0.8),wall.darkened(0.22),Vector3(x,2.43,15.1))
@@ -3562,6 +3562,12 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
             _sphere(prop,0.12,Color("#c38c47"),Vector3.ZERO)
             var loaf := prop.get_child(prop.get_child_count()-1) as Node3D
             loaf.scale=Vector3(1.6,0.65,0.8)
+        "PIZZA":
+            _cylinder(prop,0.15,0.04,Color("#c68b43"),Vector3.ZERO)
+            _cylinder(prop,0.12,0.02,Color("#b9543c"),Vector3(0,0.025,0))
+        "GELATO":
+            _cylinder(prop,0.055,0.09,Color("#e7dfcb"),Vector3.ZERO)
+            _sphere(prop,0.06,Color("#c98b99"),Vector3(0,0.065,0))
         "COFFEE":
             _cylinder(prop,0.075,0.10,Color("#f4ebdb"),Vector3.ZERO)
         "CRATE":
@@ -3666,8 +3672,30 @@ func _sync_resident_weather(person: Node3D,talking: bool,seated: bool) -> bool:
     if umbrella!=null:umbrella.visible=use_umbrella
     return use_umbrella
 
+func _assign_food_staff() -> void:
+    var used: Dictionary={}
+    for person in _residents_root.get_children():
+        var kind := str(person.get_meta("work_visual",""))
+        var working: bool = str(person.get_meta("activity",""))=="WORKING" and kind in ["PIZZA","GELATO"]
+        if working and not used.has(kind):
+            var at := Vector3(-6.0 if kind=="PIZZA" else 6.0,0,19.9)
+            if not _can_stand(at,WALKER_RADIUS):continue
+            used[kind]=true
+            if not person.has_meta("pre_work_anchor"):person.set_meta("pre_work_anchor",person.get_meta("anchor",person.position))
+            person.position=at
+            person.set_meta("anchor",at)
+            person.rotation.y=0.0
+        elif person.has_meta("pre_work_anchor"):
+            var previous: Vector3=person.get_meta("pre_work_anchor")
+            person.set_meta("anchor",previous)
+            person.position=_open_anchor(previous)
+            person.remove_meta("pre_work_anchor")
+
 func _assign_work_stations() -> void:
     if _apartment_active:return
+    if _current_place=="CENTRO":
+        _assign_food_staff()
+        return
     var stations: Array[Vector3] = []
     var yaw := 0.0
     match _current_place:
