@@ -306,7 +306,15 @@ func _exercise() -> void:
     world._sync_host_routine({"activity":"FAMILY_DINNER","cleanliness":95,"household":{"members":3,"present":3,"dinnerNow":true}})
     if not _check(world._host_activity=="FAMILY_DINNER" and world._guest.get_node("FamilyDinner").visible and not world._guest.get_node("FamilyDinner").get_child(3).visible,"family dinner places match present household"):
         return
+    if not _check(not world._host_path.is_empty() and world._guest.can_stand(world._guest.routine_anchor("FAMILY_DINNER"),0.25),"dinner chair has a navigable approach"):
+        return
+    for tick in range(160):
+        world._animate_guest_host(0.1)
+    if not _check(world._host_seated and world._guest_host.position.is_equal_approx(world._guest.routine_seat("FAMILY_DINNER")+Vector3(0,-0.34,0)),"host sits at dinner table"):
+        return
     world._sync_host_routine({"activity":"READING","cleanliness":95,"household":{"members":3,"present":1,"dinnerNow":false}})
+    if not _check(not world._host_seated and world._guest_host.position.is_equal_approx(world._guest.routine_anchor("FAMILY_DINNER")),"host stands at safe approach when dinner ends"):
+        return
     if not _check(not world._guest.get_node("FamilyDinner").visible,"finished dinner clears table preview"):
         return
     if not _check(world._host_activity=="READING" and not world._host_path.is_empty() and not world._guest.get_node("Clutter").visible,"host changes routine and home cleanliness updates"):
