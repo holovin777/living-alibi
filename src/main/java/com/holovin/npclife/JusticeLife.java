@@ -76,6 +76,8 @@ final class JusticeLife {
     }
     static String payFine(TownLife.Town t){
         requireFree(t);
+        PlayerLife.requireAlive(t.player);
+        if(t.player.place!=TownLife.Place.OFFICE||t.player.travelRemaining>0)throw new IllegalArgumentException("Visit the municipal office to pay a fine.");
         int payment=Math.min(t.player.money,get(t,"fine-outstanding"));
         if(payment<=0)throw new IllegalArgumentException("No payable fine or insufficient funds.");
         t.player.money-=payment;
