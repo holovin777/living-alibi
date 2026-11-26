@@ -89,6 +89,6 @@ final class HouseholdLife {
         String unit=host.homeUnit;
         return new View(members.size(),(int)members.stream().filter(c->c.age<18).count(),
             (int)members.stream().filter(HouseholdLife::awake).count(),get(t,unit,"meals"),
-            dinnerNow(t,host,day,minute),visible);
+            dinnerNow(t,host,day,minute),visible,inside&&BirthdayLife.celebrating(t,host,day,minute));
     }
 }
