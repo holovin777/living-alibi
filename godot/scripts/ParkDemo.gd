@@ -5088,13 +5088,13 @@ func _create_interface() -> void:
     travel_col.add_child(_travel_choices)
 
     _dialog_panel = PanelContainer.new()
+    _dialog_panel.visible = false
+    canvas.add_child(_dialog_panel)
     _dialog_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
     _dialog_panel.offset_left=-440
     _dialog_panel.offset_right=-15
     _dialog_panel.offset_top=15
     _dialog_panel.custom_minimum_size = Vector2(0,0)
-    _dialog_panel.visible = false
-    canvas.add_child(_dialog_panel)
     var dialog_col := VBoxContainer.new()
     _dialog_panel.add_child(dialog_col)
     _dialog_title = Label.new()
@@ -5335,7 +5335,7 @@ func _send_dialog(message: String) -> void:
     if not _dialog_panel.visible or _dialog_pending or _api.is_busy() or not _connected:
         return
     var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
-    if person == null or _nearest_resident()!=_dialog_target:
+    if person == null or _avatar.position.distance_to(person.position)>=2.5:
         _close_dialog()
         return
     if message.strip_edges().is_empty():
