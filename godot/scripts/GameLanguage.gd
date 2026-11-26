@@ -1,6 +1,15 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "Baton": "Bastone da allenamento",
+    "Buy training baton · 12 EUR": "Compra bastone da allenamento · 12 EUR",
+    "Bought a training baton for 12 EUR.": "Hai comprato un bastone da allenamento per 12 EUR.",
+    "You struck a resident. Witnesses remember the assault.": "Hai colpito un residente. I testimoni ricordano l'aggressione.",
+    "Police intervened and recorded the assault.": "La polizia è intervenuta e ha registrato l'aggressione.",
+    "Select empty hands or the training baton with Q.": "Seleziona le mani libere o il bastone con Q.",
+    "X: strike": "X: colpisci",
+    "You need a moment to recover.": "Devi recuperare un momento.",
+    "This person cannot be attacked.": "Non puoi colpire questa persona.",
     "They had to leave.": "Ha dovuto andare via.",
     "They have other things to do. Talk later.": "Ha altri impegni. Parlate più tardi.",
     "They have to get back to their shift.": "Deve riprendere il suo turno.",
