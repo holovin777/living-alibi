@@ -1,6 +1,14 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "Ask to visit at home": "Chiedi di andare a casa sua",
+    "Accept invitation": "Accetta invito",
+    "Visit with %s · day %s · %s": "Visita a %s · giorno %s · %s",
+    "Friend's home": "Casa di un amico",
+    "C: coffee · F: snack · V: dinner": "C: caffè · F: spuntino · V: cena",
+    "You shared dinner.": "Avete cenato insieme.",
+    "Dinner is served between 18:00 and 21:00.": "La cena si serve tra le 18:00 e le 21:00.",
+    "Sorry, I do not have enough food for dinner.": "Mi dispiace, non ho abbastanza cibo per la cena.",
     "End call": "Termina chiamata",
     "Invite for coffee": "Invita per un caffè",
     "Call contact": "Chiama contatto",
