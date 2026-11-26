@@ -44,6 +44,34 @@ class IncomingCallTest {
         }
     }
     @Test
+    void outgoingCallsRequireConsentAndRespectAvailability() throws Exception {
+        Path file=directory.resolve("outgoing.db");
+        try(var db=new WorldDatabase(file)){
+            var clock=db.load();var town=db.loadTown(clock);
+            friendly(town,"marco");
+            assertThrows(IllegalArgumentException.class,()->PhoneLife.outgoing(town,"marco","dial",5,600));
+            assertTrue(PhoneLife.shareNumber(town,town.get("marco")));
+            town.get("marco").activity="WORKING";
+            assertEquals("No answer.",PhoneLife.outgoing(town,"marco","dial",5,600));
+            assertEquals("NO_ANSWER",PhoneLife.report(town).outgoingCalls().getFirst().status());
+            town.get("marco").activity="FREE_TIME";town.get("marco").travelRemaining=0;
+            assertEquals("Please wait before calling again.",PhoneLife.outgoing(town,"marco","dial",5,601));
+            assertEquals("Ciao! Dimmi pure.",PhoneLife.outgoing(town,"marco","dial",5,630));
+            assertTrue(PhoneLife.report(town).dialContacts().getFirst().connected());
+            assertEquals("Volentieri! Domani alle 18 al bar.",PhoneLife.outgoing(town,"marco","invite-coffee",5,631));
+            assertEquals(6,PhoneLife.report(town).meetings().getFirst().day());
+            clock.day=5;clock.minute=632;
+            db.save(clock,List.of(),List.of(),town,List.of(),List.of(),List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals("ACCEPTED",PhoneLife.report(town).outgoingCalls().getFirst().status());
+            assertFalse(PhoneLife.report(town).dialContacts().getFirst().connected());
+            assertEquals(6,PhoneLife.report(town).meetings().getFirst().day());
+        }
+    }
+
+    @Test
     void missedCallsExpireAndCooldownPreventsRepeatedRinging(){
         var clock=new WorldState();var town=TownLife.create(clock);
         friendly(town,"marco");assertTrue(PhoneLife.shareNumber(town,town.get("marco")));
