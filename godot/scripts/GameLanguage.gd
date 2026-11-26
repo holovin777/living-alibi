@@ -1,6 +1,10 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "They had to leave.": "Ha dovuto andare via.",
+    "They have other things to do. Talk later.": "Ha altri impegni. Parlate più tardi.",
+    "They have to get back to their shift.": "Deve riprendere il suo turno.",
+    "They need to take care of themselves.": "Deve occuparsi delle proprie necessità.",
     "T or click: talk to a person": "T o clic: parla con una persona",
     "Ask the host to introduce their family.": "Chiedi al padrone di casa di presentarti la famiglia.",
     "This resident is not in the apartment with you.": "Questa persona non è nell'appartamento con te.",
