@@ -3655,6 +3655,8 @@ func _sync_hosted_guest() -> void:
             person.position=_open_anchor(at)
         person.set_meta("hosted_guest",visiting)
         if visiting:
+            if int(person.get_meta("seat_index",-1))>=0:
+                person.position=person.get_meta("anchor",person.position)
             person.set_meta("seat_index",-1)
             person.set_meta("activity","SOCIALIZING")
             person.set_meta("walking_companion","")
@@ -4797,7 +4799,7 @@ func _animate_residents(delta: float) -> void:
             var facing: Vector3=person.get_meta("peer_face")-person.position
             if facing.length_squared()>0.001:
                 person.rotation.y=lerp_angle(person.rotation.y,atan2(-facing.x,-facing.z),minf(delta*6.0,1.0))
-        if talking or seated:
+        if talking or seated or bool(person.get_meta("hosted_guest",false)):
             walking = false
         if talking and not seated:
             var toward := _avatar.position-person.position
