@@ -3734,12 +3734,31 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
             _sphere(hair_root,0.085,hair,Vector3(0,1.88,0.10))
     for side in [-1.0,1.0]:
         _sphere(person,0.045,skin,Vector3(side*0.18,1.64,0))
-        _sphere(person,0.025,Color("#e9e3d8"),Vector3(side*0.072,1.69,-0.177))
-        _sphere(person,0.013,profile["eye"],Vector3(side*0.072,1.69,-0.199))
-        _sphere(person,0.006,Color("#202225"),Vector3(side*0.072,1.69,-0.211))
+        var eye := Node3D.new()
+        eye.name="EyeLeft" if side<0 else "EyeRight"
+        person.add_child(eye)
+        eye.position=Vector3(side*0.072,1.69,-0.177)
+        _sphere(eye,0.025,Color("#e9e3d8"),Vector3.ZERO)
+        _sphere(eye,0.013,profile["eye"],Vector3(0,0,-0.022))
+        _sphere(eye,0.006,Color("#202225"),Vector3(0,0,-0.034))
         _box(hair_root,Vector3(0.071,0.014,0.014),hair,Vector3(side*0.072,1.735,-0.187))
+        var brow := hair_root.get_child(hair_root.get_child_count()-1) as Node3D
+        brow.name="BrowLeft" if side<0 else "BrowRight"
     _sphere(person,float(profile["nose"]),skin,Vector3(0,1.635,-0.193))
-    _box(person,Vector3(0.075,0.012,0.012),skin.darkened(0.32),Vector3(0,1.57,-0.178))
+    var mouth := Node3D.new()
+    mouth.name="Mouth"
+    mouth.position=Vector3(0,1.57,-0.184)
+    person.add_child(mouth)
+    var lip := skin.darkened(0.48)
+    _box(mouth,Vector3(0.048,0.012,0.018),lip,Vector3.ZERO)
+    mouth.get_child(0).name="Center"
+    for side in [-1.0,1.0]:
+        _box(mouth,Vector3(0.025,0.012,0.018),lip,Vector3(side*0.034,0,0.005))
+        mouth.get_child(mouth.get_child_count()-1).name="Left" if side<0 else "Right"
+    var opening := _sphere(mouth,0.025,Color("#36282b"),Vector3(0,-0.004,-0.008))
+    opening.name="Opening"
+    opening.scale=Vector3(0.95,0.12,0.32)
+    opening.hide()
     _box(person,Vector3(0.05,0.46,0.027),jacket.darkened(0.24),Vector3(0,1.16,-0.175))
     var beard := Node3D.new()
     beard.name="FacialHair"
@@ -3827,6 +3846,51 @@ func _sync_resident_appearance(person: Node3D,stage: String) -> void:
         if group=="FacialHair":
             root.visible=stage in ["ADULT","MATURE","SENIOR"]
 
+# Client-only expression parameters, driven by the authoritative mood snapshot.
+# Blink timing is stable per resident and speech is bounded to delivered replies.
+func _animate_resident_face(person: Node3D,delta: float,now: float,speaking: bool) -> void:
+    var mouth := person.get_node_or_null("Mouth") as Node3D
+    if mouth==null:return
+    var mood := str(person.get_meta("mood","CALM"))
+    var smile := 0.0
+    var eye_open := 1.0
+    var brow_height := 0.0
+    var brow_slant := 0.0
+    match mood:
+        "HAPPY":smile=0.012;eye_open=0.86;brow_height=0.003
+        "ENTHUSIASTIC":smile=0.017;eye_open=1.12;brow_height=0.012
+        "TIRED":smile=-0.004;eye_open=0.48;brow_height=-0.006
+        "SAD","LONELY":smile=-0.012;eye_open=0.76;brow_slant=-0.30
+        "IRRITATED":smile=-0.009;eye_open=0.65;brow_height=-0.010;brow_slant=0.44
+        "STRESSED":smile=-0.006;eye_open=1.06;brow_height=0.008;brow_slant=0.24
+    var seed := absi(str(person.get_meta("resident_id","")).hash())
+    var cycle := 3.2+float(seed%19)*0.11
+    var blink_phase := fposmod(now+float(seed%97)*0.073,cycle)
+    var blink := 1.0
+    if blink_phase<0.18:
+        blink=0.08+0.92*absf(blink_phase-0.09)/0.09
+    var blend := minf(delta*18.0,1.0)
+    for side in [-1.0,1.0]:
+        var eye := person.get_node("EyeLeft" if side<0 else "EyeRight") as Node3D
+        eye.scale.y=lerpf(eye.scale.y,eye_open*blink,blend)
+        var brow := person.get_node("Hair/BrowLeft" if side<0 else "Hair/BrowRight") as Node3D
+        brow.position.y=lerpf(brow.position.y,1.735+brow_height,blend)
+        brow.rotation.z=lerpf(brow.rotation.z,side*brow_slant,blend)
+        var corner := mouth.get_node("Left" if side<0 else "Right") as Node3D
+        corner.position.y=lerpf(corner.position.y,smile*0.5,blend)
+        corner.rotation.z=lerpf(corner.rotation.z,side*atan2(smile,0.027),blend)
+    var opening := mouth.get_node("Opening") as Node3D
+    opening.visible=speaking
+    var syllable := 0.18+0.62*absf(sin(now*13.0+float(seed%31))) if speaking else 0.12
+    opening.scale.y=lerpf(opening.scale.y,syllable,blend)
+    var center := mouth.get_node("Center") as Node3D
+    center.visible=not speaking
+
+func _begin_resident_reply(person: Node3D,reply: String) -> void:
+    if person==null or reply.strip_edges().is_empty():return
+    # Approximate text-driven mouth motion, not audio or phoneme synchronization.
+    person.set_meta("reply_remaining",clampf(float(reply.length())*0.055,0.6,5.0))
+
 func _register_resident_seat(at: Vector3, yaw: float, kind: String) -> void:
     var seats: Array = _scenery.get_meta("resident_seats",[])
     seats.append({"at":at,"yaw":yaw,"kind":kind})
@@ -3903,7 +3967,12 @@ func _animate_residents(delta: float) -> void:
             walking = person.position.distance_squared_to(old) > 0.000001
         var umbrella := _sync_resident_weather(person,talking,seated)
         var swing := sin(phase*12.0)*stride if walking else 0.0
-        var gesture_time := float(Time.get_ticks_msec())*0.001+phase
+        var now := float(Time.get_ticks_msec())*0.001
+        var reply_remaining := maxf(0.0,float(person.get_meta("reply_remaining",0.0))-delta)
+        person.set_meta("reply_remaining",reply_remaining)
+        var joke := _current_place=="OFFICE" and str(person.get_meta("resident_id",""))==_office_joker_id and _office_joke_hold>0.0
+        _animate_resident_face(person,delta,now,(talking and reply_remaining>0.0) or joke)
+        var gesture_time := now+phase
         var coffee := seated and str(person.get_meta("seat_kind",""))=="cafe" and not talking
         var phone := not seated and not talking and not walking and activity in ["RELAXING","RESTING","FREE_TIME"] and sin(gesture_time*0.45)>0.45
         person.get_node("ArmRight/Phone").visible = phone
@@ -4400,6 +4469,7 @@ func _open_dialog() -> void:
         return
     var person := _residents_root.get_node_or_null("Resident_"+id) as Node3D
     _dialog_target = id
+    person.set_meta("reply_remaining",0.0)
     _travel_panel.visible = false
     _action_panel.visible = false
     _map_panel.visible = false
@@ -6361,7 +6431,9 @@ func _animate_guest_family(delta: float) -> void:
             else:
                 path.pop_front()
         person.set_meta("family_path",path)
-        var phase := float(Time.get_ticks_msec())*0.001+float(person.get_meta("phase",0.0))
+        var now := float(Time.get_ticks_msec())*0.001
+        _animate_resident_face(person,delta,now,false)
+        var phase := now+float(person.get_meta("phase",0.0))
         var swing := sin(phase*9.0)*0.4 if walking else 0.0
         for limb in ["LegLeft","LegRight"]:
             var leg := person.get_node(limb) as Node3D
@@ -6382,6 +6454,7 @@ func _animate_guest_host(delta: float) -> void:
     _animate_guest_family(delta)
     var walking := false
     var talking := _guest_feedback_time>0.0
+    _animate_resident_face(_guest_host,delta,float(Time.get_ticks_msec())*0.001,talking)
     if not talking and not _host_path.is_empty():
         var target: Vector3 = _host_path[0]
         var motion := target-_guest_host.position
@@ -6867,6 +6940,8 @@ func _on_action_feedback(message: String) -> void:
         _dialog_pending = false
         if _dialog_panel.visible:
             _dialog_reply.text = _localized_resident_reply(message)
+            var speaker := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+            _begin_resident_reply(speaker,_dialog_reply.text)
             _dialog_input.clear()
     if not _clock_pending:
         _message.text = tr(message)
