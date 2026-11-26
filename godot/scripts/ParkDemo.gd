@@ -91,6 +91,7 @@ var _grocery_menu := false
 const GROCERY_COUNTER := Vector3(7.3,0,3.8)
 const BAKERY_COUNTER := Vector3(-6.3,0,7.0)
 const CAFE_COUNTER := Vector3(-7.0,0,5.9)
+const BARBER_COUNTER := Vector3(-7.8,0,6.4)
 const PIZZA_COUNTER := Vector3(-6.0,0,18.0)
 const GELATO_COUNTER := Vector3(6.0,0,18.0)
 const CAFE_TABLE := Vector3(-7.0,0,9.0)
@@ -648,9 +649,12 @@ func _near_kiosk() -> bool:
 
 func _near_public_counter() -> bool:
     if _apartment_active or _guest_active or _stairwell_active:return false
-    if _current_place=="CENTRO":return not _centro_food_counter().is_empty()
+    if _current_place=="CENTRO":return _near_barber() or not _centro_food_counter().is_empty()
     var counters := {"PORTICI":GROCERY_COUNTER,"BAKERY":BAKERY_COUNTER,"LIBRARY":LIBRARY_DESK}
     return counters.has(_current_place) and _avatar.position.distance_to(counters[_current_place])<1.5
+
+func _near_barber() -> bool:
+    return _current_place=="CENTRO" and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(BARBER_COUNTER)<1.15
 
 func _centro_food_counter() -> String:
     if _current_place!="CENTRO" or _apartment_active or _guest_active or _stairwell_active:return ""
@@ -661,7 +665,7 @@ func _centro_food_counter() -> String:
 func _public_entrances() -> Array:
     # Local positions are registered only for genuinely open geometry.
     return {
-        "CENTRO":[["Pizzeria",Vector3(-6,0,15)],["Gelateria",Vector3(6,0,15)]],
+        "CENTRO":[["Pizzeria",Vector3(-6,0,15)],["Gelateria",Vector3(6,0,15)],["Barbiere",Vector3(-7.8,0,8.5)]],
         "PORTICI":[["Alimentari",Vector3(3.2,0,5.3)]],
         "BAKERY":[["Panetteria",Vector3(-2.8,0,7)]],
         "CAFE":[["Bar Centrale",Vector3(-2.8,0,7)]],
@@ -3072,6 +3076,55 @@ func _portici_grocery(parent: Node3D) -> void:
     shop.add_child(light)
     _park_lamps.append(light)
 
+func _build_barber(parent: Node3D) -> void:
+    var shop := Node3D.new()
+    shop.name="BarbiereDelBorgo"
+    parent.add_child(shop)
+    var wall := Color("#b7b09d")
+    var wood := Color("#684d3c")
+    for part in [[Vector3(-10.1,0,6),Vector2(0.22,4.6)],
+            [Vector3(-5.5,0,6),Vector2(0.22,4.6)],
+            [Vector3(-7.8,0,3.7),Vector2(4.8,0.22)],
+            [Vector3(-9.5,0,8.3),Vector2(1.35,0.22)],
+            [Vector3(-6.1,0,8.3),Vector2(1.35,0.22)]]:
+        _room_wall(shop,part[0],part[1],wall)
+    _box(shop,Vector3(4.6,0.08,4.6),Color("#d5c8b4"),Vector3(-7.8,0.035,6),"paving")
+    _box(shop,Vector3(4.9,0.22,4.9),Color("#65554b"),Vector3(-7.8,3.1,6))
+    _physical_sign(shop,"Barbiere del Borgo",Vector3(-7.8,2.75,8.45),0,4.3)
+    _box(shop,Vector3(4.6,0.48,0.15),wood,Vector3(-7.8,2.42,8.35))
+    var pole := Node3D.new()
+    pole.name="BarberPole"
+    shop.add_child(pole)
+    pole.position=Vector3(-9.8,1.8,8.48)
+    for i in range(8):
+        var stripe := _cylinder(pole,0.115,0.12,[Color("#ece8dd"),Color("#ad4949"),Color("#ece8dd"),Color("#416b8a")][i%4],Vector3(0,float(i)*0.12-0.42,0))
+        stripe.rotation.z=0.0
+    _room_furniture(shop,Vector3(-7.8,0,4.25),Vector3(2.8,0.8,0.65),wood)
+    _box(shop,Vector3(2.8,0.08,0.7),Color("#e6e2d8"),Vector3(-7.8,0.84,4.25))
+    # Mirror is decorative; no third-person camera or reflection is enabled.
+    _box(shop,Vector3(2.0,1.15,0.09),wood,Vector3(-7.8,1.8,3.85))
+    _box(shop,Vector3(1.85,1.0,0.04),Color("#9eb2bb"),Vector3(-7.8,1.8,3.92))
+    var chair := Node3D.new()
+    chair.name="BarberChair"
+    shop.add_child(chair)
+    var at := Vector3(-7.8,0,5.15)
+    _add_obstacle(at,Vector2(0.85,0.85))
+    _cylinder(chair,0.36,0.09,Color("#64696b"),at+Vector3(0,0.05,0))
+    _cylinder(chair,0.11,0.47,Color("#848b8e"),at+Vector3(0,0.30,0))
+    _box(chair,Vector3(0.64,0.14,0.64),Color("#873c3b"),at+Vector3(0,0.58,0))
+    _box(chair,Vector3(0.64,0.65,0.14),Color("#873c3b"),at+Vector3(0,0.95,0.28))
+    for side in [-0.36,0.36]:
+        _box(chair,Vector3(0.12,0.12,0.52),Color("#4b4240"),at+Vector3(side,0.82,0))
+    _room_furniture(shop,Vector3(-9.52,0,6.9),Vector3(0.66,0.44,1.4),Color("#516d65"))
+    for x in [-8.6,-8.2,-7.1]:
+        _box(shop,Vector3(0.12,0.22,0.12),Color("#687b79"),Vector3(x,0.99,4.25))
+    _physical_sign(shop,"09:00–19:00 · F",Vector3(-7.8,2.52,3.95),0,2.5)
+    var light := OmniLight3D.new()
+    light.position=Vector3(-7.8,2.65,6)
+    light.light_energy=1.2
+    light.omni_range=5.0
+    shop.add_child(light)
+
 func _build_centro() -> void:
     var piazza := Node3D.new()
     piazza.name = "PiazzaCentrale"
@@ -3086,6 +3139,7 @@ func _build_centro() -> void:
             _centro_portico(piazza,float(side),float(row)*9.0,colors[variant],variant)
             variant += 1
     _centro_courtyard(piazza)
+    _build_barber(piazza)
     _build_centro_south_walk(piazza)
     # Landmark offset from the northern exit; no fictional church access.
     var tower := Vector3(6.8,0,-14.1)
@@ -5785,8 +5839,28 @@ func _close_grocery() -> void:
     _render_actions()
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
+func _render_barber() -> void:
+    _action_title.text="Barbiere del Borgo"
+    var barber: Dictionary=_last_snapshot.get("barber",{})
+    var info := Label.new()
+    info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    info.text=tr("Open") if barber.get("open",false) else tr("Closed")
+    info.text+=" · 09:00–19:00\n"+tr("Hair")+": "+tr(str(barber.get("hair","NATURAL")).capitalize())+" · "+tr("Beard")+": "+tr(str(barber.get("beard","NATURAL")).capitalize())
+    _action_choices.add_child(info)
+    var money := int(_last_snapshot.get("player",{}).get("money",0))
+    var minute := int(_last_snapshot.get("minute",0))
+    for service in barber.get("services",[]):
+        var duration := int(service.get("minutes",0))
+        var price := int(service.get("price",0))
+        var btn := _button("%s · %s EUR · %s min" % [tr(str(service.get("label",""))),price,duration],_garden_action.bind("barber-"+str(service.get("id",""))))
+        btn.disabled=not bool(barber.get("open",false)) or money<price or minute+duration>1140
+        _action_choices.add_child(btn)
+
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _near_barber() and not _rebirth_active():
+        _render_barber()
+        return
     if _software_menu and _near_software():
         _render_software()
         return
@@ -6712,6 +6786,9 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("barber-"):
+        if _near_barber() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if not _office_action_allowed(action):return
     if action.begins_with("rebirth-dojo-") and not _near_dojo():return
     if action.begins_with("rebirth-engineer-") and not _near_engineering():return
