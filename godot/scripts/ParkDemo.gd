@@ -76,6 +76,9 @@ var _guest_active := false
 var _guest_return := Vector3.ZERO
 var _guest_pending := false
 var _guest_host: Node3D
+var _host_activity := ""
+var _host_path: Array[Vector3] = []
+var _host_seated := false
 var _guest_sitting := false
 var _guest_stand_at := Vector3.ZERO
 var _guest_feedback := ""
@@ -288,6 +291,7 @@ func _process(delta: float) -> void:
         _weather_fx.set_sheltered(true,_environment)
         _animate_guest_host(delta)
         var hints := tr("Visiting %s") % _guest.resident_name
+        if not _host_activity.is_empty():hints += "\n"+tr("Host: %s") % tr(_host_activity.capitalize().replace("_"," "))
         if _guest_sitting:
             hints += "\n"+tr("E: stand up · R: relax")
         else:
@@ -5767,6 +5771,10 @@ func _open_guest(invitation: Dictionary) -> void:
     _residents_root = original_root
     _guest_host.position = _guest.host_anchor()
     _guest_host.set_meta("activity","AT_HOME")
+    _host_activity = ""
+    _host_seated = false
+    _host_path.clear()
+    _sync_host_routine(invitation)
     _stairwell.hide()
     _avatar.position = GuestApartment.SPAWN
     _view_yaw = 0.0
@@ -5780,6 +5788,9 @@ func _close_guest() -> void:
     _guest_active = false
     _guest_sitting = false
     _guest_host = null
+    _host_path.clear()
+    _host_activity = ""
+    _host_seated = false
     _guest_feedback_time = 0.0
     _guest.queue_free()
     _guest = null
@@ -5800,14 +5811,54 @@ func _toggle_guest_seat() -> void:
     _reset_locomotion()
     _follow_player()
 
+func _sync_host_routine(invitation: Dictionary) -> void:
+    if not is_instance_valid(_guest_host):return
+    _guest.update_cleanliness(int(invitation.get("cleanliness",100)))
+    var next := str(invitation.get("activity",""))
+    if next==_host_activity:return
+    if _host_seated:
+        _guest_host.position = _guest.routine_anchor(_host_activity)
+        _host_seated = false
+    _host_activity = next
+    _host_path = _guest.host_path(_guest_host.position,_guest.routine_anchor(next))
+
 func _animate_guest_host(delta: float) -> void:
     if not is_instance_valid(_guest_host):return
-    var toward := _avatar.position-_guest_host.position
-    if toward.length_squared()>0.001:
-        _guest_host.rotation.y = lerp_angle(_guest_host.rotation.y,atan2(-toward.x,-toward.z),minf(delta*4.0,1.0))
+    var walking := false
+    var talking := _guest_feedback_time>0.0
+    if not talking and not _host_path.is_empty():
+        var target: Vector3 = _host_path[0]
+        var motion := target-_guest_host.position
+        if motion.length()>0.035:
+            _guest_host.rotation.y = atan2(-motion.x,-motion.z)
+            _guest_host.position = _guest_host.position.move_toward(target,delta*1.15)
+            walking = true
+        else:
+            _host_path.pop_front()
+    if not talking and not walking and _host_path.is_empty() and not _host_seated and _host_activity in ["READING","WATCHING_TV","RESTING"]:
+        var anchor: Vector3 = _guest.routine_anchor(_host_activity)
+        if _guest_host.position.distance_to(anchor)<0.1:
+            _host_seated = true
+            _guest_host.position = _guest.routine_seat()+Vector3(0,0.02,0)
+            _guest_host.rotation.y = PI
+    if talking:
+        var toward := _avatar.position-_guest_host.position
+        if toward.length_squared()>0.001:
+            _guest_host.rotation.y = lerp_angle(_guest_host.rotation.y,atan2(-toward.x,-toward.z),minf(delta*4.0,1.0))
+    var phase := float(Time.get_ticks_msec())*0.001
+    var swing := sin(phase*9.0)*0.42 if walking else 0.0
+    for limb in ["LegLeft","LegRight"]:
+        var leg := _guest_host.get_node(limb) as Node3D
+        var knee := leg.get_node("Knee") as Node3D
+        leg.rotation.x = lerpf(leg.rotation.x,PI/2.0 if _host_seated else (swing if limb=="LegLeft" else -swing),minf(delta*8,1.0))
+        knee.rotation.x = lerpf(knee.rotation.x,-PI/2.0 if _host_seated else 0.0,minf(delta*8,1.0))
     var arm := _guest_host.get_node("ArmRight") as Node3D
-    var gesture := 0.25+sin(float(Time.get_ticks_msec())*0.003)*0.18 if _guest_feedback_time>0.0 else 0.0
-    arm.rotation.x = lerpf(arm.rotation.x,gesture,minf(delta*6.0,1.0))
+    var gesture := 0.0
+    if talking:gesture=0.25+sin(phase*3.0)*0.18
+    elif walking:gesture=-swing
+    elif _host_activity in ["COOKING","CLEANING","DRINKING","READING"]:
+        gesture=0.7+sin(phase*3.0)*0.2
+    arm.rotation.x = lerpf(arm.rotation.x,gesture,minf(delta*6,1.0))
 
 func _near_stairwell() -> bool:
     if _stairwell_active or _rebirth_active() or _drive_active() or _cycling() or _apartment_active or _current_place!="NORTH_RESIDENCES":
@@ -5946,6 +5997,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _guest_pending = false
         if not _guest_active and _stairwell_active and invitation is Dictionary and str(invitation.get("status",""))=="VISITING" and _stairwell.near_unit(_avatar.position)==int(invitation.get("unit",0)):
             _open_guest(invitation)
+    if _guest_active and invitation is Dictionary:
+        _sync_host_routine(invitation)
     if _stairwell_active and (new_place!=_current_place or _rebirth_active()):
         _set_stairwell(false)
     if new_place != _current_place:
