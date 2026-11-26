@@ -295,10 +295,10 @@ func _exercise() -> void:
         return
     world._avatar.position=barber_saved_position
     var square := centro_root.get_node("PiazzaCentrale")
-    var paving := square.get_node("StonePaving") as MultiMeshInstance3D
-    if not _check(paving.multimesh.instance_count == 1536 and square.has_node("Facade_0")
-            and square.has_node("Facade_3") and square.has_node("CortileDeiFiori"),
-            "historic square has batched paving, distinct facades and a garden court"):
+    var paving := square.get_node("DucalePebbleMosaic") as MeshInstance3D
+    if not _check(paving.mesh is PlaneMesh and paving.mesh.material.albedo_texture != null and square.has_node("Facade_0")
+            and square.has_node("Facade_3") and square.has_node("CortileDeiFiori") and square.has_node("DuomoInspiredFacade"),
+            "historic square has a textured pebble mosaic, arcades, a cathedral facade and a garden court"):
         return
     if not _check(world._can_stand(Vector3(-6.4,0,-14.3),world.WALKER_RADIUS)
             and not world._can_stand(Vector3(-8.4,0,-14.3),world.WALKER_RADIUS),
