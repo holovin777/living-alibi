@@ -3246,7 +3246,8 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
                 _box(prop,Vector3(0.035,0.08,0.035),Color("#aeb6ba"),Vector3(side*0.045,-0.22,0))
             _box(prop,Vector3(0.12,0.045,0.035),Color("#aeb6ba"),Vector3(0,-0.17,0))
         "BREAD":
-            var loaf := _sphere(prop,0.12,Color("#c38c47"),Vector3.ZERO)
+            _sphere(prop,0.12,Color("#c38c47"),Vector3.ZERO)
+            var loaf := prop.get_child(prop.get_child_count()-1) as Node3D
             loaf.scale=Vector3(1.6,0.65,0.8)
         "COFFEE":
             _cylinder(prop,0.075,0.10,Color("#f4ebdb"),Vector3.ZERO)
