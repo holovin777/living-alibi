@@ -1332,6 +1332,7 @@ func _generate_chunk(place_id: String) -> void:
                     Vector3(-7.0, 2.35, 3.0))
             _box(_scenery, Vector3(6.0, 0.18, 3.0), Color(0.90, 0.76, 0.31),
                     Vector3(4.0, 2.35, 8.0))
+            _build_market_counters()
         "SCHOOL":
             _build_college()
             _build_dojo()
@@ -2811,6 +2812,18 @@ func _build_library() -> void:
     light.light_energy=1.8
     library.add_child(light)
 
+# The market has real walkable counters, with separate vendor and customer sides.
+func _build_market_counters() -> void:
+    var stalls := Node3D.new()
+    stalls.name="MarketCounters"
+    _scenery.add_child(stalls)
+    for x in [-9.0,-7.0,-5.0]:
+        _room_furniture(stalls,Vector3(x,0,1.25),Vector3(1.65,0.92,0.58),Color("#87694d"))
+        _box(stalls,Vector3(1.72,0.08,0.64),Color("#d2bc96"),Vector3(x,0.96,1.25))
+        for i in range(3):
+            _sphere(stalls,0.09,[Color("#af4938"),Color("#7c964d"),Color("#dfaa4a")][i],Vector3(x-0.55+i*0.24,1.1,1.25))
+        _box(stalls,Vector3(0.24,0.17,0.24),Color("#42494a"),Vector3(x+0.53,1.1,1.25))
+
 func _build_bakery() -> void:
     var bakery := Node3D.new()
     bakery.name="PanetteriaDelBorgo"
@@ -3359,6 +3372,7 @@ func _render_residents() -> void:
 
     _assign_resident_seats()
     _assign_work_stations()
+    _assign_market_queues()
     _sync_office_joker()
 
 # Presentation follows the server's current visible work equipment, never a guessed identity.
@@ -3421,7 +3435,7 @@ func _assign_work_stations() -> void:
             yaw=PI
         "MARKET":
             stations=[Vector3(-9,0,2.3),Vector3(-7,0,2.3),Vector3(-5,0,2.3)]
-            yaw=PI
+            yaw=0.0
         _:
             return
     var people := _residents_root.get_children()
@@ -3446,6 +3460,31 @@ func _assign_work_stations() -> void:
             if int(person.get_meta("seat_index",-1))<0:
                 person.position=_open_anchor(at)
             person.remove_meta("pre_work_anchor")
+
+# Presentation only: show genuine SHOPPING residents waiting by occupied counters.
+# The authoritative simulation remains responsible for purchases, stock and cash.
+func _assign_market_queues() -> void:
+    if _current_place!="MARKET" or _apartment_active or _guest_active or _stairwell_active:return
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b): return str(a.get_meta("resident_id","")) < str(b.get_meta("resident_id","")))
+    var lanes: Array[float]=[]
+    for child in people:
+        var vendor := child as Node3D
+        if str(vendor.get_meta("activity",""))=="WORKING" and str(vendor.get_meta("work_visual",""))=="CRATE" and vendor.has_meta("pre_work_anchor"):
+            if absf(vendor.position.z-2.3)<0.1 and not lanes.has(vendor.position.x):
+                lanes.append(vendor.position.x)
+    lanes.sort()
+    var slots: Array[Vector3]=[]
+    for depth in range(3):
+        for x in lanes:
+            var at := Vector3(x,0,0.12-float(depth)*1.1)
+            if _can_stand(at,WALKER_RADIUS):slots.append(at)
+    for child in people:
+        var person := child as Node3D
+        if str(person.get_meta("activity",""))=="SHOPPING" and not slots.is_empty():
+            person.set_meta("market_queue_target",slots.pop_front())
+        else:
+            person.remove_meta("market_queue_target")
 
 func _sync_office_joker() -> void:
     if _current_place!="OFFICE" or _apartment_active:return
@@ -3703,6 +3742,11 @@ func _animate_residents(delta: float) -> void:
         var stride := float(appearance.get("stride",0.42))
         var seated := int(person.get_meta("seat_index",-1)) >= 0
         var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
+        var queued := person.has_meta("market_queue_target")
+        var queue_target: Vector3 = person.get_meta("market_queue_target",person.position)
+        if queued and person.position.distance_to(queue_target)<0.12:
+            walking=false
+            if not talking:person.rotation.y=lerp_angle(person.rotation.y,PI,minf(delta*6.0,1.0))
         if talking or seated:
             walking = false
         if talking and not seated:
@@ -3713,7 +3757,7 @@ func _animate_residents(delta: float) -> void:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
-            var target := anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
+            var target := queue_target if queued else anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)

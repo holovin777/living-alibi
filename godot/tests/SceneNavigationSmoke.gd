@@ -1052,7 +1052,7 @@ func _exercise() -> void:
     if not _check(layout.current_place == "MARKET" and layout.travel_minutes.is_empty(),
             "map follows committed arrival and clears stale travel estimates"):
         return
-    var wall_stop: Vector3 = world._move_on_ground(Vector3(-7,0,0),
+    var wall_stop: Vector3 = world._move_on_ground(Vector3(-11.5,0,0),
             Vector3(0,0,9), world.WALKER_RADIUS)
     if not _check(wall_stop.z > 3.5 and wall_stop.z < 3.8,
             "market building has a solid exterior"):
@@ -1061,6 +1061,36 @@ func _exercise() -> void:
             world._avatar.position == Vector3.ZERO,
             "authoritative market arrival regenerates scenery and spawns visitor"):
         return
+    var market_crowd := _world("MARKET","Market")
+    market_crowd["residents"]=[
+        {"id":"vendor-a","activity":"WORKING","workVisual":"CRATE"},
+        {"id":"buyer-a","activity":"SHOPPING"},
+        {"id":"buyer-b","activity":"SHOPPING"},
+        {"id":"walker-a","activity":"WALKING"}]
+    world._on_world_updated(market_crowd)
+    var vendor := world._residents_root.get_node("Resident_vendor-a") as Node3D
+    var buyer_a := world._residents_root.get_node("Resident_buyer-a") as Node3D
+    var buyer_b := world._residents_root.get_node("Resident_buyer-b") as Node3D
+    var passer := world._residents_root.get_node("Resident_walker-a") as Node3D
+    if not _check(world._scenery.has_node("MarketCounters")
+            and vendor.position.is_equal_approx(Vector3(-9,0,2.3))
+            and buyer_a.get_meta("market_queue_target",Vector3.ZERO).is_equal_approx(Vector3(-9,0,0.12))
+            and buyer_b.get_meta("market_queue_target",Vector3.ZERO).is_equal_approx(Vector3(-9,0,-0.98))
+            and not passer.has_meta("market_queue_target"),
+            "only actual shopping residents queue at a staffed market counter"):
+        return
+    buyer_a.position=buyer_a.get_meta("market_queue_target")
+    world._animate_residents(0.2)
+    if not _check(buyer_a.position.is_equal_approx(Vector3(-9,0,0.12)),
+            "shopper stops at the counter rather than wandering"):
+        return
+    market_crowd["residents"][0]["activity"]="FREE_TIME"
+    market_crowd["residents"][0]["workVisual"]=""
+    world._on_world_updated(market_crowd)
+    if not _check(not buyer_a.has_meta("market_queue_target") and not buyer_b.has_meta("market_queue_target"),
+            "queues dissolve when the vendor stops working"):
+        return
+    world._on_world_updated(_world("MARKET","Market"))
     world._avatar.position = world.KIOSK_POSITION + Vector3(0,0,2)
     world._toggle_actions()
     if not _check(world._action_panel.visible and
