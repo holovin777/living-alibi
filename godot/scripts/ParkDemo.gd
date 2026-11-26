@@ -4033,7 +4033,7 @@ func _sync_resident_appearance(person: Node3D,stage: String) -> void:
 func _animate_resident_face(person: Node3D,delta: float,now: float,speaking: bool) -> void:
     var mouth := person.get_node_or_null("Head/Mouth") as Node3D
     if mouth==null:return
-    var mood := str(person.get_meta("mood","CALM"))
+    var mood := str(person.get_meta("peer_expression",person.get_meta("mood","CALM")))
     var smile := 0.0
     var eye_open := 1.0
     var brow_height := 0.0
@@ -4063,11 +4063,12 @@ func _animate_resident_face(person: Node3D,delta: float,now: float,speaking: boo
         corner.rotation.z=lerpf(corner.rotation.z,side*atan2(smile,0.027),blend)
     var yawning := not speaking and mood=="TIRED" and fposmod(now+float(seed%31),19.0)<1.25
     var opening := mouth.get_node("Opening") as Node3D
-    opening.visible=speaking or yawning
+    var laughing := str(person.get_meta("peer_reaction",""))=="LAUGH"
+    opening.visible=speaking or yawning or laughing
     var syllable := 0.18+0.62*absf(sin(now*13.0+float(seed%31))) if speaking else 0.12
-    opening.scale.y=lerpf(opening.scale.y,0.95 if yawning else syllable,blend)
+    opening.scale.y=lerpf(opening.scale.y,0.95 if yawning else (0.45+0.35*absf(sin(now*9.0)) if laughing else syllable),blend)
     var center := mouth.get_node("Center") as Node3D
-    center.visible=not speaking and not yawning
+    center.visible=not speaking and not yawning and not laughing
 
 func _animate_resident_head(person: Node3D,delta: float,now: float,engaged: bool,walking: bool) -> void:
     var head := person.get_node_or_null("Head") as Node3D
@@ -4288,6 +4289,16 @@ var _peer_active: Dictionary={}
 func _peer_available(person: Node3D) -> bool:
     return is_instance_valid(person) and str(person.get_meta("activity","")) in ["WALKING","WANDERING","STROLLING","FREE_TIME","RELAXING","RESTING"] and int(person.get_meta("seat_index",-1))<0 and not person.has_meta("market_queue_target") and not (_dialog_panel.visible and str(person.get_meta("resident_id",""))==_dialog_target)
 
+# A brief visual flourish for a recorded conversation, not an extra social event.
+func _peer_reaction_phase(kind: String,left: float) -> String:
+    match kind:
+        "LAUGH":
+            if left<=5.5 and left>=3.5:return "LAUGH"
+        "ARGUMENT":return "ARGUMENT"
+        "RECONCILE":
+            return "PEACE_GESTURE" if left<2.5 else "RECONCILE"
+    return "CHAT"
+
 func _tick_peer_encounters(delta: float) -> void:
     if not is_instance_valid(_residents_root):return
     for child in _residents_root.get_children():
@@ -4295,6 +4306,8 @@ func _tick_peer_encounters(delta: float) -> void:
         child.remove_meta("peer_face")
         child.remove_meta("peer_speaking")
         child.remove_meta("peer_tone")
+        child.remove_meta("peer_reaction")
+        child.remove_meta("peer_expression")
     var valid: Dictionary={}
     for cue in _last_snapshot.get("peerEncounters",[]):
         if not cue is Dictionary:continue
@@ -4330,6 +4343,18 @@ func _tick_peer_encounters(delta: float) -> void:
             b.set_meta("peer_speaking",fposmod(left,3.0)>=1.5)
             a.set_meta("peer_tone",tone)
             b.set_meta("peer_tone",tone)
+            var reaction := _peer_reaction_phase(str(cue.get("reaction","CHAT")),left)
+            a.set_meta("peer_reaction",reaction)
+            b.set_meta("peer_reaction",reaction)
+            if reaction=="LAUGH":
+                a.set_meta("peer_expression","ENTHUSIASTIC")
+                b.set_meta("peer_expression","ENTHUSIASTIC")
+            elif reaction=="ARGUMENT":
+                a.set_meta("peer_expression","IRRITATED")
+                b.set_meta("peer_expression","STRESSED")
+            elif reaction=="RECONCILE" or reaction=="PEACE_GESTURE":
+                a.set_meta("peer_expression","HAPPY")
+                b.set_meta("peer_expression","HAPPY")
     for key in _peer_active.keys():
         if not valid.has(key):_peer_active.erase(key)
     for key in _peer_seen.keys():
@@ -4393,6 +4418,7 @@ func _animate_residents(delta: float) -> void:
         person.set_meta("reply_remaining",reply_remaining)
         var joke := _current_place=="OFFICE" and str(person.get_meta("resident_id",""))==_office_joker_id and _office_joke_hold>0.0
         var peer_speaking := bool(person.get_meta("peer_speaking",false))
+        var peer_reaction := str(person.get_meta("peer_reaction",""))
         _animate_resident_face(person,delta,now,(talking and reply_remaining>0.0) or joke or peer_speaking)
         _resident_attention(person)
         _animate_resident_head(person,delta,now,talking or peer_chat,walking)
@@ -4444,6 +4470,12 @@ func _animate_residents(delta: float) -> void:
                 angle=-0.95
             elif umbrella and limb=="ArmLeft":
                 angle=0.85
+            elif peer_reaction=="LAUGH" and limb=="ArmRight":
+                angle=0.65+sin(gesture_time*8.0)*0.10
+            elif peer_reaction=="PEACE_GESTURE" and limb=="ArmRight":
+                angle=0.85
+            elif peer_reaction=="ARGUMENT" and peer_speaking and limb=="ArmRight":
+                angle=0.55+sin(gesture_time*6.0)*0.38
             elif peer_speaking and limb=="ArmRight":
                 var emphasis := 0.48 if str(person.get_meta("peer_tone",""))=="TENSE" else 0.22
                 angle=0.35+sin(gesture_time*4.0)*emphasis
@@ -4481,6 +4513,8 @@ func _animate_residents(delta: float) -> void:
                 if grip:elbow_bend=-0.20
                 elif wave and limb=="ArmRight":elbow_bend=-0.36
                 elif guarded:elbow_bend=-0.55
+                if limb=="ArmRight" and peer_reaction=="PEACE_GESTURE":elbow_bend=0.40
+                elif limb=="ArmRight" and peer_reaction=="LAUGH":elbow_bend=0.65
                 if idle_pose!=Vector3.ZERO:elbow_bend=idle_pose.z
                 _animate_resident_elbow(part,delta,elbow_bend,grip)
 

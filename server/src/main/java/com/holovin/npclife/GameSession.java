@@ -20,6 +20,7 @@ public final class GameSession implements AutoCloseable {
     private WorldState state;
     private TownLife.Town town;
     private int archiveYear,archivePage=1;
+    private final List<SocialLife.Interaction> recentPeerEvents=new ArrayList<>();
 
     static final String POPULATION_SEED_TARGET="population:seed-target";
 
@@ -42,6 +43,8 @@ public final class GameSession implements AutoCloseable {
         db=new WorldDatabase(databasePath);
         state=db.load();
         town=db.loadTown(state);
+        recentPeerEvents.addAll(db.socialEvents(512));
+        prunePeerEvents((long)(state.day-1)*1440L+state.minute);
         int previousTarget=town.industryStocks.getOrDefault(POPULATION_SEED_TARGET,12);
         boolean changed=false;
         if(firstLaunch||population>previousTarget) {
@@ -148,12 +151,24 @@ public final class GameSession implements AutoCloseable {
                 .filter(p->!lowStock||p.stock()<3)
                 .sorted(java.util.Comparator.comparing(RetailView::id)).toList();
     }
-    public record PeerEncounterView(String firstId,String secondId,long tick,String tone) { }
+    public record PeerEncounterView(String firstId,String secondId,long tick,String tone,String reaction) { }
+    private void prunePeerEvents(long now){
+        recentPeerEvents.removeIf(e->now-((long)(e.day()-1)*1440L+e.minute())>15);
+    }
+    static String peerReaction(SocialLife.Kind kind,String tone){
+        if(kind==SocialLife.Kind.TENSE_EXCHANGE)return "ARGUMENT";
+        if(kind==SocialLife.Kind.RECONCILIATION)return "RECONCILE";
+        if(kind==SocialLife.Kind.FRIENDLY_CHAT&&"WARM".equals(tone))return "LAUGH";
+        return "CHAT";
+    }
     static boolean leisureEncounter(TownLife.Citizen c){
         return c.alive&&c.travelRemaining==0&&java.util.Set.of("WALKING","WANDERING","STROLLING","FREE_TIME","RELAXING","RESTING").contains(c.activity);
     }
     // Only render recent, real simulation interactions between currently visible peers.
     static List<PeerEncounterView> peerEncounters(TownLife.Town town,List<TownLife.Citizen> visible,long now){
+        return peerEncounters(town,visible,now,List.of());
+    }
+    static List<PeerEncounterView> peerEncounters(TownLife.Town town,List<TownLife.Citizen> visible,long now,List<SocialLife.Interaction> events){
         var result=new java.util.ArrayList<PeerEncounterView>();
         var used=new java.util.HashSet<String>();
         var eligible=visible.stream().filter(GameSession::leisureEncounter).sorted(java.util.Comparator.comparing(c->c.id)).toList();
@@ -163,7 +178,14 @@ public final class GameSession implements AutoCloseable {
             var r=town.existingRelationship(a.id,b.id);
             if(r==null||r.conversations==0||r.lastInteractionTick<0||r.lastInteractionTick>now||now-r.lastInteractionTick>15)continue;
             String tone=r.tension>=58?"TENSE":r.affinity>=65&&r.trust>=58?"WARM":"CASUAL";
-            result.add(new PeerEncounterView(a.id,b.id,r.lastInteractionTick,tone));
+            SocialLife.Kind kind=null;
+            for(var event:events){
+                long tick=(long)(event.day()-1)*1440L+event.minute();
+                if(tick==r.lastInteractionTick&&event.place()==a.place&&SocialNetwork.key(event.firstId(),event.secondId()).equals(SocialNetwork.key(a.id,b.id))){
+                    kind=event.kind();break;
+                }
+            }
+            result.add(new PeerEncounterView(a.id,b.id,r.lastInteractionTick,tone,peerReaction(kind,tone)));
             used.add(a.id);used.add(b.id);
         }
         return List.copyOf(result);
@@ -201,7 +223,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,MutualAidLife.notices(town,state.day),services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute),peerEncounters(town,visible,(long)(state.day-1)*1440L+state.minute));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute),peerEncounters(town,visible,(long)(state.day-1)*1440L+state.minute,recentPeerEvents));
     }
 
     public synchronized BusinessView business() {
@@ -698,6 +720,8 @@ public final class GameSession implements AutoCloseable {
         db.save(candidateState,events,List.of(),candidateTown,truth,observations,interactions);
         state=candidateState;
         town=candidateTown;
+        recentPeerEvents.addAll(interactions);
+        prunePeerEvents((long)(state.day-1)*1440L+state.minute);
         return new ActionView(message,snapshot());
     }
 
