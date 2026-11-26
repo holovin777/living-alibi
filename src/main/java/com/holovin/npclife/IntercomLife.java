@@ -46,6 +46,62 @@ final class IntercomLife {
         put(t,id,"until",Math.addExact(time,10));
         return "Hello! We can chat at the entrance for a few minutes.";
     }
+    record ApartmentVisit(String residentId,String name,int unit,int level,String style,String status,int until) {}
+    private static int unit(TownLife.Town t,TownLife.Citizen c){
+        if(c.id.equals("marco"))return 1;
+        String key="intercom:unit:"+c.homeUnit;
+        int assigned=t.industryStocks.getOrDefault(key,0);
+        if(assigned>0)return assigned;
+        for(int n=2;n<=6;n++){
+            final int candidate=n;
+            if(t.industryStocks.entrySet().stream().noneMatch(e->e.getKey().startsWith("intercom:unit:")&&e.getValue()==candidate)){
+                t.industryStocks.put(key,n);return n;
+            }
+        }
+        return 0;
+    }
+    static String invite(TownLife.Town t,String id,int building,int day,int minute){
+        var c=validate(t,id,building);
+        int time=now(day,minute);
+        var contact=t.player.contacts.get(id);
+        if(building!=1||get(t,id,"until")<=time||AddressLife.building(c)!=1||!available(c,minute)||
+                contact==null||contact.trust<80||contact.affinity<35)
+            return "Sorry, I cannot invite you inside right now.";
+        if(apartment(t,day,minute)!=null)return "You already have an apartment invitation.";
+        int number=unit(t,c);
+        if(number==0)return "This apartment is not accessible yet.";
+        put(t,id,"unit",number);
+        put(t,id,"inside-until",Math.addExact(time,30));
+        put(t,id,"inside",0);
+        put(t,id,"until",0);
+        return "Come in! Apartment "+number+".";
+    }
+    static ApartmentVisit apartment(TownLife.Town t,int day,int minute){
+        if(!PhoneLife.available(t)||t.player.place!=TownLife.Place.NORTH_RESIDENCES||t.player.travelRemaining>0||t.player.cycling)return null;
+        for(var contact:t.player.contacts.values()){
+            String id=contact.residentId;
+            var c=t.people.get(id);
+            if(c==null||get(t,id,"inside-until")<=now(day,minute)||!available(c,minute)||AddressLife.building(c)!=1||
+                    contact.trust<80||contact.affinity<35)continue;
+            int level=c.money>=250?2:c.money>=90?1:0;
+            String style=c.carefulness>=65?"tiglio":c.sociability>=65?"rosa":"olmo";
+            return new ApartmentVisit(id,c.name,get(t,id,"unit"),level,style,get(t,id,"inside")>0?"VISITING":"INVITED",get(t,id,"inside-until"));
+        }
+        return null;
+    }
+    static String enter(TownLife.Town t,String id,int building,int day,int minute){
+        validate(t,id,building);
+        var invitation=apartment(t,day,minute);
+        if(invitation==null||!invitation.residentId().equals(id))throw new IllegalArgumentException("No valid apartment invitation.");
+        put(t,id,"inside",1);
+        return "Welcome inside.";
+    }
+    static String leave(TownLife.Town t,String id,int building,int day,int minute){
+        validate(t,id,building);
+        put(t,id,"inside-until",0);
+        put(t,id,"inside",0);
+        return "You left the apartment.";
+    }
     static String visit(TownLife.Town t,String id,int building,int day,int minute){
         var c=validate(t,id,building);
         int time=now(day,minute);
