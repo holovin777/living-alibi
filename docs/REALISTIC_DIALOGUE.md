@@ -80,8 +80,22 @@ milestone excerpts, and "Ti ricordi quando ci siamo conosciuti?" recalls the
 recorded first meeting without a model. Old array-format history remains
 readable; the first meeting cannot be reconstructed for preexisting contacts.
 The first meeting is preserved; other categories keep their latest verified
-example. Same-day repeats, emotional decay, and semantic summaries remain
-future work.
+example. Same-day repeats and semantic summaries remain future work.
+
+## Emotional drift during absence
+
+At midnight the authoritative world clock advances private contact attitudes.
+After 14 days without a recorded conversation, affinity moves one point
+towards neutral every seven days. After 30 days trust moves one point towards
+50 every 30 days; serious unresolved betrayal and overdue debt prevent
+automatic recovery of low trust. An ordinary hurt can cease to be unresolved
+after 90 days without erasing its event. Serious betrayal still requires
+reconciliation. These are initial game-balance rules, not a psychological model.
+Conversation resets the absence timer but does not automatically restore trust.
+A persisted daily cursor prevents applying the same day twice after reload.
+Past names, milestones, debts and other world facts are unaffected.
+Only player-contact relationships use this rule; NPC-to-NPC relationships
+retain their existing simulation.
 
 Manual check:
 ```sh
