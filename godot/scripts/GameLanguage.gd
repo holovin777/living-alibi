@@ -482,6 +482,7 @@ const IT := {
     "Talk: approach someone and press T or click on them.": "Per parlare, avvicinati a una persona e premi T o cliccaci sopra.",
     "You": "Tu",
     "Error": "Errore",
+    "The world is updating. Try sending again.": "Il mondo si sta aggiornando. Riprova a inviare.",
     "First steps / navigation": "Primi passi / navigazione",
     "First steps: connecting to the world...": "Primi passi: connessione al mondo...",
     "nearby": "qui vicino",
