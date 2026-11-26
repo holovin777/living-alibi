@@ -445,6 +445,10 @@ func _unhandled_input(event: InputEvent) -> void:
         # UI consumes its own clicks before they reach this handler.
         if not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible or _intercom.visible):
             if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and (not _rebirth_active() or _child_can_walk()):
+                if _hands.held_item=="sport":
+                    _try_shoot()
+                    get_viewport().set_input_as_handled()
+                    return
                 var looked_at := _looked_at_resident()
                 if not looked_at.is_empty():
                     _open_dialog(looked_at)
@@ -509,7 +513,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
         return
     if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_X:
-        _try_strike()
+        if _hands.held_item=="sport":
+            _try_shoot()
+        else:
+            _try_strike()
         get_viewport().set_input_as_handled()
         return
     if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_Q:
@@ -6402,6 +6409,14 @@ func _render_actions() -> void:
     if _custody_active:return
     var justice: Dictionary = _last_snapshot.get("player",{}).get("justice",{})
     var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
+    if _current_place=="WORKSHOP" and not _rebirth_active() and bool(permit.get("ownsSportWeapon",false)):
+        var practice_info := Label.new()
+        practice_info.text=tr("Training counter · 08:00–18:00")
+        _action_choices.add_child(practice_info)
+        var practice_btn := _button(tr("Practice shot"),_weapon_license_action.bind("weapon-practice"))
+        var practice_minute := int(_last_snapshot.get("minute",0))
+        practice_btn.disabled = not bool(permit.get("valid",false)) or practice_minute<480 or practice_minute+2>1080
+        _action_choices.add_child(practice_btn)
     if _current_place=="OFFICE" and not _rebirth_active():
         var permit_info := Label.new()
         permit_info.text = tr("Weapon license: active") if bool(permit.get("valid",false)) else tr("Weapon license: inactive")
@@ -7420,9 +7435,16 @@ func _try_strike() -> void:
     _hands.strike()
     _api.garden_action("combat-strike:%s:%s" % ["baton" if _hands.held_item=="baton" else "fists",id])
 
+func _try_shoot() -> void:
+    if not _foot_controls_available() or _rebirth_active() or _guest_active or _stairwell_active or not _connected or _api.is_busy():return
+    var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
+    if not bool(permit.get("valid",false)) or not bool(permit.get("ownsSportWeapon",false)):return
+    var id := _looked_at_resident()
+    _api.garden_action("weapon-fire" if id.is_empty() else "weapon-fire:"+id)
+
 func _weapon_license_action(action: String) -> void:
     if not _connected or _api.is_busy() or not _near_kiosk():return
-    if (action=="weapon-license-apply" and _current_place=="OFFICE") or (action=="weapon-buy-sport" and _current_place=="MARKET"):
+    if (action=="weapon-license-apply" and _current_place=="OFFICE") or (action=="weapon-buy-sport" and _current_place=="MARKET") or (action=="weapon-practice" and _current_place=="WORKSHOP"):
         _api.garden_action(action)
 
 func _buy_training_baton() -> void:
@@ -7435,6 +7457,9 @@ func _holdable_items() -> Array[String]:
     var choices: Array[String] = [""]
     if bool(player.get("ownsBaton",false)):
         choices.append("baton")
+    var permit: Dictionary = player.get("weaponLicense",{})
+    if not _rebirth_active() and bool(permit.get("valid",false)) and bool(permit.get("ownsSportWeapon",false)):
+        choices.append("sport")
     for id in ["bread","water","grape-juice"]:
         if int(bag.get(id,0))>0:
             choices.append(id)
@@ -7447,6 +7472,8 @@ func _refresh_held_item() -> void:
         _held_label.text = tr("Held item (Q): %s") % (tr("Empty hands") if _hands.held_item.is_empty() else tr(str(_hands.held_item).capitalize()))
         if not _rebirth_active() and _hands.held_item in ["","baton"]:
             _held_label.text += " · "+tr("X: strike")
+        elif _hands.held_item=="sport":
+            _held_label.text += " · "+tr("Left click / X: fire")
 
 func _cycle_held_item() -> void:
     var choices := _holdable_items()
@@ -8463,6 +8490,9 @@ func _on_work_orders_updated(orders: Array) -> void:
         _render_actions()
 
 func _on_action_feedback(message: String) -> void:
+    if message.begins_with("Shot fired.") or message=="Practice shot recorded.":
+        _hands.fire()
+        _town_audio.play_effect("shot")
     if _guest_pending and _guest_active:
         _guest_feedback = tr(message)
         _guest_feedback_time = 7.0

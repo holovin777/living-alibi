@@ -28,6 +28,7 @@ func _ready() -> void:
     _streams["bird"] = _make_sound("bird",0.72,false)
     _streams["bell"] = _make_sound("bell",2.8,false)
     _streams["landing"] = _make_sound("landing",0.32,false)
+    _streams["shot"] = _make_sound("shot",0.35,false)
     _streams["door"] = _make_sound("door",0.65,false)
     for kind in ["bicycle","industry","crickets"]:
         _streams[kind] = _make_sound(kind,3.0,true)
@@ -100,6 +101,8 @@ func _make_sound(kind: String, duration: float, looping: bool) -> AudioStreamWAV
                 sample = sin(TAU*(1900.0*burst+2800.0*burst*burst))*shape*0.5
             "bell":
                 sample = (sin(TAU*392.0*t)*exp(-t*1.5)+0.42*sin(TAU*786.0*t)*exp(-t*2.4)+0.25*sin(TAU*1151.0*t)*exp(-t*3.4))*0.55
+            "shot":
+                sample = (white*0.65+low*0.3)*exp(-t*23.0)
             "landing":
                 sample = (sin(TAU*72.0*t)*0.48+low*0.60+white*0.14)*exp(-t*18.0)
             "door":
@@ -163,7 +166,7 @@ func play_alarm() -> void:
     effects.play()
 
 func play_effect(kind: String) -> void:
-    if not enabled or not kind in ["landing","door"]:
+    if not enabled or not kind in ["landing","door","shot"]:
         return
     effects.stream = _streams[kind]
     effects.pitch_scale = _rng.randf_range(0.92,1.08)

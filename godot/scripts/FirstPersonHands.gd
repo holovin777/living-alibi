@@ -7,6 +7,7 @@ var _right: Node3D
 var _props: Dictionary = {}
 var _reach := 0.0
 var _strike := 0.0
+var _shot := 0.0
 
 func _ready() -> void:
     name = "FirstPersonHands"
@@ -14,13 +15,16 @@ func _ready() -> void:
     var skin := Color("#d0a17e")
     _left = _arm(-1.0,sleeve,skin)
     _right = _arm(1.0,sleeve,skin)
-    for id in ["bread","water","grape-juice","baton"]:
+    for id in ["bread","water","grape-juice","baton","sport"]:
         var prop := Node3D.new()
         prop.name = id
         _right.add_child(prop)
         prop.position = Vector3(-0.015,0.065,-0.055)
         if id=="baton":
             _shape(prop,Vector3(0.055,0.42,0.055),Color("#73513c"),Vector3(0,0.15,0),false)
+        elif id=="sport":
+            _shape(prop,Vector3(0.085,0.09,0.25),Color("#464d54"),Vector3(0,0.07,-0.06),false)
+            _shape(prop,Vector3(0.065,0.12,0.075),Color("#343a40"),Vector3(0,0.005,0.015),false)
         elif id=="bread":
             _shape(prop,Vector3(0.11,0.07,0.17),Color("#b17c3f"),Vector3.ZERO,true)
             _shape(prop,Vector3(0.095,0.015,0.13),Color("#e9c791"),Vector3(0,0.036,0),true)
@@ -73,6 +77,9 @@ func reach() -> void:
 func strike() -> void:
     _strike = 0.35
 
+func fire() -> void:
+    _shot = 0.2
+
 func update_pose(delta: float,bob: float,available: bool) -> void:
     visible = enabled and available
     _reach = maxf(0.0,_reach-maxf(delta,0.0))
@@ -85,5 +92,8 @@ func update_pose(delta: float,bob: float,available: bool) -> void:
     var swing := sin(PI*_strike/0.35)
     _right.position += Vector3(-0.12*swing,0.08*swing,-0.35*swing)
     _right.rotation.x -= 0.9*swing
+    _shot = maxf(0.0,_shot-maxf(delta,0.0))
+    _right.position.z += _shot*0.25
+    _right.rotation.x -= _shot*0.9
     if not held_item.is_empty():
         _right.position += Vector3(-0.07,0.075,-0.035)

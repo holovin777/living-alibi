@@ -620,13 +620,23 @@ public final class GameSession implements AutoCloseable {
         if("weapon-buy-sport".equals(action)){
             var copy=town.copy();return apply(copy,2,WeaponLicenseLife.buySport(copy,state));
         }
+        if("weapon-practice".equals(action)){
+            var copy=town.copy();return apply(copy,2,WeaponLicenseLife.practice(copy,state));
+        }
+        if(action!=null&&(action.equals("weapon-fire")||action.startsWith("weapon-fire:"))){
+            String id=action.equals("weapon-fire")?"":action.substring("weapon-fire:".length());
+            var copy=town.copy();var clock=state.copy();
+            var truth=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
+            var result=CombatLife.fire(copy,clock,id,truth,observations);
+            return applyInternal(copy,result.minutes(),result.message(),false,clock,truth,observations);
+        }
         if("combat-buy-baton".equals(action)){
             var copy=town.copy();
             return apply(copy,2,CombatLife.buyBaton(copy,state));
         }
         if(action!=null&&action.startsWith("combat-strike:")){
             String[] parts=action.split(":",3);
-            if(parts.length!=3)throw new IllegalArgumentException("Choose an attack and resident.");
+            if(parts.length!=3||!List.of("fists","baton").contains(parts[1]))throw new IllegalArgumentException("Choose an attack and resident.");
             var copy=town.copy();var clock=state.copy();
             var truth=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
             var result=CombatLife.strike(copy,clock,parts[2],parts[1],truth,observations);
