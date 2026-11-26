@@ -13,6 +13,34 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void centroFoodCountersConserveStockAndMoney() {
+        var town=TownLife.create(new WorldState());
+        RetailLife.ensure(town);
+        var p=town.player;p.place=TownLife.Place.CENTRO;p.money=20;p.hunger=80;
+        int stock=town.retailStock.get("pizza");
+        int funds=town.employerFunds.getOrDefault("shop-assistant",0);
+        assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"pizza",659));
+        RetailLife.buy(town,"pizza",660);
+        assertEquals(13,p.money);
+        assertEquals(stock-1,town.retailStock.get("pizza"));
+        assertEquals(funds+7,town.employerFunds.get("shop-assistant"));
+        assertEquals(1,FoodLife.quantity(p,"pizza",false));
+        RetailLife.consume(p,"pizza");
+        assertEquals(15,p.hunger);
+        assertEquals(0,FoodLife.quantity(p,"pizza",false));
+        RetailLife.buy(town,"gelato",720);
+        RetailLife.consume(p,"gelato");
+        assertEquals(0,p.hunger);
+        assertEquals(10,p.money);
+        assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"bread",720));
+        assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"gelato",1319));
+        town.retailStock.put("gelato",0);
+        assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"gelato",720));
+        p.place=TownLife.Place.MARKET;
+        assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"pizza",720));
+    }
+
+    @Test
     void visitorBakeryAndGroceryRespectDistinctOpeningHours() throws Exception {
         try(var db=new WorldDatabase(directory.resolve("shop-hours.db"))){
             var town=db.loadTown(db.load());
