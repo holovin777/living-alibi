@@ -68,6 +68,21 @@ topic matching and unlimited transcripts are not implemented. The model can
 still misinterpret a remembered statement. A new player life has no inherited
 contact history.
 
+## Selective long-term memory
+
+The same contact row now also holds up to seven durable milestones: the first
+recorded meeting, latest introduction, support, hurt, broken trust, apology,
+and received aid. Social milestones are captured only when the corresponding
+authoritative social-memory date advances; a claim in dialogue alone does
+not create a world event. Ordinary recent turns still roll off at 32.
+Milestones survive that eviction and restarts. Ollama receives compact dated
+milestone excerpts, and "Ti ricordi quando ci siamo conosciuti?" recalls the
+recorded first meeting without a model. Old array-format history remains
+readable; the first meeting cannot be reconstructed for preexisting contacts.
+The first meeting is preserved; other categories keep their latest verified
+example. Same-day repeats, emotional decay, and semantic summaries remain
+future work.
+
 Manual check:
 ```sh
 ollama pull qwen2.5:3b
