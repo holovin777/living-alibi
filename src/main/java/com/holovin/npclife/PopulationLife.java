@@ -83,6 +83,7 @@ final class PopulationLife {
         else if(publicSafety&&working)desired=PoliceLife.assignment(town,c,clock.day,minute);
         else if(journalist&&working)desired=NewspaperLife.assignment(clock.day,minute);
         else if(working)desired=c.workplace;
+        else if(PhoneLife.playerHomeWindow(town,c,clock))desired=HousingLife.HOUSE_DISTRICT;
         else if(PhoneLife.homeVisitWindow(town,c,clock))desired=c.home;
         else if(PhoneLife.meetingWindow(town,c,clock))desired=TownLife.Place.CAFE;
         else if(DojoCommunityLife.scheduled(town,c,clock.day,minute))desired=TownLife.Place.SCHOOL;
