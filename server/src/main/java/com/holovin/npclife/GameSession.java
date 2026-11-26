@@ -99,7 +99,8 @@ public final class GameSession implements AutoCloseable {
             case WORKSHOP -> role.equals("Mechanic")||role.equals("Engineer")||role.equals("Independent fabricator")?"WRENCH":"";
             case FACTORY -> role.equals("Factory machinist")?"WRENCH":"";
             case CLINIC -> role.equals("Pharmacist")?"PHARMACY":role.equals("Doctor")||role.equals("Nurse")?"MEDICAL":"PAPERS";
-            case OFFICE, LIBRARY, SCHOOL -> "PAPERS";
+            case SCHOOL -> role.equals("Teacher")?"TEACHER":"PAPERS";
+            case OFFICE, LIBRARY -> "PAPERS";
             default -> "";
         };
     }
