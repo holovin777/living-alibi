@@ -829,3 +829,7 @@ Portici grocery (08:00–20:00), bakery (07:00–18:00) and cafe (07:00–21:00)
 ### Music and interface
 
 The original procedural instrumental soundtrack plays locally, loops automatically, and can be adjusted or muted under More / settings → Background music. The preference is saved on this computer. Music fades down while a spoken conversation is open. The town HUD, chat, actions and phone share a warm green theme; advanced information remains in a scrollable collapsed section. No external soundtrack or microphone is needed.
+
+### Local police and detectives
+
+Towns configured for at least 24 generated residents are staffed once by recruiting up to two existing adult residents as police officers and one as detective, preserving IDs and population. Officers rotate public patrol districts, detectives visit recent open case scenes and otherwise work in the office. They use the same autonomous travel, sickness, and life simulation as other residents. On-duty clothing distinguishes police and detectives, and text/voice dialogue supports duty, help and public case questions. This is not yet a formal police report or autonomous case resolution system; case truth remains private.

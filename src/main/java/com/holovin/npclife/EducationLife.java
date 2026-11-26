@@ -69,10 +69,11 @@ final class EducationLife {
     }
     static boolean availableRole(TownLife.Town t,TownLife.Citizen c,String job){
         String f=subject(job);
-        int minimum=switch(job){case "Doctor" -> 65;case "Engineer","Programmer","Detective" -> 45;case "Teacher","Nurse","Journalist" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
+        int minimum=switch(job){case "Doctor" -> 65;case "Engineer","Programmer","Detective" -> 45;case "Teacher","Nurse","Journalist","Police officer" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
         if(get(t,c,f)<minimum)return false;
         String diploma=switch(job){case "Engineer" -> "engineering";case "Programmer" -> "programming";case "Doctor" -> "medicine";case "Detective" -> "investigation";default -> null;};
         if(diploma!=null&&get(t,c,"diploma-"+diploma)==0)return false;
+        if(PoliceLife.OFFICER.equals(job)&&c.age<21)return false;
         if("Doctor".equals(job)&&(c.age<25||get(t,c,"social")<35))return false;
         if(NewspaperLife.OCCUPATION.equals(job)&&(t.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY*30||c.money<200))return false;
         if(RetailLife.foodRole(job))return t.employerFunds.getOrDefault(RetailLife.foodAccount(job),0)>=RetailLife.FOOD_WAGE && t.people.values().stream().noneMatch(x->x.alive&&x.employed&&job.equals(x.occupation));

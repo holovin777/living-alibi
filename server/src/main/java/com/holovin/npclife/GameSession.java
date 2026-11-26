@@ -58,6 +58,7 @@ public final class GameSession implements AutoCloseable {
             town.industryStocks.put(POPULATION_SEED_TARGET,population);
             changed=true;
         }
+        changed=PoliceLife.establish(town,state,population)||changed;
         // Old save files might contain a deceased visitor.
         changed=RebirthLife.restoreIdentity(town)||changed;
         if(!town.player.alive&&!RebirthLife.active(town)) {
@@ -90,6 +91,7 @@ public final class GameSession implements AutoCloseable {
     static String workVisual(TownLife.Citizen c){
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
         String role=c.occupation==null?"":c.occupation;
+        if(PoliceLife.officer(c)||PoliceLife.detective(c))return "";
         return switch(c.place){
             case CENTRO -> role.equals("Pizzaiolo")?"PIZZA":role.equals("Gelataio")?"GELATO":"";
             case BAKERY -> role.equals("Baker")?"BREAD":"";
@@ -117,6 +119,8 @@ public final class GameSession implements AutoCloseable {
         if(c.place==TownLife.Place.SCHOOL&&c.age>=6&&c.age<18&&"STUDYING".equals(c.activity))return "BACKPACK";
         if(!"WORKING".equals(c.activity))return "";
         String role=c.occupation==null?"":c.occupation;
+        if(PoliceLife.officer(c))return "POLICE";
+        if(PoliceLife.detective(c))return "DETECTIVE";
         return switch(c.place){
             case CENTRO -> role.equals("Pizzaiolo")?"BAKER_APRON":role.equals("Gelataio")?"CAFE_APRON":"";
             case BAKERY -> role.equals("Baker")?"BAKER_APRON":"";

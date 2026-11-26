@@ -49,6 +49,9 @@ final class NaturalDialogue {
         if(has(n,"i'm here for you","i am here for you","you can count on me","ti sono vicino","sono qui per te","puoi contare su di me",
                 "я поруч","можеш на мене розраховувати"))return "I'm here for you.";
         if(has(n,"i'm sorry","i am sorry","i apologize","mi dispiace","scusami","chiedo scusa","вибач","пробач","перепрошую"))return "I'm sorry.";
+        if(has(n,"i need the police","call the police","report a crime","report a theft","help officer","ho bisogno della polizia","chiamare la polizia","denunciare un furto","voglio fare una denuncia","потрібна поліція","повідомити про крадіжку"))return "@police-help";
+        if(has(n,"are you on patrol","what are you investigating","what is your duty","sei di pattuglia","su cosa indaghi","cosa stai investigando","ти патрулюєш","що розслідуєш"))return "@police-work";
+        if(has(n,"any open cases","any crimes here","open investigations","ci sono indagini","ci sono furti","casi aperti","є відкриті справи","які злочини тут"))return "@police-cases";
         if(has(n,"looking for a job","looking for work","find a job","find work","need a job","any jobs","job openings",
                 "cerco lavoro","sto cercando lavoro","trovare lavoro","hai lavoro per me","c'e lavoro","assumono",
                 "шукаю роботу","знайти роботу","потрібна робота","є робота"))return "@jobs";
@@ -106,6 +109,7 @@ final class NaturalDialogue {
     static String reply(TownLife.Town town,TownLife.Citizen resident,PlayerLife.Contact contact,
                         String intent,int day,int minute) {
         return switch(intent) {
+            case "@police-help","@police-work","@police-cases" -> PoliceLife.assistance(town,resident,intent,day,minute);
             case "@jobs" -> "Look for job notices on your phone or ask at the market. They can tell you whether work is available.";
             case "@workplace" -> resident.employed&&resident.workplace!=null
                     ? "My workplace is "+resident.workplace.label+"." : "I don't have a workplace at the moment.";

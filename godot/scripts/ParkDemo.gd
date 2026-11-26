@@ -3710,6 +3710,25 @@ func _sync_resident_uniform(person: Node3D,kind: String) -> void:
             else:
                 _box(uniform,Vector3(0.24,0.24,0.18),Color("#443a30"),Vector3(0.26,0.91,0.04))
                 _box(uniform,Vector3(0.055,0.14,0.06),Color("#b1b8b9"),Vector3(0.26,1.07,0.04))
+        "POLICE","DETECTIVE":
+            var uniform_color := Color("#233b5b") if kind=="POLICE" else Color("#4a4844")
+            var jacket := _cylinder(uniform,0.27,0.63,uniform_color,Vector3(0,1.12,0))
+            jacket.scale.z=0.79
+            _box(uniform,Vector3(0.045,0.49,0.032),uniform_color.darkened(0.18),Vector3(0,1.13,-0.215))
+            _box(uniform,Vector3(0.068,0.065,0.02),Color("#d9bb77"),Vector3(-0.125,1.3,-0.225))
+            if kind=="POLICE":
+                _cylinder(uniform,0.225,0.105,uniform_color,Vector3(0,1.88,0))
+                _box(uniform,Vector3(0.30,0.025,0.17),Color("#18242f"),Vector3(0,1.84,-0.15))
+                _box(uniform,Vector3(0.05,0.14,0.055),Color("#18242f"),Vector3(0.18,1.3,-0.20))
+                var label := Label3D.new()
+                label.text="POLIZIA"
+                label.font_size=26
+                label.pixel_size=0.003
+                label.position=Vector3(0,1.23,0.216)
+                label.outline_size=0
+                uniform.add_child(label)
+            else:
+                _box(uniform,Vector3(0.20,0.28,0.04),Color("#77573d"),Vector3(0.19,1.0,-0.23))
         "BACKPACK":
             _box(uniform,Vector3(0.37,0.43,0.21),Color("#526c90"),Vector3(0,1.15,0.25))
             _box(uniform,Vector3(0.25,0.18,0.08),Color("#384c6c"),Vector3(0,1.08,0.39))
@@ -4669,7 +4688,8 @@ func _animate_residents(delta: float) -> void:
     for child in _residents_root.get_children():
         var person := child as Node3D
         var activity := str(person.get_meta("activity", ""))
-        var walking := activity in ["WALKING", "WANDERING", "STROLLING", "FREE_TIME", "SHOPPING", "JOB_SEARCH"]
+        var patrol := activity=="WORKING" and str(person.get_meta("outfit_visual",""))=="POLICE"
+        var walking := patrol or activity in ["WALKING", "WANDERING", "STROLLING", "FREE_TIME", "SHOPPING", "JOB_SEARCH"]
         var phase := float(person.get_meta("phase", 0.0))
         var appearance: Dictionary = person.get_meta("appearance",{})
         var pace := float(appearance.get("pace",1.0))*ResidentAppearance.pace_factor(str(person.get_meta("appearance_stage","ADULT")))
@@ -4707,7 +4727,7 @@ func _animate_residents(delta: float) -> void:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
-            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (person.get_meta("companion_target") if companion else (queue_target if queued else anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)))
+            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (person.get_meta("companion_target") if companion else (queue_target if queued else anchor + Vector3(sin(phase)* (3.3 if patrol else 1.1),0,cos(phase)* (2.7 if patrol else 0.8))))
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
