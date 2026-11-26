@@ -6298,6 +6298,10 @@ func _render_barber() -> void:
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _custody_active:return
+    var justice: Dictionary = _last_snapshot.get("player",{}).get("justice",{})
+    if _current_place=="OFFICE" and int(justice.get("fineOutstanding",0))>0 and not _rebirth_active():
+        _action_choices.add_child(_button(tr("Pay outstanding fine"),_pay_justice_fine))
     if _near_barber() and not _rebirth_active():
         _render_barber()
         return
@@ -7944,6 +7948,10 @@ func _sync_custody(justice: Dictionary) -> void:
     _camera.global_position=Vector3(0,121.65,-1.9)
     _camera.global_rotation=Vector3(0,PI,0)
 
+func _pay_justice_fine() -> void:
+    if not _custody_active and _current_place=="OFFICE" and _near_kiosk() and not _api.is_busy():
+        _api.garden_action("justice-pay-fine")
+
 func _wait_custody(minutes: int) -> void:
     if _custody_active and _connected and not _api.is_busy():
         _api.wait_for(minutes)
@@ -7971,6 +7979,11 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
         str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
     ]
     _needs.text += tr(" | Hygiene %s") % str(player.get("hygiene",100))
+    var justice: Dictionary = player.get("justice",{})
+    if str(justice.get("status","NONE"))!="NONE":
+        _needs.text += "\n"+tr("Convictions: %s · Fine outstanding: %s EUR") % [justice.get("convictions",0),justice.get("fineOutstanding",0)]
+        if str(justice.get("status",""))=="REPORTED":
+            _needs.text+=" · "+tr("Assault reported to police")
     var utilities: Dictionary = snapshot.get("services", {})
     var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
     var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
