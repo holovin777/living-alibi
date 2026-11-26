@@ -3244,11 +3244,11 @@ func _build_centro() -> void:
         _cylinder(piazza,0.65,0.09,Color(0.45,0.25,0.14),at+Vector3(0,0.92,0))
         _cylinder(piazza,1.1,0.1,Color(0.65,0.19,0.14),at+Vector3(0,2.15,0))
         _cylinder(piazza,0.035,1.2,Color(0.35,0.27,0.2),at+Vector3(0,1.55,0))
-    _sign(piazza,"Caffè Ducale",Vector3(-11,3.55,-9))
-    _sign(piazza,"Botteghe",Vector3(11,3.55,-9))
+    _physical_sign(piazza,"Caffè Ducale",Vector3(-11.25,3.6,-9),PI*0.5,2.4)
+    _physical_sign(piazza,"Botteghe",Vector3(11.25,3.6,-9),-PI*0.5,2.0)
     _box(piazza,Vector3(0.10,2.0,0.10),Color("#6a6c67"),Vector3(4,1,-12))
     _physical_sign(piazza,"Piazza Ducale",Vector3(4,2.05,-12),0,2.5)
-    _sign(piazza,"Bacheca lavoro · F",KIOSK_POSITION+Vector3(0,2.4,0))
+    _physical_sign(piazza,"Bacheca lavoro · F",KIOSK_POSITION+Vector3(0,1.04,-0.85),PI,2.1)
 
 func _centro_paving(parent: Node3D) -> void:
     var slab := PlaneMesh.new()
@@ -5057,6 +5057,24 @@ func _building(_title: String, wall_color: Color) -> void:
     _box(_scenery,Vector3(11.0,0.18,0.14),trim,Vector3(-7,2.42,3.9))
 
 func _create_gate_and_kiosk() -> void:
+    # In historic districts use restrained physical wayfinding, not a bright game portal.
+    if _scenery.name in ["PublicScene_CENTRO","PublicScene_PORTICI"]:
+        var iron := Color("#56574f")
+        for offset in [-1.6,1.6]:
+            var at := GATE_POSITION+Vector3(offset,0,0)
+            _add_obstacle(at,Vector2(0.4,0.4))
+            _cylinder(_scenery,0.10,1.05,iron,at+Vector3(0,0.525,0))
+            _sphere(_scenery,0.12,iron,at+Vector3(0,1.08,0))
+        _box(_scenery,Vector3(0.09,2.35,0.09),iron,GATE_POSITION+Vector3(1.6,1.175,0))
+        _physical_sign(_scenery,tr("TRAVEL · E"),GATE_POSITION+Vector3(1.6,2.4,0),0,1.7)
+        _physical_sign(_scenery,tr("TRAVEL · E"),GATE_POSITION+Vector3(1.6,2.4,-0.10),PI,1.7)
+        if _scenery.name=="PublicScene_CENTRO":
+            _add_obstacle(KIOSK_POSITION,Vector2(2.4,1.6))
+            _box(_scenery,Vector3(2.4,1.4,1.6),Color("#727c69"),KIOSK_POSITION+Vector3(0,0.7,0),"wood")
+            _box(_scenery,Vector3(2.5,0.14,1.7),Color("#b3a38a"),KIOSK_POSITION+Vector3(0,1.43,0))
+            _historic_roof(_scenery,KIOSK_POSITION+Vector3(0,1.54,0),2.65,1.85,0.35)
+            _physical_sign(_scenery,tr("SERVICES · F"),KIOSK_POSITION+Vector3(0,1.04,0.85),0,1.9)
+        return
     # A yellow gate is a map transition — actual travel is authorized by Java.
     for offset in [-1.6, 1.6]:
         _add_obstacle(GATE_POSITION + Vector3(offset, 0.0, 0.0), Vector2(0.4, 0.4))
