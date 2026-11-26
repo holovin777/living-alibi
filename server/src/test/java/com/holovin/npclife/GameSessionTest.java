@@ -40,9 +40,25 @@ class GameSessionTest {
             assertEquals(20,FamilyBudgetLife.savings(town,first)+FamilyBudgetLife.savings(town,second));
             assertEquals("FAMILY_DINNER",HomeRoutineLife.activity(town,first,36,1080));
             assertEquals(1,HouseholdLife.view(town,first,36,1080).dinners());
+            assertTrue(HouseholdLife.view(town,first,36,1080).visibleResidents().isEmpty());
+            var visible=HouseholdLife.view(town,first,36,1080,true).visibleResidents();
+            assertEquals(1,visible.size());
+            assertEquals(second.id,visible.getFirst().id());
+            assertEquals("FAMILY_DINNER",visible.getFirst().activity());
+            second.travelRemaining=1;
+            assertTrue(HouseholdLife.view(town,first,36,1080,true).visibleResidents().isEmpty());
+            second.travelRemaining=0;
             state.minute=1110;HouseholdLife.tick(town,state);
             assertEquals(6,first.food+second.food);
             assertFalse(HouseholdLife.view(town,first,36,1110).dinnerNow());
+            second.age=4;
+            assertEquals("PLAYING",HomeRoutineLife.activity(town,second,36,1110));
+            second.age=10;
+            boolean homework=false;
+            for(int minute=900;minute<1020;minute+=30)
+                homework|=HomeRoutineLife.activity(town,second,36,minute).equals("HOMEWORK");
+            assertTrue(homework);
+            second.age=30;
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
         try(var db=new WorldDatabase(file)){
