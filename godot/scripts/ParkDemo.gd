@@ -6202,6 +6202,8 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
         _needs.text += tr(" · Town population: %s") % (int(demography.get("alive",0))+2)
 
 func _on_world_updated(snapshot: Dictionary) -> void:
+    if "--packaged-smoke" in OS.get_cmdline_user_args() and snapshot.has("player"):
+        print("PACKAGED_WORLD_CONNECTED")
     var clock_update := _clock_pending
     var walking_transition := _home_transition or not _road_pending.is_empty()
     _home_transition=false
