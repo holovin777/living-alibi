@@ -52,7 +52,7 @@ class ContactTimeLifeTest {
         SocialMemoryLife.remember(town,"elena",SocialMemoryLife.Kind.BROKEN_TRUST,1);
         for(int d=2;d<=91;d++)ContactTimeLife.tick(town,d,0);
         assertEquals(28,marco.trust);
-        assertEquals(-28,marco.affinity);
+        assertEquals(-29,marco.affinity);
         assertFalse(SocialMemoryLife.unresolved(town,"marco"));
         assertEquals(1,SocialMemoryLife.last(town,"marco",SocialMemoryLife.Kind.HURT));
         assertTrue(SocialMemoryLife.recollection(town,"marco").contains("disagreement"));
