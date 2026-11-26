@@ -585,7 +585,7 @@ final class RebirthLife {
         if(!linkedAdult(t,c)||!awakePresent(c)||atHome(c))return null;
         boolean bakery=c.place==TownLife.Place.BAKERY;
         if(!bakery&&c.place!=TownLife.Place.PORTICI)return null;
-        boolean open=minute>=(bakery?420:480)&&minute+5<=(bakery?1080:1200)&&!EmploymentLife.sick(c,day);
+        boolean open=RetailLife.open(c.place,minute)&&minute+5<=RetailLife.closes(c.place)&&!EmploymentLife.sick(c,day);
         int capacity=24;
         var items=(bakery?List.of("bread","water"):GROCERY_ITEMS).stream().map(id->{
             var product=RetailLife.product(id);

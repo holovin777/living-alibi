@@ -13,6 +13,25 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void visitorBakeryAndGroceryRespectDistinctOpeningHours() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("shop-hours.db"))){
+            var town=db.loadTown(db.load());
+            var p=town.player;
+            p.place=TownLife.Place.BAKERY;p.travelRemaining=0;p.money=50;
+            RetailLife.ensure(town);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"bread",419));
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"bread",1079));
+            RetailLife.buy(town,"bread",420);
+            assertEquals(47,p.money);
+            p.place=TownLife.Place.PORTICI;
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"bread",479));
+            RetailLife.buy(town,"bread",480);
+            assertEquals(44,p.money);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"bread",1200));
+        }
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";

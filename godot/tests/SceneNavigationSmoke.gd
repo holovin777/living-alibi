@@ -269,7 +269,9 @@ func _exercise() -> void:
             return
     world._on_world_updated(_world("PARK","Park"))
 
-    world._on_world_updated(_world("PORTICI","Via dei Portici"))
+    var open_portici := _world("PORTICI","Via dei Portici")
+    open_portici["minute"]=600
+    world._on_world_updated(open_portici)
     if not _check(world._scenery.has_node("ViaDeiPortici/BottegaAlimentare")
             and world._road_links.size() == 4
             and world._road_destination(Vector3(0,0,-23.9),23.8) == "CENTRO",
@@ -279,6 +281,23 @@ func _exercise() -> void:
     if not _check(entered.x > 6.8 and not world._can_stand(Vector3(4.4,0,3.2),world.WALKER_RADIUS),
             "walk through open grocery door, but not through its wall"):
         return
+    world._avatar.position=Vector3(3,0,5.3)
+    open_portici["minute"]=1200
+    world._on_world_updated(open_portici)
+    world._tick_public_door(1.0)
+    var blocked: Vector3=world._move_on_ground(Vector3(3,0,5.3),Vector3(3,0,0),world.WALKER_RADIUS)
+    if not _check(blocked.x<4.4 and not world._door_open_hours(world._public_door()),"closed shop door blocks entry"):
+        return
+    world._avatar.position=Vector3(6,0,5.3)
+    world._tick_public_door(1.0)
+    var exit: Vector3=world._move_on_ground(world._avatar.position,Vector3(-3,0,0),world.WALKER_RADIUS)
+    if not _check(exit.x<4.0,"after-hours customer can safely leave"):
+        return
+    world._avatar.position=exit
+    world._tick_public_door(1.0)
+    open_portici["minute"]=600
+    world._on_world_updated(open_portici)
+    world._tick_public_door(1.0)
     world._avatar.position=world.GROCERY_COUNTER
     if not _check(world._can_stand(world.GROCERY_COUNTER,world.WALKER_RADIUS) and world._near_public_counter() and world._near_kiosk(),"visitor reaches unobstructed grocery checkout"):
         return
@@ -1254,6 +1273,7 @@ func _exercise() -> void:
         return
 
     var shopping := _world("PORTICI","Via dei Portici")
+    shopping["minute"]=600
     shopping["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","grocery":{"open":true,"food":2,"water":3,"capacity":24,"items":[{"id":"bread","label":"Bread","price":3,"stock":2,"available":true},{"id":"water","label":"Bottled water","price":1,"stock":0,"available":false}]}}
     world._on_world_updated(shopping)
     if not _check(world._scenery.has_node("ViaDeiPortici/BottegaAlimentare/GroceryCounter") and not world._near_grocery_counter(),
