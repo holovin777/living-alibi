@@ -32,6 +32,26 @@ class GameSessionTest {
     }
 
     @Test
+    void peerEncountersRequireRecentConversationAndSharedVisibleSpace() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("peer-visual.db"))){
+            var town=db.loadTown(db.load());
+            var a=town.get("marco");var b=town.get("elena");
+            a.place=TownLife.Place.PARK;b.place=TownLife.Place.PARK;
+            a.activity="RELAXING";b.activity="FREE_TIME";a.travelRemaining=0;b.travelRemaining=0;
+            var r=town.relationship;r.conversations=1;r.lastInteractionTick=100;r.affinity=75;r.trust=65;
+            var visible=java.util.List.of(a,b);
+            assertEquals(1,GameSession.peerEncounters(town,visible,105).size());
+            assertEquals("WARM",GameSession.peerEncounters(town,visible,105).getFirst().tone());
+            assertTrue(GameSession.peerEncounters(town,visible,116).isEmpty());
+            assertTrue(GameSession.peerEncounters(town,java.util.List.of(a),105).isEmpty());
+            b.activity="WORKING";
+            assertTrue(GameSession.peerEncounters(town,visible,105).isEmpty());
+            b.activity="FREE_TIME";b.place=TownLife.Place.CAFE;
+            assertTrue(GameSession.peerEncounters(town,visible,105).isEmpty());
+        }
+    }
+
+    @Test
     void visibleLifeStageTracksAgeWithoutRevealingExactBirthday() {
         var resident=new TownLife.Citizen("appearance","Resident","Child",TownLife.Place.PARK);
         int[] ages={0,5,6,11,12,17,18,44,45,66,67,90};
