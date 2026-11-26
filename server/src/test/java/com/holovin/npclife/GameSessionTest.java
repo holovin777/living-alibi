@@ -13,17 +13,40 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void foodWorkerPaysFromShopAndProducesFiniteStock(){
+        var clock=new WorldState();clock.minute=720;
+        var town=TownLife.create(clock);
+        CareerLife.ensureEmployers(town);
+        var c=new TownLife.Citizen("cook","Cook","Pizzaiolo",TownLife.Place.CENTRO);
+        c.occupation="Pizzaiolo";c.employed=true;c.money=10;c.travelRemaining=0;c.activity="WORKING";
+        town.people.put(c.id,c);
+        town.retailStock.put("pizza",13);
+        town.employerFunds.put("pizzeria",20);
+        RetailLife.foodShift(town,c,clock,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+        assertEquals(18,c.money);
+        assertEquals(15,town.retailStock.get("pizza"));
+        assertEquals(8,town.employerFunds.get("pizzeria"));
+        RetailLife.foodShift(town,c,clock,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+        assertEquals(26,c.money);
+        assertEquals(15,town.retailStock.get("pizza"));
+        assertEquals(0,town.employerFunds.get("pizzeria"));
+        RetailLife.foodShift(town,c,clock,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+        assertEquals(26,c.money);
+        assertEquals("PIZZA",GameSession.workVisual(c));
+    }
+
+    @Test
     void centroFoodCountersConserveStockAndMoney() {
         var town=TownLife.create(new WorldState());
         RetailLife.ensure(town);
         var p=town.player;p.place=TownLife.Place.CENTRO;p.money=20;p.hunger=80;
         int stock=town.retailStock.get("pizza");
-        int funds=town.employerFunds.getOrDefault("shop-assistant",0);
+        int funds=town.employerFunds.getOrDefault("pizzeria",0);
         assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"pizza",659));
         RetailLife.buy(town,"pizza",660);
         assertEquals(13,p.money);
         assertEquals(stock-1,town.retailStock.get("pizza"));
-        assertEquals(funds+7,town.employerFunds.get("shop-assistant"));
+        assertEquals(funds+7,town.employerFunds.get("pizzeria"));
         assertEquals(1,FoodLife.quantity(p,"pizza",false));
         RetailLife.consume(p,"pizza");
         assertEquals(15,p.hunger);
