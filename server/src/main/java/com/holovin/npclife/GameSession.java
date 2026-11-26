@@ -82,7 +82,7 @@ public final class GameSession implements AutoCloseable {
                                 String phase,int condition,int completedDay,
                                 String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
-    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual) { }
     // Observable equipment, not a disclosure of a stranger's name or private employment record.
     static String workVisual(TownLife.Citizen c){
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
@@ -95,6 +95,27 @@ public final class GameSession implements AutoCloseable {
             case WORKSHOP -> role.equals("Mechanic")||role.equals("Engineer")||role.equals("Independent fabricator")?"WRENCH":"";
             case FACTORY -> role.equals("Factory machinist")?"WRENCH":"";
             case OFFICE, LIBRARY, SCHOOL, CLINIC -> "PAPERS";
+            default -> "";
+        };
+    }
+    // Visible clothing only; do not expose a stranger's age or occupation string.
+    static String outfitVisual(TownLife.Citizen c){
+        if(!c.alive||c.travelRemaining>0)return "";
+        if(c.place==TownLife.Place.SCHOOL&&c.age>=6&&c.age<18&&"STUDYING".equals(c.activity))return "BACKPACK";
+        if(!"WORKING".equals(c.activity))return "";
+        String role=c.occupation==null?"":c.occupation;
+        return switch(c.place){
+            case BAKERY -> role.equals("Baker")?"BAKER_APRON":"";
+            case CAFE -> role.equals("Barista")?"CAFE_APRON":"";
+            case CLINIC -> role.equals("Doctor")?"DOCTOR_COAT":role.equals("Nurse")?"SCRUBS":"";
+            case QUARRY -> role.equals("Miner")?"HIGH_VIS":"";
+            case FACTORY -> role.equals("Factory machinist")?"HIGH_VIS":"";
+            case WORKSHOP -> switch(role){
+                case "Engineer","Electrician","Technician","Mechanic","Independent fabricator" -> "TECHNICIAN";
+                case "Construction worker","Builder" -> "HIGH_VIS";
+                default -> "";
+            };
+            case LOGISTICS_DEPOT -> role.equals("Transport driver")?"HIGH_VIS":"";
             default -> "";
         };
     }
@@ -139,7 +160,7 @@ public final class GameSession implements AutoCloseable {
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
                             contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c));
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
