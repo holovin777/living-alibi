@@ -28,7 +28,7 @@ final class PhoneLife {
         t.industryStocks.put(key(t,id,field),value);
     }
     static boolean available(TownLife.Town t){
-        return t.player.alive&&!RebirthLife.active(t);
+        return t.player.alive&&!RebirthLife.active(t)&&!JusticeLife.confined(t);
     }
     static boolean shareNumber(TownLife.Town t,TownLife.Citizen c){
         var contact=t.player.contacts.get(c.id);
