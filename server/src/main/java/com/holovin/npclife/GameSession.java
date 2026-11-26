@@ -613,9 +613,15 @@ public final class GameSession implements AutoCloseable {
             };
             return apply(copy,visit?5:1,reply);
         }
+        if(action!=null&&action.startsWith("host-cook:")){
+            var copy=town.copy();
+            String id=action.substring("host-cook:".length());
+            String result=PhoneLife.cookTogether(copy,id,state.day,state.minute);
+            return apply(copy,25,result);
+        }
         if(action!=null&&action.startsWith("phone-out:")){
             String[] parts=action.split(":",3);
-            if(parts.length!=3||!java.util.Set.of("dial","hangup","invite-coffee","ask-home-visit").contains(parts[1]))throw new IllegalArgumentException("Choose an outgoing call action.");
+            if(parts.length!=3||!java.util.Set.of("dial","hangup","invite-coffee","ask-home-visit","invite-my-home").contains(parts[1]))throw new IllegalArgumentException("Choose an outgoing call action.");
             var copy=town.copy();
             return apply(copy,1,PhoneLife.outgoing(copy,parts[2],parts[1],state.day,state.minute));
         }
@@ -855,7 +861,7 @@ public final class GameSession implements AutoCloseable {
     private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction) throws SQLException {
         if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Choose a family or use childhood actions first.");
         var candidateState=state.copy();
-        if("You shared dinner.".equals(message)){
+        if("You shared dinner.".equals(message)||"You cooked and ate together.".equals(message)){
             var host=candidateTown.get("marco");
             candidateState.food=host.food;candidateState.water=host.water;
             candidateState.hunger=host.hunger;candidateState.thirst=host.thirst;
