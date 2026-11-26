@@ -1086,6 +1086,20 @@ func _exercise() -> void:
     if not _check(_has_button(world._action_choices, "Apply: quarry miner"),
             "quarry offers a real paid mining career"):
         return
+    var crew := _world("QUARRY","Quarry")
+    crew["residents"]=[{"id":"miner-a","activity":"WORKING","workVisual":"PICK"},{"id":"miner-b","activity":"WORKING","workVisual":"PICK"}]
+    world._on_world_updated(crew)
+    var worker_a := world._residents_root.get_node("Resident_miner-a") as Node3D
+    var worker_b := world._residents_root.get_node("Resident_miner-b") as Node3D
+    if not _check(worker_a.position.distance_to(worker_b.position)>1.0 and absf(worker_a.position.z-4.7)<0.01 and absf(worker_b.position.z-4.7)<0.01 and world._can_stand(worker_a.position,world.WALKER_RADIUS),"miners work at different ore heaps, not random street points"):
+        return
+    if not _check(worker_a.has_node("ArmRight/WorkProp") and worker_a.get_node("ArmRight/WorkProp").get_meta("kind")=="PICK" and not worker_a.get_node("ResidentName").visible,"working miner visibly carries a pick without a name label"):
+        return
+    crew["residents"][0]["activity"]="FREE_TIME"
+    crew["residents"][0]["workVisual"]=""
+    world._on_world_updated(crew)
+    if not _check(not worker_a.has_node("ArmRight/WorkProp"),"work tool is removed when shift ends"):
+        return
     var employed_miner = _world("QUARRY", "Quarry")
     employed_miner["player"]["jobId"] = "miner"
     world._on_world_updated(employed_miner)

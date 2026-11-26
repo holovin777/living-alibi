@@ -13,6 +13,23 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void visibleWorkEquipmentMatchesActualActivityAndLocation() {
+        var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
+        miner.activity="WORKING";
+        assertEquals("PICK",GameSession.workVisual(miner));
+        miner.occupation="Transport driver";
+        assertEquals("",GameSession.workVisual(miner));
+        miner.occupation="Miner";
+        miner.activity="FREE_TIME";
+        assertEquals("",GameSession.workVisual(miner));
+        miner.activity="WORKING";miner.place=TownLife.Place.PARK;
+        assertEquals("",GameSession.workVisual(miner));
+        miner.place=TownLife.Place.QUARRY;miner.travelRemaining=3;
+        assertEquals("",GameSession.workVisual(miner));
+    }
+
+
+    @Test
     void autonomousFamilyCohabitsAndSharesDinnerWithoutCreatingMoney() throws Exception {
         Path file=directory.resolve("autonomous-household.db");
         String id;
