@@ -3204,6 +3204,7 @@ func _render_residents() -> void:
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
+        _sync_shopping_bag(person,bool(resident.get("shoppingBag",false)))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
         _sync_office_employee(person,id)
@@ -3227,6 +3228,23 @@ func _render_residents() -> void:
     _sync_office_joker()
 
 # Presentation follows the server's current visible work equipment, never a guessed identity.
+func _sync_shopping_bag(person: Node3D, carrying: bool) -> void:
+    var hand := person.get_node("ArmLeft") as Node3D
+    var bag := hand.get_node_or_null("ShoppingBag") as Node3D
+    if bag!=null:
+        bag.visible=carrying
+        return
+    if not carrying:return
+    bag=Node3D.new()
+    bag.name="ShoppingBag"
+    bag.position=Vector3(0,-0.58,0)
+    hand.add_child(bag)
+    var paper := Color("#c29a6e")
+    _box(bag,Vector3(0.26,0.31,0.16),paper,Vector3(0,-0.12,0))
+    for x in [-0.075,0.075]:
+        _box(bag,Vector3(0.02,0.12,0.02),Color("#80664a"),Vector3(x,0.085,0))
+    _box(bag,Vector3(0.17,0.02,0.02),Color("#80664a"),Vector3(0,0.14,0))
+
 func _sync_work_prop(person: Node3D, kind: String) -> void:
     var hand := person.get_node("ArmRight") as Node3D
     var old := hand.get_node_or_null("WorkProp") as Node3D

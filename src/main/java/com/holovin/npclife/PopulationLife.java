@@ -73,6 +73,7 @@ final class PopulationLife {
         else if(working)desired=c.workplace;
         else if(PhoneLife.meetingWindow(town,c,clock))desired=TownLife.Place.CAFE;
         else if(DojoCommunityLife.scheduled(town,c,clock.day,minute))desired=TownLife.Place.SCHOOL;
+        else if(LeisureShoppingLife.wantsShop(town,c,clock))desired=TownLife.Place.PORTICI;
         else if(minute>=960 && minute<1200) {
             // The same resident favors a location consistently for a given day.
             // Unlit parks lose visitors at dusk; they choose a covered cafe.
@@ -122,11 +123,14 @@ final class PopulationLife {
             c.water--;c.thirst=clamp(c.thirst-52);
             TownLife.publish(town,clock,c.id,c.place,c.name+" drank water.",events,observations);
         }
+        boolean leisureShop=desired==TownLife.Place.PORTICI&&manual==null&&!working&&!sleeping&&!sick&&LeisureShoppingLife.wantsShop(town,c,clock);
+        if(leisureShop)LeisureShoppingLife.purchase(town,c,clock);
         if(sleeping)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
         else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":c.place==c.home?"AT_HOME":"FREE_TIME";
         else if(RebirthLife.outsideHome(town,c))c.activity="OUTSIDE_HOME";
         else if(RebirthLife.stayingHome(town,c)&&c.place==c.home)c.activity="AT_HOME";
+        else if(leisureShop)c.activity="SHOPPING";
         else if(retired)c.activity="RETIRED";
         else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
         else if(freightRun)c.activity="WORKING";
@@ -144,6 +148,7 @@ final class PopulationLife {
                 }
             }
         } else c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"FREE_TIME";
+        LeisureShoppingLife.home(town,c,clock);
         if(minute%60==0 && (c.hunger>93||c.thirst>93))c.health=clamp(c.health-2);
         if(minute%180==0 && c.hunger<65 && c.thirst<60 && c.fatigue<85)c.health=clamp(c.health+1);
         if(c.health==0){

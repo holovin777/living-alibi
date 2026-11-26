@@ -52,6 +52,22 @@ final class WardrobeLife {
             for(var o:OUTFITS)t.industryStocks.put("clothes:stock:"+o.id(),Math.min(SHOP_CAPACITY,stock(t,o)+1));
             t.industryStocks.put("clothes:delivery-day",clock.day);
         }
+        if(clock.minute==360){
+            int temp=WeatherLife.at(clock.day,720).temperatureC();
+            int ideal=temp<5?3:temp<13?2:temp<24?1:0;
+            for(var resident:t.people.values()){
+                if(!resident.alive||resident.generationIndex<=0||resident.age<18||
+                    RebirthLife.linkedAdult(t,resident)||!HomeRoutineLife.atHome(resident)||
+                    get(t,resident,"last-day")>=clock.day)continue;
+                set(t,resident,"last-day",clock.day);
+                var previous=worn(t,resident);
+                set(t,resident,previous.id()+"-wear",Math.min(100,get(t,resident,previous.id()+"-wear")+1));
+                var best=OUTFITS.stream().filter(o->owns(t,resident,o))
+                    .min(java.util.Comparator.comparingInt(o->Math.abs(o.warmth()-ideal)*100+(100-condition(t,resident,o))))
+                    .orElse(OUTFITS.getFirst());
+                set(t,resident,"worn",best.code());
+            }
+        }
         var c=RebirthLife.child(t);
         if(!RebirthLife.linkedAdult(t,c))return;
         if(clock.minute==360&&get(t,c,"last-day")<clock.day){
