@@ -94,7 +94,7 @@ final class InvestigationLife {
                 for(var victim:people) {
                     if(victim==offender || victim.money<30 || PropertyLife.carriedWallet(town,victim)==null ||
                             recentlyVictimized(town,clock,victim.id,14))continue;
-                    var assessment=MotiveLife.assess(town,clock,offender,victim);
+                    var assessment=MafiaLife.assess(town,offender,MotiveLife.assess(town,clock,offender,victim));
                     if(assessment.strength()<59)continue;
                     int jitter=(int)Math.floorMod(mix(now^offender.id.hashCode()^
                             Long.rotateLeft(victim.id.hashCode(),17)),13);
@@ -166,6 +166,7 @@ final class InvestigationLife {
         if(victim.id.equals("marco"))clock.money-=amount;
         if(offender.id.equals("marco"))clock.money+=amount;
         town.cases.put(c.id,c);
+        MafiaLife.noteCase(town,c);
         // Public report never includes offender, motive, or protected profiles.
         TownLife.publish(town,clock,offender.id,place,
                 "A wallet belonging to "+victim.name+" disappeared at "+place.label+".",

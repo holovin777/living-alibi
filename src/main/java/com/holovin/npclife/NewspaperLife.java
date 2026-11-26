@@ -62,7 +62,7 @@ final class NewspaperLife {
                 &&"WORKING".equals(c.activity)&&!EmploymentLife.sick(c,day)).findFirst().orElse(null);
         if(reporter==null||cash<REPORTER_PAY)return;
         StringBuilder text=new StringBuilder("Il Giornale · Day ").append(day);
-        t.archive.values().stream().filter(e->e.day()==day&&List.of("Business","Construction","Municipality","Yearbook").contains(e.category()))
+        t.archive.values().stream().filter(e->e.day()==day&&List.of("Public safety","Business","Construction","Municipality","Yearbook").contains(e.category()))
                 .limit(3).forEach(e->text.append("\nOfficial notice: ").append(e.text()));
         var b=claim(t,reporter,day,minute);
         if(b!=null)text.append("\n").append(attributed(reporter,b));
