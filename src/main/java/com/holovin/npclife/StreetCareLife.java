@@ -7,7 +7,8 @@ final class StreetCareLife {
     private StreetCareLife(){}
     static final String CLEANER="Street cleaner", GARDENER="Gardener";
     static final int WAGE=8;
-    private static final String ACCOUNT="city-maintenance";
+    static final String ACCOUNT="street-care-payroll";
+    static final int CORE_RESERVE=500, WEEKLY_GRANT=80;
     private static int get(TownLife.Town t,String key,int fallback){
         return t.industryStocks.getOrDefault("street-care:"+key,fallback);
     }
@@ -26,6 +27,13 @@ final class StreetCareLife {
     static void tick(TownLife.Town t,WorldState clock){
         if(clock.minute!=360||get(t,"last-day",0)>=clock.day)return;
         put(t,"last-day",clock.day);
+        if((clock.day-1)%7==0){
+            int amount=Math.min(WEEKLY_GRANT,Math.max(0,t.employerFunds.getOrDefault(MunicipalLife.CITY,0)-CORE_RESERVE));
+            if(amount>0){
+                t.employerFunds.merge(MunicipalLife.CITY,-amount,Integer::sum);
+                t.employerFunds.merge(ACCOUNT,amount,Math::addExact);
+            }
+        }
         put(t,"litter",Math.min(100,get(t,"litter",24)+12));
         put(t,"garden",Math.min(100,get(t,"garden",24)+8));
     }
