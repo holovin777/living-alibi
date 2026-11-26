@@ -21,6 +21,7 @@ var _pending_route := ""
 var dialogue_language := ""
 var dialogue_locale := ""
 var dialogue_rendered := false
+var dialogue_farewell := ""
 
 func _ready() -> void:
     http_request = HTTPRequest.new()
@@ -210,6 +211,7 @@ func _on_request_completed(
         dialogue_language = str(response.get("dialogueLanguage","")) if route=="/actions/speak" else ""
         dialogue_locale = str(response.get("dialogueLocale","")) if route=="/actions/speak" else ""
         dialogue_rendered = bool(response.get("dialogueRendered",false)) if route=="/actions/speak" else false
+        dialogue_farewell = str(response.get("dialogueFarewell")) if route=="/actions/speak" and response.get("dialogueFarewell")!=null else ""
         action_feedback.emit(str(response.get("message", "Action completed.")))
     var snapshot = response.get("world", response)
     if typeof(snapshot) != TYPE_DICTIONARY:
