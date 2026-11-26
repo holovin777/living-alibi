@@ -519,7 +519,7 @@ final class RebirthLife {
         c.money-=10;p.money=wallet;
         return "Transferred EUR 10 to "+p.name+".";
     }
-    record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations,String bond){}
+    record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations,String bond,int sharedChildhoodDays,int firstChildhoodDay){}
     private static String bond(boolean family,SocialLife.Relationship r){
         if(family)return "Family";
         if(r==null)return "Stranger";
