@@ -11,6 +11,7 @@ usage() {
 Living Alibi — local Godot preview
 Usage:
   bash play.sh                 Build Java + Spring, start server, open Godot.
+  bash play.sh --no-voice      Skip optional voice setup.
   bash play.sh --check         Check required installed programs.
   bash play.sh --server-only   Build and run only the local Spring server.
   bash play.sh --help          Show this help.
@@ -22,7 +23,7 @@ EOF
 }
 
 case "$MODE" in
-    play|--check|--server-only|--help) ;;
+    play|--no-voice|--check|--server-only|--help) ;;
     *) usage >&2; echo "Unknown option: $MODE" >&2; exit 2 ;;
 esac
 if [[ $# -gt 1 ]]; then
@@ -72,6 +73,10 @@ if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/world >/dev/null 2>&1; th
     echo "A Living Alibi server already answers on port 8080." >&2
     echo "Close the other server before launching another instance." >&2
     exit 1
+fi
+
+if [[ "$MODE" == play && -z "${LIVING_ALIBI_SKIP_VOICE_SETUP:-}" ]]; then
+    source "$ROOT/setup-voice.sh" || echo "Optional voice setup skipped." >&2
 fi
 
 echo "Building the Java world engine..."
