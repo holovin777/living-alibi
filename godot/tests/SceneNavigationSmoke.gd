@@ -898,6 +898,35 @@ func _exercise() -> void:
             and marco.has_node("LegLeft") and marco.has_node("ArmRight"),
             "residents have stable distinct visual profiles and articulated limbs"):
         return
+    world._sync_resident_uniform(marco,"BAKER_APRON")
+    if not _check(marco.has_node("Uniform") and marco.get_node("Uniform").get_child_count()>2,
+            "visible work outfit has apron geometry"):
+        return
+    world._sync_resident_uniform(marco,"")
+    if not _check(not marco.has_node("Uniform"),"uniform disappears after work"):
+        return
+    var previous_weather: Dictionary=world._last_snapshot.get("weather",{}).duplicate()
+    world._last_snapshot["weather"]={"temperatureC":3,"raining":true}
+    var rain_resident: Node3D=marco
+    if absi(str(rain_resident.get_meta("resident_id")).hash())%3==0:
+        rain_resident=elena
+    var old_id: String=str(rain_resident.get_meta("resident_id"))
+    var umbrella_id := "umbrella-test"
+    while absi(umbrella_id.hash())%3==0:umbrella_id+="x"
+    rain_resident.set_meta("resident_id",umbrella_id)
+    if not _check(world._sync_resident_weather(rain_resident,false,false)
+            and rain_resident.get_node("Umbrella").visible
+            and rain_resident.get_node("WinterClothes").visible,
+            "cold rain displays winter clothes and an umbrella outdoors"):
+        return
+    world._last_snapshot["weather"]={"temperatureC":24,"raining":false}
+    world._sync_resident_weather(rain_resident,false,false)
+    if not _check(not rain_resident.get_node("Umbrella").visible
+            and not rain_resident.get_node("WinterClothes").visible,
+            "warm dry weather hides rain and winter accessories"):
+        return
+    rain_resident.set_meta("resident_id",old_id)
+    world._last_snapshot["weather"]=previous_weather
     var start_position: Vector3 = marco.position
     world._animate_residents(0.5)
     if not _check(marco.position.distance_to(start_position) > 0.01,
