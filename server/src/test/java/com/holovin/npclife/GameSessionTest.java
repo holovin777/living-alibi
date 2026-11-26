@@ -13,6 +13,76 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void linkedAdultCanSpeakThroughApiWithPersistentContactMemory() throws Exception {
+        Path file=directory.resolve("linked-dialogue.db");
+        String selfId,neighborId,farId;
+        try(var db=new WorldDatabase(file)){
+            var clock=db.load();var town=db.loadTown(clock);
+            var people=PopulationGenerator.add(town,3);
+            var self=people.get(0);var neighbor=people.get(1);var far=people.get(2);
+            selfId=self.id;neighborId=neighbor.id;farId=far.id;
+            for(var p:people){
+                p.age=30;p.home=TownLife.Place.NORTH_RESIDENCES;
+                p.place=TownLife.Place.PARK;p.destination=p.place;p.travelRemaining=0;
+                p.activity="FREE_TIME";p.health=100;p.hunger=10;p.thirst=10;p.fatigue=10;
+            }
+            far.place=TownLife.Place.LIBRARY;far.destination=far.place;
+            town.player.alive=false;town.player.money=0;
+            town.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+            town.industryStocks.put(RebirthLife.CHILD,self.generationIndex);
+            DemographyLife.set(town,self,"played-incarnation",town.player.incarnation);
+            clock.minute=720;
+            RebirthLife.synchronize(town);
+            assertTrue(RebirthLife.visible(town).contains(neighbor));
+            assertFalse(RebirthLife.visible(town).contains(far));
+            db.save(clock,java.util.List.of(),java.util.List.of(),town,
+                    java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var game=new GameSession(file)){
+            assertTrue(game.snapshot().player().alive());
+            assertTrue(game.snapshot().residents().stream().anyMatch(p->p.id().equals(neighborId)));
+            assertFalse(game.snapshot().residents().stream().anyMatch(p->p.id().equals(selfId)));
+            assertThrows(IllegalArgumentException.class,()->game.speak(selfId,"Hello"));
+            assertThrows(IllegalArgumentException.class,()->game.speak(farId,"Hello"));
+            var response=game.speak(neighborId,"Hello");
+            assertTrue(response.message().contains("Hello"));
+            assertFalse(response.message().contains("Elapsed:"));
+            assertEquals(721,response.world().minute());
+            assertTrue(game.speak(neighborId,"My name is Alex.").message().contains("Alex"));
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertFalse(town.player.alive);
+            assertEquals("Alex",town.player.contacts.get(neighborId).knownName);
+            assertTrue(town.player.contacts.get(neighborId).conversations>=2);
+            assertEquals(RebirthLife.LINKED_ADULT,RebirthLife.phase(town));
+        }
+    }
+
+    @Test
+    void childhoodAndSleepRespectRealSharedSpaceForDialogue() {
+        var town=TownLife.create(new WorldState());
+        var people=PopulationGenerator.add(town,2);
+        var self=people.get(0);var friend=people.get(1);
+        for(var p:people){
+            p.age=8;p.home=TownLife.Place.NORTH_RESIDENCES;
+            p.place=TownLife.Place.PARK;p.destination=p.place;
+            p.travelRemaining=0;p.activity="FREE_TIME";
+        }
+        town.player.alive=false;
+        town.industryStocks.put(RebirthLife.PHASE,RebirthLife.CHILDHOOD);
+        town.industryStocks.put(RebirthLife.CHILD,self.generationIndex);
+        assertEquals(friend,PlayerLife.nearby(town,friend.id));
+        assertTrue(PlayerLife.speak(town,friend.id,"Hello",1,800).contains("Hello"));
+        self.activity="SLEEPING";
+        assertThrows(IllegalArgumentException.class,()->PlayerLife.nearby(town,friend.id));
+        self.activity="FREE_TIME";self.age=2;
+        assertThrows(IllegalArgumentException.class,()->PlayerLife.nearby(town,friend.id));
+        self.age=8;friend.place=TownLife.Place.LIBRARY;
+        assertThrows(IllegalArgumentException.class,()->PlayerLife.nearby(town,friend.id));
+    }
+
+    @Test
     void barberServicePersistsStyleAndConservesMoney() throws Exception {
         Path file=directory.resolve("barber.db");
         try(var db=new WorldDatabase(file)){

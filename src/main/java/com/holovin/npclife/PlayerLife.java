@@ -271,6 +271,19 @@ final class PlayerLife {
         return people;
     }
     static TownLife.Citizen nearby(TownLife.Town town,String residentId) {
+        // In a born/linked life, the playable identity is a real citizen. The
+        // visitor shell is intentionally dead: testing visitor.alive here made
+        // every typed NPC conversation fail with "The visitor is not alive".
+        if(RebirthLife.active(town)) {
+            TownLife.Citizen self=RebirthLife.child(town);
+            if(self==null||!self.alive||self.age<3||self.travelRemaining>0
+                    ||"SLEEPING".equals(self.activity))
+                throw new IllegalArgumentException("You cannot talk at this age or while asleep or traveling.");
+            TownLife.Citizen person=town.get(residentId);
+            if(!RebirthLife.visible(town).contains(person))
+                throw new IllegalArgumentException("This resident is not with you in the same place.");
+            return person;
+        }
         requireAlive(town.player);
         TownLife.Citizen person=town.get(residentId);
         if(!visible(town).contains(person))

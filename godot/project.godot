@@ -6,6 +6,9 @@ config_version=5
 config/name="Living Alibi"
 run/main_scene="res://scenes/park.tscn"
 
+[audio]
+general/text_to_speech=true
+
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"

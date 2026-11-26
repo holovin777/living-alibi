@@ -218,6 +218,10 @@ var _dialog_attitude: Label
 var _dialog_style: Label
 var _language_selector: OptionButton
 var _dialog_input: LineEdit
+var _dialog_history: RichTextLabel
+var _dialog_more_scroll: ScrollContainer
+var _spoken_dialog_enabled := true
+var _hud_details: VBoxContainer
 var _dialog_target := ""
 var _dialog_pending := false
 var _action_title: Label
@@ -345,7 +349,9 @@ func _process(delta: float) -> void:
     _weather_fx.set_sheltered(_stairwell_active or _apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
         _update_first_steps()
-        if _near_software():
+        if not _nearest_resident().is_empty():
+            _hint.text=tr("Talk: approach someone and press T or click on them.")
+        elif _near_software():
             _hint.text="E: Borgo Digital · "+_office_station()+" · F: life choices"
         elif _near_engineering():
             _hint.text="E: engineering work orders · F: life choices"
@@ -416,10 +422,21 @@ func _unhandled_input(event: InputEvent) -> void:
         _follow_player()
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # UI consumes its own clicks before they reach this handler.
-        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
+        if not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible or _intercom.visible):
+            if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and (not _rebirth_active() or _child_can_walk()):
+                var looked_at := _looked_at_resident()
+                if not looked_at.is_empty():
+                    _open_dialog(looked_at)
+                    get_viewport().set_input_as_handled()
+                    return
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if _dialog_panel.visible and event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode == KEY_ESCAPE:
+            _close_dialog()
+        get_viewport().set_input_as_handled()
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         if _guest_active:
             if event.keycode==KEY_G and not _guest_sitting and _guest.near_exit(_avatar.position):
@@ -474,6 +491,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     if _rebirth_active():
         if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
+            if event.keycode == KEY_T and not _dialog_panel.visible:
+                _open_dialog()
+                get_viewport().set_input_as_handled()
+                return
             if event.keycode == KEY_E and _apartment_active and not _action_panel.visible:
                 var action := _apartment_action()
                 if action=="door":
@@ -538,8 +559,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_ESCAPE:
-                _action_panel.visible = true
-                Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+                _action_panel.visible = false
+                Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
                 get_viewport().set_input_as_handled()
         return
     if event is InputEventKey and event.pressed and not event.echo:
@@ -591,6 +612,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
             _toggle_actions()
             get_viewport().set_input_as_handled()
 
+func _toggle_hud_details(enabled: bool) -> void:
+    _hud_details.visible = enabled
+
 func _set_guide_enabled(enabled: bool) -> void:
     _guide_enabled=enabled
     _update_first_steps()
@@ -615,6 +639,8 @@ func _update_first_steps() -> void:
         return
     if _rebirth_active():
         _guide_label.text=tr("Your life: F opens choices. Follow signs to shops, work and home.")
+        if _child_can_walk():
+            _guide_label.text+="\n"+tr("Talk: approach someone and press T or click on them.")
         if not _entrance_hint().is_empty():_guide_label.text+="\n"+_entrance_hint()
         return
     var p: Dictionary=_last_snapshot.get("player",{})
@@ -4916,6 +4942,19 @@ func _create_interface() -> void:
     _status = Label.new()
     _status.text = "A visitor with 50 EUR and no assigned profession"
     column.add_child(_status)
+    var primary_actions := HBoxContainer.new()
+    column.add_child(primary_actions)
+    primary_actions.add_child(_button(tr("Talk (T)"),_open_dialog))
+    primary_actions.add_child(_button(tr("Actions (F)"),_toggle_actions))
+    primary_actions.add_child(_button(tr("Map (M)"),_toggle_map))
+    primary_actions.add_child(_button(tr("Phone (H)"),_toggle_phone))
+    var details_toggle := CheckButton.new()
+    details_toggle.text = tr("More / settings")
+    details_toggle.toggled.connect(_toggle_hud_details)
+    column.add_child(details_toggle)
+    _hud_details = VBoxContainer.new()
+    _hud_details.visible = false
+    column.add_child(_hud_details)
     var guide_toggle := CheckButton.new()
     guide_toggle.text = "First steps / navigation"
     guide_toggle.button_pressed = true
@@ -4928,25 +4967,25 @@ func _create_interface() -> void:
     column.add_child(_guide_label)
     _weather = Label.new()
     _weather.text = "Connecting to the local Java world..."
-    column.add_child(_weather)
+    _hud_details.add_child(_weather)
     _needs = Label.new()
     _needs.text = "Jobs, study and travel use the real game world."
-    column.add_child(_needs)
+    _hud_details.add_child(_needs)
     _bag_label = Label.new()
     _bag_label.text = "Bag: empty"
-    column.add_child(_bag_label)
+    _hud_details.add_child(_bag_label)
     _aid_label = Label.new()
     _aid_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _aid_label.visible = false
-    column.add_child(_aid_label)
+    _hud_details.add_child(_aid_label)
     _housing_label = Label.new()
     _housing_label.text = "Housing: no room"
-    column.add_child(_housing_label)
+    _hud_details.add_child(_housing_label)
     _car_label = Label.new()
     _car_label.text = "Car: none"
-    column.add_child(_car_label)
+    _hud_details.add_child(_car_label)
     var bag_row := HBoxContainer.new()
-    column.add_child(bag_row)
+    _hud_details.add_child(bag_row)
     _eat_button = _button("Eat bread",_consume_product.bind("bread"))
     _water_button = _button("Drink bottle",_consume_product.bind("water"))
     bag_row.add_child(_eat_button)
@@ -4961,30 +5000,30 @@ func _create_interface() -> void:
     column.add_child(_message)
 
     var buttons := HBoxContainer.new()
-    column.add_child(buttons)
+    _hud_details.add_child(buttons)
     buttons.add_child(_button("Refresh", _refresh))
     buttons.add_child(_button("Jobs", _find_jobs))
     buttons.add_child(_button("Industry", _view_industry))
     buttons.add_child(_button("Business", _view_business))
     buttons.add_child(_button("Wait 60m", _wait_one_hour))
     _transport_button = _button("Transport: walking (B)",_toggle_transport)
-    column.add_child(_transport_button)
+    _hud_details.add_child(_transport_button)
     _transport_button.disabled = true
     _parking_button = _button("Bicycle rack (P)",_toggle_parking)
-    column.add_child(_parking_button)
+    _hud_details.add_child(_parking_button)
     _parking_button.disabled = true
     var map_button := Button.new()
     map_button.text = "Town map (M)"
     map_button.pressed.connect(_toggle_map)
-    column.add_child(map_button)
+    _hud_details.add_child(map_button)
     _language_selector = OptionButton.new()
     _language_selector.add_item("English",0)
     _language_selector.add_item("Italiano",1)
     _language_selector.select(1 if TranslationServer.get_locale()=="it" else 0)
     _language_selector.item_selected.connect(_on_language_selected)
-    column.add_child(_language_selector)
+    _hud_details.add_child(_language_selector)
     var clock_row := HBoxContainer.new()
-    column.add_child(clock_row)
+    _hud_details.add_child(clock_row)
     var clock_label := Label.new()
     clock_label.text = "World time:"
     clock_row.add_child(clock_label)
@@ -4996,7 +5035,7 @@ func _create_interface() -> void:
     _clock_selector.item_selected.connect(_on_clock_speed_selected)
     clock_row.add_child(_clock_selector)
     var graphics_row := HBoxContainer.new()
-    column.add_child(graphics_row)
+    _hud_details.add_child(graphics_row)
     var graphics_label := Label.new()
     graphics_label.text = "Graphics quality"
     graphics_row.add_child(graphics_label)
@@ -5007,7 +5046,7 @@ func _create_interface() -> void:
     quality.item_selected.connect(_set_graphics_quality)
     graphics_row.add_child(quality)
     var atmosphere_row := HBoxContainer.new()
-    column.add_child(atmosphere_row)
+    _hud_details.add_child(atmosphere_row)
     var effects_toggle := CheckButton.new()
     effects_toggle.text = "Weather FX"
     effects_toggle.button_pressed = true
@@ -5022,20 +5061,20 @@ func _create_interface() -> void:
     sound_toggle.text = "Town sound"
     sound_toggle.button_pressed = true
     sound_toggle.toggled.connect(_set_town_audio)
-    column.add_child(sound_toggle)
+    _hud_details.add_child(sound_toggle)
     var head_bob_toggle := CheckButton.new()
     head_bob_toggle.text = tr("Camera motion")
     head_bob_toggle.button_pressed = _head_bob_enabled
     head_bob_toggle.toggled.connect(_set_head_bob)
-    column.add_child(head_bob_toggle)
+    _hud_details.add_child(head_bob_toggle)
     var hands_toggle := CheckButton.new()
     hands_toggle.text = "First-person hands"
     hands_toggle.button_pressed = true
     hands_toggle.toggled.connect(_set_hands_enabled)
-    column.add_child(hands_toggle)
+    _hud_details.add_child(hands_toggle)
     _held_label = Label.new()
-    column.add_child(_held_label)
-    column.add_child(_button("Open phone (H)",_toggle_phone))
+    _hud_details.add_child(_held_label)
+    _hud_details.add_child(_button("Open phone (H)",_toggle_phone))
     _refresh_held_item()
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -5044,7 +5083,7 @@ func _create_interface() -> void:
     _jobs = Label.new()
     _jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _jobs.text = ""
-    column.add_child(_jobs)
+    _hud_details.add_child(_jobs)
 
     _map_panel = PanelContainer.new()
     _map_panel.position = Vector2(15, 15)
@@ -5094,32 +5133,55 @@ func _create_interface() -> void:
     _dialog_reply.custom_minimum_size = Vector2(400,0)
     _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_reply)
-    dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
-    dialog_col.add_child(_button("Ask their name",_send_dialog.bind("What is your name?")))
-    dialog_col.add_child(_button("Ask their address",_send_dialog.bind("Where do you live?")))
-    dialog_col.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
-    dialog_col.add_child(_button("Offer support",_send_dialog.bind("I'm here for you.")))
-    dialog_col.add_child(_button("Ask about shared memories",_send_dialog.bind("What do you remember about me?")))
-    dialog_col.add_child(_button("Offer bread",_send_dialog.bind("Offer bread")))
-    dialog_col.add_child(_button("Offer water",_send_dialog.bind("Offer water")))
-    dialog_col.add_child(_button("Ask for bread",_send_dialog.bind("Ask for bread")))
-    dialog_col.add_child(_button("Ask for water",_send_dialog.bind("Ask for water")))
-    dialog_col.add_child(_button("Ask for a 10 EUR loan",_send_dialog.bind("Ask for a 10 EUR loan")))
-    dialog_col.add_child(_button("Repay personal loan",_send_dialog.bind("Repay personal loan")))
-    dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
-    dialog_col.add_child(_button("Allow sharing my name",_send_dialog.bind("You can tell people my name.")))
-    dialog_col.add_child(_button("Ask for visitor news",_send_dialog.bind("Any news about visitors?")))
-    dialog_col.add_child(_button("Press interview",_send_dialog.bind("Any public news for the newspaper?")))
-    dialog_col.add_child(_button("Apologize",_send_dialog.bind("I'm sorry.")))
-    dialog_col.add_child(_button("Leave me alone!",_send_dialog.bind("Leave me alone!")))
+    _dialog_history = RichTextLabel.new()
+    _dialog_history.bbcode_enabled = false
+    _dialog_history.custom_minimum_size = Vector2(400,140)
+    _dialog_history.scroll_following = true
+    dialog_col.add_child(_dialog_history)
     _dialog_input = LineEdit.new()
-    _dialog_input.placeholder_text = "My name is ... / Say something"
+    _dialog_input.placeholder_text = tr("Write to this person...")
     _dialog_input.max_length = 1000
     _dialog_input.text_submitted.connect(_send_dialog)
     dialog_col.add_child(_dialog_input)
-    dialog_col.add_child(_button("Speak",_send_typed_dialog))
+    dialog_col.add_child(_button(tr("Send message (Enter)"),_send_typed_dialog))
+    var quick := HBoxContainer.new()
+    dialog_col.add_child(quick)
+    quick.add_child(_button(tr("Say hello"),_send_dialog.bind("Hello")))
+    quick.add_child(_button(tr("Ask their name"),_send_dialog.bind("What is your name?")))
+    quick.add_child(_button(tr("How are you?"),_send_dialog.bind("How are you?")))
+    var more_toggle := CheckButton.new()
+    more_toggle.text = tr("More questions")
+    more_toggle.toggled.connect(_toggle_dialog_more)
+    dialog_col.add_child(more_toggle)
+    _dialog_more_scroll = ScrollContainer.new()
+    _dialog_more_scroll.custom_minimum_size = Vector2(400,170)
+    _dialog_more_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _dialog_more_scroll.visible = false
+    dialog_col.add_child(_dialog_more_scroll)
+    var more_choices := VBoxContainer.new()
+    _dialog_more_scroll.add_child(more_choices)
+    more_choices.add_child(_button(tr("Ask their address"),_send_dialog.bind("Where do you live?")))
+    more_choices.add_child(_button(tr("Ask about occupation"),_send_dialog.bind("What do you do?")))
+    more_choices.add_child(_button(tr("Offer support"),_send_dialog.bind("I'm here for you.")))
+    more_choices.add_child(_button(tr("Ask about shared memories"),_send_dialog.bind("What do you remember about me?")))
+    more_choices.add_child(_button(tr("Offer bread"),_send_dialog.bind("Offer bread")))
+    more_choices.add_child(_button(tr("Offer water"),_send_dialog.bind("Offer water")))
+    more_choices.add_child(_button(tr("Ask for bread"),_send_dialog.bind("Ask for bread")))
+    more_choices.add_child(_button(tr("Ask for water"),_send_dialog.bind("Ask for water")))
+    more_choices.add_child(_button(tr("Ask for a 10 EUR loan"),_send_dialog.bind("Ask for a 10 EUR loan")))
+    more_choices.add_child(_button(tr("Repay personal loan"),_send_dialog.bind("Repay personal loan")))
+    more_choices.add_child(_button(tr("Allow sharing my name"),_send_dialog.bind("You can tell people my name.")))
+    more_choices.add_child(_button(tr("Ask for visitor news"),_send_dialog.bind("Any news about visitors?")))
+    more_choices.add_child(_button(tr("Press interview"),_send_dialog.bind("Any public news for the newspaper?")))
+    more_choices.add_child(_button(tr("Apologize"),_send_dialog.bind("I'm sorry.")))
+    more_choices.add_child(_button(tr("Leave me alone!"),_send_dialog.bind("Leave me alone!")))
+    var voice_toggle := CheckButton.new()
+    voice_toggle.text = tr("Read replies aloud")
+    voice_toggle.button_pressed = true
+    voice_toggle.toggled.connect(_set_dialog_voice)
+    dialog_col.add_child(voice_toggle)
     var close := Button.new()
-    close.text = "Close conversation"
+    close.text = tr("Close conversation")
     close.pressed.connect(_close_dialog)
     dialog_col.add_child(close)
 
@@ -5230,20 +5292,46 @@ func _nearest_resident() -> String:
             nearest = str(person.get_meta("resident_id",""))
     return nearest
 
+func _looked_at_resident() -> String:
+    if not is_instance_valid(_residents_root) or not is_instance_valid(_camera):
+        return ""
+    var center := get_viewport().get_visible_rect().size*0.5
+    var selected := ""
+    var best := 90.0
+    for child in _residents_root.get_children():
+        var person := child as Node3D
+        if person == null or str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:
+            continue
+        if _avatar.position.distance_to(person.position) >= 2.5:
+            continue
+        var head := person.global_position + Vector3(0,1.35,0)
+        if _camera.is_position_behind(head):
+            continue
+        var distance := _camera.unproject_position(head).distance_to(center)
+        if distance < best:
+            best = distance
+            selected = str(person.get_meta("resident_id",""))
+    return selected
+
 func _resident_caption(person: Node3D) -> String:
     var label := str(person.get_meta("display_name","Unknown resident"))
     if label=="Unknown resident" and int(person.get_meta("conversations",0))>0:
         return tr("Familiar face")
     return tr(label)
 
-func _open_dialog() -> void:
-    if not _connected or _api.is_busy() or _dialog_pending:
+func _open_dialog(preferred_id: String = "") -> void:
+    # Reading the town or fetching location choices must not hide the chat.
+    # Only sending requires a free API channel.
+    if not _connected or _dialog_pending:
         return
-    var id := _nearest_resident()
+    var id := preferred_id if not preferred_id.is_empty() else _nearest_resident()
     if id.is_empty():
-        _message.text = "Approach a resident to talk."
+        _message.text = tr("Approach a resident to talk.")
         return
     var person := _residents_root.get_node_or_null("Resident_"+id) as Node3D
+    if person == null or _avatar.position.distance_to(person.position) >= 2.5:
+        _message.text = tr("Approach a resident to talk.")
+        return
     _dialog_target = id
     person.set_meta("reply_remaining",0.0)
     _travel_panel.visible = false
@@ -5256,8 +5344,11 @@ func _open_dialog() -> void:
     _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     _dialog_input.clear()
+    _dialog_history.clear()
+    _dialog_history.append_text(_dialog_reply.text+"\n")
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    _dialog_input.grab_focus()
 
 func _render_dialog_mood(person: Node3D) -> void:
     var mood := str(person.get_meta("mood","CALM"))
@@ -5282,15 +5373,43 @@ func _localized_resident_reply(message: String) -> String:
     return tr(spoken)
 
 func _close_dialog() -> void:
+    var was_open := _dialog_panel.visible
     _dialog_panel.visible = false
     _dialog_target = ""
     _dialog_input.release_focus()
+    if was_open:
+        DisplayServer.tts_stop()
+        if not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _phone.visible or _intercom.visible):
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _toggle_dialog_more(enabled: bool) -> void:
+    _dialog_more_scroll.visible = enabled
+
+func _set_dialog_voice(enabled: bool) -> void:
+    _spoken_dialog_enabled = enabled
+    if not enabled:
+        DisplayServer.tts_stop()
+
+func _speak_resident_reply(reply: String) -> void:
+    if not _spoken_dialog_enabled or reply.is_empty():
+        return
+    var language := "it" if TranslationServer.get_locale().begins_with("it") else "en"
+    var voices := DisplayServer.tts_get_voices_for_language(language)
+    if voices.is_empty():
+        voices = DisplayServer.tts_get_voices_for_language("en")
+    if voices.is_empty():
+        _message.text = tr("No system speech voice is available. Text chat still works.")
+        return
+    DisplayServer.tts_speak(reply,str(voices[0]),75,1.0,1.0,0,true)
 
 func _send_typed_dialog() -> void:
     _send_dialog(_dialog_input.text)
 
 func _send_dialog(message: String) -> void:
-    if not _dialog_panel.visible or _dialog_pending or _api.is_busy() or not _connected:
+    if not _dialog_panel.visible or _dialog_pending or not _connected:
+        return
+    if _api.is_busy():
+        _dialog_reply.text = tr("The world is updating. Try sending again.")
         return
     var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
     if person == null or _avatar.position.distance_to(person.position) >= 2.5:
@@ -5299,6 +5418,7 @@ func _send_dialog(message: String) -> void:
     if message.strip_edges().is_empty():
         return
     _dialog_pending = true
+    _dialog_history.append_text(tr("You")+": "+message.strip_edges()+"\n")
     _api.speak_to(_dialog_target,message)
 
 func _toggle_map() -> void:
@@ -5344,6 +5464,16 @@ func _travel_to(destination: String) -> void:
     _api.go_to(destination)
 
 func _toggle_actions() -> void:
+    if _rebirth_active():
+        if not _connected:
+            return
+        _close_dialog()
+        _travel_panel.visible = false
+        _action_panel.visible = not _action_panel.visible
+        if _action_panel.visible:
+            _render_actions()
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
+        return
     if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck()) or not _connected:
         _message.text = "Approach a local kiosk or your rented bed."
         return
@@ -7527,9 +7657,12 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if _rebirth_active():
         _travel_panel.visible = false
         _map_panel.visible = false
-        _close_dialog()
-        _action_panel.visible = not walking_transition and not _phone.visible
-        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible or _phone.visible else Input.MOUSE_MODE_CAPTURED)
+        if not _child_can_walk():
+            _close_dialog()
+            _action_panel.visible = not walking_transition and not _phone.visible
+            Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible or _phone.visible else Input.MOUSE_MODE_CAPTURED)
+        elif walking_transition:
+            _action_panel.visible = false
     if _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 
@@ -7758,9 +7891,12 @@ func _on_action_feedback(message: String) -> void:
         _dialog_pending = false
         if _dialog_panel.visible:
             _dialog_reply.text = _localized_resident_reply(message)
+            _dialog_history.append_text(_dialog_reply.text+"\n")
+            _speak_resident_reply(_dialog_reply.text)
             var speaker := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
             _begin_resident_reply(speaker,_dialog_reply.text)
             _dialog_input.clear()
+            _dialog_input.grab_focus()
     if not _clock_pending:
         _message.text = tr(message)
         _phone.add_notification(message)
@@ -7811,6 +7947,7 @@ func _on_request_failed(message: String) -> void:
         _dialog_pending = false
         if _dialog_panel.visible:
             _dialog_reply.text = message
+            _dialog_history.append_text(tr("Error")+": "+message+"\n")
     if _clock_pending:
         # The server might have committed before a connection failure.
         # Pause rather than automatically retry a potentially committed write.

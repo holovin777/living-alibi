@@ -423,7 +423,22 @@ public final class GameSession implements AutoCloseable {
         var copy=town.copy();
         var resident=PlayerLife.nearby(copy,residentId);
         String reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")?NewspaperLife.interview(copy,resident,state.day,state.minute):PlayerLife.speak(copy,residentId,message,state.day,state.minute);
-        return apply(copy,1,PlayerLife.displayName(copy,resident)+": "+reply);
+        var controlled=RebirthLife.child(copy);
+        if(RebirthLife.linkedAdult(copy,controlled)&&!RebirthLife.atHome(controlled)
+                &&PlayerLife.publicPlaces().contains(controlled.place)) {
+            // The person explicitly chose to stop and talk. Keep their actual
+            // public location under player control during the one-minute tick,
+            // instead of an NPC work/home schedule teleporting them away.
+            // "Resume work and daily routine" restores autonomous scheduling.
+            RebirthLife.holdPublicPlace(copy,controlled);
+        }
+        // A real conversation occupies the other person's next one-minute
+        // simulation tick. Their schedule resumes as soon as this turn ends.
+        copy.industryStocks.put(TownLife.conversationHoldKey(resident.id),1);
+        // Conversation is valid in both a visitor life and a born/linked
+        // life. The latter must use the rebirth-aware time/commit path.
+        return applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+reply,
+                RebirthLife.active(town));
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
@@ -776,7 +791,8 @@ public final class GameSession implements AutoCloseable {
         events.addAll(LifeSimulation.advance(candidateState,minutes,
                 current->TownLife.tick(candidateTown,current,truth,observations,interactions),
                 ()->!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays))));
-        if(rebirthAction&&minutes>0){
+        TownLife.clearConversationHolds(candidateTown);
+        if(rebirthAction&&minutes>1){ // Keep one-minute dialogue replies free of clock diagnostics.
             long elapsed=(candidateState.day-(long)state.day)*1440+candidateState.minute-state.minute;
             message+=" Elapsed: "+elapsed/1440+" day(s), "+elapsed%1440+" minute(s).";
         }

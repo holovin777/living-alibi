@@ -1269,6 +1269,51 @@ func _exercise() -> void:
             and social_person.get_meta("relationship") == "FAMILIAR",
             "nearby resident carries server-owned conversation memory"):
         return
+    # An adult born in the simulated town must be able to type to a nearby NPC.
+    # The old rebirth key handler swallowed T, and every world refresh closed chat.
+    if not _check(not world._hud_details.visible,"advanced HUD starts collapsed"):
+        return
+    world._toggle_hud_details(true)
+    if not _check(world._hud_details.visible,"extra HUD settings can be expanded"):
+        return
+    world._toggle_hud_details(false)
+    var reborn_social := social.duplicate(true)
+    reborn_social["rebirth"] = {"phase":"LINKED_ADULT","age":30,"childName":"Anna"}
+    world._on_world_updated(reborn_social)
+    world._avatar.position = world._residents_root.get_node("Resident_marco").position
+    var talk_key := InputEventKey.new()
+    talk_key.keycode = KEY_T
+    talk_key.pressed = true
+    world._unhandled_key_input(talk_key)
+    print("DIALOGUE TEST: connected=",world._connected,
+            " rebirth=",world._rebirth_active()," can_walk=",world._child_can_walk(),
+            " npc=",world._nearest_resident()," pending=",world._dialog_pending,
+            " api_busy=",world._api.is_busy()," guest=",world._guest_active,
+            " stairwell=",world._stairwell_active," phone=",world._phone.visible,
+            " intercom=",world._intercom.visible," action_menu=",world._action_panel.visible,
+            " chat=",world._dialog_panel.visible," target=",world._dialog_target)
+    if not _check(world._dialog_panel.visible and not world._action_panel.visible
+            and world._dialog_target == "marco",
+            "T opens real text chat instead of the life choices menu"):
+        return
+    world._dialog_pending = true
+    world._on_action_feedback("Marco: Hello, visitor.")
+    if not _check(not world._dialog_pending and world._dialog_history.get_parsed_text().contains("Hello, visitor."),
+            "NPC's accepted reply appears in text conversation history"):
+        return
+    world._on_world_updated(reborn_social)
+    if not _check(world._dialog_panel.visible and not world._action_panel.visible,
+            "refreshing a linked adult life keeps the dialogue open"):
+        return
+    var escape_key := InputEventKey.new()
+    escape_key.keycode = KEY_ESCAPE
+    escape_key.pressed = true
+    world._unhandled_key_input(escape_key)
+    if not _check(not world._dialog_panel.visible and not world._action_panel.visible,
+            "Escape closes chat without reopening the large menu"):
+        return
+    world._on_world_updated(social)
+    world._avatar.position = world._residents_root.get_node("Resident_marco").position
     world._avatar.position = Vector3(16,0,16)
     if not _check(world._nearest_resident().is_empty(),
             "distant residents cannot be selected for conversation"):
