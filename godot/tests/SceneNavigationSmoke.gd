@@ -258,6 +258,16 @@ func _exercise() -> void:
             and not world._can_stand(Vector3(6,0,22),world.WALKER_RADIUS),
             "historic centre promenade expands walkable space without crossing the tile boundary"):
         return
+    var food_saved_position: Vector3=world._avatar.position
+    for x in [-6.0,6.0]:
+        var reached: Vector3=world._move_on_ground(Vector3(x,0,14.0),Vector3(0,0,4.0),world.WALKER_RADIUS)
+        world._avatar.position=reached
+        if not _check(reached.z>17.8 and world._near_public_counter()
+                and world._centro_food_counter()==("pizza" if x<0 else "gelato")
+                and not world._can_stand(Vector3(x,0,19.1),world.WALKER_RADIUS),
+                "food shop entrance and correct counter are accessible, furniture solid"):
+            return
+    world._avatar.position=food_saved_position
     var square := centro_root.get_node("PiazzaCentrale")
     var paving := square.get_node("StonePaving") as MultiMeshInstance3D
     if not _check(paving.multimesh.instance_count == 1536 and square.has_node("Facade_0")
