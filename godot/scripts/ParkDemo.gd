@@ -1174,6 +1174,7 @@ func _generate_chunk(place_id: String) -> void:
             _build_home_garden()
             _build_home_coop()
             _build_orchard()
+            _lombardy_facade(_scenery,"CasaOlmo",Vector3(-10,0,-3),Color("#c4bb9a"),3)
         "PORTICI":
             _build_portici()
         "CENTRO":
@@ -1260,6 +1261,7 @@ func _generate_chunk(place_id: String) -> void:
     if place_id in FREIGHT_DISTRICTS:
         _build_freight_parking(place_id)
     _build_road_links(place_id)
+    _street_marker(place_id)
     _chunks[place_id] = {
         "root": _scenery, "residents": _residents_root,
         "ground": _ground_material, "obstacles": _obstacles,
@@ -1965,7 +1967,7 @@ func _build_lombardy_neighborhood() -> void:
             _box(street,Vector3(0.035,0.018,1.45),Color("#918e85"),Vector3(x,0.1,z))
     _lombardy_facade(street,"CasaMagnolia",Vector3(11,0,-6.8),Color("#d3b895"),3)
     _lombardy_facade(street,"CasaTiglio",Vector3(-10,0,-7.5),Color("#c88f7b"),2)
-    _sign(street,"Via delle Magnolie",Vector3(-3,2.5,-2.4))
+    _physical_sign(street,"Via delle Magnolie",Vector3(7.28,2.8,-4.0),0,2.8)
     for x in [-15.0,15.0]:
         _lamp(street,Vector3(x,0,-2.3))
     _box(street,Vector3(4.0,0.055,5.3),paving,Vector3(-4.6,0.025,-8.0))
@@ -2010,7 +2012,17 @@ func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: 
                 for bar in range(7):
                     _box(building,Vector3(0.045,0.65,0.045),Color("#444442"),Vector3(x-0.84+float(bar)*0.28,y-0.48,face+0.77))
                 _box(building,Vector3(1.85,0.055,0.055),Color("#444442"),Vector3(x,y-0.14,face+0.77))
-    _sign(building,"Casa Magnolia" if id=="CasaMagnolia" else "Casa Tiglio",Vector3(at.x,2.8,face+0.35))
+    var number := "12" if id=="CasaMagnolia" else "14" if id=="CasaTiglio" else "8"
+    var building_name := "Casa Magnolia" if id=="CasaMagnolia" else "Casa Tiglio" if id=="CasaTiglio" else "Casa Olmo"
+    _physical_sign(building,building_name,Vector3(at.x,2.8,face+0.18),0,2.1)
+    _physical_sign(building,number,Vector3(at.x+1.18,1.9,face+0.13),0,0.52)
+    var mailbox := Node3D.new()
+    mailbox.name="Mailboxes"
+    building.add_child(mailbox)
+    for n in range(4):
+        var pos := Vector3(at.x-1.15,1.05+0.20*float(n),face+0.13)
+        _box(mailbox,Vector3(0.35,0.18,0.16),Color("#647078"),pos)
+        _box(mailbox,Vector3(0.24,0.025,0.01),Color("#252e31"),pos+Vector3(0,0.035,0.086))
     if id=="CasaMagnolia":
         var entrance := Marker3D.new()
         entrance.name="HomeApproach"
@@ -2044,7 +2056,8 @@ func _build_guesthouse(owned: bool = false) -> void:
         _box(house,Vector3(0.08,1.3,1.0),Color("#3b5051"),Vector3(-3.96,4.7,z))
         for offset in [-0.72,0.72]:
             _box(house,Vector3(0.14,1.4,0.35),Color("#486045"),Vector3(-3.86,4.7,z+offset))
-    _sign(house,"Casa del Glicine" if owned else "Casa Ospiti · Camera 1",Vector3(-3.7,3.35,8.5))
+    _physical_sign(house,"Casa del Glicine" if owned else "Casa Ospiti",Vector3(-3.78,3.35,8.5),PI/2.0,2.8)
+    _physical_sign(house,"6" if owned else "10",Vector3(-3.78,2.0,6.7),PI/2.0,0.52)
     _sign(house,"Property office · F" if owned else "Reception · F",KIOSK_POSITION+Vector3(0,2.2,0))
     if owned:
         _box(house,Vector3(2.8,0.10,1.2),Color("#a58d71"),Vector3(-2.5,0.04,8.5))
@@ -3001,6 +3014,15 @@ func _lamp(parent: Node3D, at: Vector3) -> void:
 func _district_sign_name(id: String) -> String:
     return str({"PARK":"Parco","MARKET":"Mercato","CAFE":"Bar Centrale","BAKERY":"Panetteria","LIBRARY":"Biblioteca","OFFICE":"Uffici","CLINIC":"Ambulatorio","SCHOOL":"Scuola","WORKSHOP":"Officina","NORTH_RESIDENCES":"Quartiere Nord","SOUTH_RESIDENCES":"Quartiere Sud","RIVER":"Fiume","WOODS":"Bosco","QUARRY":"Cava","FACTORY":"Fabbrica","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Cascina","FUEL_STATION":"Stazione di servizio","LOGISTICS_DEPOT":"Deposito logistico"}.get(id,id))
 
+func _street_marker(place_id: String) -> void:
+    var street := str({"PARK":"Viale del Parco","MARKET":"Piazza del Mercato","CAFE":"Via del Caffè","BAKERY":"Via del Pane","LIBRARY":"Via dei Libri","OFFICE":"Via dell'Industria","CLINIC":"Via della Salute","SCHOOL":"Via Leonardo","WORKSHOP":"Via degli Artigiani","NORTH_RESIDENCES":"Via delle Magnolie","SOUTH_RESIDENCES":"Via del Glicine","RIVER":"Lungofiume","WOODS":"Via del Bosco","QUARRY":"Via della Cava","FACTORY":"Via delle Fabbriche","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Strada delle Risaie","FUEL_STATION":"Via della Stazione","LOGISTICS_DEPOT":"Via del Deposito"}.get(place_id,"Via del Borgo"))
+    var marker := Node3D.new()
+    marker.name = "StreetMarker"
+    _scenery.add_child(marker)
+    marker.position = Vector3(3.8,0,-11.5)
+    _box(marker,Vector3(0.10,2.1,0.10),Color("#686e70"),Vector3(0,1.05,0))
+    _physical_sign(marker,street,Vector3(0,2.12,0),0,3.0)
+
 func _physical_sign(parent: Node3D, caption: String, at: Vector3, yaw: float, width: float) -> void:
     var board := Node3D.new()
     board.name = "PhysicalSign"
@@ -3693,6 +3715,7 @@ func _create_interface() -> void:
     dialog_col.add_child(_dialog_reply)
     dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
     dialog_col.add_child(_button("Ask their name",_send_dialog.bind("What is your name?")))
+    dialog_col.add_child(_button("Ask their address",_send_dialog.bind("Where do you live?")))
     dialog_col.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
     dialog_col.add_child(_button("Offer support",_send_dialog.bind("I'm here for you.")))
     dialog_col.add_child(_button("Ask about shared memories",_send_dialog.bind("What do you remember about me?")))
@@ -3843,6 +3866,8 @@ func _localized_resident_reply(message: String) -> String:
     var separator := message.find(": ")
     if separator<0:return tr(message)
     var spoken := message.substr(separator+2)
+    if spoken.begins_with("I live at ") and spoken.ends_with("."):
+        return tr("I live at %s.") % spoken.substr(10,spoken.length()-11)
     if spoken.begins_with("My name is ") and spoken.ends_with("."):
         return tr("My name is %s.") % spoken.substr(11,spoken.length()-12)
     return tr(spoken)
