@@ -4280,9 +4280,65 @@ func _idle_arm_pose(gesture: String,right: bool,now: float) -> Vector3:
             return Vector3(2.40,0.50 if right else -0.50,0.25)
     return Vector3.ZERO
 
+# A cue describes a real recent server interaction, never a new relationship.
+# Keep visual encounters bounded and do not replay a cue on every snapshot.
+var _peer_seen: Dictionary={}
+var _peer_active: Dictionary={}
+
+func _peer_available(person: Node3D) -> bool:
+    return is_instance_valid(person) and str(person.get_meta("activity","")) in ["WALKING","WANDERING","STROLLING","FREE_TIME","RELAXING","RESTING"] and int(person.get_meta("seat_index",-1))<0 and not person.has_meta("market_queue_target") and not (_dialog_panel.visible and str(person.get_meta("resident_id",""))==_dialog_target)
+
+func _tick_peer_encounters(delta: float) -> void:
+    if not is_instance_valid(_residents_root):return
+    for child in _residents_root.get_children():
+        child.remove_meta("peer_target")
+        child.remove_meta("peer_face")
+        child.remove_meta("peer_speaking")
+        child.remove_meta("peer_tone")
+    var valid: Dictionary={}
+    for cue in _last_snapshot.get("peerEncounters",[]):
+        if not cue is Dictionary:continue
+        var a_id := str(cue.get("firstId",""))
+        var b_id := str(cue.get("secondId",""))
+        if a_id.is_empty() or b_id.is_empty() or a_id==b_id:continue
+        var key := a_id+"|"+b_id+"|"+str(cue.get("tick",-1))
+        valid[key]=true
+        var a := _residents_root.get_node_or_null("Resident_"+a_id) as Node3D
+        var b := _residents_root.get_node_or_null("Resident_"+b_id) as Node3D
+        if not _peer_available(a) or not _peer_available(b):
+            if _peer_active.has(key):_peer_active.erase(key)
+            continue
+        var gap := a.position.distance_to(b.position)
+        if not _peer_seen.has(key) and gap<=4.0 and gap>0.05:
+            _peer_seen[key]=true
+            _peer_active[key]=9.0
+        if not _peer_active.has(key):continue
+        var left := float(_peer_active[key])-delta
+        if left<=0.0 or gap>5.0:
+            _peer_active.erase(key)
+            continue
+        _peer_active[key]=left
+        var tone := str(cue.get("tone","CASUAL"))
+        var direction := (b.position-a.position).normalized()
+        if gap>1.35:
+            a.set_meta("peer_target",b.position-direction*1.28)
+            b.set_meta("peer_target",a.position+direction*1.28)
+        else:
+            a.set_meta("peer_face",b.position)
+            b.set_meta("peer_face",a.position)
+            a.set_meta("peer_speaking",fposmod(left,3.0)<1.5)
+            b.set_meta("peer_speaking",fposmod(left,3.0)>=1.5)
+            a.set_meta("peer_tone",tone)
+            b.set_meta("peer_tone",tone)
+    for key in _peer_active.keys():
+        if not valid.has(key):_peer_active.erase(key)
+    for key in _peer_seen.keys():
+        if not valid.has(key):_peer_seen.erase(key)
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
+    _tick_peer_encounters(delta)
     for child in _residents_root.get_children():
         var person := child as Node3D
         var activity := str(person.get_meta("activity", ""))
@@ -4298,6 +4354,14 @@ func _animate_residents(delta: float) -> void:
         if queued and person.position.distance_to(queue_target)<0.12:
             walking=false
             if not talking:person.rotation.y=lerp_angle(person.rotation.y,PI,minf(delta*6.0,1.0))
+        var peer_chat := person.has_meta("peer_face")
+        var peer_approach := person.has_meta("peer_target")
+        if peer_approach:walking=true
+        if peer_chat:
+            walking=false
+            var facing: Vector3=person.get_meta("peer_face")-person.position
+            if facing.length_squared()>0.001:
+                person.rotation.y=lerp_angle(person.rotation.y,atan2(-facing.x,-facing.z),minf(delta*6.0,1.0))
         if talking or seated:
             walking = false
         if talking and not seated:
@@ -4309,7 +4373,7 @@ func _animate_residents(delta: float) -> void:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
-            var target := queue_target if queued else anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
+            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (queue_target if queued else anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8))
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
@@ -4328,9 +4392,10 @@ func _animate_residents(delta: float) -> void:
         var reply_remaining := maxf(0.0,float(person.get_meta("reply_remaining",0.0))-delta)
         person.set_meta("reply_remaining",reply_remaining)
         var joke := _current_place=="OFFICE" and str(person.get_meta("resident_id",""))==_office_joker_id and _office_joke_hold>0.0
-        _animate_resident_face(person,delta,now,(talking and reply_remaining>0.0) or joke)
+        var peer_speaking := bool(person.get_meta("peer_speaking",false))
+        _animate_resident_face(person,delta,now,(talking and reply_remaining>0.0) or joke or peer_speaking)
         _resident_attention(person)
-        _animate_resident_head(person,delta,now,talking,walking)
+        _animate_resident_head(person,delta,now,talking or peer_chat,walking)
         _animate_resident_posture(person,delta,now,gait,walking,seated)
         var casual := person.get_node_or_null("CasualDetails") as Node3D
         var winter := person.get_node_or_null("WinterClothes") as Node3D
@@ -4338,15 +4403,15 @@ func _animate_residents(delta: float) -> void:
             casual.visible=str(person.get_meta("outfit_visual","")).is_empty() and (winter==null or not winter.visible)
         var gesture_time := now+phase
         var coffee := seated and str(person.get_meta("seat_kind",""))=="cafe" and not talking
-        var phone := not seated and not talking and not walking and activity in ["RELAXING","RESTING","FREE_TIME"] and sin(gesture_time*0.45)>0.45
+        var phone := not peer_chat and not seated and not talking and not walking and activity in ["RELAXING","RESTING","FREE_TIME"] and sin(gesture_time*0.45)>0.45
         var familiar := int(person.get_meta("conversations",0))>0 and str(person.get_meta("relationship","STRANGER"))!="STRANGER"
         var friendly := str(person.get_meta("mood","CALM")) in ["CALM","HAPPY","ENTHUSIASTIC"]
-        var wave := _resident_wave(person,delta,familiar and friendly and not seated and not walking and not talking and not phone and activity!="WORKING" and not umbrella,person.position.distance_to(_avatar.position)<3.3)
+        var wave := _resident_wave(person,delta,familiar and friendly and not peer_chat and not seated and not walking and not talking and not phone and activity!="WORKING" and not umbrella,person.position.distance_to(_avatar.position)<3.3)
         if wave:
             var to_visitor := _avatar.position-person.position
             if to_visitor.length_squared()>0.001:
                 person.rotation.y=lerp_angle(person.rotation.y,atan2(-to_visitor.x,-to_visitor.z),minf(delta*5.0,1.0))
-        var idle_ok := not walking and not seated and not talking and not phone and not coffee and not umbrella and not wave and not joke and not queued and activity in ["RELAXING","RESTING","FREE_TIME"]
+        var idle_ok := not peer_chat and not walking and not seated and not talking and not phone and not coffee and not umbrella and not wave and not joke and not queued and activity in ["RELAXING","RESTING","FREE_TIME"]
         var idle_gesture := _tick_idle_gesture(person,delta,idle_ok)
         var guarded := idle_ok and idle_gesture.is_empty() and str(person.get_meta("mood","")) in ["IRRITATED","STRESSED"]
         if idle_gesture in ["CHECK_WATCH","LOOK_HANDS"]:
@@ -4379,6 +4444,9 @@ func _animate_residents(delta: float) -> void:
                 angle=-0.95
             elif umbrella and limb=="ArmLeft":
                 angle=0.85
+            elif peer_speaking and limb=="ArmRight":
+                var emphasis := 0.48 if str(person.get_meta("peer_tone",""))=="TENSE" else 0.22
+                angle=0.35+sin(gesture_time*4.0)*emphasis
             elif talking and limb=="ArmRight":
                 angle=0.30+sin(gesture_time*3.3)*0.28
             elif coffee and limb=="ArmRight":

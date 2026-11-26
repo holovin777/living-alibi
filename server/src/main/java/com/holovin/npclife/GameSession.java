@@ -148,9 +148,29 @@ public final class GameSession implements AutoCloseable {
                 .filter(p->!lowStock||p.stock()<3)
                 .sorted(java.util.Comparator.comparing(RetailView::id)).toList();
     }
+    public record PeerEncounterView(String firstId,String secondId,long tick,String tone) { }
+    static boolean leisureEncounter(TownLife.Citizen c){
+        return c.alive&&c.travelRemaining==0&&java.util.Set.of("WALKING","WANDERING","STROLLING","FREE_TIME","RELAXING","RESTING").contains(c.activity);
+    }
+    // Only render recent, real simulation interactions between currently visible peers.
+    static List<PeerEncounterView> peerEncounters(TownLife.Town town,List<TownLife.Citizen> visible,long now){
+        var result=new java.util.ArrayList<PeerEncounterView>();
+        var used=new java.util.HashSet<String>();
+        var eligible=visible.stream().filter(GameSession::leisureEncounter).sorted(java.util.Comparator.comparing(c->c.id)).toList();
+        for(int i=0;i<eligible.size();i++)for(int j=i+1;j<eligible.size();j++){
+            var a=eligible.get(i);var b=eligible.get(j);
+            if(used.contains(a.id)||used.contains(b.id)||!a.currentSpace().equals(b.currentSpace()))continue;
+            var r=town.existingRelationship(a.id,b.id);
+            if(r==null||r.conversations==0||r.lastInteractionTick<0||r.lastInteractionTick>now||now-r.lastInteractionTick>15)continue;
+            String tone=r.tension>=58?"TENSE":r.affinity>=65&&r.trust>=58?"WARM":"CASUAL";
+            result.add(new PeerEncounterView(a.id,b.id,r.lastInteractionTick,tone));
+            used.add(a.id);used.add(b.id);
+        }
+        return List.copyOf(result);
+    }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit) { }
+                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -164,7 +184,8 @@ public final class GameSession implements AutoCloseable {
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
                 p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
-        var residents=(RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town)).stream()
+        var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
+        var residents=visible.stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
@@ -180,7 +201,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,MutualAidLife.notices(town,state.day),services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute),peerEncounters(town,visible,(long)(state.day-1)*1440L+state.minute));
     }
 
     public synchronized BusinessView business() {
