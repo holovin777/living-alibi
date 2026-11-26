@@ -45,6 +45,8 @@ func _ready() -> void:
         plate.material_override=material
         dinner.add_child(plate)
     dinner.hide()
+    _furniture("DinnerChair",Vector3(-2.5*side,0,0.48),Vector3(0.54,0.48,0.52),wood)
+    _box("DinnerChairBack",Vector3(0.54,0.65,0.10),wood,Vector3(-2.5*side,0.72,0.71))
     _furniture("Sofa",Vector3(2.9*side,0,1.8),Vector3(1.2,0.65,1.9),fabric)
     _box("SofaBack",Vector3(0.18,0.65,1.9),fabric,Vector3(3.38*side,0.9,1.8))
     # Small shared tray, visible only after the server accepts coffee.
@@ -149,11 +151,16 @@ func routine_anchor(activity: String) -> Vector3:
         "COOKING","DRINKING":return Vector3(-2.7*side,0,-2.25)
         "READING","WATCHING_TV","RESTING":return Vector3(-1.15*side,0,2.8)
         "CLEANING":return Vector3(0,0,-1.25)
-        "FAMILY_DINNER":return Vector3(-2.5*side,0,0.15)
+        "FAMILY_DINNER":return Vector3(-1.65*side,0,0.50)
     return host_anchor()
 
-func routine_seat() -> Vector3:
-    return Vector3(2.0 if unit%2==1 else -2.0,0,2.8)
+func routine_seat(activity: String = "") -> Vector3:
+    var side := -1.0 if unit%2==1 else 1.0
+    if activity=="FAMILY_DINNER":return Vector3(-2.5*side,0,0.48)
+    return Vector3(-2.0*side,0,2.8)
+
+func routine_seat_yaw(activity: String) -> float:
+    return 0.0 if activity=="FAMILY_DINNER" else PI
 
 func update_cleanliness(value: int) -> void:
     get_node("Clutter").visible = value<75
