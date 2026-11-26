@@ -229,6 +229,9 @@ var _music: AudioStreamPlayer
 var _music_value: Label
 var _dialog_target := ""
 var _dialog_pending := false
+var _dialog_started_at := 0
+var _dialog_end_remaining := 0.0
+var _dialog_farewell := ""
 var _action_title: Label
 var _action_choices: VBoxContainer
 
@@ -255,6 +258,7 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    _tick_dialog_autonomy(delta)
     _music.update_mix(delta,_dialog_panel.visible and _spoken_dialog_enabled)
     _tick_public_door(delta)
     if _phone_alert_remaining>0.0:
@@ -4783,7 +4787,7 @@ func _animate_residents(delta: float) -> void:
         var pace := float(appearance.get("pace",1.0))*ResidentAppearance.pace_factor(str(person.get_meta("appearance_stage","ADULT")))
         var stride := float(appearance.get("stride",0.42))
         var seated := int(person.get_meta("seat_index",-1)) >= 0
-        var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
+        var talking := _dialog_panel.visible and _dialog_end_remaining<=0.0 and str(person.get_meta("resident_id","")) == _dialog_target
         var queued := person.has_meta("market_queue_target")
         var queue_target: Vector3 = person.get_meta("market_queue_target",person.position)
         if queued and person.position.distance_to(queue_target)<0.12:
@@ -5560,6 +5564,9 @@ func _open_dialog(preferred_id: String = "") -> void:
     _dialog_input.clear()
     _dialog_history.clear()
     _dialog_history.append_text(_dialog_reply.text+"\n")
+    _dialog_started_at = _dialog_world_minute()
+    _dialog_end_remaining = 0.0
+    _dialog_farewell = ""
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
     _dialog_input.grab_focus()
@@ -5610,10 +5617,43 @@ func _localized_resident_reply(message: String) -> String:
         return _reply_translate("Good to see you again, %s.") % _reply_translate(spoken.substr(23,spoken.length()-24))
     return _reply_translate(spoken)
 
+func _dialog_world_minute() -> int:
+    return (int(_last_snapshot.get("day",1))-1)*1440+int(_last_snapshot.get("minute",0))
+
+func _dialog_patience(person: Node3D) -> int:
+    var activity := str(person.get_meta("activity",""))
+    if activity in ["SLEEPING","TRAVELING","SICK_LEAVE","RESTING_WHILE_SICK"]:
+        return 1
+    if activity in ["WORKING","STUDYING","JOB_SEARCH","SHOPPING"]:
+        return 4
+    if str(person.get_meta("relationship",""))=="FRIENDLY":
+        return 18
+    return 10
+
+func _finish_dialog_autonomously(farewell: String) -> void:
+    _close_dialog()
+    _message.text = farewell
+    _phone.add_notification(farewell)
+
+func _tick_dialog_autonomy(delta: float) -> void:
+    if not _dialog_panel.visible or _dialog_pending:return
+    if _dialog_end_remaining>0.0:
+        _dialog_end_remaining=maxf(0.0,_dialog_end_remaining-delta)
+        if _dialog_end_remaining<=0.0:
+            _finish_dialog_autonomously(_dialog_farewell)
+        return
+    var person := _dialog_person(_dialog_target)
+    if person==null:
+        _finish_dialog_autonomously(tr("They had to leave."))
+        return
+    if _dialog_world_minute()-_dialog_started_at>=_dialog_patience(person):
+        _finish_dialog_autonomously(tr("They have other things to do. Talk later."))
+
 func _close_dialog() -> void:
     var was_open := _dialog_panel.visible
     _dialog_panel.visible = false
     _dialog_target = ""
+    _dialog_end_remaining = 0.0
     _dialog_input.release_focus()
     if was_open:
         DisplayServer.tts_stop()
@@ -5656,7 +5696,7 @@ func _send_typed_dialog() -> void:
     _send_dialog(_dialog_input.text)
 
 func _send_dialog(message: String) -> void:
-    if not _dialog_panel.visible or _dialog_pending or not _connected:
+    if not _dialog_panel.visible or _dialog_pending or _dialog_end_remaining>0.0 or not _connected:
         return
     if _api.is_busy():
         _dialog_reply.text = tr("The world is updating. Try sending again.")
@@ -7402,7 +7442,7 @@ func _tick_live_clock(delta: float) -> void:
         return
     var eligible: bool = _connected and not _api.is_busy() and not _clock_pending \
             and _road_pending.is_empty() and not _travel_panel.visible \
-            and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _intercom.visible
+            and not _action_panel.visible and not _map_panel.visible and not _intercom.visible
     if _clock.advance(delta, eligible):
         _clock_pending = true
         # The existing atomic Java action advances needs, NPCs and SQLite.
@@ -7633,7 +7673,7 @@ func _animate_guest_family(delta: float) -> void:
         var activity := str(person.get_meta("activity","RESTING"))
         var path: Array = person.get_meta("family_path",[])
         var walking := false
-        var engaged := _dialog_panel.visible and str(person.get_meta("resident_id",""))==_dialog_target
+        var engaged := _dialog_panel.visible and _dialog_end_remaining<=0.0 and str(person.get_meta("resident_id",""))==_dialog_target
         if not engaged and not path.is_empty():
             var target: Vector3 = path[0]
             var motion := target-person.position
@@ -7678,7 +7718,7 @@ func _animate_guest_host(delta: float) -> void:
     if not is_instance_valid(_guest_host):return
     _animate_guest_family(delta)
     var walking := false
-    var engaged := _dialog_panel.visible and str(_guest_host.get_meta("resident_id",""))==_dialog_target
+    var engaged := _dialog_panel.visible and _dialog_end_remaining<=0.0 and str(_guest_host.get_meta("resident_id",""))==_dialog_target
     var reply_left := maxf(0.0,float(_guest_host.get_meta("reply_remaining",0.0))-delta)
     _guest_host.set_meta("reply_remaining",reply_left)
     var talking := _guest_feedback_time>0.0 or engaged
@@ -7923,7 +7963,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if _dialog_panel.visible:
         var person := _dialog_person(_dialog_target)
         if person == null:
-            _close_dialog()
+            _finish_dialog_autonomously(_dialog_farewell if not _dialog_farewell.is_empty() else tr("They had to leave."))
         else:
             _dialog_title.text = _resident_caption(person)
             _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
@@ -8182,7 +8222,15 @@ func _on_action_feedback(message: String) -> void:
             var speaker := _dialog_person(_dialog_target)
             _begin_resident_reply(speaker,_dialog_reply.text)
             _dialog_input.clear()
-            _dialog_input.grab_focus()
+            if not _api.dialogue_farewell.is_empty():
+                _dialog_farewell=_api.dialogue_farewell
+                _dialog_end_remaining=4.0
+                if _dialog_reply.text!=_dialog_farewell:
+                    _dialog_history.append_text(_dialog_farewell+"\n")
+                    _dialog_reply.text+="\n"+_dialog_farewell
+                _dialog_input.release_focus()
+            else:
+                _dialog_input.grab_focus()
     if not _clock_pending:
         _message.text = tr(message)
         _phone.add_notification(message)
