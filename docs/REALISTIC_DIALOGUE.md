@@ -42,8 +42,31 @@ Italian rule-based replies use existing Godot translation strings regardless
 of menu locale; missing translations are displayed without speech, marked as
 unavailable. Voice selection follows the actual reply language and requires
 an installed platform voice. No microphone recognition or automatic spoken
-language identification yet; no persistent full chat transcript. Existing
+language identification yet. Existing
 REST clients without the language field retain the previous behavior.
+
+## Private conversation memory
+
+Each resident contact stores the last 32 understood dialogue turns in the
+existing SQLite contact row, including game day, minute, declared language,
+player utterance and NPC reply (engine replies may be in canonical English
+before client localization). The migration preserves existing relationships
+and legacy last-heard text; it cannot recover conversations never recorded.
+NPCs do not receive another resident's history or a previous player's life.
+Ununderstood language attempts are not stored.
+
+For Ollama small talk, the prompt includes the last six turns and up to four
+older turns with overlapping topic words, with bounded excerpts. Past speech
+is not authoritative world truth and cannot execute actions. Explicit questions
+such as "Di cosa abbiamo parlato?" and "What did we talk about last time?"
+quote the most recent remembered non-recall player utterance without a model.
+Existing emotional and social memory rules remain intact.
+
+History applies to the Godot/REST conversation route; the older console
+continues its original behavior. Long-term semantic summaries, cross-language
+topic matching and unlimited transcripts are not implemented. The model can
+still misinterpret a remembered statement. A new player life has no inherited
+contact history.
 
 Manual check:
 ```sh
