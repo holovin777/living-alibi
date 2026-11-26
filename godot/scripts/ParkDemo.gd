@@ -1532,7 +1532,7 @@ func _sync_traffic_edges(origin_id: String) -> void:
                     var palette_index := absi((key+str(i)).hash())%colors.size()
                     var car := _make_city_car(_traffic_root,colors[palette_index],palette_index%2)
                     car.visible = false
-                    cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0})
+                    cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0,"reversed":false,"turning":false,"turn_progress":0.0})
                 _traffic_edges[key] = {"first":str(first),"second":str(second),"cars":cars}
     for key in _traffic_edges.keys():
         if not wanted.has(key):
@@ -1544,18 +1544,30 @@ func _sync_traffic_edges(origin_id: String) -> void:
     for edge in _traffic_edges.values():
         _position_traffic_edge(edge,origin_id)
 
+# Local traffic follows a continuous two-lane loop on each loaded motor link.
+# The turn is an actual semicircle rather than a disappearance/reappearance.
+func _traffic_forward(i: int,record: Dictionary) -> bool:
+    return (i==0)!=bool(record.get("reversed",false))
+
 func _position_traffic_edge(edge: Dictionary,origin_id: String) -> void:
     var origin := TownLayout.world_center(origin_id)
     var first := TownLayout.world_center(edge["first"])-origin
     var second := TownLayout.world_center(edge["second"])-origin
     for i in range(2):
         var record: Dictionary = edge["cars"][i]
-        var start := first if i==0 else second
-        var direction := (second-first).normalized() if i==0 else (first-second).normalized()
+        var forward := _traffic_forward(i,record)
+        var start := first if forward else second
+        var direction := (second-first).normalized() if forward else (first-second).normalized()
         var right := Vector3(-direction.z,0,direction.x)
         var car: Node3D = record["node"]
-        car.position = start+direction*float(record["distance"])+right*1.6
-        car.rotation.y = atan2(-direction.x,-direction.z)
+        if bool(record.get("turning",false)):
+            var angle := float(record.get("turn_progress",0.0))*PI
+            car.position=start+direction*(34.0+1.6*sin(angle))+right*1.6*cos(angle)
+            var tangent := direction*cos(angle)-right*sin(angle)
+            car.rotation.y=atan2(-tangent.x,-tangent.z)
+        else:
+            car.position = start+direction*float(record["distance"])+right*1.6
+            car.rotation.y = atan2(-direction.x,-direction.z)
 
 func _car_footprint(car: Node3D) -> Rect2:
     var dimensions := Vector2(1.88,3.62) if absf(cos(car.rotation.y))>0.5 else Vector2(3.62,1.88)
@@ -1583,17 +1595,19 @@ func _advance_traffic(delta: float) -> void:
         for i in range(2):
             var record: Dictionary = edge["cars"][i]
             var car: Node3D = record["node"]
-            var start := first if i==0 else second
-            var direction := (second-first).normalized() if i==0 else (first-second).normalized()
+            var forward := _traffic_forward(i,record)
+            var start := first if forward else second
+            var direction := (second-first).normalized() if forward else (first-second).normalized()
             var right := Vector3(-direction.z,0,direction.x)
             var distance := float(record["distance"])
             var blocked := false
             # Yield to pedestrians anywhere immediately ahead, including
             # a pedestrian already on either crossing.
             for person in people:
-                var relative := person-(start+direction*distance+right*1.6)
-                var ahead := relative.dot(direction)
-                if ahead>=-2.2 and ahead<=4.3 and absf(relative.dot(right))<1.45:
+                var relative := person-car.position
+                var heading := -car.basis.z.normalized()
+                var ahead := relative.dot(heading)
+                if ahead>=-2.2 and ahead<=4.3 and absf(relative.dot(car.basis.x.normalized()))<1.45:
                     blocked = true
                     break
             if float(record["delay"])>0.0:
@@ -1605,16 +1619,35 @@ func _advance_traffic(delta: float) -> void:
             car.visible = true
             if blocked:
                 continue
+            # Avoid following another car too closely, including during turns.
+            var traffic_blocked := false
+            for other_record in edge["cars"]:
+                var other: Node3D=other_record["node"]
+                if other==car or not other.visible:continue
+                var offset := other.position-car.position
+                var ahead := offset.dot(-car.basis.z.normalized())
+                if ahead>0.0 and ahead<4.5 and absf(offset.dot(car.basis.x.normalized()))<1.8:
+                    traffic_blocked=true
+                    break
+            if traffic_blocked:continue
+            if bool(record.get("turning",false)):
+                var progress := minf(1.0,float(record.get("turn_progress",0.0))+dt*0.42)
+                record["turn_progress"]=progress
+                if progress>=1.0:
+                    record["turning"]=false
+                    record["reversed"]=not bool(record.get("reversed",false))
+                    record["distance"]=TownLayout.TILE_SPACING-34.0
+                continue
             var next := distance+dt*(2.0 if phase==-1 else 4.0)
             if phase in [0,1]:
                 for stop in [15.0,27.0]:
                     if distance<=stop and next>stop:
                         next = stop
                         break
-            if next>=33.8:
-                record["distance"] = 14.2
-                record["delay"] = 4.0
-                car.visible = false
+            if next>=34.0:
+                record["distance"]=34.0
+                record["turning"]=true
+                record["turn_progress"]=0.0
             else:
                 record["distance"] = next
         _position_traffic_edge(edge,_current_place)
@@ -4868,6 +4901,7 @@ func _create_interface() -> void:
     _compact_status=Label.new()
     _compact_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _compact_status.custom_minimum_size=Vector2(280,0)
+    _compact_status.text=tr("Connecting to the local Java world...")
     root_column.add_child(_compact_status)
     _compact_keys=Label.new()
     _compact_keys.text=tr("I: character / settings · M: map · H: phone")
@@ -4933,7 +4967,9 @@ func _create_interface() -> void:
     _message.text = "No forced mission. Find your own direction."
     _message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _message.custom_minimum_size = Vector2(420.0, 0.0)
-    column.add_child(_message)
+    _message.custom_minimum_size=Vector2(280,0)
+    _message.max_lines_visible=2
+    root_column.add_child(_message)
 
     var buttons := HBoxContainer.new()
     work.add_child(buttons)
