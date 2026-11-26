@@ -310,14 +310,28 @@ final class PlayerLife {
         c.affinity=Math.max(-100,Math.min(100,c.affinity+affinity));
     }
 
+    private static String introductionKey(TownLife.Town t,String id){
+        return "introduction:"+t.player.incarnation+":"+id;
+    }
+    static boolean knowsResident(TownLife.Town t,String id){
+        return t.industryStocks.getOrDefault(introductionKey(t,id),0)>0;
+    }
+    static String displayName(TownLife.Town t,TownLife.Citizen c){
+        return knowsResident(t,c.id)?c.name:"Unknown resident";
+    }
+    static void learnResident(TownLife.Town t,String id){
+        t.industryStocks.put(introductionKey(t,id),1);
+    }
+
     static String speak(TownLife.Town town,String id,String message,int day,int minute) {
         TownLife.Citizen resident=nearby(town,id);
         String spoken=message.strip();
         if(spoken.isEmpty()||spoken.length()>1000)
             throw new IllegalArgumentException("Speak 1–1000 characters.");
         if(resident.activity.equals("SLEEPING")||resident.activity.equals("TRAVELING"))
-            throw new IllegalArgumentException(resident.name+" is not available for a conversation.");
+            throw new IllegalArgumentException(displayName(town,resident)+" is not available for a conversation.");
         Contact contact=town.player.contacts.computeIfAbsent(resident.id,Contact::new);
+        boolean askingName=spoken.equalsIgnoreCase("What is your name?")||spoken.equalsIgnoreCase("Come ti chiami?");
         boolean introduction=spoken.regionMatches(true,0,"My name is ",0,11);
         boolean changedAlias=false;
         if(introduction) {
@@ -378,6 +392,15 @@ final class PlayerLife {
         contact.conversations++;
         contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=spoken;
         String greeting=contact.knownName==null?"stranger":contact.knownName;
+        if(askingName){
+            if(knowsResident(town,id))return "My name is "+resident.name+".";
+            var mood=EmotionLife.mood(town,resident,day,minute);
+            if(contact.trust<45||mood==EmotionLife.Mood.IRRITATED||mood==EmotionLife.Mood.STRESSED)return "I would rather not say.";
+            if(contact.knownName==null&&(resident.sociability<70||contact.conversations<2))return "Why do you ask? Please introduce yourself first.";
+            if(resident.sociability<40&&contact.trust<60)return "Maybe another time.";
+            learnResident(town,id);
+            return "My name is "+resident.name+".";
+        }
         if(permission) {
             KnowledgeLife.shareableIntroduction(town,resident,contact.knownName,day,minute);
             return "All right. I may mention that we met.";
