@@ -433,7 +433,7 @@ public final class GameSession implements AutoCloseable {
         if(residentId==null || message==null)
             throw new IllegalArgumentException("Resident and message are required.");
         var copy=town.copy();
-        var resident=PlayerLife.nearby(copy,residentId);
+        var resident=PlayerLife.nearby(copy,residentId,state.day,state.minute);
         var region=WorldSpeechRegion.CURRENT;
         String language=spokenLanguage==null?null:ResidentLanguages.normalize(spokenLanguage);
         String reply=null;
@@ -455,6 +455,10 @@ public final class GameSession implements AutoCloseable {
                 reply=ResidentLanguages.languageQuestion(region,message,resident.id,language);
                 rendered=reply!=null;
             }
+        }
+        if(reply==null&&understood&&java.util.Set.of("can i meet your family","introduce me to your family","mi presenti la tua famiglia","posso conoscere la tua famiglia","mi fai conoscere la tua famiglia").contains(NaturalDialogue.normalize(message))){
+            reply=IntercomLife.introduceFamily(copy,resident.id,state.day,state.minute,language);
+            rendered=language!=null;
         }
         if(reply==null&&understood&&java.util.Set.of("can i give you my number","can i give you my phone number","ti posso dare il mio numero","posso darti il mio numero","share phone number").contains(NaturalDialogue.normalize(message))){
             boolean shared=PhoneLife.shareNumber(copy,resident);
