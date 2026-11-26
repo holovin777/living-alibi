@@ -5849,15 +5849,15 @@ func _sync_guest_family(household: Dictionary) -> void:
         residents = []
     var side := -1.0 if _guest.unit%2==1 else 1.0
     var spots: Array[Vector3] = []
-    for at in [Vector3(-0.65*side,0,-2.0),Vector3(0.65*side,0,1.25),Vector3(2.85*side,0,-0.1),Vector3(-1.15*side,0,1.55),Vector3(0.0,0,-0.35)]:
+    for at in [Vector3(-0.75*side,0,-2.0),Vector3(0.75*side,0,1.25),Vector3(2.75*side,0,-0.25),Vector3(-1.0*side,0,1.5),Vector3(0.0,0,-0.25),Vector3(-2.5*side,0,-2.0),Vector3(-1.25*side,0,-0.75)]:
         if _guest.can_stand(at,0.3):
             spots.append(at)
     var desired := {}
     for entry in residents:
         if not entry is Dictionary:continue
         var id := str(entry.get("id",""))
-        if id.is_empty() or desired.has(id) or desired.size()>=spots.size():continue
-        desired[id] = {"entry":entry,"position":spots[desired.size()]}
+        if id.is_empty() or desired.has(id) or desired.size()>=mini(5,spots.size()):continue
+        desired[id] = entry
     var existing := {}
     for child in root.get_children():
         var id := str(child.get_meta("resident_id",""))
@@ -5866,10 +5866,22 @@ func _sync_guest_family(household: Dictionary) -> void:
             child.queue_free()
         else:
             existing[id] = child
-    for id in desired:
-        var data: Dictionary = desired[id]
-        var entry: Dictionary = data["entry"]
+    var ids := desired.keys()
+    ids.sort()
+    for id in ids:
+        var entry: Dictionary = desired[id]
+        var activity := str(entry.get("activity","RESTING"))
         var person := existing.get(id) as Node3D
+        var target: Vector3 = _guest.routine_anchor(activity)
+        match activity:
+            "PLAYING":target=Vector3(-1.0*side,0,1.5)
+            "HOMEWORK","FAMILY_DINNER":target=Vector3(-1.25*side,0,-0.75)
+            "READING","WATCHING_TV","RESTING":target=Vector3(-1.0*side,0,1.5)
+        var goal: Vector3 = spots[0]
+        for at in spots:
+            if at.distance_squared_to(target)<goal.distance_squared_to(target):
+                goal=at
+        spots.erase(goal)
         if person == null:
             var old_root := _residents_root
             _residents_root = root
@@ -5878,11 +5890,25 @@ func _sync_guest_family(household: Dictionary) -> void:
             var age := int(entry.get("age",18))
             var size := 0.56 if age<6 else 0.72 if age<12 else 0.90 if age<18 else 1.0
             person.scale *= size
-        person.position = data["position"]
-        person.set_meta("activity",str(entry.get("activity","RESTING")))
-        var face: Vector3 = _guest.routine_anchor("FAMILY_DINNER")-person.position
-        if face.length_squared()>0.01:
-            person.rotation.y = atan2(-face.x,-face.z)
+            person.position = goal
+            var hand := person.get_node("ArmRight") as Node3D
+            _box(hand,Vector3(0.18,0.025,0.15),Color("#9d6744"),Vector3(0,-0.48,-0.10))
+            var book := hand.get_child(hand.get_child_count()-1) as Node3D
+            book.name="FamilyBook"
+            book.hide()
+            _box(hand,Vector3(0.11,0.11,0.11),Color("#d8a445"),Vector3(0,-0.49,-0.08))
+            var toy := hand.get_child(hand.get_child_count()-1) as Node3D
+            toy.name="FamilyToy"
+            toy.hide()
+        if not person.has_meta("family_goal") or person.get_meta("family_goal")!=goal:
+            var path: Array[Vector3] = _guest.host_path(person.position,goal)
+            # Keep a resident in place if there is no safe route.
+            if not path.is_empty():
+                person.set_meta("family_goal",goal)
+                person.set_meta("family_path",path)
+            else:
+                person.set_meta("family_path",[])
+        person.set_meta("activity",activity)
 
 func _animate_guest_family(delta: float) -> void:
     var root := _guest.get_node_or_null("GuestFamily") as Node3D
@@ -5890,14 +5916,38 @@ func _animate_guest_family(delta: float) -> void:
     for child in root.get_children():
         var person := child as Node3D
         var activity := str(person.get_meta("activity","RESTING"))
+        var path: Array = person.get_meta("family_path",[])
+        var walking := false
+        if not path.is_empty():
+            var target: Vector3 = path[0]
+            var motion := target-person.position
+            if motion.length()>0.025:
+                var next := person.position.move_toward(target,delta*0.95)
+                if _guest.can_stand(next,0.25):
+                    person.rotation.y=atan2(-motion.x,-motion.z)
+                    person.position=next
+                    walking=true
+                else:
+                    path.clear()
+                    person.remove_meta("family_goal")
+            else:
+                path.pop_front()
+        person.set_meta("family_path",path)
         var phase := float(Time.get_ticks_msec())*0.001+float(person.get_meta("phase",0.0))
-        var gesture := 0.0
-        match activity:
-            "PLAYING":gesture=0.55+sin(phase*5.0)*0.5
-            "HOMEWORK","READING":gesture=0.65+sin(phase*2.0)*0.15
-            "COOKING","CLEANING","DRINKING","FAMILY_DINNER":gesture=0.65+sin(phase*3.0)*0.25
+        var swing := sin(phase*9.0)*0.4 if walking else 0.0
+        for limb in ["LegLeft","LegRight"]:
+            var leg := person.get_node(limb) as Node3D
+            leg.rotation.x=lerpf(leg.rotation.x,swing if limb=="LegLeft" else -swing,minf(delta*8.0,1.0))
+        var gesture := -swing if walking else 0.0
+        if not walking:
+            match activity:
+                "PLAYING":gesture=0.55+sin(phase*5.0)*0.5
+                "HOMEWORK","READING":gesture=0.65+sin(phase*2.0)*0.15
+                "COOKING","CLEANING","DRINKING","FAMILY_DINNER":gesture=0.65+sin(phase*3.0)*0.25
         var arm := person.get_node("ArmRight") as Node3D
         arm.rotation.x=lerpf(arm.rotation.x,gesture,minf(delta*6.0,1.0))
+        arm.get_node("FamilyBook").visible=not walking and activity in ["HOMEWORK","READING"]
+        arm.get_node("FamilyToy").visible=not walking and activity=="PLAYING"
 
 func _animate_guest_host(delta: float) -> void:
     if not is_instance_valid(_guest_host):return
