@@ -241,6 +241,7 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    _tick_public_door(delta)
     if _phone_alert_remaining>0.0:
         _phone_alert_remaining = maxf(0.0,_phone_alert_remaining-delta)
         if _phone_alert_remaining<=0.0:
@@ -666,6 +667,8 @@ func _entrance_hint() -> String:
     var lines := PackedStringArray()
     for entry in entries:
         lines.append("%s · %s" % [entry[0],_guide_direction(entry[1])])
+    var door := _public_door()
+    if door!=null and not _door_open_hours(door):return tr("Closed · %s") % " / ".join(lines)
     return tr("Walk through the open entrance: %s") % " / ".join(lines)
 
 func _owns_house() -> bool:
@@ -1650,6 +1653,7 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
+    if _public_door_blocks(at,radius):return false
     if _current_place=="SOUTH_RESIDENCES" and _owns_house():
         var plants: Array = _last_snapshot.get("orchard",{}).get("plants",[])
         for n in range(mini(plants.size(),4)):
@@ -2674,6 +2678,7 @@ func _build_cafe() -> void:
     _box(cafe,Vector3(0.22,0.50,2.1),wood,Vector3(-4,2.75,7))
     _box(cafe,Vector3(1.45,0.14,2.4),Color("#537569"),Vector3(-3.4,3.0,7))
     _physical_sign(cafe,"Bar Centrale",Vector3(-3.8,3.4,7),PI/2.0,2.6)
+    _build_public_door(cafe,Vector3(-4,0,7),2.1,420,1260,Rect2(-13,3,9,8))
     for z in [4.5,9.5]:
         _box(cafe,Vector3(0.12,1.55,1.85),Color("#536e75"),Vector3(-3.82,1.45,z))
         _box(cafe,Vector3(0.16,1.3,1.1),Color("#4e6352"),Vector3(-3.84,4.6,z))
@@ -2704,6 +2709,74 @@ func _build_cafe() -> void:
         light.light_energy=1.4
         light.omni_range=6
         cafe.add_child(light)
+
+# Animated sliding entrance, registered in the actual district scene.
+func _build_public_door(parent: Node3D, at: Vector3, width: float, opens: int, closes: int, inside: Rect2) -> void:
+    var door := Node3D.new()
+    door.name="PublicDoor"
+    parent.add_child(door)
+    door.position=at
+    door.set_meta("width",width)
+    door.set_meta("opens",opens)
+    door.set_meta("closes",closes)
+    door.set_meta("inside",inside)
+    door.set_meta("fraction",0.0)
+    for side in [-1,1]:
+        var leaf := Node3D.new()
+        leaf.name="Left" if side<0 else "Right"
+        door.add_child(leaf)
+        leaf.position.z=side*width/4.0
+        var frame := Color("#6a5949")
+        _box(leaf,Vector3(0.09,2.35,width/2.0-0.025),Color("#78999b"),Vector3(0,1.175,0))
+        for z in [-width/4.0+0.04,width/4.0-0.04]:
+            _box(leaf,Vector3(0.12,2.35,0.08),frame,Vector3(0,1.175,z))
+        for y in [0.04,1.0,2.31]:
+            _box(leaf,Vector3(0.12,0.08,width/2.0),frame,Vector3(0,y,0))
+    var signboard := Label3D.new()
+    signboard.name="Hours"
+    signboard.position=Vector3(-0.18 if at.x>0 else 0.18,2.55,0)
+    signboard.rotation.y=-PI/2.0 if at.x>0 else PI/2.0
+    signboard.font_size=32
+    signboard.pixel_size=0.006
+    signboard.outline_size=5
+    door.add_child(signboard)
+
+func _public_door() -> Node3D:
+    if not is_instance_valid(_scenery):return null
+    var path := str({"PORTICI":"ViaDeiPortici/BottegaAlimentare/PublicDoor","BAKERY":"PanetteriaDelBorgo/PublicDoor","CAFE":"BarCentrale/PublicDoor"}.get(_current_place,""))
+    return null if path.is_empty() else _scenery.get_node_or_null(path) as Node3D
+
+func _door_open_hours(door: Node3D) -> bool:
+    var minute := int(_last_snapshot.get("minute",0))
+    return minute>=int(door.get_meta("opens")) and minute<int(door.get_meta("closes"))
+
+func _tick_public_door(delta: float) -> void:
+    var door := _public_door()
+    if door==null:return
+    var inside: Rect2=door.get_meta("inside")
+    var player_at := Vector2(_avatar.position.x,_avatar.position.z)
+    var width := float(door.get_meta("width"))
+    var at := door.position
+    var in_public := not _apartment_active and not _guest_active and not _stairwell_active
+    var threshold := Rect2(at.x-0.45,at.z-width/2.0-0.35,0.90,width+0.70)
+    var leaving := in_public and (inside.has_point(player_at) or (threshold.has_point(player_at) and float(door.get_meta("fraction"))>0.0))
+    var open := _door_open_hours(door)
+    var fraction := move_toward(float(door.get_meta("fraction")),1.0 if open or leaving else 0.0,delta*2.5)
+    door.set_meta("fraction",fraction)
+    for side in [-1,1]:
+        var leaf := door.get_node("Left" if side<0 else "Right") as Node3D
+        leaf.position.z=side*(width/4.0+fraction*width/2.0)
+    var start := int(door.get_meta("opens"))
+    var end := int(door.get_meta("closes"))
+    var hours := "%02d:%02d–%02d:%02d" % [floori(start/60.0),start%60,floori(end/60.0),end%60]
+    door.get_node("Hours").text="%s · %s" % [tr("Open") if open else tr("Closed"),hours]
+
+func _public_door_blocks(at: Vector3,radius: float) -> bool:
+    var door := _public_door()
+    if door==null or float(door.get_meta("fraction"))>=0.95:return false
+    var width := float(door.get_meta("width"))
+    var rect := Rect2(door.position.x-0.06,door.position.z-width/2.0,0.12,width)
+    return rect.grow(radius).has_point(Vector2(at.x,at.z))
 
 func _build_library() -> void:
     var library := Node3D.new()
@@ -2762,6 +2835,7 @@ func _build_bakery() -> void:
         _box(bakery,Vector3(0.24,0.12,1.4),stone,Vector3(-3.72,0.88,z))
         _box(bakery,Vector3(0.16,1.25,1.10),Color("#526554"),Vector3(-3.85,4.55,z))
     _physical_sign(bakery,"Panetteria del Borgo",Vector3(-3.1,3.36,7),PI/2.0,3.0)
+    _build_public_door(bakery,Vector3(-4,0,7),2.1,420,1080,Rect2(-12,3.5,8,7))
     _box(bakery,Vector3(2.1,0.07,4.0),stone,Vector3(-2.95,0.045,7))
     var counter := Node3D.new()
     counter.name="BakeryCounter"
@@ -2858,6 +2932,7 @@ func _portici_grocery(parent: Node3D) -> void:
     _box(shop,Vector3(6.65,0.3,6.25),Color("#794b36"),Vector3(7.45,7.35,5))
     _box(shop,Vector3(0.24,0.45,2.3),Color("#6f4931"),Vector3(4.4,2.85,5.3))
     _physical_sign(shop,"Alimentari",Vector3(4.05,3.1,5.3),-PI/2.0,2.3)
+    _build_public_door(shop,Vector3(4.4,0,5.3),1.95,480,1200,Rect2(4.4,2.15,6.1,5.7))
     for z in [4.5,6.8]:
         var shelf := Vector3(9.8,0,z)
         _add_obstacle(shelf,Vector2(0.6,1.3))
@@ -6317,6 +6392,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _avatar.position = _truck_exit(new_place) if truck_arrival else (CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO))
         if not _can_stand(_avatar.position, WALKER_RADIUS, true):
             _avatar.position = Vector3.ZERO
+        _tick_public_door(1.0)
         _locations.clear() # Previous-origin travel estimates are now stale.
         _follow_player()
         _action_panel.visible = false
