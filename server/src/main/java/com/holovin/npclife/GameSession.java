@@ -613,6 +613,12 @@ public final class GameSession implements AutoCloseable {
             };
             return apply(copy,visit?5:1,reply);
         }
+        if(action!=null&&action.startsWith("phone-out:")){
+            String[] parts=action.split(":",3);
+            if(parts.length!=3||!java.util.Set.of("dial","hangup","invite-coffee").contains(parts[1]))throw new IllegalArgumentException("Choose an outgoing call action.");
+            var copy=town.copy();
+            return apply(copy,1,PhoneLife.outgoing(copy,parts[2],parts[1],state.day,state.minute));
+        }
         if(action!=null&&action.startsWith("phone-call:")){
             String[] parts=action.split(":",3);
             if(parts.length!=3||!java.util.Set.of("answer","decline","accept").contains(parts[1]))throw new IllegalArgumentException("Choose a call action.");
