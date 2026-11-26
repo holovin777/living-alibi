@@ -117,6 +117,9 @@ func drink_from(source_id: String) -> void:
 func forage(source_id: String) -> void:
     _send("/actions/forage", HTTPClient.METHOD_POST, {"sourceId": source_id})
 
+func rest_for(minutes: int) -> void:
+    _send("/actions/rest", HTTPClient.METHOD_POST, {"minutes": minutes})
+
 func wait_for(minutes: int) -> void:
     _send("/actions/wait", HTTPClient.METHOD_POST, {"minutes": minutes})
 
