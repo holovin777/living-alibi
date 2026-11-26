@@ -29,3 +29,6 @@
 # Backups and logs
 *.backup
 *.log
+
+# Portable release staging
+/dist/
