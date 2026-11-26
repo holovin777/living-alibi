@@ -13,6 +13,49 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void birthdayCelebrationConservesMoneyAndPersists() throws Exception {
+        Path file=directory.resolve("birthday.db");
+        String childId,parentId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var family=PopulationGenerator.add(town,2);
+            var parent=family.get(0);var child=family.get(1);
+            childId=child.id;parentId=parent.id;
+            for(var c:family){
+                c.age=30;c.alive=true;c.health=100;c.fatigue=20;c.activity="FREE_TIME";
+                c.home=TownLife.Place.NORTH_RESIDENCES;c.homeUnit=parent.homeUnit;c.place=c.home;
+                c.destination=c.home;c.travelRemaining=0;
+            }
+            parent.money=90;child.money=10;child.age=7;
+            DemographyLife.set(town,child,"parent-a",parent.generationIndex);
+            DemographyLife.set(town,child,"born",10);
+            state.day=374;state.minute=1080;
+            BirthdayLife.tick(town,state);
+            assertEquals(0,BirthdayLife.memory(town,child,state.day).celebrations());
+            state.day=375;parent.travelRemaining=1;
+            BirthdayLife.tick(town,state);
+            assertEquals(0,BirthdayLife.memory(town,child,state.day).celebrations());
+            parent.travelRemaining=0;state.minute=1110;
+            BirthdayLife.tick(town,state);BirthdayLife.tick(town,state);
+            assertEquals(85,parent.money);assertEquals(15,child.money);
+            assertEquals(1,BirthdayLife.memory(town,child,state.day).celebrations());
+            assertTrue(BirthdayLife.celebrating(town,parent,375,1115));
+            assertFalse(HouseholdLife.view(town,parent,375,1115,false).birthdayNow());
+            assertTrue(HouseholdLife.view(town,parent,375,1115,true).birthdayNow());
+            assertFalse(BirthdayLife.celebrating(town,parent,375,1140));
+            state.minute=1140;
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());var child=town.get(childId);var parent=town.get(parentId);
+            assertEquals(100,child.money+parent.money);
+            var memory=RebirthLife.identity(town,child,376).birthday();
+            assertEquals(1,memory.celebrations());assertEquals(375,memory.lastDay());
+            assertEquals(5,memory.lastGift());assertEquals(740,memory.nextDay());
+        }
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";
