@@ -48,6 +48,27 @@ final class ConversationMemory {
         for(var score:scored){if(indices.size()>=PROMPT_LIMIT)break;indices.add(score[0]);}
         return indices.stream().map(turns::get).toList();
     }
+    static boolean recallQuestion(String message){
+        return Set.of("what did we talk about","what did we talk about last time",
+                "do you remember what we talked about","what did i tell you last time",
+                "di cosa abbiamo parlato","di cosa abbiamo parlato l'ultima volta",
+                "ti ricordi di cosa abbiamo parlato","cosa ti ho detto l'ultima volta").contains(NaturalDialogue.normalize(message));
+    }
+    /** Exact recall of the last recorded utterance; never invent a missing turn. */
+    static String recall(PlayerLife.Contact contact,String language){
+        boolean it="it".equals(language);
+        if(contact==null||contact.dialogue.isEmpty()){
+            if(contact!=null&&contact.lastHeard!=null&&!contact.lastHeard.isBlank())
+                return (it?"Ricordo che mi hai detto: «":"I remember you said: “")+clip(contact.lastHeard,500)+(it?"».":"”.");
+            return it?"Non ricordo una conversazione precedente.":"I don't remember an earlier conversation.";
+        }
+        for(int i=contact.dialogue.size()-1;i>=0;i--){
+            var t=contact.dialogue.get(i);
+            if(recallQuestion(t.player()))continue;
+            return (it?"Ricordo che mi hai detto: «":"I remember you said: “")+clip(t.player(),500)+(it?"».":"”.");
+        }
+        return it?"Non ricordo altro.":"I don't remember anything else.";
+    }
     static String encode(PlayerLife.Contact contact) throws java.sql.SQLException {
         var array=JSON.createArrayNode();
         for(var t:contact.dialogue){
