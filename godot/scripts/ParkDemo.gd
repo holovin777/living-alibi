@@ -7311,7 +7311,8 @@ func _on_phone_alarm(message: String) -> void:
 
 func _reply_phone_call(resident_id: String,action: String) -> void:
     if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
-        _api.garden_action("phone-call:%s:%s" % [action,resident_id])
+        var route := "phone-out" if action in ["dial","hangup","invite-coffee"] else "phone-call"
+        _api.garden_action("%s:%s:%s" % [route,action,resident_id])
 
 func _reply_phone_sms(resident_id: String,choice: int) -> void:
     if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
