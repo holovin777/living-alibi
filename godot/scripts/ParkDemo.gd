@@ -3352,6 +3352,7 @@ func _render_residents() -> void:
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
+        _sync_resident_uniform(person,str(resident.get("outfitVisual","")))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
         _sync_office_employee(person,id)
@@ -3413,6 +3414,99 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
             _box(prop,Vector3(0.22,0.035,0.30),Color("#a17e53"),Vector3.ZERO)
             _box(prop,Vector3(0.19,0.012,0.26),Color("#f1eee4"),Vector3(0,0.025,0))
     prop.show()
+
+# Outfit meshes are presentation only; they do not grant equipment or clothing ownership.
+func _sync_resident_uniform(person: Node3D,kind: String) -> void:
+    if str(person.get_meta("outfit_visual",""))==kind:return
+    var previous := person.get_node_or_null("Uniform")
+    if previous!=null:
+        person.remove_child(previous)
+        previous.queue_free()
+    person.set_meta("outfit_visual",kind)
+    if kind.is_empty():return
+    var uniform := Node3D.new()
+    uniform.name="Uniform"
+    person.add_child(uniform)
+    match kind:
+        "BAKER_APRON","CAFE_APRON":
+            var cloth := Color("#f3eee3") if kind=="BAKER_APRON" else Color("#4c645c")
+            _box(uniform,Vector3(0.37,0.62,0.055),cloth,Vector3(0,1.03,-0.19))
+            _box(uniform,Vector3(0.18,0.14,0.03),cloth.darkened(0.13),Vector3(0,0.91,-0.225))
+            for x in [-0.12,0.12]:
+                _box(uniform,Vector3(0.045,0.25,0.04),cloth,Vector3(x,1.37,-0.16))
+            if kind=="BAKER_APRON":
+                _cylinder(uniform,0.19,0.14,cloth,Vector3(0,1.92,0))
+        "DOCTOR_COAT","SCRUBS":
+            var cloth := Color("#f4f1e9") if kind=="DOCTOR_COAT" else Color("#528c91")
+            var coat := _cylinder(uniform,0.255,0.68,cloth,Vector3(0,1.08,0))
+            coat.scale.z=0.76
+            _box(uniform,Vector3(0.045,0.53,0.03),cloth.darkened(0.2),Vector3(0,1.09,-0.204))
+            _box(uniform,Vector3(0.105,0.06,0.025),Color("#78949d"),Vector3(0.13,1.29,-0.205))
+        "TECHNICIAN","HIGH_VIS":
+            var cloth := Color("#384f65") if kind=="TECHNICIAN" else Color("#d5a63c")
+            var vest := _cylinder(uniform,0.255,0.54,cloth,Vector3(0,1.15,0))
+            vest.scale.z=0.77
+            if kind=="HIGH_VIS":
+                for y in [1.04,1.24]:
+                    var stripe := _cylinder(uniform,0.259,0.055,Color("#e7e9cf"),Vector3(0,y,0))
+                    stripe.scale.z=0.78
+                _cylinder(uniform,0.235,0.045,Color("#d6ac39"),Vector3(0,1.83,0))
+                var helmet := _sphere(uniform,0.22,Color("#e7bc42"),Vector3(0,1.88,0))
+                helmet.scale.y=0.52
+            else:
+                _box(uniform,Vector3(0.24,0.24,0.18),Color("#443a30"),Vector3(0.26,0.91,0.04))
+                _box(uniform,Vector3(0.055,0.14,0.06),Color("#b1b8b9"),Vector3(0.26,1.07,0.04))
+        "BACKPACK":
+            _box(uniform,Vector3(0.37,0.43,0.21),Color("#526c90"),Vector3(0,1.15,0.25))
+            _box(uniform,Vector3(0.25,0.18,0.08),Color("#384c6c"),Vector3(0,1.08,0.39))
+            for x in [-0.17,0.17]:
+                _box(uniform,Vector3(0.05,0.45,0.06),Color("#526c90"),Vector3(x,1.15,-0.15))
+
+func _resident_outdoors(person: Node3D) -> bool:
+    if _apartment_active or _guest_active or _stairwell_active:return false
+    # Conservative outdoor districts only; avoid guessing shelter in mixed office/home scenes.
+    if _current_place not in ["PARK","CENTRO","RIVER","WOODS","MARKET","QUARRY","BAKERY","CAFE","PORTICI"]:return false
+    var door := _public_door()
+    if door!=null:
+        var inside: Rect2=door.get_meta("inside")
+        if inside.has_point(Vector2(person.position.x,person.position.z)):return false
+    return true
+
+func _sync_resident_weather(person: Node3D,talking: bool,seated: bool) -> bool:
+    var weather: Dictionary=_last_snapshot.get("weather",{})
+    var outdoors := _resident_outdoors(person)
+    var activity := str(person.get_meta("activity",""))
+    var cold := outdoors and int(weather.get("temperatureC",18))<=8 and activity!="WORKING" and str(person.get_meta("outfit_visual","")).is_empty()
+    var coat := person.get_node_or_null("WinterClothes") as Node3D
+    if cold and coat==null:
+        coat=Node3D.new()
+        coat.name="WinterClothes"
+        person.add_child(coat)
+        var profile: Dictionary=person.get_meta("appearance",{})
+        var paint: Color=profile.get("jacket",Color("#52636c"))
+        var jacket := _cylinder(coat,0.27,0.63,paint.darkened(0.12),Vector3(0,1.12,0))
+        jacket.scale.z=0.83
+        _cylinder(coat,0.15,0.12,Color("#aa775d"),Vector3(0,1.48,0))
+        _box(coat,Vector3(0.11,0.29,0.045),Color("#aa775d"),Vector3(0.10,1.35,-0.21))
+        var hat := _sphere(coat,0.215,paint.darkened(0.25),Vector3(0,1.79,0))
+        hat.scale.y=0.60
+    if coat!=null:coat.visible=cold
+    var use_umbrella := outdoors and bool(weather.get("raining",false)) and not seated and not talking and activity!="WORKING" and activity in ["WALKING","WANDERING","STROLLING","FREE_TIME","SHOPPING","JOB_SEARCH"] and absi(str(person.get_meta("resident_id","")).hash())%3!=0
+    var umbrella := person.get_node_or_null("Umbrella") as Node3D
+    if use_umbrella and umbrella==null:
+        umbrella=Node3D.new()
+        umbrella.name="Umbrella"
+        person.add_child(umbrella)
+        var profile: Dictionary=person.get_meta("appearance",{})
+        var paint: Color=profile.get("jacket",Color("#52636c"))
+        _cylinder(umbrella,0.016,1.18,Color("#555a5b"),Vector3(-0.29,1.60,-0.34))
+        var canopy := _cylinder(umbrella,0.67,0.22,paint,Vector3(-0.29,2.25,-0.34))
+        var mesh := canopy.mesh as CylinderMesh
+        mesh.top_radius=0.06
+        mesh.bottom_radius=0.67
+        _sphere(umbrella,0.035,Color("#555a5b"),Vector3(-0.29,2.39,-0.34))
+    if umbrella!=null:umbrella.visible=use_umbrella
+    return use_umbrella
 
 func _assign_work_stations() -> void:
     if _apartment_active:return
@@ -3765,6 +3859,7 @@ func _animate_residents(delta: float) -> void:
             var old := person.position
             person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
             walking = person.position.distance_squared_to(old) > 0.000001
+        var umbrella := _sync_resident_weather(person,talking,seated)
         var swing := sin(phase*12.0)*stride if walking else 0.0
         var gesture_time := float(Time.get_ticks_msec())*0.001+phase
         var coffee := seated and str(person.get_meta("seat_kind",""))=="cafe" and not talking
@@ -3781,7 +3876,9 @@ func _animate_residents(delta: float) -> void:
                 knee.rotation.x = lerpf(knee.rotation.x,-PI/2.0 if seated else 0.0,minf(delta*10.0,1.0))
                 if seated:
                     angle = PI/2.0
-            if talking and limb=="ArmRight":
+            if umbrella and limb=="ArmLeft":
+                angle=0.85
+            elif talking and limb=="ArmRight":
                 angle=0.30+sin(gesture_time*3.3)*0.28
             elif coffee and limb=="ArmRight":
                 angle=0.85+0.50*maxf(0.0,sin(gesture_time*1.4))
@@ -3893,7 +3990,7 @@ func _box(parent: Node3D, size: Vector3, color: Color,
     parent.add_child(node)
 
 func _sphere(parent: Node3D, radius: float, color: Color,
-        where: Vector3) -> void:
+        where: Vector3) -> MeshInstance3D:
     var mesh := SphereMesh.new()
     mesh.radius = radius
     mesh.height = radius * 2.0
@@ -3904,6 +4001,7 @@ func _sphere(parent: Node3D, radius: float, color: Color,
     node.material_override = mat
     node.position = where
     parent.add_child(node)
+    return node
 
 func _create_interface() -> void:
     var canvas := CanvasLayer.new()

@@ -32,6 +32,29 @@ class GameSessionTest {
     }
 
     @Test
+    void observableOutfitsRequireActualWorkOrSchoolAttendance() {
+        var resident=new TownLife.Citizen("outfit","Resident","Baker",TownLife.Place.BAKERY);
+        resident.activity="WORKING";
+        assertEquals("BAKER_APRON",GameSession.outfitVisual(resident));
+        resident.activity="FREE_TIME";
+        assertEquals("",GameSession.outfitVisual(resident));
+        resident.activity="WORKING";resident.place=TownLife.Place.CLINIC;resident.occupation="Doctor";
+        assertEquals("DOCTOR_COAT",GameSession.outfitVisual(resident));
+        resident.occupation="Nurse";
+        assertEquals("SCRUBS",GameSession.outfitVisual(resident));
+        resident.place=TownLife.Place.WORKSHOP;resident.occupation="Engineer";
+        assertEquals("TECHNICIAN",GameSession.outfitVisual(resident));
+        resident.place=TownLife.Place.QUARRY;resident.occupation="Miner";
+        assertEquals("HIGH_VIS",GameSession.outfitVisual(resident));
+        resident.place=TownLife.Place.SCHOOL;resident.age=10;resident.activity="STUDYING";
+        assertEquals("BACKPACK",GameSession.outfitVisual(resident));
+        resident.travelRemaining=1;
+        assertEquals("",GameSession.outfitVisual(resident));
+        resident.travelRemaining=0;resident.age=25;
+        assertEquals("",GameSession.outfitVisual(resident));
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";
