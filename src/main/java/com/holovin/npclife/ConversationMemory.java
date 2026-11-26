@@ -12,10 +12,46 @@ final class ConversationMemory {
     private static final int PROMPT_LIMIT=10;
     private static final ObjectMapper JSON=new ObjectMapper();
     record Turn(int day,int minute,String language,String player,String reply) {}
+    enum Milestone { FIRST_MEETING, INTRODUCTION, SUPPORT, HURT, BROKEN_TRUST, APOLOGY, RECEIVED_AID }
+    record Important(Milestone kind,Turn turn) {}
     private ConversationMemory(){}
     static void remember(PlayerLife.Contact contact,int day,int minute,String language,String player,String reply){
         contact.dialogue.add(new Turn(day,minute,language==null?"und":language,clip(player,1000),clip(reply,1200)));
         while(contact.dialogue.size()>LIMIT)contact.dialogue.remove(0);
+    }
+    /** One first meeting and the latest verified milestone of each other kind. */
+    static void mark(PlayerLife.Contact contact,Milestone kind,Turn turn){
+        if(kind==Milestone.FIRST_MEETING && contact.important.containsKey(kind))return;
+        contact.important.put(kind,turn);
+    }
+    static void captureMilestones(TownLife.Town before,TownLife.Town after,
+                                  PlayerLife.Contact prior,PlayerLife.Contact current,Turn turn){
+        if(prior==null)mark(current,Milestone.FIRST_MEETING,turn);
+        if(current.knownName!=null&&(prior==null||!current.knownName.equals(prior.knownName)))
+            mark(current,Milestone.INTRODUCTION,turn);
+        for(var kind:List.of(SocialMemoryLife.Kind.SUPPORT,SocialMemoryLife.Kind.HURT,
+                SocialMemoryLife.Kind.BROKEN_TRUST,SocialMemoryLife.Kind.APOLOGY,SocialMemoryLife.Kind.RECEIVED_AID)){
+            int oldDay=SocialMemoryLife.last(before,current.residentId,kind);
+            int newDay=SocialMemoryLife.last(after,current.residentId,kind);
+            if(newDay>oldDay)mark(current,Milestone.valueOf(kind.name()),turn);
+        }
+    }
+    static List<Important> importantContext(PlayerLife.Contact contact){
+        if(contact==null)return List.of();
+        return contact.important.entrySet().stream().map(e->new Important(e.getKey(),e.getValue())).toList();
+    }
+    static boolean importantQuestion(String message){
+        return Set.of("what do you remember about our first meeting","do you remember when we met",
+                "do you remember our first meeting","ti ricordi quando ci siamo conosciuti",
+                "ti ricordi il nostro primo incontro","ricordi il nostro primo incontro",
+                "come ci siamo conosciuti").contains(NaturalDialogue.normalize(message));
+    }
+    static String firstMeeting(PlayerLife.Contact contact,String language){
+        boolean it="it".equals(language);
+        Turn turn=contact==null?null:contact.important.get(Milestone.FIRST_MEETING);
+        if(turn==null)return it?"Non ricordo il nostro primo incontro.":"I don't remember our first meeting.";
+        return (it?"Ricordo il nostro primo incontro, il giorno ":"I remember our first meeting, on day ")
+                +turn.day()+(it?". Mi hai detto: «":". You said: “")+clip(turn.player(),300)+(it?"».":"”.");
     }
     private static String clip(String text,int max){
         if(text==null)return "";
@@ -69,21 +105,40 @@ final class ConversationMemory {
         }
         return it?"Non ricordo altro.":"I don't remember anything else.";
     }
+    private static void writeTurn(com.fasterxml.jackson.databind.node.ObjectNode row,Turn t){
+        row.put("day",t.day());row.put("minute",t.minute());
+        row.put("language",t.language());row.put("player",t.player());row.put("reply",t.reply());
+    }
+    private static Turn readTurn(com.fasterxml.jackson.databind.JsonNode t){
+        return new Turn(t.path("day").asInt(),t.path("minute").asInt(),
+                t.path("language").asText("und"),clip(t.path("player").asText(""),1000),
+                clip(t.path("reply").asText(""),1200));
+    }
     static String encode(PlayerLife.Contact contact) throws java.sql.SQLException {
-        var array=JSON.createArrayNode();
-        for(var t:contact.dialogue){
-            var row=array.addObject();row.put("day",t.day());row.put("minute",t.minute());
-            row.put("language",t.language());row.put("player",t.player());row.put("reply",t.reply());
-        }
-        return array.toString();
+        var root=JSON.createObjectNode();
+        var array=root.putArray("recent");
+        for(var t:contact.dialogue)writeTurn(array.addObject(),t);
+        var milestones=root.putObject("important");
+        for(var e:contact.important.entrySet())writeTurn(milestones.putObject(e.getKey().name()),e.getValue());
+        return root.toString();
     }
     static void decode(PlayerLife.Contact contact,String stored) throws java.sql.SQLException {
         if(stored==null||stored.isBlank())return;
         try {
-            var array=JSON.readTree(stored);
+            var root=JSON.readTree(stored);
+            var array=root.isArray()?root:root.path("recent");
             if(!array.isArray())throw new IllegalArgumentException("Expected conversation array");
-            for(var t:array)remember(contact,t.path("day").asInt(),t.path("minute").asInt(),
-                    t.path("language").asText("und"),t.path("player").asText(""),t.path("reply").asText(""));
+            contact.dialogue.clear();contact.important.clear();
+            for(var node:array){
+                var t=readTurn(node);
+                remember(contact,t.day(),t.minute(),t.language(),t.player(),t.reply());
+            }
+            // Previous array-format saves keep their recent turns without invented milestones.
+            if(root.isObject()){
+                var milestones=root.path("important");
+                for(var kind:Milestone.values())if(milestones.path(kind.name()).isObject())
+                    mark(contact,kind,readTurn(milestones.path(kind.name())));
+            }
         } catch(Exception ex){throw new java.sql.SQLException("Invalid conversation memory",ex);}
     }
 }
