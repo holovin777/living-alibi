@@ -13,6 +13,39 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void electricianRepairsRecurringFaultWithRealMaterialsAndPay() {
+        var state=new WorldState();var town=TownLife.create(state);
+        var worker=PopulationGenerator.add(town,1).getFirst();
+        worker.occupation=ElectricianLife.JOB;worker.age=30;worker.employed=true;
+        worker.workplace=TownLife.Place.PARK;worker.place=worker.workplace;
+        worker.activity="WORKING";worker.travelRemaining=0;
+        var order=town.technicalOrders.get("street-lights");
+        town.employerFunds.put(StreetCareLife.ACCOUNT,ElectricianLife.WAGE);
+        assertFalse(ElectricianLife.ready(town),"initial player order is reserved");
+        order.completedDay=1;order.condition=55;
+        state.day=2;state.minute=660;
+        assertFalse(UtilityLife.status(town).lightsWorking());
+        int cash=worker.money,steel=town.technicalMaterials.get("steel"),copper=town.technicalMaterials.get("copper");
+        var events=new java.util.ArrayList<TownLife.Event>();
+        var observations=new java.util.ArrayList<TownLife.Observation>();
+        worker.travelRemaining=1;
+        ElectricianLife.tick(town,state,events,observations);
+        assertEquals(55,order.condition);
+        worker.travelRemaining=0;
+        assertEquals("ELECTRIC_TOOL",GameSession.workVisual(worker));
+        ElectricianLife.tick(town,state,events,observations);
+        ElectricianLife.tick(town,state,events,observations);
+        assertTrue(UtilityLife.status(town).lightsWorking());
+        assertEquals(95,order.condition);
+        assertEquals(steel-1,town.technicalMaterials.get("steel"));
+        assertEquals(copper-1,town.technicalMaterials.get("copper"));
+        assertEquals(cash+ElectricianLife.WAGE,worker.money);
+        assertEquals(0,town.employerFunds.get(StreetCareLife.ACCOUNT));
+        assertFalse(ElectricianLife.ready(town));
+    }
+
+
+    @Test
     void constructionWorkerIsPaidFromReservedStageLabor() {
         var state=new WorldState();var town=TownLife.create(state);
         var worker=PopulationGenerator.add(town,1).getFirst();
