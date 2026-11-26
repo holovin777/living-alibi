@@ -229,6 +229,10 @@ var _music: AudioStreamPlayer
 var _music_value: Label
 var _dialog_target := ""
 var _dialog_pending := false
+var _custody_panel: PanelContainer
+var _custody_label: Label
+var _custody_cell: Node3D
+var _custody_active := false
 var _dialog_started_at := 0
 var _dialog_end_remaining := 0.0
 var _dialog_farewell := ""
@@ -258,6 +262,8 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    if _custody_active:
+        return
     _tick_dialog_autonomy(delta)
     _music.update_mix(delta,_dialog_panel.visible and _spoken_dialog_enabled)
     _tick_public_door(delta)
@@ -426,6 +432,7 @@ func _process(delta: float) -> void:
         _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
 
 func _unhandled_input(event: InputEvent) -> void:
+    if _custody_active:return
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         if _drive_active():
             _drive_look = clampf(_drive_look-event.relative.x*MOUSE_SENSITIVITY,-1.05,1.05)
@@ -446,6 +453,7 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if _custody_active:return
     if _dialog_panel.visible and event is InputEventKey and event.pressed and not event.echo:
         if event.keycode == KEY_ESCAPE:
             _close_dialog()
@@ -7871,6 +7879,75 @@ func _set_apartment(active: bool) -> void:
         _avatar.position=Vector3.ZERO
     _follow_player()
 
+func _sync_custody(justice: Dictionary) -> void:
+    var status := str(justice.get("status","NONE"))
+    var locked := status in ["DETAINED","PRISON"]
+    if not locked:
+        if _custody_active:
+            _custody_active=false
+            _custody_panel.hide()
+            if is_instance_valid(_custody_cell):_custody_cell.queue_free()
+            _custody_cell=null
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+            _follow_player()
+            _message.text=tr("You have been released.")
+        return
+    if not _custody_active:
+        _close_dialog()
+        _close_phone()
+        _close_intercom()
+        _action_panel.hide()
+        _map_panel.hide()
+        _travel_panel.hide()
+        _custody_active=true
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+        if not is_instance_valid(_custody_panel):
+            var layer := CanvasLayer.new()
+            layer.layer=90
+            add_child(layer)
+            _custody_panel=PanelContainer.new()
+            layer.add_child(_custody_panel)
+            _custody_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+            _custody_panel.offset_left=-235
+            _custody_panel.offset_right=235
+            _custody_panel.offset_top=-245
+            _custody_panel.offset_bottom=-15
+            var col := VBoxContainer.new()
+            _custody_panel.add_child(col)
+            _custody_label=Label.new()
+            _custody_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+            col.add_child(_custody_label)
+            col.add_child(_button(tr("Wait one hour in custody"),_wait_custody.bind(60)))
+            col.add_child(_button(tr("Serve one day"),_wait_custody.bind(1440)))
+        _custody_panel.show()
+        _custody_cell=Node3D.new()
+        add_child(_custody_cell)
+        _custody_cell.position=Vector3(0,120,0)
+        var wall := Color("#999b9a")
+        _box(_custody_cell,Vector3(5,0.2,6),Color("#55595a"),Vector3(0,-0.1,0))
+        _box(_custody_cell,Vector3(5,3,0.2),wall,Vector3(0,1.5,-3))
+        _box(_custody_cell,Vector3(0.2,3,6),wall,Vector3(-2.5,1.5,0))
+        _box(_custody_cell,Vector3(0.2,3,6),wall,Vector3(2.5,1.5,0))
+        _box(_custody_cell,Vector3(1,0.45,2),Color("#62686e"),Vector3(-1.65,0.25,-1.4))
+        _box(_custody_cell,Vector3(1,0.15,2),Color("#b2b5b1"),Vector3(-1.65,0.55,-1.4))
+        for i in range(13):
+            _box(_custody_cell,Vector3(0.07,3,0.07),Color("#44484a"),Vector3(-2.4+i*0.4,1.5,2.9))
+        var light := OmniLight3D.new()
+        light.position=Vector3(0,2.6,0)
+        light.omni_range=8.0
+        light.light_energy=1.4
+        _custody_cell.add_child(light)
+    _custody_label.text=tr("Detained: waiting for court") if status=="DETAINED" else tr("Prison sentence")
+    _custody_label.text+="\n"+tr("Time remaining: %s h %s min") % [int(justice.get("minutesRemaining",0))/60,int(justice.get("minutesRemaining",0))%60]
+    _custody_label.text+="\n"+tr("Convictions: %s · Fine outstanding: %s EUR") % [justice.get("convictions",0),justice.get("fineOutstanding",0)]
+    _custody_label.text+="\n"+tr("The town continues while you serve your sentence.")
+    _camera.global_position=Vector3(0,121.65,-1.9)
+    _camera.global_rotation=Vector3(0,PI,0)
+
+func _wait_custody(minutes: int) -> void:
+    if _custody_active and _connected and not _api.is_busy():
+        _api.wait_for(minutes)
+
 func _render_hud_summary(snapshot: Dictionary) -> void:
     var player: Dictionary = snapshot.get("player", {})
     var job = player.get("jobId")
@@ -7967,6 +8044,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _park_in_cabin()
 
     _render_hud_summary(snapshot)
+    _sync_custody(player.get("justice",{}))
     var home = snapshot.get("rebirth",{}).get("homeOptions")
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
@@ -8018,7 +8096,10 @@ func _on_world_updated(snapshot: Dictionary) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible or _phone.visible else Input.MOUSE_MODE_CAPTURED)
         elif walking_transition:
             _action_panel.visible = false
-    if _api != null and not _api.is_busy() and not clock_update:
+    if _custody_active:
+        _camera.global_position=Vector3(0,121.65,-1.9)
+        _camera.global_rotation=Vector3(0,PI,0)
+    elif _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 
 func _set_weather_visuals(enabled: bool) -> void:
