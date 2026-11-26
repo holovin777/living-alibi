@@ -600,6 +600,9 @@ func _exercise() -> void:
             and not world._can_stand(world.CAR_PARK,world.WALKER_RADIUS),
             "owned car is parked physically and offers nearby motor routes"):
         return
+    if not _check(world._scenery.has_node("PoligonoDiTiro") and world._can_stand(world.SPORT_COUNTER,world.WALKER_RADIUS) and not world._near_sport_counter(),
+            "sports facility remains accessible and does not intercept parking actions"):
+        return
     var controls = preload("res://scripts/DriveControls.gd").new()
     for i in range(100):
         controls.accept(controls.propose(0.1,1.0,0.0,false,0))

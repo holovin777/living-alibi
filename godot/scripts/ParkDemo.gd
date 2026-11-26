@@ -6,7 +6,7 @@ extends Node3D
 
 const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
-const SPORT_COUNTER := Vector3(10.5,0,-6.0)
+const SPORT_COUNTER := Vector3(12.5,0,2.0)
 const LIBRARY_DESK := Vector3(-7,0,6.1)
 const DEPOT_DESK := Vector3(-9.0,0.0,10.0)
 const DEPOT_BAYS := [Vector3(6.5,0,12.0),Vector3(12.5,0,12.0)]
@@ -704,6 +704,9 @@ func _update_first_steps() -> void:
     if not _entrance_hint().is_empty():_guide_label.text+="\n"+_entrance_hint()
     if _current_place in ["MARKET","WORKSHOP"] and not _rebirth_active():
         _guide_label.text+="\n"+("%s · F: %s" % ["Armeria" if _current_place=="MARKET" else "Poligono di tiro",_guide_direction(SPORT_COUNTER)])
+    var safety: Dictionary = _last_snapshot.get("publicSafety",{})
+    if bool(safety.get("localAlert",false)):
+        _guide_label.text+="\n"+tr("Public safety alert in this district.")
 
 func _near_gate() -> bool:
     return _avatar.position.distance_to(GATE_POSITION) < INTERACTION_RADIUS
@@ -2966,20 +2969,20 @@ func _build_sport_facility(range_site: bool) -> void:
     site.name = "PoligonoDiTiro" if range_site else "Armeria"
     _scenery.add_child(site)
     var wall := Color("#c9baa4")
-    _box(site,Vector3(6.0,0.08,5.6),Color("#9d9b93"),Vector3(10.5,0.02,-8.5))
-    for x in [7.5,13.5]:
-        _room_wall(site,Vector3(x,0,-8.5),Vector2(0.24,5.6),wall)
-    _room_wall(site,Vector3(10.5,0,-11.3),Vector2(6.0,0.24),wall)
-    _box(site,Vector3(6.4,0.24,5.9),Color("#626a68"),Vector3(10.5,3.15,-8.5))
-    _room_furniture(site,Vector3(10.5,0,-7.4),Vector3(2.3,1.0,0.65),Color("#6e6456"))
-    _sign(site,"Poligono di tiro · F" if range_site else "Armeria · F",Vector3(10.5,2.65,-5.5))
-    _sign(site,"08:00–18:00" if range_site else "08:00–20:00",Vector3(10.5,1.5,-7.03))
+    _box(site,Vector3(6.0,0.08,5.6),Color("#9d9b93"),Vector3(12.5,0.02,-0.5))
+    for x in [9.5,15.5]:
+        _room_wall(site,Vector3(x,0,-0.5),Vector2(0.24,5.6),wall)
+    _room_wall(site,Vector3(12.5,0,-3.3),Vector2(6.0,0.24),wall)
+    _box(site,Vector3(6.4,0.24,5.9),Color("#626a68"),Vector3(12.5,3.15,-0.5))
+    _room_furniture(site,Vector3(12.5,0,0.6),Vector3(2.3,1.0,0.65),Color("#6e6456"))
+    _sign(site,"Poligono di tiro · F" if range_site else "Armeria · F",Vector3(12.5,2.65,2.5))
+    _sign(site,"08:00–18:00" if range_site else "08:00–20:00",Vector3(12.5,1.5,0.97))
     if range_site:
-        for x in [9.0,12.0]:
-            _box(site,Vector3(0.9,0.9,0.10),Color("#d9d9cf"),Vector3(x,1.45,-10.7))
-            _box(site,Vector3(0.4,0.4,0.11),Color("#696c67"),Vector3(x,1.45,-10.62))
+        for x in [11.0,14.0]:
+            _box(site,Vector3(0.9,0.9,0.10),Color("#d9d9cf"),Vector3(x,1.45,-2.7))
+            _box(site,Vector3(0.4,0.4,0.11),Color("#696c67"),Vector3(x,1.45,-2.62))
     else:
-        _box(site,Vector3(2.0,1.4,0.35),Color("#7e8888"),Vector3(10.5,1.0,-10.8))
+        _box(site,Vector3(2.0,1.4,0.35),Color("#7e8888"),Vector3(12.5,1.0,-2.8))
 
 func _build_bakery() -> void:
     var bakery := Node3D.new()

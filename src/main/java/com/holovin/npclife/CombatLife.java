@@ -63,7 +63,9 @@ final class CombatLife {
         if(last>0&&now(clock)-last<2)throw new IllegalArgumentException("You need a moment to recover.");
         if("sport".equals(weapon))WeaponLicenseLife.spendRound(t);
         int damage="sport".equals(weapon)?18:"baton".equals(weapon)?12:6;
+        int previousHealth=victim.health;
         victim.health=Math.max(20,victim.health-damage);
+        EmergencyLife.request(t,clock,victim,previousHealth);
         if("marco".equals(id))clock.health=victim.health;
         t.player.fatigue=Math.min(100,t.player.fatigue+5);
         t.industryStocks.put(key(t,"last-strike"),now(clock));
