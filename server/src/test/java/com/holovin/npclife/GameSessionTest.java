@@ -13,6 +13,31 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void naturalDialogueParaphrasesAndContextPreserveWorldFacts() {
+        var town=TownLife.create(new WorldState());
+        var resident=town.get("marco");
+        resident.place=TownLife.Place.PARK;resident.travelRemaining=0;resident.activity="WORKING";
+        resident.employed=true;resident.workplace=TownLife.Place.BAKERY;
+        resident.sociability=80;
+        town.player.place=TownLife.Place.PARK;
+        assertEquals("What is your name?",NaturalDialogue.canonical("Ciao, come posso chiamarti?",null));
+        assertEquals("How are you?",NaturalDialogue.canonical("Добрий день, як справи?",null));
+        assertEquals("What do you do?",NaturalDialogue.canonical("Hey! What is your job?",null));
+        assertEquals("@workplace",NaturalDialogue.canonical("E dove?", "Che lavoro fai?"));
+        assertEquals("@place:CLINIC",NaturalDialogue.canonical("Dov'è la farmacia?",null));
+        assertEquals("My name is Alex.",NaturalDialogue.canonical("Ciao, mi chiamo Alex!",null));
+        assertEquals("don't share my name",NaturalDialogue.canonical("don't share my name",null));
+        assertTrue(PlayerLife.speak(town,resident.id,"Ciao, mi chiamo Alex!",1,720).contains("Alex"));
+        assertTrue(PlayerLife.speak(town,resident.id,"Che lavoro fai?",1,720).contains(resident.occupation));
+        assertEquals("My workplace is Bakery.",PlayerLife.speak(town,resident.id,"E dove?",1,720));
+        assertEquals("E dove?",town.player.contacts.get(resident.id).lastHeard);
+        assertEquals("I'm working at the moment.",PlayerLife.speak(town,resident.id,"Cosa stai facendo?",1,720));
+        assertEquals("It's 12:00.",PlayerLife.speak(town,resident.id,"Che ore sono?",1,720));
+        assertEquals("I'm not sure I understood. Could you ask me in a different way?",
+                PlayerLife.speak(town,resident.id,"Quantum teleportation?",1,720));
+    }
+
+    @Test
     void linkedAdultCanSpeakThroughApiWithPersistentContactMemory() throws Exception {
         Path file=directory.resolve("linked-dialogue.db");
         String selfId,neighborId,farId;

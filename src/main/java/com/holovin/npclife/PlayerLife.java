@@ -344,6 +344,9 @@ final class PlayerLife {
         if(resident.activity.equals("SLEEPING")||resident.activity.equals("TRAVELING"))
             throw new IllegalArgumentException(displayName(town,resident)+" is not available for a conversation.");
         Contact contact=town.player.contacts.computeIfAbsent(resident.id,Contact::new);
+        String rawMessage=spoken;
+        // Interpret paraphrases while retaining the actual text in persistent memory.
+        spoken=NaturalDialogue.canonical(rawMessage,contact.lastHeard);
         boolean askingName=spoken.equalsIgnoreCase("What is your name?")||spoken.equalsIgnoreCase("Come ti chiami?");
         boolean introduction=spoken.regionMatches(true,0,"My name is ",0,11);
         boolean changedAlias=false;
@@ -403,7 +406,7 @@ final class PlayerLife {
         if(apology && SocialMemoryLife.unresolved(town,id))
             SocialMemoryLife.remember(town,id,SocialMemoryLife.Kind.APOLOGY,day);
         contact.conversations++;
-        contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=spoken;
+        contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=rawMessage;
         String greeting=contact.knownName==null?"stranger":contact.knownName;
         if(spoken.equalsIgnoreCase("Where do you live?")||spoken.equalsIgnoreCase("Dove abiti?"))return AddressLife.ask(town,resident,contact);
         if(askingName){
@@ -433,6 +436,10 @@ final class PlayerLife {
             return "It's good to see you, "+greeting+"! How have you been?";
         if(spoken.equalsIgnoreCase("What do you do?"))
             return resident.employed?"I work as "+resident.occupation+".":"I'm currently looking for work.";
+        String natural=NaturalDialogue.reply(town,resident,contact,spoken,day,minute);
+        if(natural!=null)return natural;
+        if(!spoken.equalsIgnoreCase("Hello"))
+            return "I'm not sure I understood. Could you ask me in a different way?";
         if(resident.sociability<40)return "Hello. I'm having a quiet day.";
         if(spoken.contains("?"))return "I'm not sure, "+greeting+". I can only tell you what I know.";
         if(contact.conversations==1)return "Hello, "+greeting+". Nice to meet someone around here.";
