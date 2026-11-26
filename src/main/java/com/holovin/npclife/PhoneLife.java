@@ -38,6 +38,18 @@ final class PhoneLife {
     }
     private static final int CALL_WINDOW=5;
     private static final int OUTGOING_WINDOW=10;
+    static boolean homeInvitation(TownLife.Town t,String id,int day,int minute){
+        return get(t,id,"meeting-kind")==2&&get(t,id,"meeting-day")==day
+                &&(get(t,id,"meeting-state")==1||get(t,id,"meeting-state")==2)
+                &&minute>=MEETING_MINUTE&&minute<MEETING_END;
+    }
+    static void visitArrived(TownLife.Town t,String id,int day,int minute){
+        if(homeInvitation(t,id,day,minute))put(t,id,"meeting-state",2);
+    }
+    private static boolean canHost(TownLife.Town t,TownLife.Citizen c,PlayerLife.Contact contact){
+        return contact!=null&&contact.trust>=80&&contact.affinity>=35&&AddressLife.sharedBuilding(t,c.id)==1
+                &&AddressLife.building(c)==1&&!SocialMemoryLife.unresolved(t,c.id);
+    }
     private static long outgoingStart(TownLife.Town t,String id){
         return (get(t,id,"out-day")-1L)*1440+get(t,id,"out-minute");
     }
@@ -73,24 +85,29 @@ final class PhoneLife {
         if("hangup".equals(action)){
             put(t,id,"out-state",4);return "Call ended.";
         }
-        if(!"invite-coffee".equals(action))throw new IllegalArgumentException("Choose a call action.");
+        boolean home="ask-home-visit".equals(action);
+        if(!home&&!"invite-coffee".equals(action))throw new IllegalArgumentException("Choose a call action.");
+        if(home&&!canHost(t,c,contact)){
+            put(t,id,"out-state",7);return "Mi dispiace, preferisco non ricevere visite a casa.";
+        }
         if(!canAnswer(c,minute)||contact.trust<65||contact.affinity<20||
                 t.player.contacts.values().stream().anyMatch(x->get(t,x.residentId,"meeting-state")==1)){
-            put(t,id,"out-state",5);return "Mi dispiace, non posso prendere un caffè domani.";
+            put(t,id,"out-state",home?7:5);return home?"Mi dispiace, preferisco non ricevere visite a casa.":"Mi dispiace, non posso prendere un caffè domani.";
         }
         put(t,id,"meeting-day",Math.addExact(day,1));put(t,id,"meeting-state",1);
-        put(t,id,"out-state",6);
+        put(t,id,"meeting-kind",home?2:1);
+        put(t,id,"out-state",home?8:6);
         contact.lastDay=day;contact.lastMinute=minute;
-        return "Volentieri! Domani alle 18 al bar.";
+        return home?"Volentieri! Vieni a trovarmi domani alle 18.":"Volentieri! Domani alle 18 al bar.";
     }
     private static String outgoingStatus(int state){
         return switch(state){case 1 -> "NO_ANSWER";case 2 -> "CONNECTED";case 3 -> "DECLINED";
-            case 4 -> "ENDED";case 5 -> "INVITATION_DECLINED";default -> "ACCEPTED";};
+            case 4 -> "ENDED";case 5,7 -> "INVITATION_DECLINED";default -> "ACCEPTED";};
     }
     private static String outgoingText(int state){
         return switch(state){case 2 -> "Ciao! Dimmi pure.";case 3 -> "Scusa, preferisco non parlare adesso.";
             case 5 -> "Mi dispiace, non posso prendere un caffè domani.";
-            case 6 -> "Volentieri! Domani alle 18 al bar.";default -> "";};
+            case 6 -> "Volentieri! Domani alle 18 al bar.";case 7 -> "Mi dispiace, preferisco non ricevere visite a casa.";case 8 -> "Volentieri! Vieni a trovarmi domani alle 18.";default -> "";};
     }
     private static boolean ringing(TownLife.Town t,String id){return get(t,id,"call-state")==1;}
     private static long callStart(TownLife.Town t,String id){
@@ -125,12 +142,12 @@ final class PhoneLife {
             boolean invitation=contact.affinity>=35&&get(t,id,"meeting-state")!=1&&
                     t.player.contacts.values().stream().noneMatch(x->get(t,x.residentId,"meeting-state")==1);
             put(t,id,"call-day",clock.day);put(t,id,"call-minute",clock.minute);
-            put(t,id,"call-state",1);put(t,id,"call-kind",invitation?2:1);
+            put(t,id,"call-state",1);put(t,id,"call-kind",invitation?(canHost(t,c,contact)&&Math.floorMod(id.hashCode()+clock.day,3)==0?3:2):1);
             put(t,"inbox","last-call-day",clock.day);return;
         }
     }
     private static String callText(int kind){
-        return kind==2?"Ciao! Ti va un caffè domani alle 18?":"Ciao! Come stai? È da un po' che non ci sentiamo.";
+        return kind==3?"Ciao! Ti va di venire a casa mia domani alle 18?":kind==2?"Ciao! Ti va un caffè domani alle 18?":"Ciao! Come stai? È da un po' che non ci sentiamo.";
     }
     static String answerCall(TownLife.Town t,String id,String action,int day,int minute){
         var c=t.people.get(id);
@@ -146,17 +163,20 @@ final class PhoneLife {
             contact.lastDay=day;contact.lastMinute=minute;
             return callText(get(t,id,"call-kind"));
         }
-        if(!"accept".equals(action)||state!=2||get(t,id,"call-kind")!=2||get(t,id,"call-day")!=day)
+        if(!"accept".equals(action)||state!=2||get(t,id,"call-kind")<2||get(t,id,"call-day")!=day)
             throw new IllegalArgumentException("No current coffee invitation.");
         if(t.player.contacts.values().stream().anyMatch(x->get(t,x.residentId,"meeting-state")==1))
             throw new IllegalArgumentException("You already have a planned meeting.");
         put(t,id,"meeting-day",Math.addExact(day,1));put(t,id,"meeting-state",1);
+        boolean home=get(t,id,"call-kind")==3;
+        if(home&&!canHost(t,c,t.player.contacts.get(id)))throw new IllegalArgumentException("Home invitation is no longer available.");
+        put(t,id,"meeting-kind",home?2:1);
         put(t,id,"call-state",5);
-        return "A domani alle 18 al bar!";
+        return home?"A domani alle 18 a casa mia!":"A domani alle 18 al bar!";
     }
     static final int MEETING_MINUTE=1080, MEETING_END=1110, DEPART_MINUTE=1050;
     static boolean meetingWindow(TownLife.Town t,TownLife.Citizen c,WorldState clock){
-        return available(t)&&(get(t,c.id,"meeting-state")==1||get(t,c.id,"meeting-state")==2)&&get(t,c.id,"meeting-day")==clock.day&&clock.minute>=DEPART_MINUTE&&clock.minute<MEETING_END;
+        return available(t)&&get(t,c.id,"meeting-kind")!=2&&(get(t,c.id,"meeting-state")==1||get(t,c.id,"meeting-state")==2)&&get(t,c.id,"meeting-day")==clock.day&&clock.minute>=DEPART_MINUTE&&clock.minute<MEETING_END;
     }
     static void tick(TownLife.Town t,WorldState clock){
         tickCalls(t,clock);
@@ -169,7 +189,7 @@ final class PhoneLife {
             if(clock.day>day||(clock.day==day&&clock.minute>=MEETING_END)){
                 put(t,id,"meeting-state",3);continue;
             }
-            if(clock.day==day&&clock.minute>=MEETING_MINUTE&&c.presentAt(TownLife.Place.CAFE)&&
+            if(get(t,id,"meeting-kind")!=2&&clock.day==day&&clock.minute>=MEETING_MINUTE&&c.presentAt(TownLife.Place.CAFE)&&
                     t.player.place==TownLife.Place.CAFE&&t.player.travelRemaining==0&&c.travelRemaining==0){
                 put(t,id,"meeting-state",2);
             }
@@ -207,9 +227,9 @@ final class PhoneLife {
             if(c.alive&&get(t,c.id,"number-shared")==1)dialContacts.add(new DialContact(c.id,c.name,outState==2));
             if(outState>0)outgoingCalls.add(new OutgoingCall(c.id,c.name,get(t,c.id,"out-day"),get(t,c.id,"out-minute"),outgoingStatus(outState),outgoingText(outState)));
             int callState=get(t,c.id,"call-state");
-            if(callState>0)calls.add(new Call(c.id,c.name,get(t,c.id,"call-day"),get(t,c.id,"call-minute"),switch(callState){case 1 -> "RINGING";case 2 -> "ANSWERED";case 3 -> "DECLINED";case 4 -> "MISSED";default -> "ACCEPTED";},callState==2||callState==5?callText(get(t,c.id,"call-kind")):"",callState==2&&get(t,c.id,"call-kind")==2));
+            if(callState>0)calls.add(new Call(c.id,c.name,get(t,c.id,"call-day"),get(t,c.id,"call-minute"),switch(callState){case 1 -> "RINGING";case 2 -> "ANSWERED";case 3 -> "DECLINED";case 4 -> "MISSED";default -> "ACCEPTED";},callState==2||callState==5?callText(get(t,c.id,"call-kind")):"",callState==2&&get(t,c.id,"call-kind")>=2));
             int meetingState=get(t,c.id,"meeting-state");
-            if(meetingState>0)meetings.add(new Meeting(c.id,c.name,get(t,c.id,"meeting-day"),MEETING_MINUTE,"CAFE",switch(meetingState){
+            if(meetingState>0)meetings.add(new Meeting(c.id,c.name,get(t,c.id,"meeting-day"),MEETING_MINUTE,get(t,c.id,"meeting-kind")==2?"HOME":"CAFE",switch(meetingState){
                 case 1 -> "SCHEDULED"; case 2 -> "MET"; case 3 -> "MISSED"; default -> "CANCELLED";
             }));
             int day=get(t,c.id,"day");
@@ -244,6 +264,7 @@ final class PhoneLife {
             if(day!=get(t,id,"day"))throw new IllegalArgumentException("The invitation has expired. Reply not today.");
             put(t,id,"meeting-day",Math.addExact(day,1));
             put(t,id,"meeting-state",1);
+            put(t,id,"meeting-kind",1);
         }
         put(t,id,"reply",choice);
         return "Message sent.";
