@@ -5370,6 +5370,20 @@ func _localized_resident_reply(message: String) -> String:
         return tr("I live at %s.") % spoken.substr(10,spoken.length()-11)
     if spoken.begins_with("My name is ") and spoken.ends_with("."):
         return tr("My name is %s.") % spoken.substr(11,spoken.length()-12)
+    if spoken.begins_with("I work as ") and spoken.ends_with("."):
+        return tr("I work as %s.") % tr(spoken.substr(10,spoken.length()-11))
+    if spoken.begins_with("My workplace is ") and spoken.ends_with("."):
+        return tr("My workplace is %s.") % tr(spoken.substr(16,spoken.length()-17))
+    if spoken.begins_with("Look for ") and spoken.ends_with(" on your town map."):
+        return tr("Look for %s on your town map.") % tr(spoken.substr(9,spoken.length()-27))
+    if spoken.begins_with("Nice to meet you, ") and spoken.ends_with("."):
+        return tr("Nice to meet you, %s.") % spoken.substr(18,spoken.length()-19)
+    if spoken.begins_with("It's ") and spoken.ends_with(".") and spoken.contains(":"):
+        return tr("It's %s.") % spoken.substr(5,spoken.length()-6)
+    if spoken.begins_with("Hello, ") and spoken.ends_with(". Nice to meet someone around here."):
+        return tr("Hello, %s. Nice to meet someone around here.") % tr(spoken.substr(7,spoken.length()-42))
+    if spoken.begins_with("Good to see you again, ") and spoken.ends_with("."):
+        return tr("Good to see you again, %s.") % tr(spoken.substr(23,spoken.length()-24))
     return tr(spoken)
 
 func _close_dialog() -> void:
@@ -5400,7 +5414,11 @@ func _speak_resident_reply(reply: String) -> void:
     if voices.is_empty():
         _message.text = tr("No system speech voice is available. Text chat still works.")
         return
-    DisplayServer.tts_speak(reply,str(voices[0]),75,1.0,1.0,0,true)
+    # Stable voice and subtle pitch/rate variation for each resident.
+    var voice_seed := absi(_dialog_target.hash())
+    var pitch := 0.90+float(voice_seed%21)/100.0
+    var rate := 0.92+float((voice_seed/21)%17)/100.0
+    DisplayServer.tts_speak(reply,str(voices[voice_seed%voices.size()]),75,pitch,rate,0,true)
 
 func _send_typed_dialog() -> void:
     _send_dialog(_dialog_input.text)
