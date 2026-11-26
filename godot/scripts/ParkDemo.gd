@@ -218,6 +218,11 @@ var _dialog_attitude: Label
 var _dialog_style: Label
 var _language_selector: OptionButton
 var _dialog_input: LineEdit
+var _dialog_history: RichTextLabel
+var _dialog_send: Button
+var _dialog_transcripts: Dictionary={}
+var _dialog_sent := ""
+var _dialog_life := ""
 var _dialog_target := ""
 var _dialog_pending := false
 var _action_title: Label
@@ -420,6 +425,12 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and _dialog_panel.visible:
+        if event.keycode==KEY_ESCAPE:
+            _close_dialog()
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+        get_viewport().set_input_as_handled()
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         if _guest_active:
             if event.keycode==KEY_G and not _guest_sitting and _guest.near_exit(_avatar.position):
@@ -5077,8 +5088,11 @@ func _create_interface() -> void:
     travel_col.add_child(_travel_choices)
 
     _dialog_panel = PanelContainer.new()
-    _dialog_panel.position = Vector2(480,15)
-    _dialog_panel.custom_minimum_size = Vector2(410,0)
+    _dialog_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+    _dialog_panel.offset_left=-440
+    _dialog_panel.offset_right=-15
+    _dialog_panel.offset_top=15
+    _dialog_panel.custom_minimum_size = Vector2(0,0)
     _dialog_panel.visible = false
     canvas.add_child(_dialog_panel)
     var dialog_col := VBoxContainer.new()
@@ -5091,33 +5105,49 @@ func _create_interface() -> void:
     _dialog_style.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_style)
     _dialog_reply = Label.new()
-    _dialog_reply.custom_minimum_size = Vector2(400,0)
     _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_reply)
-    dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
-    dialog_col.add_child(_button("Ask their name",_send_dialog.bind("What is your name?")))
-    dialog_col.add_child(_button("Ask their address",_send_dialog.bind("Where do you live?")))
-    dialog_col.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
-    dialog_col.add_child(_button("Offer support",_send_dialog.bind("I'm here for you.")))
-    dialog_col.add_child(_button("Ask about shared memories",_send_dialog.bind("What do you remember about me?")))
-    dialog_col.add_child(_button("Offer bread",_send_dialog.bind("Offer bread")))
-    dialog_col.add_child(_button("Offer water",_send_dialog.bind("Offer water")))
-    dialog_col.add_child(_button("Ask for bread",_send_dialog.bind("Ask for bread")))
-    dialog_col.add_child(_button("Ask for water",_send_dialog.bind("Ask for water")))
-    dialog_col.add_child(_button("Ask for a 10 EUR loan",_send_dialog.bind("Ask for a 10 EUR loan")))
-    dialog_col.add_child(_button("Repay personal loan",_send_dialog.bind("Repay personal loan")))
-    dialog_col.add_child(_button("Ask about occupation",_send_dialog.bind("What do you do?")))
-    dialog_col.add_child(_button("Allow sharing my name",_send_dialog.bind("You can tell people my name.")))
-    dialog_col.add_child(_button("Ask for visitor news",_send_dialog.bind("Any news about visitors?")))
-    dialog_col.add_child(_button("Press interview",_send_dialog.bind("Any public news for the newspaper?")))
-    dialog_col.add_child(_button("Apologize",_send_dialog.bind("I'm sorry.")))
-    dialog_col.add_child(_button("Leave me alone!",_send_dialog.bind("Leave me alone!")))
-    _dialog_input = LineEdit.new()
-    _dialog_input.placeholder_text = "My name is ... / Say something"
-    _dialog_input.max_length = 1000
+    _dialog_history=RichTextLabel.new()
+    _dialog_history.bbcode_enabled=false
+    _dialog_history.scroll_following=true
+    _dialog_history.custom_minimum_size=Vector2(300,145)
+    _dialog_history.selection_enabled=true
+    dialog_col.add_child(_dialog_history)
+    var entry := HBoxContainer.new()
+    dialog_col.add_child(entry)
+    _dialog_input=LineEdit.new()
+    _dialog_input.placeholder_text=tr("Write a message…")
+    _dialog_input.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    _dialog_input.max_length=1000
     _dialog_input.text_submitted.connect(_send_dialog)
-    dialog_col.add_child(_dialog_input)
-    dialog_col.add_child(_button("Speak",_send_typed_dialog))
+    entry.add_child(_dialog_input)
+    _dialog_send=_button("Send",_send_typed_dialog)
+    entry.add_child(_dialog_send)
+    var suggestions := HFlowContainer.new()
+    dialog_col.add_child(suggestions)
+    suggestions.add_child(_button("Say hello",_send_dialog.bind("Hello")))
+    suggestions.add_child(_button("Ask their name",_send_dialog.bind("What is your name?")))
+    suggestions.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
+    var more := OptionButton.new()
+    more.add_item(tr("More topics…"),0)
+    var topics := [
+        ["Ask about occupation","What do you do?"],
+        ["Ask their address","Where do you live?"],
+        ["Offer support","I'm here for you."],
+        ["Ask about shared memories","What do you remember about me?"],
+        ["Offer bread","Offer bread"],["Offer water","Offer water"],
+        ["Ask for bread","Ask for bread"],["Ask for water","Ask for water"],
+        ["Ask for a 10 EUR loan","Ask for a 10 EUR loan"],
+        ["Repay personal loan","Repay personal loan"],
+        ["Allow sharing my name","You can tell people my name."],
+        ["Ask for visitor news","Any news about visitors?"],
+        ["Press interview","Any public news for the newspaper?"],
+        ["Apologize","I'm sorry."],["Leave me alone!","Leave me alone!"]]
+    for topic in topics:more.add_item(tr(topic[0]))
+    more.item_selected.connect(func(index:int):
+        if index>0:_send_dialog(str(topics[index-1][1]))
+        more.select(0))
+    dialog_col.add_child(more)
     var close := Button.new()
     close.text = "Close conversation"
     close.pressed.connect(_close_dialog)
@@ -5256,8 +5286,10 @@ func _open_dialog() -> void:
     _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     _dialog_input.clear()
+    _dialog_history.text=_dialog_history_text(id)
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    _dialog_input.grab_focus()
 
 func _render_dialog_mood(person: Node3D) -> void:
     var mood := str(person.get_meta("mood","CALM"))
@@ -5281,6 +5313,16 @@ func _localized_resident_reply(message: String) -> String:
         return tr("My name is %s.") % spoken.substr(11,spoken.length()-12)
     return tr(spoken)
 
+func _dialog_history_text(id: String) -> String:
+    return "\n\n".join(_dialog_transcripts.get(id,PackedStringArray()))
+
+func _append_dialog_line(id: String,label: String,message: String) -> void:
+    var lines: PackedStringArray=_dialog_transcripts.get(id,PackedStringArray())
+    lines.append(label+": "+message)
+    if lines.size()>40:lines.remove_at(0)
+    _dialog_transcripts[id]=lines
+    if id==_dialog_target:_dialog_history.text=_dialog_history_text(id)
+
 func _close_dialog() -> void:
     _dialog_panel.visible = false
     _dialog_target = ""
@@ -5293,13 +5335,16 @@ func _send_dialog(message: String) -> void:
     if not _dialog_panel.visible or _dialog_pending or _api.is_busy() or not _connected:
         return
     var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
-    if person == null or _avatar.position.distance_to(person.position) >= 2.5:
+    if person == null or _nearest_resident()!=_dialog_target:
         _close_dialog()
         return
     if message.strip_edges().is_empty():
         return
     _dialog_pending = true
-    _api.speak_to(_dialog_target,message)
+    _dialog_sent=message.strip_edges()
+    _dialog_reply.text=tr("Waiting for reply…")
+    _dialog_input.editable=false
+    _api.speak_to(_dialog_target,_dialog_sent)
 
 func _toggle_map() -> void:
     _close_dialog()
@@ -7432,6 +7477,10 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     var was_freight := _drive_freight
     _last_snapshot = snapshot
     var player: Dictionary = snapshot.get("player", {})
+    var life := str(player.get("incarnation",1))+":"+str(snapshot.get("rebirth",{}).get("childName",""))
+    if life!=_dialog_life:
+        _dialog_transcripts.clear()
+        _dialog_life=life
     var new_place := str(player.get("placeId", "PARK"))
     var truck_arrival := was_freight and _drive_pending and new_place==_drive_target and _truck_place()==new_place
     var continue_in_cabin := not was_freight and _drive_pending and not _drive_target.is_empty() and new_place==_drive_target and _car_place()==new_place
@@ -7757,10 +7806,16 @@ func _on_action_feedback(message: String) -> void:
     if _dialog_pending:
         _dialog_pending = false
         if _dialog_panel.visible:
-            _dialog_reply.text = _localized_resident_reply(message)
+            var reply := _localized_resident_reply(message)
+            _append_dialog_line(_dialog_target,tr("You"),_dialog_sent)
+            _append_dialog_line(_dialog_target,_dialog_title.text,reply)
+            _dialog_reply.text = ""
             var speaker := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
-            _begin_resident_reply(speaker,_dialog_reply.text)
+            _begin_resident_reply(speaker,reply)
             _dialog_input.clear()
+            _dialog_input.grab_focus()
+        _dialog_input.editable=true
+        _dialog_sent=""
     if not _clock_pending:
         _message.text = tr(message)
         _phone.add_notification(message)
@@ -7809,8 +7864,11 @@ func _on_request_failed(message: String) -> void:
         return
     if _dialog_pending:
         _dialog_pending = false
+        _dialog_input.editable=true
+        _dialog_sent=""
         if _dialog_panel.visible:
             _dialog_reply.text = message
+            _dialog_input.grab_focus()
     if _clock_pending:
         # The server might have committed before a connection failure.
         # Pause rather than automatically retry a potentially committed write.
