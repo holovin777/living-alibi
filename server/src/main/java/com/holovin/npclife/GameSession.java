@@ -222,9 +222,41 @@ public final class GameSession implements AutoCloseable {
         }
         return List.copyOf(result);
     }
+    public record BarberService(String id,String label,int price,int minutes) { }
+    public record BarberView(String hair,String beard,List<BarberService> services,boolean open) { }
+    static final List<BarberService> BARBER_SERVICES=List.of(
+            new BarberService("short","Short haircut",8,20),
+            new BarberService("classic","Classic haircut",8,20),
+            new BarberService("shave","Clean shave",6,15),
+            new BarberService("trim","Hair and beard trim",12,30),
+            new BarberService("style","New hairstyle",15,35));
+    static String barberKey(TownLife.Town town,String field){return "barber:"+town.player.incarnation+":"+field;}
+    static BarberView barberView(TownLife.Town town,int minute){
+        int hair=town.industryStocks.getOrDefault(barberKey(town,"hair"),0);
+        int beard=town.industryStocks.getOrDefault(barberKey(town,"beard"),0);
+        return new BarberView(switch(hair){case 1 -> "SHORT";case 2 -> "CLASSIC";case 3 -> "STYLED";default -> "NATURAL";},
+                switch(beard){case 1 -> "SHAVED";case 2 -> "TRIMMED";default -> "NATURAL";},BARBER_SERVICES,
+                !RebirthLife.active(town)&&town.player.alive&&town.player.place==TownLife.Place.CENTRO&&town.player.travelRemaining==0&&minute>=540&&minute<1140);
+    }
+    static BarberService barberVisit(TownLife.Town town,String id,int minute){
+        var service=BARBER_SERVICES.stream().filter(s->s.id().equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("Unknown barber service."));
+        if(!barberView(town,minute).open()||minute+service.minutes()>1140)throw new IllegalArgumentException("Visit the barber in Centro between 09:00 and 19:00.");
+        var p=town.player;
+        if(p.money<service.price())throw new IllegalArgumentException("Not enough money.");
+        p.money-=service.price();
+        town.employerFunds.merge("barber",service.price(),Math::addExact);
+        switch(id){
+            case "short" -> town.industryStocks.put(barberKey(town,"hair"),1);
+            case "classic" -> town.industryStocks.put(barberKey(town,"hair"),2);
+            case "shave" -> town.industryStocks.put(barberKey(town,"beard"),1);
+            case "trim" -> {town.industryStocks.put(barberKey(town,"hair"),2);town.industryStocks.put(barberKey(town,"beard"),2);}
+            case "style" -> town.industryStocks.put(barberKey(town,"hair"),3);
+        }
+        return service;
+    }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters) { }
+                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -256,7 +288,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,MutualAidLife.notices(town,state.day),services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute),peerEncounters(town,visible,(long)(state.day-1)*1440L+state.minute,recentPeerEvents));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute),peerEncounters(town,visible,(long)(state.day-1)*1440L+state.minute,recentPeerEvents),barberView(town,state.minute));
     }
 
     public synchronized BusinessView business() {
@@ -479,6 +511,11 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if(action!=null&&action.startsWith("barber-")){
+            var copy=town.copy();
+            var service=barberVisit(copy,action.substring(7),state.minute);
+            return apply(copy,service.minutes(),"Barber: "+service.label()+". Paid "+service.price()+" EUR.");
+        }
         if(action!=null&&action.startsWith("intercom:")){
             String[] parts=action.split(":",4);
             if(parts.length!=4||!java.util.Set.of("ring","visit","invite","enter","leave","talk","coffee","snack","rest").contains(parts[1])||!java.util.Set.of("1","2","3").contains(parts[2]))

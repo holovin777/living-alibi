@@ -268,6 +268,15 @@ func _exercise() -> void:
                 "food shop entrance and correct counter are accessible, furniture solid"):
             return
     world._avatar.position=food_saved_position
+    var barber_saved_position: Vector3=world._avatar.position
+    var barber_arrival: Vector3=world._move_on_ground(Vector3(-7.8,0,9.4),Vector3(0,0,-3.0),world.WALKER_RADIUS)
+    world._avatar.position=barber_arrival
+    if not _check(centro_root.has_node("PiazzaCentrale/BarbiereDelBorgo/BarberChair")
+            and barber_arrival.z<6.6 and world._near_barber()
+            and not world._can_stand(Vector3(-7.8,0,5.15),world.WALKER_RADIUS),
+            "barber entrance is walkable, service point accessible and chair solid"):
+        return
+    world._avatar.position=barber_saved_position
     var square := centro_root.get_node("PiazzaCentrale")
     var paving := square.get_node("StonePaving") as MultiMeshInstance3D
     if not _check(paving.multimesh.instance_count == 1536 and square.has_node("Facade_0")
