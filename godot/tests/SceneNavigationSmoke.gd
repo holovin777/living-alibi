@@ -972,6 +972,36 @@ func _exercise() -> void:
             and world._idle_arm_pose("CHECK_WATCH",false,0.0).z>0.0,
             "stretch and wrist check use distinct arm poses"):
         return
+    var peer_old_marco: Vector3=marco.position
+    var peer_old_elena: Vector3=elena.position
+    var peer_old_activity: String=str(elena.get_meta("activity",""))
+    var peer_marco_activity: String=str(marco.get_meta("activity",""))
+    marco.set_meta("activity","FREE_TIME")
+    elena.set_meta("activity","FREE_TIME")
+    marco.position=Vector3(0,0,0)
+    elena.position=Vector3(3,0,0)
+    world._last_snapshot["peerEncounters"]=[{"firstId":"marco","secondId":"elena","tick":120,"tone":"WARM"}]
+    world._tick_peer_encounters(0.1)
+    if not _check(marco.has_meta("peer_target") and elena.has_meta("peer_target"),
+            "recent encounter cues approach a visible nearby peer"):
+        return
+    elena.position=Vector3(1.3,0,0)
+    world._tick_peer_encounters(0.1)
+    if not _check(marco.has_meta("peer_face") and elena.has_meta("peer_face")
+            and bool(marco.get_meta("peer_speaking"))!=bool(elena.get_meta("peer_speaking")),
+            "peer conversation uses alternating speakers"):
+        return
+    world._tick_peer_encounters(10.0)
+    world._tick_peer_encounters(0.1)
+    if not _check(not marco.has_meta("peer_face") and not elena.has_meta("peer_face"),
+            "expired visual encounter does not replay on the next frame"):
+        return
+    world._last_snapshot.erase("peerEncounters")
+    world._tick_peer_encounters(0.1)
+    marco.position=peer_old_marco
+    elena.position=peer_old_elena
+    marco.set_meta("activity",peer_marco_activity)
+    elena.set_meta("activity",peer_old_activity)
     var right_arm := marco.get_node("ArmRight") as Node3D
     var right_elbow := right_arm.get_node("Elbow") as Node3D
     var right_foot := marco.get_node("LegRight/Knee/Foot") as Node3D
