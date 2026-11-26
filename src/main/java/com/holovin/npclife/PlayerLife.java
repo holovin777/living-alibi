@@ -294,6 +294,14 @@ final class PlayerLife {
             throw new IllegalArgumentException(person.name+" is not in your current public space. Use look to see nearby people.");
         return person;
     }
+    static TownLife.Citizen nearby(TownLife.Town town,String residentId,int day,int minute){
+        if(IntercomLife.insideVisit(town,day,minute)){
+            var resident=IntercomLife.visitingResident(town,residentId,day,minute);
+            if(resident==null)throw new IllegalArgumentException("This resident is not in the apartment with you.");
+            return resident;
+        }
+        return nearby(town,residentId);
+    }
     static String validateName(String name) {
         String n=name.strip();
         if(n.isEmpty()||n.length()>60||n.contains("\n")||n.contains("\r")||n.contains("|"))
@@ -341,7 +349,7 @@ final class PlayerLife {
     }
 
     static String speak(TownLife.Town town,String id,String message,int day,int minute) {
-        TownLife.Citizen resident=nearby(town,id);
+        TownLife.Citizen resident=nearby(town,id,day,minute);
         String spoken=message.strip();
         if(spoken.isEmpty()||spoken.length()>1000)
             throw new IllegalArgumentException("Speak 1–1000 characters.");
@@ -372,6 +380,7 @@ final class PlayerLife {
         boolean support=spoken.equalsIgnoreCase("I'm here for you.") || spoken.equalsIgnoreCase("Ti sono vicino.");
         boolean recall=spoken.equalsIgnoreCase("What do you remember about me?") || spoken.equalsIgnoreCase("Cosa ricordi di me?");
         if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan")||spoken.equalsIgnoreCase("Repay personal loan")) {
+            if(resident.age<18)throw new IllegalArgumentException("Personal loans require an adult resident.");
             if(RebirthLife.active(town))throw new IllegalArgumentException("Personal loans are available to visitors only.");
             if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan"))return PersonalLoanLife.borrow(town,resident,contact,day);
             return PersonalLoanLife.repay(town,resident,contact,day);
