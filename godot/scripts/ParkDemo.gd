@@ -5320,7 +5320,9 @@ func _resident_caption(person: Node3D) -> String:
     return tr(label)
 
 func _open_dialog(preferred_id: String = "") -> void:
-    if not _connected or _api.is_busy() or _dialog_pending:
+    # Reading the town or fetching location choices must not hide the chat.
+    # Only sending requires a free API channel.
+    if not _connected or _dialog_pending:
         return
     var id := preferred_id if not preferred_id.is_empty() else _nearest_resident()
     if id.is_empty():
@@ -5404,7 +5406,10 @@ func _send_typed_dialog() -> void:
     _send_dialog(_dialog_input.text)
 
 func _send_dialog(message: String) -> void:
-    if not _dialog_panel.visible or _dialog_pending or _api.is_busy() or not _connected:
+    if not _dialog_panel.visible or _dialog_pending or not _connected:
+        return
+    if _api.is_busy():
+        _dialog_reply.text = tr("The world is updating. Try sending again.")
         return
     var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
     if person == null or _avatar.position.distance_to(person.position) >= 2.5:
