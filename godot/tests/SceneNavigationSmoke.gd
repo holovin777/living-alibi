@@ -898,6 +898,43 @@ func _exercise() -> void:
             and marco.has_node("LegLeft") and marco.has_node("ArmRight"),
             "residents have stable distinct visual profiles and articulated limbs"):
         return
+    var face_seed := absi(str(marco.get_meta("resident_id")).hash())
+    var face_cycle := 3.2+float(face_seed%19)*0.11
+    var blink_at := face_cycle-float(face_seed%97)*0.073+0.09
+    marco.set_meta("mood","CALM")
+    world._animate_resident_face(marco,1.0,blink_at,false)
+    if not _check(marco.get_node("EyeLeft").scale.y<0.15,"resident blinks at stable individual timing"):
+        return
+    world._animate_resident_face(marco,1.0,blink_at+0.6,false)
+    if not _check(marco.get_node("EyeLeft").scale.y>0.9,"resident eyes reopen"):
+        return
+    marco.set_meta("mood","HAPPY")
+    world._animate_resident_face(marco,1.0,blink_at+0.6,false)
+    if not _check(marco.get_node("Mouth/Right").rotation.z>0.0
+            and marco.get_node("Mouth/Left").rotation.z<0.0,
+            "happy mood produces a smile"):
+        return
+    marco.set_meta("mood","SAD")
+    world._animate_resident_face(marco,1.0,blink_at+0.6,false)
+    if not _check(marco.get_node("Mouth/Right").rotation.z<0.0,"sad mood produces a frown"):
+        return
+    marco.set_meta("mood","IRRITATED")
+    world._animate_resident_face(marco,1.0,blink_at+0.6,false)
+    if not _check(marco.get_node("Hair/BrowRight").rotation.z>0.3,"irritated mood changes brow angle"):
+        return
+    world._begin_resident_reply(marco,"Hello there.")
+    world._animate_resident_face(marco,1.0,blink_at+0.6,true)
+    if not _check(float(marco.get_meta("reply_remaining",0.0))>0.0
+            and marco.get_node("Mouth/Opening").visible
+            and not marco.get_node("Mouth/Center").visible,
+            "delivered replies have bounded mouth motion"):
+        return
+    world._animate_resident_face(marco,1.0,blink_at+1.0,false)
+    if not _check(not marco.get_node("Mouth/Opening").visible
+            and marco.get_node("Mouth/Center").visible,"mouth closes while listening"):
+        return
+    marco.set_meta("reply_remaining",0.0)
+    marco.set_meta("mood","CALM")
     var adult_scale: Vector3=marco.scale
     var original_appearance: Dictionary=marco.get_meta("appearance").duplicate()
     populated_park["residents"][0]["appearanceStage"]="CHILD"
