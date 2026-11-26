@@ -8,6 +8,7 @@ run/main_scene="res://scenes/park.tscn"
 
 [audio]
 general/text_to_speech=true
+driver/enable_input=true
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
