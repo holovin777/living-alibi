@@ -13,6 +13,32 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void homeRoutineRunsWithoutVisitorAndPersistsCleanliness() throws Exception {
+        Path file=directory.resolve("home-routine.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=town.get("marco");
+            c.place=c.home;c.destination=c.home;c.travelRemaining=0;c.activity="SLEEPING";
+            town.player.place=TownLife.Place.PARK;
+            state.minute=300;
+            HomeRoutineLife.tick(town,state);
+            assertEquals(99,HomeRoutineLife.cleanliness(town,c));
+            assertEquals("SLEEPING",HomeRoutineLife.activity(town,c,1,300));
+            c.activity="RELAXING_AT_HOME";c.hunger=60;c.food=2;
+            assertEquals("COOKING",HomeRoutineLife.activity(town,c,1,600));
+            c.hunger=0;c.thirst=60;c.water=2;
+            assertEquals("DRINKING",HomeRoutineLife.activity(town,c,1,600));
+            c.place=TownLife.Place.BAKERY;
+            assertEquals("AWAY",HomeRoutineLife.activity(town,c,1,600));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(99,HomeRoutineLife.cleanliness(town,town.get("marco")));
+        }
+    }
+
+    @Test
     void apartmentVisitRequiresInvitationAndExpires() throws Exception {
         Path file=directory.resolve("guest-apartment.db");
         try(var db=new WorldDatabase(file)){
