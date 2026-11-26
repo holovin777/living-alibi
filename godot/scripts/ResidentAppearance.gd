@@ -25,6 +25,13 @@ static func profile(id: String) -> Dictionary:
     result["face_width"]=rng.randf_range(0.90,1.10)
     result["beard"]=rng.randi_range(0,5)
     result["hair_detail"]=rng.randi_range(0,4)
+    result["clothing_style"]=rng.randi_range(0,6)
+    result["accent"]=[Color("#ded5c3"),Color("#a85d49"),Color("#7eaa9d"),Color("#5a739c"),Color("#c3a35b")][rng.randi_range(0,4)]
+    result["shoulders"]=rng.randf_range(0.87,1.13)
+    result["waist"]=rng.randf_range(0.88,1.12)
+    result["hair_extra"]=rng.randi_range(0,5)
+    result["face_detail"]=rng.randi_range(0,5)
+    result["shoe_color"]=[Color("#303032"),Color("#76513d"),Color("#d4d0c5"),Color("#4a5966")][rng.randi_range(0,3)]
     return result
 
 static func stage_for_age(age: int) -> String:

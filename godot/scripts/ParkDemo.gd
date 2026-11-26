@@ -3702,15 +3702,18 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var hair: Color = profile["hair"]
     var pants: Color = profile["pants"]
     var torso := _cylinder(person,0.23,0.57,jacket,Vector3(0,1.14,0))
-    torso.scale.z = 0.72
+    torso.scale=Vector3(float(profile["waist"]),1.0,0.72)
     var shoulders := _cylinder(person,0.255,0.14,jacket,Vector3(0,1.36,0))
-    shoulders.scale.z = 0.68
+    shoulders.scale=Vector3(float(profile["shoulders"]),1.0,0.68)
     _cylinder(person,0.10,0.15,skin,Vector3(0,1.48,0))
-    var face := _sphere(person,0.20,skin,Vector3(0,1.66,0))
+    var head := Node3D.new()
+    head.name="Head"
+    person.add_child(head)
+    var face := _sphere(head,0.20,skin,Vector3(0,1.66,0))
     face.scale.x=float(profile["face_width"])
     var hair_root := Node3D.new()
     hair_root.name="Hair"
-    person.add_child(hair_root)
+    head.add_child(hair_root)
     var style: int = profile["style"]
     if style == 0:
         _sphere(hair_root,0.195,hair,Vector3(0,1.75,0.04))
@@ -3732,11 +3735,25 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
                 lock.scale.y=1.7
         2:
             _sphere(hair_root,0.085,hair,Vector3(0,1.88,0.10))
+    match int(profile["hair_extra"]):
+        0:
+            for x in [-0.12,0.0,0.12]:
+                _sphere(hair_root,0.075,hair,Vector3(x,1.84,0.035))
+        1:
+            var ponytail := _sphere(hair_root,0.085,hair,Vector3(0,1.56,0.20))
+            ponytail.scale.y=2.1
+        2:
+            var swept := _sphere(hair_root,0.12,hair,Vector3(0.06,1.80,-0.09))
+            swept.scale=Vector3(1.25,0.55,0.65)
+        3:
+            for x in [-0.17,0.17]:
+                var sideburn := _sphere(hair_root,0.045,hair,Vector3(x,1.65,0.02))
+                sideburn.scale.y=1.45
     for side in [-1.0,1.0]:
-        _sphere(person,0.045,skin,Vector3(side*0.18,1.64,0))
+        _sphere(head,0.045,skin,Vector3(side*0.18,1.64,0))
         var eye := Node3D.new()
         eye.name="EyeLeft" if side<0 else "EyeRight"
-        person.add_child(eye)
+        head.add_child(eye)
         eye.position=Vector3(side*0.072,1.69,-0.177)
         _sphere(eye,0.025,Color("#e9e3d8"),Vector3.ZERO)
         _sphere(eye,0.013,profile["eye"],Vector3(0,0,-0.022))
@@ -3744,11 +3761,11 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         _box(hair_root,Vector3(0.071,0.014,0.014),hair,Vector3(side*0.072,1.735,-0.187))
         var brow := hair_root.get_child(hair_root.get_child_count()-1) as Node3D
         brow.name="BrowLeft" if side<0 else "BrowRight"
-    _sphere(person,float(profile["nose"]),skin,Vector3(0,1.635,-0.193))
+    _sphere(head,float(profile["nose"]),skin,Vector3(0,1.635,-0.193))
     var mouth := Node3D.new()
     mouth.name="Mouth"
     mouth.position=Vector3(0,1.57,-0.184)
-    person.add_child(mouth)
+    head.add_child(mouth)
     var lip := skin.darkened(0.48)
     _box(mouth,Vector3(0.048,0.012,0.018),lip,Vector3.ZERO)
     mouth.get_child(0).name="Center"
@@ -3759,32 +3776,48 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     opening.name="Opening"
     opening.scale=Vector3(0.95,0.12,0.32)
     opening.hide()
-    _box(person,Vector3(0.05,0.46,0.027),jacket.darkened(0.24),Vector3(0,1.16,-0.175))
+    var casual := Node3D.new()
+    casual.name="CasualDetails"
+    person.add_child(casual)
+    _build_resident_clothes(casual,profile)
+    match int(profile["face_detail"]):
+        0:
+            for x in [-0.115,0.115]:
+                for n in range(3):
+                    _sphere(head,0.005,skin.darkened(0.30),Vector3(x+float(n-1)*0.012,1.63+float(n%2)*0.008,-0.165))
+        1:
+            _sphere(head,0.007,skin.darkened(0.55),Vector3(0.10,1.59,-0.163))
+        2:
+            for x in [-0.19,0.19]:
+                _sphere(head,0.018,Color("#d2b16c"),Vector3(x,1.61,-0.018))
     var beard := Node3D.new()
     beard.name="FacialHair"
-    person.add_child(beard)
+    head.add_child(beard)
     if int(profile["beard"])==0:
         var chin := _sphere(beard,0.115,hair,Vector3(0,1.535,-0.128))
         chin.scale=Vector3(1.03,0.61,0.55)
     elif int(profile["beard"])==1:
         _box(beard,Vector3(0.11,0.022,0.024),hair,Vector3(0,1.602,-0.186))
+    elif int(profile["beard"])==2:
+        var short_beard := _sphere(beard,0.075,hair,Vector3(0,1.52,-0.15))
+        short_beard.scale=Vector3(1.0,0.66,0.45)
     beard.hide()
     var accessory: int = profile["accessory"]
     if accessory == 0:
         for side in [-1.0,1.0]:
             # Open frames keep the animated eyes visible.
             for y in [-0.033,0.033]:
-                _box(person,Vector3(0.105,0.009,0.018),Color("#414b51"),Vector3(side*0.068,1.69+y,-0.225))
+                _box(head,Vector3(0.105,0.009,0.018),Color("#414b51"),Vector3(side*0.068,1.69+y,-0.225))
             for x in [-0.048,0.048]:
-                _box(person,Vector3(0.009,0.06,0.018),Color("#414b51"),Vector3(side*0.068+x,1.69,-0.225))
-        _box(person,Vector3(0.045,0.014,0.02),Color("#414b51"),Vector3(0,1.69,-0.214))
+                _box(head,Vector3(0.009,0.06,0.018),Color("#414b51"),Vector3(side*0.068+x,1.69,-0.225))
+        _box(head,Vector3(0.045,0.014,0.02),Color("#414b51"),Vector3(0,1.69,-0.214))
     elif accessory == 1:
-        var bag := _cylinder(person,0.19,0.43,jacket.darkened(0.35),Vector3(0,1.14,0.22))
+        var bag := _cylinder(casual,0.19,0.43,jacket.darkened(0.35),Vector3(0,1.14,0.22))
         bag.scale = Vector3(1.0,1.0,0.62)
     elif accessory == 2:
-        var cap := _cylinder(person,0.205,0.095,jacket.darkened(0.23),Vector3(0,1.85,0))
+        var cap := _cylinder(head,0.205,0.095,jacket.darkened(0.23),Vector3(0,1.85,0))
         cap.scale.z = 1.02
-        _box(person,Vector3(0.32,0.035,0.18),jacket.darkened(0.23),Vector3(0,1.82,-0.19))
+        _box(head,Vector3(0.32,0.035,0.18),jacket.darkened(0.23),Vector3(0,1.82,-0.19))
     for side in [-1,1]:
         var leg := Node3D.new()
         leg.name = "LegLeft" if side < 0 else "LegRight"
@@ -3797,11 +3830,11 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         knee.position = Vector3(0,-0.35,0)
         leg.add_child(knee)
         _cylinder(knee,0.10,0.35,pants,Vector3(0,-0.175,0))
-        _box(knee,Vector3(0.22,0.13,0.34),Color("#303032"),Vector3(0,-0.42,-0.06))
+        _box(knee,Vector3(0.22,0.13,0.34),profile["shoe_color"],Vector3(0,-0.42,-0.06))
         _box(knee,Vector3(0.23,0.035,0.35),Color("#665f55"),Vector3(0,-0.475,-0.06))
         var arm := Node3D.new()
         arm.name = "ArmLeft" if side < 0 else "ArmRight"
-        arm.position = Vector3(side*0.29,1.37,0)
+        arm.position = Vector3(side*0.29*float(profile["shoulders"]),1.37,0)
         person.add_child(arm)
         _cylinder(arm,0.083,0.43,jacket,Vector3(0,-0.22,0))
         _cylinder(arm,0.085,0.065,jacket.darkened(0.18),Vector3(0,-0.425,0))
@@ -3835,6 +3868,47 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     return person
 
 # Updates the existing model when a birthday crosses a visible life stage.
+func _build_resident_clothes(root: Node3D,profile: Dictionary) -> void:
+    var paint: Color=profile["jacket"]
+    var accent: Color=profile["accent"]
+    match int(profile["clothing_style"]):
+        0: # Zip-up hoodie
+            var hood := _sphere(root,0.17,paint.darkened(0.10),Vector3(0,1.43,0.12))
+            hood.scale=Vector3(1.0,0.70,0.65)
+            _box(root,Vector3(0.025,0.48,0.025),accent,Vector3(0,1.15,-0.185))
+            _box(root,Vector3(0.24,0.11,0.035),paint.lightened(0.10),Vector3(0,0.98,-0.18))
+        1: # Button shirt
+            for x in [-0.08,0.08]:
+                var collar := _cylinder(root,0.06,0.025,accent,Vector3(x,1.40,-0.16))
+                collar.rotation.x=PI/2.0
+            for y in [1.10,1.22,1.34]:
+                _sphere(root,0.012,accent,Vector3(0,y,-0.185))
+        2: # Knit stripes
+            for y in [1.00,1.15,1.30]:
+                var band := _cylinder(root,0.235,0.045,accent,Vector3(0,y,0))
+                band.scale=Vector3(float(profile["waist"]),1.0,0.76)
+        3: # Long coat
+            var hem := _cylinder(root,0.245,0.35,paint,Vector3(0,0.81,0))
+            hem.scale.z=0.74
+            for x in [-0.075,0.075]:
+                _box(root,Vector3(0.07,0.30,0.035),paint.lightened(0.18),Vector3(x,1.24,-0.17))
+        4: # Casual vest
+            var vest := _cylinder(root,0.248,0.49,accent.darkened(0.15),Vector3(0,1.15,0))
+            vest.scale.z=0.75
+            _box(root,Vector3(0.025,0.44,0.03),paint,Vector3(0,1.15,-0.19))
+        5: # Graphic shirt
+            _box(root,Vector3(0.19,0.10,0.018),accent,Vector3(0,1.23,-0.185))
+            _box(root,Vector3(0.12,0.025,0.018),accent.lightened(0.25),Vector3(0,1.16,-0.185))
+        6: # Smart jacket
+            for x in [-0.085,0.085]:
+                var lapel := _box_node(root,Vector3(0.07,0.29,0.035),paint.darkened(0.25),Vector3(x,1.28,-0.18))
+                lapel.rotation.z=x*2.5
+            _box(root,Vector3(0.045,0.25,0.03),accent,Vector3(0,1.29,-0.198))
+
+func _box_node(parent: Node3D,size: Vector3,color: Color,at: Vector3) -> Node3D:
+    _box(parent,size,color,at)
+    return parent.get_child(parent.get_child_count()-1) as Node3D
+
 func _sync_resident_appearance(person: Node3D,stage: String) -> void:
     if str(person.get_meta("appearance_stage",""))==stage:return
     person.set_meta("appearance_stage",stage)
@@ -3842,7 +3916,7 @@ func _sync_resident_appearance(person: Node3D,stage: String) -> void:
     person.scale=ResidentAppearance.body_scale(profile,stage)
     var tint := ResidentAppearance.hair_color(profile.get("hair",Color("#594437")),stage)
     for group in ["Hair","FacialHair"]:
-        var root := person.get_node_or_null(group) as Node3D
+        var root := person.get_node_or_null("Head/"+group) as Node3D
         if root==null:continue
         for child in root.get_children():
             if child is MeshInstance3D and child.material_override is StandardMaterial3D:
@@ -3853,7 +3927,7 @@ func _sync_resident_appearance(person: Node3D,stage: String) -> void:
 # Client-only expression parameters, driven by the authoritative mood snapshot.
 # Blink timing is stable per resident and speech is bounded to delivered replies.
 func _animate_resident_face(person: Node3D,delta: float,now: float,speaking: bool) -> void:
-    var mouth := person.get_node_or_null("Mouth") as Node3D
+    var mouth := person.get_node_or_null("Head/Mouth") as Node3D
     if mouth==null:return
     var mood := str(person.get_meta("mood","CALM"))
     var smile := 0.0
@@ -3875,20 +3949,60 @@ func _animate_resident_face(person: Node3D,delta: float,now: float,speaking: boo
         blink=0.08+0.92*absf(blink_phase-0.09)/0.09
     var blend := minf(delta*18.0,1.0)
     for side in [-1.0,1.0]:
-        var eye := person.get_node("EyeLeft" if side<0 else "EyeRight") as Node3D
+        var eye := person.get_node("Head/EyeLeft" if side<0 else "Head/EyeRight") as Node3D
         eye.scale.y=lerpf(eye.scale.y,eye_open*blink,blend)
-        var brow := person.get_node("Hair/BrowLeft" if side<0 else "Hair/BrowRight") as Node3D
+        var brow := person.get_node("Head/Hair/BrowLeft" if side<0 else "Head/Hair/BrowRight") as Node3D
         brow.position.y=lerpf(brow.position.y,1.735+brow_height,blend)
         brow.rotation.z=lerpf(brow.rotation.z,side*brow_slant,blend)
         var corner := mouth.get_node("Left" if side<0 else "Right") as Node3D
         corner.position.y=lerpf(corner.position.y,smile*0.5,blend)
         corner.rotation.z=lerpf(corner.rotation.z,side*atan2(smile,0.027),blend)
+    var yawning := not speaking and mood=="TIRED" and fposmod(now+float(seed%31),19.0)<1.25
     var opening := mouth.get_node("Opening") as Node3D
-    opening.visible=speaking
+    opening.visible=speaking or yawning
     var syllable := 0.18+0.62*absf(sin(now*13.0+float(seed%31))) if speaking else 0.12
-    opening.scale.y=lerpf(opening.scale.y,syllable,blend)
+    opening.scale.y=lerpf(opening.scale.y,0.95 if yawning else syllable,blend)
     var center := mouth.get_node("Center") as Node3D
-    center.visible=not speaking
+    center.visible=not speaking and not yawning
+
+func _animate_resident_head(person: Node3D,delta: float,now: float,engaged: bool,walking: bool) -> void:
+    var head := person.get_node_or_null("Head") as Node3D
+    if head==null:return
+    var phase := float(person.get_meta("phase",0.0))
+    var mood := str(person.get_meta("mood","CALM"))
+    var nod := 0.0
+    var turn := 0.0
+    if engaged:
+        nod=0.045*sin(now*3.0+phase)
+        if mood=="IRRITATED":turn=0.12*sin(now*4.0+phase)
+    elif not walking:
+        turn=0.20*sin(now*0.56+phase)
+        if mood=="TIRED":nod=0.10
+    else:
+        turn=0.08*sin(now*0.72+phase)
+    # Rotation is around the neck; existing facial meshes share one pivot.
+    # Limit movement when headgear is anchored to a uniform or winter outfit.
+    var winter := person.get_node_or_null("WinterClothes") as Node3D
+    if (winter!=null and winter.visible) or str(person.get_meta("outfit_visual","")) in ["HIGH_VIS","BAKER_APRON"]:
+        nod*=0.25
+        turn*=0.25
+    head.rotation.x=lerpf(head.rotation.x,nod,minf(delta*6.0,1.0))
+    head.rotation.y=lerpf(head.rotation.y,turn,minf(delta*6.0,1.0))
+    var pivot := Vector3(0,1.49,0)
+    head.position=pivot-head.basis*pivot
+
+func _resident_wave(person: Node3D,delta: float,eligible: bool,nearby: bool) -> bool:
+    var remaining := maxf(0.0,float(person.get_meta("wave_remaining",0.0))-delta)
+    var was_near := bool(person.get_meta("wave_near",false))
+    var cooldown := maxf(0.0,float(person.get_meta("wave_cooldown",0.0))-delta)
+    if nearby and not was_near and eligible and cooldown<=0.0:
+        remaining=1.6
+        cooldown=30.0
+    if not eligible or not nearby:remaining=0.0
+    person.set_meta("wave_remaining",remaining)
+    person.set_meta("wave_cooldown",cooldown)
+    person.set_meta("wave_near",nearby)
+    return remaining>0.0
 
 func _begin_resident_reply(person: Node3D,reply: String) -> void:
     if person==null or reply.strip_edges().is_empty():return
@@ -3976,9 +4090,22 @@ func _animate_residents(delta: float) -> void:
         person.set_meta("reply_remaining",reply_remaining)
         var joke := _current_place=="OFFICE" and str(person.get_meta("resident_id",""))==_office_joker_id and _office_joke_hold>0.0
         _animate_resident_face(person,delta,now,(talking and reply_remaining>0.0) or joke)
+        _animate_resident_head(person,delta,now,talking,walking)
+        var casual := person.get_node_or_null("CasualDetails") as Node3D
+        var winter := person.get_node_or_null("WinterClothes") as Node3D
+        if casual!=null:
+            casual.visible=str(person.get_meta("outfit_visual","")).is_empty() and (winter==null or not winter.visible)
         var gesture_time := now+phase
         var coffee := seated and str(person.get_meta("seat_kind",""))=="cafe" and not talking
         var phone := not seated and not talking and not walking and activity in ["RELAXING","RESTING","FREE_TIME"] and sin(gesture_time*0.45)>0.45
+        var familiar := int(person.get_meta("conversations",0))>0 and str(person.get_meta("relationship","STRANGER"))!="STRANGER"
+        var friendly := str(person.get_meta("mood","CALM")) in ["CALM","HAPPY","ENTHUSIASTIC"]
+        var wave := _resident_wave(person,delta,familiar and friendly and not seated and not walking and not talking and not phone and activity!="WORKING" and not umbrella,person.position.distance_to(_avatar.position)<3.3)
+        if wave:
+            var to_visitor := _avatar.position-person.position
+            if to_visitor.length_squared()>0.001:
+                person.rotation.y=lerp_angle(person.rotation.y,atan2(-to_visitor.x,-to_visitor.z),minf(delta*5.0,1.0))
+        var guarded := not walking and not seated and not talking and not phone and not coffee and not umbrella and not wave and activity in ["RELAXING","RESTING","FREE_TIME"] and str(person.get_meta("mood","")) in ["IRRITATED","STRESSED"]
         person.get_node("ArmRight/Phone").visible = phone
         person.get_node("ArmRight/CoffeeCup").visible = coffee
         var work_prop := person.get_node_or_null("ArmRight/WorkProp") as Node3D
@@ -3991,7 +4118,11 @@ func _animate_residents(delta: float) -> void:
                 knee.rotation.x = lerpf(knee.rotation.x,-PI/2.0 if seated else 0.0,minf(delta*10.0,1.0))
                 if seated:
                     angle = PI/2.0
-            if umbrella and limb=="ArmLeft":
+            if wave and limb=="ArmRight":
+                angle=-2.25+sin(gesture_time*11.0)*0.22
+            elif guarded and limb in ["ArmLeft","ArmRight"]:
+                angle=-0.95
+            elif umbrella and limb=="ArmLeft":
                 angle=0.85
             elif talking and limb=="ArmRight":
                 angle=0.30+sin(gesture_time*3.3)*0.28
@@ -4018,6 +4149,9 @@ func _animate_residents(delta: float) -> void:
                 elif style=="relaxed":
                     angle=-0.10
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
+            if limb in ["ArmLeft","ArmRight"]:
+                var roll := (-0.42 if limb=="ArmRight" else 0.42) if guarded else (0.30 if wave and limb=="ArmRight" else 0.0)
+                part.rotation.z=lerpf(part.rotation.z,roll,minf(delta*8.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
     _add_obstacle(Vector3(-7.0, 0.0, 7.5), Vector2(11.0, 7.0))
@@ -6437,6 +6571,7 @@ func _animate_guest_family(delta: float) -> void:
         person.set_meta("family_path",path)
         var now := float(Time.get_ticks_msec())*0.001
         _animate_resident_face(person,delta,now,false)
+        _animate_resident_head(person,delta,now,false,walking)
         var phase := now+float(person.get_meta("phase",0.0))
         var swing := sin(phase*9.0)*0.4 if walking else 0.0
         for limb in ["LegLeft","LegRight"]:
@@ -6459,6 +6594,7 @@ func _animate_guest_host(delta: float) -> void:
     var walking := false
     var talking := _guest_feedback_time>0.0
     _animate_resident_face(_guest_host,delta,float(Time.get_ticks_msec())*0.001,talking)
+    _animate_resident_head(_guest_host,delta,float(Time.get_ticks_msec())*0.001,talking,not _host_path.is_empty())
     if not talking and not _host_path.is_empty():
         var target: Vector3 = _host_path[0]
         var motion := target-_guest_host.position
