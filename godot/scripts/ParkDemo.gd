@@ -500,6 +500,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
             _jump_elapsed = 0.0
             get_viewport().set_input_as_handled()
         return
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_X:
+        _try_strike()
+        get_viewport().set_input_as_handled()
+        return
     if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_Q:
         if _foot_controls_available():
             _cycle_held_item()
@@ -6826,6 +6830,8 @@ func _render_actions() -> void:
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
             if _current_place == "MARKET":
+                if not bool(_last_snapshot.get("player",{}).get("ownsBaton",false)):
+                    _action_choices.add_child(_button(tr("Buy training baton · 12 EUR"),_buy_training_baton))
                 var stall: Dictionary = _last_snapshot.get("stall",{})
                 if not bool(stall.get("registered",false)):
                     _action_choices.add_child(_button("Register private stall · 20 EUR",_garden_action.bind("stall-register")))
@@ -7268,10 +7274,26 @@ func _set_hands_enabled(enabled: bool) -> void:
     _hands.enabled = enabled
     _hands.update_pose(0.0,_step_bob,not _drive_active() and not _cycling())
 
+func _try_strike() -> void:
+    if not _foot_controls_available() or _rebirth_active() or _guest_active or _stairwell_active or not _connected or _api.is_busy():return
+    if not _hands.held_item in ["","baton"]:
+        _message.text=tr("Select empty hands or the training baton with Q.")
+        return
+    var id := _looked_at_resident()
+    if id.is_empty():return
+    _hands.strike()
+    _api.garden_action("combat-strike:%s:%s" % ["baton" if _hands.held_item=="baton" else "fists",id])
+
+func _buy_training_baton() -> void:
+    if _current_place=="MARKET" and _near_kiosk() and _connected and not _api.is_busy():
+        _api.garden_action("combat-buy-baton")
+
 func _holdable_items() -> Array[String]:
     var player: Dictionary = _last_snapshot.get("player",{})
     var bag: Dictionary = player.get("bag",{"bread":player.get("bread",0),"water":player.get("bottledWater",0)})
     var choices: Array[String] = [""]
+    if bool(player.get("ownsBaton",false)):
+        choices.append("baton")
     for id in ["bread","water","grape-juice"]:
         if int(bag.get(id,0))>0:
             choices.append(id)
@@ -7282,6 +7304,8 @@ func _refresh_held_item() -> void:
         _hands.set_item("")
     if is_instance_valid(_held_label):
         _held_label.text = tr("Held item (Q): %s") % (tr("Empty hands") if _hands.held_item.is_empty() else tr(str(_hands.held_item).capitalize()))
+        if not _rebirth_active() and _hands.held_item in ["","baton"]:
+            _held_label.text += " · "+tr("X: strike")
 
 func _cycle_held_item() -> void:
     var choices := _holdable_items()
