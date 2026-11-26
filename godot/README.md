@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Friendly walking pairs
+
+Adults who are already in the same public park, historic center, portico or riverside can walk together during daytime leisure if their existing relationship has at least two conversations, trust >=55, affinity >=35 and tension <=25. Java derives nonoverlapping mutual pairs, prioritizing stronger relationships, and excludes work, travel, serious needs and player-controlled adults. The Godot client renders the actual visible pair walking alongside one another or trailing when space is limited; the leader waits for a separated partner. A player conversation pauses the pair. No new relationship rewards, invented people, destination changes or paid activities occur. This is a local public leisure animation driven by committed relationships, not yet planned cross-district outings, family walks with children or full obstacle pathfinding.
