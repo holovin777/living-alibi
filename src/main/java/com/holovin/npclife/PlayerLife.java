@@ -265,7 +265,7 @@ final class PlayerLife {
     }
     static List<TownLife.Citizen> visible(TownLife.Town town) {
         List<TownLife.Citizen> people=new ArrayList<>();
-        if(!town.player.alive)return people;
+        if(!town.player.alive||JusticeLife.confined(town))return people;
         if(town.player.travelRemaining>0)return people;
         String scene=TownLife.publicSpace(town.player.place);
         for(var citizen:town.people.values()) {
