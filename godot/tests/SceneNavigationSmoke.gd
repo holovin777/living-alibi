@@ -987,6 +987,32 @@ func _exercise() -> void:
         return
     marco.remove_meta("peer_expression")
     marco.remove_meta("peer_reaction")
+    var companion_marco_position: Vector3=marco.position
+    var companion_elena_position: Vector3=elena.position
+    var companion_marco_activity: String=str(marco.get_meta("activity",""))
+    var companion_elena_activity: String=str(elena.get_meta("activity",""))
+    marco.position=Vector3(0,0,0)
+    elena.position=Vector3(0,0,-3)
+    marco.set_meta("activity","FREE_TIME")
+    elena.set_meta("activity","FREE_TIME")
+    marco.set_meta("walking_companion","elena")
+    elena.set_meta("walking_companion","marco")
+    world._tick_walking_companions()
+    if not _check(marco.has_meta("companion_target") and elena.has_meta("companion_target")
+            and (bool(marco.get_meta("companion_wait")) or bool(elena.get_meta("companion_wait"))),
+            "companions wait for a distant partner"):
+        return
+    elena.set_meta("activity","WORKING")
+    world._tick_walking_companions()
+    if not _check(not marco.has_meta("companion_target") and not elena.has_meta("companion_target"),
+            "companionship yields to work and other priority activities"):
+        return
+    marco.set_meta("walking_companion","")
+    elena.set_meta("walking_companion","")
+    marco.position=companion_marco_position
+    elena.position=companion_elena_position
+    marco.set_meta("activity",companion_marco_activity)
+    elena.set_meta("activity",companion_elena_activity)
     var peer_old_marco: Vector3=marco.position
     var peer_old_elena: Vector3=elena.position
     var peer_old_activity: String=str(elena.get_meta("activity",""))
