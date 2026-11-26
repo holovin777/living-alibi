@@ -23,7 +23,7 @@ func _ready() -> void:
     header.add_child(heading)
     var close := Button.new()
     close.name="CloseCharacter"
-    close.text="Close / Chiudi (I / Esc)"
+    close.text=tr("Close (I / Esc)")
     close.pressed.connect(func():close_requested.emit())
     header.add_child(close)
     tabs=TabContainer.new()
@@ -89,22 +89,28 @@ func refresh(data: Dictionary) -> void:
     var name_value=p.get("privateName")
     if linked:name_value=life.get("childName")
     var display_name := tr("Unnamed visitor") if name_value==null or str(name_value).is_empty() else str(name_value)
+    if str(life.get("phase",""))=="CHOICE":
+        section(pages[0],tr("Choose a new family"))
+        line(pages[0],tr("Close this menu to choose your next life."))
+        return
     section(pages[0],display_name)
     if linked:line(pages[0],tr("Age: %s") % life.get("age",0))
     var occupation=p.get("jobId")
     if linked and life.get("adultOptions") is Dictionary:occupation=life["adultOptions"].get("occupation")
+    elif linked:occupation=tr("Student" if int(life.get("age",0))>=6 else "Child")
     line(pages[0],tr("Location: %s") % str(p.get("place",p.get("placeId","")))
     line(pages[0],tr("Occupation: %s") % (tr("Not employed") if occupation==null or str(occupation).is_empty() else str(occupation)))
     line(pages[0],tr("Money: %s EUR") % (identity.get("savings",p.get("money",0)) if linked and identity is Dictionary else p.get("money",0)))
     section(pages[0],tr("Wellbeing — full bars are good"))
-    if linked:
-        line(pages[0],tr("Linked life: use F for current family, school and medical information."))
+    var stats: Dictionary=data.get("characterNeeds",{} if linked else p)
+    if stats.is_empty():
+        line(pages[0],tr("Current wellbeing is unavailable."))
     else:
-        need(pages[0],"Fullness",int(p.get("hunger",0)),true)
-        need(pages[0],"Hydration",int(p.get("thirst",0)),true)
-        need(pages[0],"Energy",int(p.get("fatigue",0)),true)
-        need(pages[0],"Health",int(p.get("health",100)),false)
-        need(pages[0],"Hygiene",int(p.get("hygiene",100)),false)
+        need(pages[0],"Fullness",int(stats.get("hunger",0)),true)
+        need(pages[0],"Hydration",int(stats.get("thirst",0)),true)
+        need(pages[0],"Energy",int(stats.get("fatigue",0)),true)
+        need(pages[0],"Health",int(stats.get("health",100)),false)
+        need(pages[0],"Hygiene",int(stats.get("hygiene",100)),false)
     section(pages[0],tr("What can I do now?"))
     if linked:
         line(pages[0],tr("F: life choices, education, work and family. E: nearby services."))
