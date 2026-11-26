@@ -304,9 +304,9 @@ final class TownLife {
         m.hunger=marco.hunger;m.thirst=marco.thirst;m.fatigue=marco.fatigue;
         m.health=marco.health;m.money=marco.money;m.activity=marco.activity;
         m.food=marco.food;m.water=marco.water;
-        if(m.alive&&!inPlayerConversation(town,m))move(town,m,PhoneLife.meetingWindow(town,m,marco)&&!java.util.Set.of("WORKING","SLEEPING","RESTING_WHILE_SICK").contains(m.activity)?Place.CAFE:desiredMarco(marco,m.place),marco,truth,observations);
+        if(m.alive&&!inPlayerConversation(town,m))move(town,m,PhoneLife.homeVisitWindow(town,m,marco)&&!java.util.Set.of("WORKING","SLEEPING","RESTING_WHILE_SICK").contains(m.activity)?m.home:PhoneLife.meetingWindow(town,m,marco)&&!java.util.Set.of("WORKING","SLEEPING","RESTING_WHILE_SICK").contains(m.activity)?Place.CAFE:desiredMarco(marco,m.place),marco,truth,observations);
         elenaNeeds(e,marco,truth,observations,town);
-        if(e.alive&&!inPlayerConversation(town,e))move(town,e,PhoneLife.meetingWindow(town,e,marco)&&"FREE_TIME".equals(e.activity)?Place.CAFE:desiredElena(marco.day,marco.minute,e,town),marco,truth,observations);
+        if(e.alive&&!inPlayerConversation(town,e))move(town,e,PhoneLife.homeVisitWindow(town,e,marco)&&"FREE_TIME".equals(e.activity)?e.home:PhoneLife.meetingWindow(town,e,marco)&&"FREE_TIME".equals(e.activity)?Place.CAFE:desiredElena(marco.day,marco.minute,e,town),marco,truth,observations);
         DemographyLife.tick(town,marco,truth,observations);
         EmploymentLife.tick(town,marco,truth,observations);
         PopulationLife.tick(town,marco,truth,observations);
