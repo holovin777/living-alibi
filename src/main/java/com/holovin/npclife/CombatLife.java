@@ -63,7 +63,7 @@ final class CombatLife {
         }
         if(officer){
             t.industryStocks.merge(key(t,"police-reports"),1,Math::addExact);
-            if("baton".equals(weapon))t.industryStocks.remove(key(t,"baton"));
+            if("baton".equals(weapon))t.industryStocks.put(key(t,"baton"),0);
             return new Result("Police intervened and recorded the assault.",30);
         }
         return new Result("You struck a resident. Witnesses remember the assault.",2);
