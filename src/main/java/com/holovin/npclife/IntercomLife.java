@@ -152,7 +152,7 @@ final class IntercomLife {
         contact.lastDay=day;contact.lastMinute=minute;
         if("dinner".equals(action)){
             ConversationMemory.remember(contact,day,minute,"und","Shared dinner at home",message);
-            ConversationMemory.mark(contact,ConversationMemory.Milestone.SUPPORT,contact.dialogue.getLast());
+            ConversationMemory.mark(contact,ConversationMemory.Milestone.SHARED_MEAL,contact.dialogue.getLast());
         }
         contact.trust=Math.min(100,contact.trust+1);
         contact.affinity=Math.min(100,contact.affinity+2);
