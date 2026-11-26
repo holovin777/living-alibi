@@ -1,6 +1,10 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "T or click: talk to a person": "T o clic: parla con una persona",
+    "Ask the host to introduce their family.": "Chiedi al padrone di casa di presentarti la famiglia.",
+    "This resident is not in the apartment with you.": "Questa persona non è nell'appartamento con te.",
+    "Personal loans require an adult resident.": "I prestiti personali richiedono un residente adulto.",
     "Invite to your home": "Invita a casa tua",
     "Cook pasta together · 25m": "Cucinate la pasta insieme · 25m",
     "You cooked and ate together.": "Avete cucinato e mangiato insieme.",
