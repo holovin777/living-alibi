@@ -112,6 +112,7 @@ final class PlayerLife {
         int lastMinute;
         String lastHeard;
         final List<ConversationMemory.Turn> dialogue=new ArrayList<>();
+        final Map<ConversationMemory.Milestone,ConversationMemory.Turn> important=new java.util.EnumMap<>(ConversationMemory.Milestone.class);
         Contact(String residentId) {this.residentId=residentId;}
         Contact copy() {
             Contact c=new Contact(residentId);
@@ -119,6 +120,7 @@ final class PlayerLife {
             c.trust=trust;c.affinity=affinity;c.lastPositiveDay=lastPositiveDay;
             c.lastDay=lastDay;c.lastMinute=lastMinute;c.lastHeard=lastHeard;
             c.dialogue.addAll(dialogue);
+            c.important.putAll(important);
             return c;
         }
     }
