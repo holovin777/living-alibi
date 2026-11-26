@@ -75,6 +75,7 @@ final class EducationLife {
         if(diploma!=null&&get(t,c,"diploma-"+diploma)==0)return false;
         if("Doctor".equals(job)&&(c.age<25||get(t,c,"social")<35))return false;
         if(NewspaperLife.OCCUPATION.equals(job)&&(t.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY*30||c.money<200))return false;
+        if(ConstructionLife.BUILDER.equals(job)&&(!ConstructionLife.ready(t)||t.people.values().stream().anyMatch(p->p.alive&&p.employed&&ConstructionLife.BUILDER.equals(p.occupation))))return false;
         if((StreetCareLife.CLEANER.equals(job)||StreetCareLife.GARDENER.equals(job))&&!StreetCareLife.funded(t))return false;
         String employer=IndustryLife.companyFor(job);
         if(employer!=null&&t.employerFunds.getOrDefault(employer,0)<IndustryLife.HOURLY_WAGE)return false;
