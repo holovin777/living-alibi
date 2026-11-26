@@ -245,6 +245,11 @@ func refresh() -> void:
             var job = player.get("jobId")
             lines.append("\n"+tr("Occupation: %s") % (str(job) if job!=null else tr("unemployed")))
             lines.append(tr("Work schedules are confirmed at the workplace."))
+            var phone = _snapshot.get("phone")
+            if phone is Dictionary:
+                for meeting in phone.get("meetings",[]):
+                    lines.append("\n"+tr("Coffee with %s · day %s · %s") % [meeting.get("name",""),meeting.get("day",0),format_time(int(meeting.get("minute",1080)))])
+                    lines.append(tr("Cafe") + " · " + tr(str(meeting.get("status","SCHEDULED"))))
             if alarm_at>=0:
                 lines.append(tr("Alarm: day %s, %s") % [alarm_at/1440+1,format_time(alarm_at%1440)])
         "weather":
@@ -276,6 +281,8 @@ func refresh() -> void:
                 for sms in phone.get("messages",[]):
                     lines.append("\n%s · %s %s · %s" % [sms.get("name",""),tr("Day"),sms.get("day",0),format_time(int(sms.get("minute",0)))])
                     lines.append(tr(str(sms.get("text",""))))
+                    if str(sms.get("text",""))=="Coffee tomorrow at 18:00? Let me know." and str(sms.get("reply","")).is_empty():
+                        lines.append(tr("Reply thanks to accept today; tomorrow at 18:00 in the cafe."))
                     if str(sms.get("reply","")).is_empty():
                         _sms_choice.add_item(str(sms.get("name","")))
                         var index := _sms_choice.item_count-1
