@@ -4614,6 +4614,34 @@ func _tick_walking_companions() -> void:
         follower.set_meta("companion_target",alongside)
         follower.set_meta("companion_wait",follower.position.distance_to(alongside)<0.10)
 
+# Choose reachable short public walks, not a tiny circle around the spawn.
+func _resident_walk_target(person: Node3D,delta: float) -> Vector3:
+    var origin := person.position
+    var remaining := float(person.get_meta("walk_target_time",0.0))-delta
+    var goal: Vector3=person.get_meta("walk_target",origin)
+    if remaining>0.0 and origin.distance_to(goal)>0.25:
+        person.set_meta("walk_target_time",remaining)
+        return goal
+    var serial := int(person.get_meta("walk_serial",0))+1
+    person.set_meta("walk_serial",serial)
+    var seed := absi(str(person.get_meta("resident_id","")).hash())
+    for attempt in range(12):
+        var angle := float(posmod(seed+serial*5+attempt*7,24))*TAU/24.0
+        var length := 3.0+float(posmod(seed+serial+attempt,5))
+        var candidate := origin+Vector3(cos(angle),0,sin(angle))*length
+        var clear := true
+        for step in range(1,9):
+            if not _can_stand(origin.lerp(candidate,float(step)/8.0),WALKER_RADIUS):
+                clear=false
+                break
+        if clear and _resident_spawn_clear(candidate):
+            person.set_meta("walk_target",candidate)
+            person.set_meta("walk_target_time",8.0)
+            return candidate
+    person.set_meta("walk_target_time",0.8)
+    person.set_meta("walk_target",origin)
+    return origin
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
@@ -4659,8 +4687,7 @@ func _animate_residents(delta: float) -> void:
         if walking:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
-            var anchor: Vector3 = person.get_meta("anchor")
-            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (person.get_meta("companion_target") if companion else (queue_target if queued else anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)))
+            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (person.get_meta("companion_target") if companion else (queue_target if queued else _resident_walk_target(person,delta)))
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
@@ -4668,6 +4695,8 @@ func _animate_residents(delta: float) -> void:
             var old := person.position
             person.position = _move_among_people(old,next-old,WALKER_RADIUS,person)
             walked=person.position.distance_to(old)
+            if not peer_approach and not companion and not queued and walked<0.001:
+                person.set_meta("walk_target_time",0.0)
             if walked>0.001:
                 var actual := person.position-old
                 person.rotation.y=atan2(-actual.x,-actual.z)
