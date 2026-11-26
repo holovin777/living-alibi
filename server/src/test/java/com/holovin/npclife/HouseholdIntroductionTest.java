@@ -14,7 +14,8 @@ class HouseholdIntroductionTest {
         try(var db=new WorldDatabase(file)){
             var clock=db.load();var town=db.loadTown(clock);
             var host=town.get("marco");var partner=town.get("elena");
-            host.generationIndex=1;partner.generationIndex=2;
+            int maxIndex=town.people.values().stream().mapToInt(x->x.generationIndex).max().orElse(0);
+            host.generationIndex=maxIndex+1;partner.generationIndex=maxIndex+2;
             host.age=35;partner.age=34;
             for(var c:List.of(host,partner)){
                 c.alive=true;c.travelRemaining=0;c.activity="FREE_TIME";
