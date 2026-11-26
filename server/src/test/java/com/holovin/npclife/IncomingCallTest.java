@@ -99,6 +99,46 @@ class IncomingCallTest {
     }
 
     @Test
+    void playerHostingRequiresHouseAndGuestArrivalAndConsumesTwoPortions() throws Exception {
+        Path file=directory.resolve("hosting.db");
+        try(var db=new WorldDatabase(file)){
+            var clock=db.load();var town=db.loadTown(clock);
+            friendly(town,"marco");
+            var guest=town.get("marco");guest.travelRemaining=0;
+            assertTrue(PhoneLife.shareNumber(town,guest));
+            PhoneLife.outgoing(town,"marco","dial",5,600);
+            assertTrue(PhoneLife.outgoing(town,"marco","invite-my-home",5,601).contains("Mi dispiace"));
+            town.player.ownsHouse=true;
+            PhoneLife.outgoing(town,"marco","dial",5,630);
+            assertTrue(PhoneLife.outgoing(town,"marco","invite-my-home",5,631).contains("Volentieri"));
+            assertEquals("PLAYER_HOME",PhoneLife.report(town).meetings().getFirst().place());
+            clock.day=6;clock.minute=1080;
+            assertTrue(PhoneLife.playerHomeWindow(town,guest,clock));
+            assertFalse(PhoneLife.meetingWindow(town,guest,clock));
+            town.player.place=HousingLife.HOUSE_DISTRICT;
+            town.player.travelRemaining=0;
+            assertThrows(IllegalArgumentException.class,()->PhoneLife.cookTogether(town,"marco",6,1080));
+            guest.place=HousingLife.HOUSE_DISTRICT;guest.activity="FREE_TIME";guest.travelRemaining=0;
+            PhoneLife.tick(town,clock);
+            assertTrue(PhoneLife.report(town,6,1080).meetings().getFirst().guestPresent());
+            assertThrows(IllegalArgumentException.class,()->PhoneLife.cookTogether(town,"marco",6,1080));
+            for(String item:List.of("pasta","vegetables","water"))FoodLife.change(town.player,item,true,2);
+            town.player.hunger=80;guest.hunger=80;
+            assertEquals("You cooked and ate together.",PhoneLife.cookTogether(town,"marco",6,1080));
+            for(String item:List.of("pasta","vegetables","water"))assertEquals(0,FoodLife.quantity(town.player,item,true));
+            assertEquals(15,town.player.hunger);assertEquals(15,guest.hunger);
+            assertTrue(PhoneLife.report(town,6,1080).meetings().getFirst().mealServed());
+            assertThrows(IllegalArgumentException.class,()->PhoneLife.cookTogether(town,"marco",6,1081));
+            db.save(clock,List.of(),List.of(),town,List.of(),List.of(),List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var clock=db.load();var town=db.loadTown(clock);
+            assertTrue(PhoneLife.report(town,clock.day,clock.minute).meetings().getFirst().mealServed());
+            assertTrue(town.player.contacts.get("marco").important.containsKey(ConversationMemory.Milestone.SHARED_MEAL));
+        }
+    }
+
+    @Test
     void missedCallsExpireAndCooldownPreventsRepeatedRinging(){
         var clock=new WorldState();var town=TownLife.create(clock);
         friendly(town,"marco");assertTrue(PhoneLife.shareNumber(town,town.get("marco")));
