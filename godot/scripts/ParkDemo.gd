@@ -218,6 +218,7 @@ var _dialog_attitude: Label
 var _dialog_style: Label
 var _language_selector: OptionButton
 var _dialog_input: LineEdit
+var _dialog_language: OptionButton
 var _dialog_history: RichTextLabel
 var _dialog_more_scroll: ScrollContainer
 var _spoken_dialog_enabled := true
@@ -5272,6 +5273,14 @@ func _create_interface() -> void:
     _dialog_history.custom_minimum_size = Vector2(370,140)
     _dialog_history.scroll_following = true
     dialog_col.add_child(_dialog_history)
+    var spoken_label := Label.new()
+    spoken_label.text = "Parlo / I speak"
+    dialog_col.add_child(spoken_label)
+    _dialog_language = OptionButton.new()
+    _dialog_language.add_item("Italiano")
+    _dialog_language.add_item("English")
+    _dialog_language.select(0)
+    dialog_col.add_child(_dialog_language)
     _dialog_input = LineEdit.new()
     _dialog_input.placeholder_text = tr("Write to this person...")
     _dialog_input.max_length = 1000
@@ -5513,31 +5522,41 @@ func _render_dialog_mood(person: Node3D) -> void:
         if int(_last_snapshot.get("day",1))>due:
             _dialog_style.text += " · "+tr("Overdue")
 
+# The spoken language is independent of TranslationServer's interface locale.
+func _reply_translate(source: String) -> String:
+    if _api.dialogue_language == "it":
+        return str(GameLanguage.IT.get(source,source))
+    if _api.dialogue_language == "en":
+        return source
+    return tr(source)
+
 func _localized_resident_reply(message: String) -> String:
     var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
     if person==null:return message
     var separator := message.find(": ")
-    if separator<0:return tr(message)
+    if separator<0:return _reply_translate(message)
     var spoken := message.substr(separator+2)
+    if _api.dialogue_rendered:
+        return spoken
     if spoken.begins_with("I live at ") and spoken.ends_with("."):
-        return tr("I live at %s.") % spoken.substr(10,spoken.length()-11)
+        return _reply_translate("I live at %s.") % spoken.substr(10,spoken.length()-11)
     if spoken.begins_with("My name is ") and spoken.ends_with("."):
-        return tr("My name is %s.") % spoken.substr(11,spoken.length()-12)
+        return _reply_translate("My name is %s.") % spoken.substr(11,spoken.length()-12)
     if spoken.begins_with("I work as ") and spoken.ends_with("."):
-        return tr("I work as %s.") % tr(spoken.substr(10,spoken.length()-11))
+        return _reply_translate("I work as %s.") % _reply_translate(spoken.substr(10,spoken.length()-11))
     if spoken.begins_with("My workplace is ") and spoken.ends_with("."):
-        return tr("My workplace is %s.") % tr(spoken.substr(16,spoken.length()-17))
+        return _reply_translate("My workplace is %s.") % _reply_translate(spoken.substr(16,spoken.length()-17))
     if spoken.begins_with("Look for ") and spoken.ends_with(" on your town map."):
-        return tr("Look for %s on your town map.") % tr(spoken.substr(9,spoken.length()-27))
+        return _reply_translate("Look for %s on your town map.") % _reply_translate(spoken.substr(9,spoken.length()-27))
     if spoken.begins_with("Nice to meet you, ") and spoken.ends_with("."):
-        return tr("Nice to meet you, %s.") % spoken.substr(18,spoken.length()-19)
+        return _reply_translate("Nice to meet you, %s.") % spoken.substr(18,spoken.length()-19)
     if spoken.begins_with("It's ") and spoken.ends_with(".") and spoken.contains(":"):
-        return tr("It's %s.") % spoken.substr(5,spoken.length()-6)
+        return _reply_translate("It's %s.") % spoken.substr(5,spoken.length()-6)
     if spoken.begins_with("Hello, ") and spoken.ends_with(". Nice to meet someone around here."):
-        return tr("Hello, %s. Nice to meet someone around here.") % tr(spoken.substr(7,spoken.length()-42))
+        return _reply_translate("Hello, %s. Nice to meet someone around here.") % _reply_translate(spoken.substr(7,spoken.length()-42))
     if spoken.begins_with("Good to see you again, ") and spoken.ends_with("."):
-        return tr("Good to see you again, %s.") % tr(spoken.substr(23,spoken.length()-24))
-    return tr(spoken)
+        return _reply_translate("Good to see you again, %s.") % _reply_translate(spoken.substr(23,spoken.length()-24))
+    return _reply_translate(spoken)
 
 func _close_dialog() -> void:
     var was_open := _dialog_panel.visible
@@ -5560,10 +5579,10 @@ func _set_dialog_voice(enabled: bool) -> void:
 func _speak_resident_reply(reply: String) -> void:
     if not _spoken_dialog_enabled or reply.is_empty():
         return
-    var language := "it" if TranslationServer.get_locale().begins_with("it") else "en"
+    var language: String = _api.dialogue_language
+    if language not in ["it","en"]:
+        language = "it" if TranslationServer.get_locale().begins_with("it") else "en"
     var voices := DisplayServer.tts_get_voices_for_language(language)
-    if voices.is_empty():
-        voices = DisplayServer.tts_get_voices_for_language("en")
     if voices.is_empty():
         _message.text = tr("No system speech voice is available. Text chat still works.")
         return
@@ -5590,7 +5609,7 @@ func _send_dialog(message: String) -> void:
         return
     _dialog_pending = true
     _dialog_history.append_text(tr("You")+": "+message.strip_edges()+"\n")
-    _api.speak_to(_dialog_target,message)
+    _api.speak_to(_dialog_target,message,"en" if _dialog_language.selected==1 else "it")
 
 func _toggle_map() -> void:
     _close_dialog()
@@ -8063,7 +8082,12 @@ func _on_action_feedback(message: String) -> void:
         if _dialog_panel.visible:
             _dialog_reply.text = _localized_resident_reply(message)
             _dialog_history.append_text(_dialog_reply.text+"\n")
-            _speak_resident_reply(_dialog_reply.text)
+            var raw_reply := message.substr(message.find(": ")+2) if message.contains(": ") else message
+            if _api.dialogue_language=="it" and not _api.dialogue_rendered and _dialog_reply.text==raw_reply:
+                # An untranslated engine response is a subtitle, not Italian speech.
+                _dialog_reply.text += "\n[Traduzione non disponibile / Translation unavailable]"
+            else:
+                _speak_resident_reply(_dialog_reply.text)
             var speaker := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
             _begin_resident_reply(speaker,_dialog_reply.text)
             _dialog_input.clear()
