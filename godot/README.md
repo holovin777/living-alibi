@@ -833,3 +833,7 @@ The original procedural instrumental soundtrack plays locally, loops automatical
 ### Local police and detectives
 
 Towns configured for at least 24 generated residents are staffed once by recruiting up to two existing adult residents as police officers and one as detective, preserving IDs and population. Officers rotate public patrol districts, detectives visit recent open case scenes and otherwise work in the office. They use the same autonomous travel, sickness, and life simulation as other residents. On-duty clothing distinguishes police and detectives, and text/voice dialogue supports duty, help and public case questions. This is not yet a formal police report or autonomous case resolution system; case truth remains private.
+
+### Classroom placement
+
+Istituto Leonardo has twelve real classroom chairs, desks and a teacher area. Studying residents occupy separate seats while actual working teachers stand inside; other visitors and dojo members retain their own locations. The entrance and registration desk remain accessible. Class placement follows the Java schedule; the renderer does not create students or override home addresses.

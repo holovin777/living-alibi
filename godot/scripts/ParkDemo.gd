@@ -2658,11 +2658,16 @@ func _build_college() -> void:
     var classroom := Node3D.new()
     classroom.name="Classroom"
     campus.add_child(classroom)
-    for x in [-11.1,-9.4]:
-        for z in [4.35,9.55]:
-            _room_furniture(classroom,Vector3(x,0,z),Vector3(0.95,0.72,0.65),wood)
-            _room_furniture(classroom,Vector3(x,0,z+0.7),Vector3(0.45,0.42,0.45),Color("#65786e"))
-            _box(classroom,Vector3(0.45,0.3,0.06),Color("#3a454a"),Vector3(x,0.9,z-0.2))
+    # Desks face the west-wall board. The central entrance/secretary aisle stays clear.
+    for x in [-11.15,-9.65,-8.15]:
+        for z in [3.9,5.3,8.7,10.1]:
+            _room_furniture(classroom,Vector3(x,0,z),Vector3(0.62,0.69,0.78),wood)
+            var chair := Vector3(x+0.70,0,z)
+            _room_furniture(classroom,chair,Vector3(0.42,0.36,0.43),Color("#65786e"))
+            _box(classroom,Vector3(0.07,0.36,0.43),Color("#65786e"),chair+Vector3(0.20,0.50,0))
+            _box(classroom,Vector3(0.26,0.035,0.38),Color("#e4dfcb"),Vector3(x,0.72,z))
+            _register_resident_seat(chair+Vector3(0,0.36,0),PI/2.0,"classroom")
+    _physical_sign(classroom,"AULA",Vector3(-6.2,2.4,5.7),PI/2.0,1.2)
     _box(classroom,Vector3(0.12,1.25,3.1),Color("#415d53"),Vector3(-12.82,1.85,7))
     _box(classroom,Vector3(0.17,0.1,3.2),wood,Vector3(-12.75,1.2,7))
     var light := OmniLight3D.new()
@@ -3664,7 +3669,7 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
             _box(prop,Vector3(0.29,0.17,0.23),Color("#99724a"),Vector3.ZERO)
             for x in [-0.08,0.08]:
                 _sphere(prop,0.055,Color("#b94c38"),Vector3(x,0.10,0))
-        "PAPERS":
+        "PAPERS","TEACHING":
             _box(prop,Vector3(0.22,0.035,0.30),Color("#a17e53"),Vector3.ZERO)
             _box(prop,Vector3(0.19,0.012,0.26),Color("#f1eee4"),Vector3(0,0.025,0))
     prop.show()
@@ -3805,6 +3810,9 @@ func _assign_work_stations() -> void:
     if _current_place=="CENTRO":
         _assign_food_staff()
         return
+    if _current_place=="SCHOOL":
+        _assign_school_staff()
+        return
     var stations: Array[Vector3] = []
     var yaw := 0.0
     match _current_place:
@@ -3849,6 +3857,31 @@ func _assign_work_stations() -> void:
             if int(person.get_meta("seat_index",-1))<0:
                 person.position=_open_anchor(at)
             person.remove_meta("pre_work_anchor")
+
+# Teachers use real working snapshots, not arbitrary bystanders or dojo members.
+func _assign_school_staff() -> void:
+    var spots: Array[Vector3] = [Vector3(-12.15,0,7),Vector3(-11.0,0,6.6),Vector3(-10.0,0,7.4),Vector3(-11.0,0,7.7),Vector3(-9.25,0,6.6)]
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b): return str(a.get_meta("resident_id","")) < str(b.get_meta("resident_id","")))
+    for child in people:
+        var person := child as Node3D
+        var teaching: bool = str(person.get_meta("activity",""))=="WORKING" and str(person.get_meta("work_visual",""))=="TEACHING" and not person.get_meta("dojo_member",false)
+        if teaching:
+            while not spots.is_empty():
+                var at: Vector3 = spots.pop_front()
+                if not _can_stand(at,WALKER_RADIUS):continue
+                if not person.has_meta("pre_school_anchor"):
+                    person.set_meta("pre_school_anchor",person.get_meta("anchor",person.position))
+                person.position=at
+                person.set_meta("anchor",at)
+                person.rotation.y=-PI/2.0
+                break
+        elif person.has_meta("pre_school_anchor"):
+            var previous: Vector3=person.get_meta("pre_school_anchor")
+            if not person.get_meta("dojo_member",false):
+                person.set_meta("anchor",previous)
+                person.position=_open_anchor(previous)
+            person.remove_meta("pre_school_anchor")
 
 # Presentation only: show genuine SHOPPING residents waiting by occupied counters.
 # The authoritative simulation remains responsible for purchases, stock and cash.
@@ -4402,7 +4435,9 @@ func _assign_resident_seats() -> void:
     for child in people:
         var person := child as Node3D
         var activity := str(person.get_meta("activity",""))
-        var eligible := activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"]
+        var school := _current_place=="SCHOOL" and not _apartment_active
+        var in_class: bool = school and activity=="STUDYING" and not person.get_meta("dojo_member",false)
+        var eligible: bool = in_class if school else activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"]
         var old_index := int(person.get_meta("seat_index",-1))
         var chosen := -1
         if eligible:
@@ -4418,13 +4453,32 @@ func _assign_resident_seats() -> void:
             used[chosen] = true
             var seat: Dictionary = seats[chosen]
             var at: Vector3 = seat["at"]
+            # Seat the hips at chair height, including scaled children.
             person.position = at-Vector3(0,0.84*person.scale.y,0)
             person.rotation.y = float(seat["yaw"])
             person.set_meta("seat_kind",seat["kind"])
-        elif old_index>=0:
+        elif in_class:
+            # If chairs fill up, place extra pupils in the classroom aisle,
+            # not at the generic outdoor spawn points.
+            var overflow: Array[Vector3]=[Vector3(-6.0,0,4.0),Vector3(-6.0,0,5.0),Vector3(-6.0,0,9.0),Vector3(-6.0,0,10.0),Vector3(-7.0,0,4.0),Vector3(-7.0,0,5.0),Vector3(-7.0,0,9.0),Vector3(-7.0,0,10.0)]
+            for at in overflow:
+                if not _can_stand(at,WALKER_RADIUS):continue
+                var occupied := false
+                for other in people:
+                    if other!=person and other.position.distance_to(at)<0.7:
+                        occupied=true
+                        break
+                if occupied:continue
+                person.position=at
+                person.rotation.y=PI/2.0
+                break
+            person.set_meta("seat_kind","")
+            person.set_meta("school_overflow",true)
+        elif old_index>=0 or person.get_meta("school_overflow",false):
             var anchor: Vector3 = person.get_meta("anchor")
             person.position = _open_anchor(anchor)
             person.set_meta("seat_kind","")
+            person.remove_meta("school_overflow")
 
 # Advance gait only by distance actually covered, not by the wall clock.
 func _resident_attention(person: Node3D) -> void:

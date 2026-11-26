@@ -13,6 +13,23 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void schoolWorkVisualDistinguishesTeacherFromOtherResidents() {
+        var clock=new WorldState();
+        var town=TownLife.create(clock);
+        var teacher=PopulationGenerator.add(town,1).getFirst();
+        teacher.occupation="Teacher";teacher.place=TownLife.Place.SCHOOL;teacher.workplace=teacher.place;
+        teacher.activity="WORKING";teacher.travelRemaining=0;
+        assertEquals("TEACHING",GameSession.workVisual(teacher));
+        town.industryStocks.put(TownLife.conversationHoldKey(teacher.id),1);
+        PopulationLife.tick(town,clock,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+        assertEquals("WORKING",teacher.activity);
+        teacher.occupation="Office clerk";
+        assertEquals("PAPERS",GameSession.workVisual(teacher));
+        teacher.activity="FREE_TIME";
+        assertEquals("",GameSession.workVisual(teacher));
+    }
+
+    @Test
     void publicSafetyStaffUsesRealResidentsAndVisibleDutyClothes() {
         var clock=new WorldState();
         var town=TownLife.create(clock);
