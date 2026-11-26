@@ -6671,6 +6671,11 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Sleep in your house · 2h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in your house · 8h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 8h",_sleep_room.bind(8)))
             elif _near_kitchen():
+                var phone_data = _last_snapshot.get("phone")
+                if _owns_house() and phone_data is Dictionary:
+                    for meeting in phone_data.get("meetings",[]):
+                        if meeting.get("place","")=="PLAYER_HOME" and meeting.get("status","")=="MET" and int(meeting.get("day",0))==int(_last_snapshot.get("day",1)) and int(_last_snapshot.get("minute",0))<1145:
+                            _action_choices.add_child(_button(tr("Cook pasta together · 25m"),_garden_action.bind("host-cook:"+str(meeting.get("residentId","")))))
                 var bag: Dictionary = player.get("bag",{"bread":player.get("bread",0),"water":player.get("bottledWater",0)})
                 var pantry: Dictionary = player.get("pantry",{"bread":player.get("storedBread",0),"water":player.get("storedWater",0)})
                 var stock := Label.new()
@@ -7313,7 +7318,7 @@ func _on_phone_alarm(message: String) -> void:
 
 func _reply_phone_call(resident_id: String,action: String) -> void:
     if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
-        var route := "phone-out" if action in ["dial","hangup","invite-coffee","ask-home-visit"] else "phone-call"
+        var route := "phone-out" if action in ["dial","hangup","invite-coffee","ask-home-visit","invite-my-home"] else "phone-call"
         _api.garden_action("%s:%s:%s" % [route,action,resident_id])
 
 func _reply_phone_sms(resident_id: String,choice: int) -> void:
