@@ -5880,7 +5880,7 @@ func _sync_guest_family(household: Dictionary) -> void:
             person.scale *= size
         person.position = data["position"]
         person.set_meta("activity",str(entry.get("activity","RESTING")))
-        var face := _guest.routine_anchor("FAMILY_DINNER")-person.position
+        var face: Vector3 = _guest.routine_anchor("FAMILY_DINNER")-person.position
         if face.length_squared()>0.01:
             person.rotation.y = atan2(-face.x,-face.z)
 
@@ -5900,8 +5900,8 @@ func _animate_guest_family(delta: float) -> void:
         arm.rotation.x=lerpf(arm.rotation.x,gesture,minf(delta*6.0,1.0))
 
 func _animate_guest_host(delta: float) -> void:
-    _animate_guest_family(delta)
     if not is_instance_valid(_guest_host):return
+    _animate_guest_family(delta)
     var walking := false
     var talking := _guest_feedback_time>0.0
     if not talking and not _host_path.is_empty():
