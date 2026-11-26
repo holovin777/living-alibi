@@ -262,8 +262,9 @@ public final class GameSession implements AutoCloseable {
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber) { }
-    public record ActionView(String message,WorldView world,String dialogueLanguage,boolean dialogueRendered) {
-        public ActionView(String message,WorldView world){this(message,world,null,false);}
+    public record ActionView(String message,WorldView world,String dialogueLanguage,boolean dialogueRendered,String dialogueLocale) {
+        public ActionView(String message,WorldView world){this(message,world,null,false,null);}
+        public ActionView(String message,WorldView world,String language,boolean rendered){this(message,world,language,rendered,language==null?null:WorldSpeechRegion.CURRENT.localeFor(language));}
     }
 
     public synchronized WorldView snapshot() {
@@ -433,6 +434,7 @@ public final class GameSession implements AutoCloseable {
             throw new IllegalArgumentException("Resident and message are required.");
         var copy=town.copy();
         var resident=PlayerLife.nearby(copy,residentId);
+        var region=WorldSpeechRegion.CURRENT;
         String language=spokenLanguage==null?null:ResidentLanguages.normalize(spokenLanguage);
         String reply=null;
         boolean rendered=false;
@@ -441,12 +443,12 @@ public final class GameSession implements AutoCloseable {
                 throw new IllegalArgumentException("Speak 1–1000 characters.");
             if("SLEEPING".equals(resident.activity)||"TRAVELING".equals(resident.activity))
                 throw new IllegalArgumentException("This person is not available for a conversation.");
-            if(!ResidentLanguages.speaks(resident.id,language)){
-                language="it";
-                reply=ResidentLanguages.misunderstanding();
+            if(!ResidentLanguages.speaks(region,resident.id,language)){
+                reply=ResidentLanguages.misunderstanding(region,language);
+                language=region.nativeLanguage();
                 rendered=true;
             } else {
-                reply=ResidentLanguages.languageQuestion(message,resident.id,language);
+                reply=ResidentLanguages.languageQuestion(region,message,resident.id,language);
                 rendered=reply!=null;
             }
         }
@@ -457,7 +459,7 @@ public final class GameSession implements AutoCloseable {
                     ?NewspaperLife.interview(copy,resident,state.day,state.minute)
                     :PlayerLife.speak(copy,residentId,message,state.day,state.minute);
             if(language!=null&&reply.equals("I'm not sure I understood. Could you ask me in a different way?")){
-                String generated=LocalDialogue.smallTalk(resident,copy.player.contacts.get(resident.id),previous,message,language);
+                String generated=LocalDialogue.smallTalk(resident,copy.player.contacts.get(resident.id),previous,message,region,language);
                 if(generated!=null){reply=generated;rendered=true;}
             }
         }
@@ -477,7 +479,7 @@ public final class GameSession implements AutoCloseable {
         // life. The latter must use the rebirth-aware time/commit path.
         ActionView applied=applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+reply,
                 RebirthLife.active(town));
-        return new ActionView(applied.message(),applied.world(),language,rendered);
+        return new ActionView(applied.message(),applied.world(),language,rendered,language==null?null:region.localeFor(language));
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
