@@ -432,6 +432,9 @@ public final class GameSession implements AutoCloseable {
             // "Resume work and daily routine" restores autonomous scheduling.
             RebirthLife.holdPublicPlace(copy,controlled);
         }
+        // A real conversation occupies the other person's next one-minute
+        // simulation tick. Their schedule resumes as soon as this turn ends.
+        copy.industryStocks.put(TownLife.conversationHoldKey(resident.id),1);
         // Conversation is valid in both a visitor life and a born/linked
         // life. The latter must use the rebirth-aware time/commit path.
         return applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+reply,
@@ -788,6 +791,7 @@ public final class GameSession implements AutoCloseable {
         events.addAll(LifeSimulation.advance(candidateState,minutes,
                 current->TownLife.tick(candidateTown,current,truth,observations,interactions),
                 ()->!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays))));
+        TownLife.clearConversationHolds(candidateTown);
         if(rebirthAction&&minutes>1){ // Keep one-minute dialogue replies free of clock diagnostics.
             long elapsed=(candidateState.day-(long)state.day)*1440+candidateState.minute-state.minute;
             message+=" Elapsed: "+elapsed/1440+" day(s), "+elapsed%1440+" minute(s).";
