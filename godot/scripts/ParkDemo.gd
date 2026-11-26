@@ -2247,7 +2247,7 @@ func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: 
     var dark := Color("#394c52")
     _add_obstacle(at,Vector2(width,depth))
     _box(building,Vector3(width,height,depth),wall,at+Vector3(0,height/2,0),"stucco")
-    _box(building,Vector3(width+0.4,0.35,depth+0.4),Color("#8e503a"),at+Vector3(0,height+0.12,0),"terracotta")
+    _historic_roof(building,at+Vector3(0,height,0),width+0.4,depth+0.4,1.15)
     _box(building,Vector3(width+0.16,0.45,0.12),stone,Vector3(at.x,0.23,face+0.07))
     for level in range(floors):
         var y := 1.6+float(level)*3.1
@@ -3052,8 +3052,8 @@ func _build_portici() -> void:
     var street := Node3D.new()
     street.name = "ViaDeiPortici"
     _scenery.add_child(street)
-    _box(street,Vector3(7.4,0.06,34),Color("#b7aa93"),Vector3(0,0.025,0))
-    _box(street,Vector3(34,0.06,5.1),Color("#b7aa93"),Vector3(0,0.025,0))
+    _box(street,Vector3(7.4,0.06,34),Color("#a29b8c"),Vector3(0,0.025,0),"paving")
+    _box(street,Vector3(34,0.06,5.1),Color("#a29b8c"),Vector3(0,0.025,0),"paving")
     for side in [-1,1]:
         _box(street,Vector3(1.1,0.12,34),Color("#d1c4a9"),Vector3(side*3.65,0.06,0))
     # The four road axes are open; blocks occupy the corners only.
@@ -3075,7 +3075,8 @@ func _portici_house(parent: Node3D,side: float,z: float,length: float,height: fl
     var trim := Color("#dfc9a5")
     _add_obstacle(Vector3(center,0,z),Vector2(9.6,length))
     _box(parent,Vector3(9.6,height,length),wall,Vector3(center,height*0.5,z),"stucco")
-    _box(parent,Vector3(9.85,0.32,length+0.2),Color("#91523c"),Vector3(center,height+0.12,z),"terracotta")
+    _historic_roof(parent,Vector3(center,height,z),9.85,length,1.45)
+    _box(parent,Vector3(9.85,0.20,length+0.2),trim,Vector3(center,height-0.05,z))
     _box(parent,Vector3(0.12,0.18,length),trim,Vector3(front-side*0.06,3.3,z))
     for offset in [-length/3.0,0.0,length/3.0]:
         for y in [4.5,6.5]:
@@ -3194,23 +3195,43 @@ func _build_centro() -> void:
     var stone := Color(0.68,0.64,0.57)
     _box(piazza,Vector3(34,0.035,34),stone,Vector3(0,0.006,0))
     _centro_paving(piazza)
-    var colors := [Color("#bf956e"),Color("#d6b185"),Color("#d4c1a0"),Color("#ba8274")]
+    var colors := [Color("#c4a47a"),Color("#c9ad86"),Color("#c7a780"),Color("#ceb38b")]
     var variant := 0
     for side in [-1,1]:
         for row in [-1,1]:
             _centro_portico(piazza,float(side),float(row)*9.0,colors[variant],variant)
             variant += 1
     _centro_courtyard(piazza)
+    _historic_cathedral(piazza)
     _build_barber(piazza)
     _build_centro_south_walk(piazza)
     # Landmark offset from the northern exit; no fictional church access.
-    var tower := Vector3(6.8,0,-14.1)
+    var tower := Vector3(8.0,0,-19.0)
     _add_obstacle(tower,Vector2(3.0,3.0))
     _box(piazza,Vector3(3,10,3),Color(0.59,0.34,0.25),tower+Vector3(0,5,0))
     _box(piazza,Vector3(3.5,0.45,3.5),Color(0.73,0.61,0.45),tower+Vector3(0,9.8,0))
     _box(piazza,Vector3(2.7,2.3,2.7),Color(0.68,0.42,0.30),tower+Vector3(0,11.15,0))
     _box(piazza,Vector3(3.2,0.35,3.2),Color(0.29,0.20,0.17),tower+Vector3(0,12.5,0))
-    _sign(piazza,"Torre Civica",tower+Vector3(0,8,1.6))
+    # Layered brick silhouette, crenellated cornice and clock face.
+    for x in [-1.25,0.0,1.25]:
+        for z in [-1.25,1.25]:
+            _box(piazza,Vector3(0.42,0.65,0.42),Color("#956044"),tower+Vector3(x,13.0,z),"stucco")
+    for x in [-1.25,1.25]:
+        _box(piazza,Vector3(0.42,0.65,0.42),Color("#956044"),tower+Vector3(x,13.0,0),"stucco")
+    _box(piazza,Vector3(1.85,2.6,1.85),Color("#b17e59"),tower+Vector3(0,14.0,0),"stucco")
+    _historic_roof(piazza,tower+Vector3(0,15.3,0),2.1,2.1,0.85)
+    var clock_face := Node3D.new()
+    piazza.add_child(clock_face)
+    clock_face.position=tower+Vector3(0,8.35,1.52)
+    clock_face.rotation.x=PI*0.5
+    _cylinder(clock_face,0.73,0.11,Color("#d6c8a9"),Vector3.ZERO)
+    _cylinder(clock_face,0.61,0.13,Color("#ede0c3"),Vector3(0,0.035,0))
+    for angle in range(12):
+        var r := float(angle)*TAU/12.0
+        _box(clock_face,Vector3(0.045,0.018,0.065),Color("#554a3b"),Vector3(sin(r)*0.49,0.11,cos(r)*0.49))
+    _box(clock_face,Vector3(0.045,0.025,0.38),Color("#554a3b"),Vector3(0,0.12,0.13))
+    _box(clock_face,Vector3(0.29,0.025,0.055),Color("#554a3b"),Vector3(-0.10,0.12,0))
+    _physical_sign(piazza,"Torre Civica",tower+Vector3(0,2.2,1.62),0,2.0)
     for at in [Vector3(-5,0,-9),Vector3(5,0,-6),Vector3(-5,0,8),Vector3(5,0,10)]:
         _lamp(piazza,at)
     _bench(piazza,Vector3(-7,0,12))
@@ -3230,30 +3251,67 @@ func _build_centro() -> void:
     _sign(piazza,"Bacheca lavoro · F",KIOSK_POSITION+Vector3(0,2.4,0))
 
 func _centro_paving(parent: Node3D) -> void:
-    # One batched mesh for 1,536 stone blocks, not 1,536 scene nodes.
-    var stone := BoxMesh.new()
-    stone.size = Vector3(0.96,0.025,0.65)
+    var slab := PlaneMesh.new()
+    slab.size=Vector2(24,34)
     var material := StandardMaterial3D.new()
-    material.vertex_color_use_as_albedo = true
-    material.roughness = 0.96
-    stone.material = material
-    var batch := MultiMesh.new()
-    batch.transform_format = MultiMesh.TRANSFORM_3D
-    batch.use_colors = true
-    batch.mesh = stone
-    batch.instance_count = 32*48
-    var palette := [Color("#b3aa99"),Color("#c4b9a4"),Color("#a99f91"),Color("#c9c1b2"),Color("#bcb2a2")]
-    for row in range(48):
-        for col in range(32):
-            var index := row*32+col
-            var x := float(col)-15.75 + float(row%2)*0.5
-            var z := (float(row)-23.5)*0.69
-            batch.set_instance_transform(index,Transform3D(Basis.IDENTITY,Vector3(x,0.038,z)))
-            batch.set_instance_color(index,palette[(row*13+col*7+row*col)%palette.size()])
-    var paving := MultiMeshInstance3D.new()
-    paving.name = "StonePaving"
-    paving.multimesh = batch
+    material.albedo_texture=TownVisuals.ducale_paving()
+    material.roughness=0.96
+    slab.material=material
+    var paving := MeshInstance3D.new()
+    paving.name="DucalePebbleMosaic"
+    paving.mesh=slab
+    paving.position=Vector3(0,0.046,0)
     parent.add_child(paving)
+
+# Sloped clay tiles, eaves and ridge; roof geometry does not alter walking collision.
+func _historic_roof(parent: Node3D,at: Vector3,width: float,depth: float,rise: float) -> void:
+    var half := width*0.5
+    var slope := atan2(rise,half)
+    var length := sqrt(half*half+rise*rise)
+    for side in [-1.0,1.0]:
+        var roof := Node3D.new()
+        roof.position=at+Vector3(side*half*0.5,rise*0.5,0)
+        roof.rotation.z=-side*slope
+        parent.add_child(roof)
+        _box(roof,Vector3(length+0.26,0.18,depth+0.32),Color("#975b43"),Vector3.ZERO,"terracotta")
+    _box(parent,Vector3(0.18,0.20,depth+0.38),Color("#a46b4d"),at+Vector3(0,rise+0.04,0),"terracotta")
+
+func _historic_roundel(parent: Node3D,at: Vector3,side: float,radius: float) -> void:
+    var ring := Node3D.new()
+    ring.position=at
+    ring.rotation.z=PI*0.5
+    parent.add_child(ring)
+    _cylinder(ring,radius,0.10,Color("#cab69a"),Vector3.ZERO)
+    _cylinder(ring,radius*0.72,0.12,Color("#423e37"),Vector3(0,side*0.055,0))
+
+func _historic_cathedral(parent: Node3D) -> void:
+    # Compressed landmark off the north pedestrian axis, with no inaccessible fake interaction.
+    var church := Node3D.new()
+    church.name="DuomoInspiredFacade"
+    church.position=Vector3(-7,0,-20.1)
+    parent.add_child(church)
+    _add_obstacle(church.position,Vector2(7.4,5.2))
+    var plaster := Color("#c8c1b2")
+    var trim := Color("#ddd4c1")
+    _box(church,Vector3(7.4,7.4,5.2),plaster,Vector3(0,3.7,0),"stucco")
+    _historic_roof(church,Vector3(0,7.4,0),7.4,5.2,1.65)
+    _box(church,Vector3(5.0,2.1,0.34),plaster,Vector3(0,8.15,2.66),"stucco")
+    for x in [-3.35,-1.65,1.65,3.35]:
+        _box(church,Vector3(0.34,6.5,0.38),trim,Vector3(x,3.55,2.78))
+        _box(church,Vector3(0.58,0.22,0.52),trim,Vector3(x,6.77,2.82))
+    for y in [0.25,3.9,6.9,9.15]:
+        _box(church,Vector3(7.7 if y<8 else 5.25,0.19,0.48),trim,Vector3(0,y,2.8))
+    for x in [-2.5,0.0,2.5]:
+        var height := 3.0 if x==0.0 else 2.1
+        _box(church,Vector3(1.35,height,0.13),Color("#514236"),Vector3(x,height*0.5,2.79),"wood")
+        for sx in [-0.76,0.76]:
+            _box(church,Vector3(0.16,height+0.17,0.22),trim,Vector3(x+sx,height*0.5,2.85))
+        _box(church,Vector3(1.85,0.22,0.3),trim,Vector3(x,height+0.12,2.88))
+    _box(church,Vector3(1.65,1.7,0.14),Color("#646e6b"),Vector3(0,5.45,2.79))
+    for x in [-0.58,0.0,0.58]:
+        _box(church,Vector3(0.08,1.72,0.17),trim,Vector3(x,5.45,2.89))
+    _box(church,Vector3(0.12,1.0,0.12),Color("#53504b"),Vector3(0,9.7,2.72))
+    _box(church,Vector3(0.62,0.12,0.12),Color("#53504b"),Vector3(0,9.88,2.72))
 
 func _centro_courtyard(parent: Node3D) -> void:
     # A small open garden court off the piazza, entered from its south side.
@@ -3285,15 +3343,17 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
     var trim := Color(0.89,0.78,0.60)
     _add_obstacle(Vector3(back,0,z),Vector2(2.2,12.0))
     _box(parent,Vector3(2.2,7.1,12),wall,Vector3(back,3.55,z),"stucco")
-    _box(parent,Vector3(5.2,3.9,12),wall,Vector3(side*14,5.15,z),"stucco")
-    _box(parent,Vector3(5.5,0.32,12.2),Color("#95503a"),Vector3(side*14,7.25,z),"terracotta")
+    _box(parent,Vector3(5.2,3.6,12),wall,Vector3(side*14,5.45,z),"stucco")
+    _historic_roof(parent,Vector3(side*14,7.25,z),5.5,12.0,1.15)
     _box(parent,Vector3(5.7,0.14,12.3),trim,Vector3(side*14,7.03,z))
-    _box(parent,Vector3(5.2,0.16,12),trim,Vector3(side*14,3.25,z))
+    _box(parent,Vector3(5.2,0.16,12),trim,Vector3(side*14,3.82,z))
+    _box(parent,Vector3(0.15,0.29,12),Color("#a98363"),Vector3(side*11.32,6.75,z))
+    _box(parent,Vector3(0.18,0.11,12),trim,Vector3(side*11.25,6.96,z))
     _box(parent,Vector3(0.16,0.16,12),trim,Vector3(side*11.35,5.35,z))
     for offset in [-6.0,-2.0,2.0,6.0]:
         var at := Vector3(front,0,z+offset)
         _add_obstacle(at,Vector2(0.55,0.55))
-        _box(parent,Vector3(0.55,1.95,0.55),trim,at+Vector3(0,0.975,0))
+        _cylinder(parent,0.22,1.95,Color("#a8a29a"),at+Vector3(0,0.975,0))
         _box(parent,Vector3(0.70,0.15,0.70),trim.darkened(0.12),at+Vector3(0,0.075,0))
         _box(parent,Vector3(0.71,0.17,0.71),trim,at+Vector3(0,1.88,0))
     for offset in [-4.0,0.0,4.0]:
@@ -3305,7 +3365,7 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
             arch.rotation.x = -angle
             parent.add_child(arch)
             _box(arch,Vector3(0.58,0.74,0.36),trim,Vector3.ZERO)
-        for y in [4.4,6.15]:
+        for y in [4.65]:
             var face := side*11.36
             _box(parent,Vector3(0.08,1.1,0.85),Color(0.19,0.28,0.30),Vector3(face,y,z+offset))
             _box(parent,Vector3(0.09,1.08,0.055),trim,Vector3(face-side*0.035,y,z+offset))
@@ -3318,6 +3378,9 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
                 _centro_balcony(parent,side,face,y,z+offset)
             elif y > 5.0 and variant%2 == 0:
                 _centro_flowers(parent,Vector3(face-side*0.22,y-0.60,z+offset))
+        _historic_roundel(parent,Vector3(side*11.30,6.18,z+offset),side,0.33)
+        for dz in [-1.65,1.65]:
+            _box(parent,Vector3(0.09,1.6,0.11),trim,Vector3(side*11.30,4.9,z+offset+dz))
         var rear := side*14.64
         # Recessed shop fronts have a frame, glass panes and timber door.
         _box(parent,Vector3(0.12,2.35,2.55),Color("#6d5140"),Vector3(rear,1.175,z+offset))
