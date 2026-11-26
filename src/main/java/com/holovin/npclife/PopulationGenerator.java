@@ -10,7 +10,7 @@ import java.util.SplittableRandom;
 final class PopulationGenerator {
     private PopulationGenerator() { }
 
-    static final int MAX_GENERATED = 40; // Conservative until large-population performance is tested.
+    static final int MAX_GENERATED = 64; // Bounded population; larger worlds need performance profiling.
     private static final String[] FIRST = {"Amelia","Luca","Giulia","Pietro","Sofia","Davide",
             "Chiara","Matteo","Aurora","Nico","Beatrice","Alessandro","Marta","Andrea",
             "Valentina","Filippo","Elisa","Riccardo","Irene","Samuele","Sara","Leonardo",

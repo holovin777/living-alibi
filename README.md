@@ -138,7 +138,7 @@ against the same SQLite database simultaneously.
 - **Anonymous visitor (v1.15):** player has a separate persistent position and private identity. Walk freely between public places with `go`, inspect people actually nearby with `look`, speak face-to-face, introduce yourself by choice, and keep an independent per-NPC contact memory. Nothing obliges the player to investigate a case. No NPC learns the player's private name automatically.
 - **Marco Bianchi:** baker with richer physiological needs, economic goals, permanent mortality, personal memory, and optional paid OpenAI dialogue.
 - **Elena Rossi:** shopkeeper with a simpler independent needs/work system and a persistent friendship with Marco.
-- **Procedural population:** generate up to 40 *additional* unique, stable residents (`resident-0001`, etc.), 1–20 per command, without any AI/API calls.
+- **Procedural population:** generate up to 64 *additional* unique, stable residents (`resident-0001`, etc.), 1–20 per command, without any AI/API calls.
 - Generated citizens have age, profession, work location, **private home unit**, stable personality traits, goals, individual food/water, money, work schedules and daily travel.
 - New citizens purchase provisions, eat, drink, earn wages and can die if their basic needs aren't met. Their identity and state persist in SQLite.
 - Multiple abstract locations and private home units, timed travel, authoritative world events and per-resident eyewitness logs.
@@ -436,7 +436,7 @@ Smoke tests do not replace more thorough integration and balance testing. GitHub
 - Generated residents form basic pairwise relationships and can conceal or lie about selected experiences, but have no children, migration, autonomous crimes, sophisticated deception plans, complex memory decay or freeform AI conversations yet.
 - Only two named residents are pre-authored. New identities appear **only when you request population generation**, not automatically on a timer.
 - Travel uses approximate times and does not have routes or a map. Some legacy Marco actions do not yet require physical presence at a site.
-- Maximum 40 generated residents (42 including Marco and Elena) is a conservative testing cap, not a general engine limit.
+- Maximum 64 generated residents (66 including Marco and Elena) is a testing cap, not a general engine limit. The graphical game defaults to 48 generated residents (50 including Marco and Elena), with one-time immigration when upgrading a smaller world. Use `--living-alibi.population=28` for a smaller new world. Existing residents and save history are retained.
 - Local SQLite history is private; do not commit it. Back up before upgrading or performing long simulations.
 - A public repository does not automatically grant an open-source license; no license is selected yet.
 

@@ -4178,8 +4178,8 @@ class GameSessionTest {
             assertEquals(27,game.snapshot().demography().alive());
         }
         Path fresh=directory.resolve("expanded-fresh.db");
-        try(var game=new GameSession(fresh,28)){
-            assertEquals(28,game.snapshot().demography().alive());
+        try(var game=new GameSession(fresh,48)){
+            assertEquals(48,game.snapshot().demography().alive());
             assertEquals("Park",game.snapshot().player().place());
         }
     }

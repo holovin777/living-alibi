@@ -1650,7 +1650,10 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         return _stairwell.can_stand(at,radius)
     if _apartment_active:
         return _apartment.can_stand(at,radius)
-    if absf(at.x) > 17.0 or absf(at.z) > 17.0:
+    # Extra walkable garden space inside the existing 48 m park tile.
+    # Keep the road axes and inter-district triggers unchanged.
+    var extended_park := _current_place=="PARK" and absf(at.x)<=20.0-radius and at.z>=12.0 and at.z<=21.0-radius
+    if (absf(at.x) > 17.0 or absf(at.z) > 17.0) and not extended_park:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
@@ -3185,6 +3188,18 @@ func _build_park() -> void:
         _lamp(park, p)
     for at in [Vector3(-8,0,-5),Vector3(-15,0,9),Vector3(10,0,11)]:
         _park_flowers(park,at)
+    # Southern garden promenade occupies previously unused space in the tile.
+    var garden := Node3D.new()
+    garden.name="SouthGardenPromenade"
+    park.add_child(garden)
+    _box(garden,Vector3(36,0.06,2.4),paving,Vector3(0,0.01,18.6),"paving")
+    for x in [-12.0,12.0]:
+        _box(garden,Vector3(2.4,0.06,11.0),paving,Vector3(x,0.01,12.0),"paving")
+        _bench(garden,Vector3(x,0,20.1))
+        _lamp(garden,Vector3(x*1.35,0,16.8))
+        _park_flowers(garden,Vector3(x*1.4,0,19.9))
+    _tree(Vector3(-18.5,0,13.0))
+    _tree(Vector3(18.5,0,13.0))
     # The pool is decorative; drinking still requires the validated Java action.
     var fountain := Node3D.new()
     fountain.name = "PublicFountain"
@@ -3722,16 +3737,35 @@ func _sync_office_employee(person: Node3D,id: String) -> void:
         person.set_meta("anchor",OFFICE_STAFF_ANCHOR)
         person.rotation.y=PI/2.0
 
+func _resident_spawn_anchor(index: int) -> Vector3:
+    # Preserve the original first row, then distribute additional residents
+    # over alternating north/south rows instead of piling up at z=-13.
+    var rows := [-4.0,3.0,-9.0,8.0,-13.0,13.0,18.0,0.0]
+    var preferred := Vector3((float(index%8)-3.5)*3.0,0,rows[posmod(floori(float(index)/8.0),rows.size())])
+    var start := _open_anchor(preferred)
+    if _resident_spawn_clear(start):return start
+    for row in rows:
+        for column in range(8):
+            var at := Vector3((float((column+index)%8)-3.5)*3.0,0,row)
+            if _resident_spawn_clear(at):return at
+    return start
+
+func _resident_spawn_clear(at: Vector3) -> bool:
+    if not _can_stand(at,WALKER_RADIUS):return false
+    if not is_instance_valid(_residents_root):return true
+    for child in _residents_root.get_children():
+        var other := child as Node3D
+        if other!=null and other.position.distance_squared_to(at)<1.44:return false
+    return true
+
 func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var person := Node3D.new()
     person.name = "Resident_" + id
     person.set_meta("resident_id", id)
     person.set_meta("personality",ResidentPersonality.style(id))
-    var anchor := Vector3((float(index % 8)-3.5)*3.0, 0, -4.0-float(index / 8)*2.5)
+    var anchor := _resident_spawn_anchor(index)
     if _apartment_active:
-        anchor = FamilyApartment.ANCHORS[index % FamilyApartment.ANCHORS.size()]
-    anchor.z = maxf(anchor.z, -13.0)
-    anchor = _open_anchor(anchor)
+        anchor = _open_anchor(FamilyApartment.ANCHORS[index % FamilyApartment.ANCHORS.size()])
     person.position = anchor
     person.set_meta("anchor", anchor)
     person.set_meta("phase", float(absi(id.hash()) % 628) / 100.0)
