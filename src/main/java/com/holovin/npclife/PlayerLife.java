@@ -441,6 +441,15 @@ final class PlayerLife {
             return "It's good to see you, "+greeting+"! How have you been?";
         if(spoken.equalsIgnoreCase("What do you do?"))
             return resident.employed?"I work as "+resident.occupation+".":"I'm currently looking for work.";
+        if(spoken.equals("Thank you"))return "You are welcome.";
+        if(spoken.equals("Goodbye"))return "See you around.";
+        if(spoken.equals("What are you doing?"))return switch(resident.activity){
+            case "WORKING" -> "I am working right now.";
+            case "STUDYING" -> "I am studying right now.";
+            case "SHOPPING" -> "I am doing some shopping.";
+            case "JOB_SEARCH" -> "I am looking for work.";
+            default -> "I am taking some time for myself.";
+        };
         if(resident.sociability<40)return "Hello. I'm having a quiet day.";
         if(spoken.contains("?"))return "I'm not sure, "+greeting+". I can only tell you what I know.";
         if(!spoken.equalsIgnoreCase("Hello"))return "I am not sure what you mean. Could you ask me something else?";
