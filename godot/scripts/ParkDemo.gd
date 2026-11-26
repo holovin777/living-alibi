@@ -3066,7 +3066,7 @@ func _build_portici() -> void:
         _lamp(street,at)
     _box(street,Vector3(0.10,2.0,0.10),Color("#6a6c67"),Vector3(4,1,-8))
     _physical_sign(street,"Via dei Portici",Vector3(4,2.05,-8),0,2.4)
-    _sign(street,"Piazza Centrale",Vector3(0,3.4,-16))
+    _physical_sign(street,"Piazza Ducale",Vector3(-3.1,2.55,-16),0,2.4)
 
 func _portici_house(parent: Node3D,side: float,z: float,length: float,height: float,
         wall: Color,caption: String) -> void:
@@ -3193,7 +3193,7 @@ func _build_centro() -> void:
     piazza.name = "PiazzaCentrale"
     _scenery.add_child(piazza)
     var stone := Color(0.68,0.64,0.57)
-    _box(piazza,Vector3(34,0.035,34),stone,Vector3(0,0.006,0))
+    _box(piazza,Vector3(34,0.035,34),stone,Vector3(0,0.006,0),"paving")
     _centro_paving(piazza)
     var colors := [Color("#c4a47a"),Color("#c9ad86"),Color("#c7a780"),Color("#ceb38b")]
     var variant := 0
@@ -3247,14 +3247,16 @@ func _build_centro() -> void:
     _sign(piazza,"Caffè Ducale",Vector3(-11,3.55,-9))
     _sign(piazza,"Botteghe",Vector3(11,3.55,-9))
     _box(piazza,Vector3(0.10,2.0,0.10),Color("#6a6c67"),Vector3(4,1,-12))
-    _physical_sign(piazza,"Piazza Centrale",Vector3(4,2.05,-12),0,2.5)
+    _physical_sign(piazza,"Piazza Ducale",Vector3(4,2.05,-12),0,2.5)
     _sign(piazza,"Bacheca lavoro · F",KIOSK_POSITION+Vector3(0,2.4,0))
 
 func _centro_paving(parent: Node3D) -> void:
     var slab := PlaneMesh.new()
     slab.size=Vector2(24,34)
     var material := StandardMaterial3D.new()
-    material.albedo_texture=TownVisuals.ducale_paving()
+    if not _surface_textures.has("ducale"):
+        _surface_textures["ducale"]=TownVisuals.ducale_paving()
+    material.albedo_texture=_surface_textures["ducale"]
     material.roughness=0.96
     slab.material=material
     var paving := MeshInstance3D.new()
@@ -3275,6 +3277,23 @@ func _historic_roof(parent: Node3D,at: Vector3,width: float,depth: float,rise: f
         parent.add_child(roof)
         _box(roof,Vector3(length+0.26,0.18,depth+0.32),Color("#975b43"),Vector3.ZERO,"terracotta")
     _box(parent,Vector3(0.18,0.20,depth+0.38),Color("#a46b4d"),at+Vector3(0,rise+0.04,0),"terracotta")
+    var gable := SurfaceTool.new()
+    gable.begin(Mesh.PRIMITIVE_TRIANGLES)
+    for side in [-1.0,1.0]:
+        var z: float=side*depth*0.5
+        gable.add_vertex(Vector3(-half,0,z))
+        gable.add_vertex(Vector3(half,0,z))
+        gable.add_vertex(Vector3(0,rise,z))
+    gable.generate_normals()
+    var gable_mesh := MeshInstance3D.new()
+    gable_mesh.mesh=gable.commit()
+    var material := StandardMaterial3D.new()
+    material.albedo_color=Color("#b49b7d")
+    material.cull_mode=BaseMaterial3D.CULL_DISABLED
+    TownVisuals.surface(material,_surface_textures["stucco"],0.32)
+    gable_mesh.material_override=material
+    gable_mesh.position=at
+    parent.add_child(gable_mesh)
 
 func _historic_roundel(parent: Node3D,at: Vector3,side: float,radius: float) -> void:
     var ring := Node3D.new()
@@ -3378,6 +3397,7 @@ func _centro_portico(root: Node3D, side: float, z: float, wall: Color, variant: 
                 _centro_balcony(parent,side,face,y,z+offset)
             elif y > 5.0 and variant%2 == 0:
                 _centro_flowers(parent,Vector3(face-side*0.22,y-0.60,z+offset))
+        _historic_roundel(parent,Vector3(side*11.30,5.14,z+offset),side,0.43)
         _historic_roundel(parent,Vector3(side*11.30,6.18,z+offset),side,0.33)
         for dz in [-1.65,1.65]:
             _box(parent,Vector3(0.09,1.6,0.11),trim,Vector3(side*11.30,4.9,z+offset+dz))
