@@ -1,6 +1,18 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "End call": "Termina chiamata",
+    "Invite for coffee": "Invita per un caffè",
+    "Call contact": "Chiama contatto",
+    "Outgoing call": "Chiamata in uscita",
+    "NO_ANSWER": "NESSUNA RISPOSTA",
+    "CONNECTED": "IN CONVERSAZIONE",
+    "ENDED": "TERMINATA",
+    "INVITATION_DECLINED": "INVITO RIFIUTATO",
+    "No answer.": "Nessuna risposta.",
+    "Call ended.": "Chiamata terminata.",
+    "Please wait before calling again.": "Aspetta prima di richiamare.",
+    "Finish the current call first.": "Termina prima la chiamata in corso.",
     "Phone calls": "Chiamate",
     "Decline call": "Rifiuta chiamata",
     "Answer call": "Rispondi",
