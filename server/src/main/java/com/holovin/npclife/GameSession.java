@@ -431,6 +431,7 @@ public final class GameSession implements AutoCloseable {
     }
     /** A declared spoken language is separate from the UI locale. Null preserves legacy clients. */
     public synchronized ActionView speak(String residentId,String message,String spokenLanguage) throws SQLException {
+        JusticeLife.requireFree(town);
         if(residentId==null || message==null)
             throw new IllegalArgumentException("Resident and message are required.");
         var copy=town.copy();
