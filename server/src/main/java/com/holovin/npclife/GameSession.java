@@ -74,7 +74,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
                              int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
-                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse,boolean ownsBaton,int policeReports) { }
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse,boolean ownsBaton,int policeReports,JusticeLife.View justice) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -278,7 +278,7 @@ public final class GameSession implements AutoCloseable {
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,controlled?RebirthLife.hygiene(town,linked):p.hygiene,
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
-                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse,CombatLife.ownsBaton(town),CombatLife.reports(town));
+                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse,CombatLife.ownsBaton(town),CombatLife.reports(town),JusticeLife.view(town,state));
         var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
         var companions=walkingCompanions(town,visible,state.minute);
         var residents=visible.stream()
@@ -523,6 +523,10 @@ public final class GameSession implements AutoCloseable {
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
         if(minutes<1 || minutes>1440)
             throw new IllegalArgumentException("Wait between 1 and 1440 game minutes.");
+        if(JusticeLife.confined(town)){
+            int duration=JusticeLife.waitDuration(town,state,minutes);
+            return applyInternal(town.copy(),duration,"Time passed in custody.",false,state.copy(),new ArrayList<>(),new ArrayList<>(),true);
+        }
         return apply(town.copy(),minutes,"Waited "+minutes+" minute(s).");
     }
 
@@ -605,6 +609,10 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if("justice-pay-fine".equals(action)){
+            var copy=town.copy();return apply(copy,1,JusticeLife.payFine(copy));
+        }
+        JusticeLife.requireFree(town);
         if("combat-buy-baton".equals(action)){
             var copy=town.copy();
             return apply(copy,2,CombatLife.buyBaton(copy,state));
@@ -892,6 +900,11 @@ public final class GameSession implements AutoCloseable {
     }
     private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction,
             WorldState candidateState,List<TownLife.Event> truth,List<TownLife.Observation> observations) throws SQLException {
+        return applyInternal(candidateTown,minutes,message,rebirthAction,candidateState,truth,observations,false);
+    }
+    private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction,
+            WorldState candidateState,List<TownLife.Event> truth,List<TownLife.Observation> observations,boolean custodyWait) throws SQLException {
+        if(!custodyWait)JusticeLife.requireFree(town);
         if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Choose a family or use childhood actions first.");
         if("You shared dinner.".equals(message)||"You cooked and ate together.".equals(message)){
             var host=candidateTown.get("marco");
