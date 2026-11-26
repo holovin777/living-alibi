@@ -58,6 +58,44 @@ static func texture(kind: String) -> ImageTexture:
     img.generate_mipmaps()
     return ImageTexture.create_from_image(img)
 
+## Piazza Ducale-inspired original pebble mosaic, mapped once across the plaza.
+## Pebbles are shaded in the texture rather than thousands of separate meshes.
+static func ducale_paving() -> ImageTexture:
+    const N := 768
+    var img := Image.create(N,N,false,Image.FORMAT_RGB8)
+    for y in range(N):
+        for x in range(N):
+            var px := (float(x)+0.5)/N*24.0-12.0
+            var pz := (float(y)+0.5)/N*34.0-17.0
+            var row := floori(pz*19.0)
+            var shifted := px*17.0+float(posmod(row,2))*0.5
+            var col := floori(shifted)
+            var dx := (shifted-floorf(shifted)-0.5)*2.0
+            var dz := (pz*19.0-floorf(pz*19.0)-0.5)*2.0
+            var seed_value := sin(float(col*73+row*139))*43758.5453
+            var variation := seed_value-floorf(seed_value)
+            var r := sqrt(dx*dx+dz*dz)
+            var pebble := Color("#77746c").lerp(Color("#aaa294"),variation)
+            if r>0.94:
+                pebble=Color("#4c4944")
+            else:
+                pebble=pebble.lightened(maxf(0.0,-dx-dz)*0.085)
+            var radius := Vector2(px,pz).length()
+            var inlay := absf(px)<0.16 or absf(absf(px)-9.8)<0.14 or absf(absf(pz)-15.6)<0.14
+            inlay=inlay or absf(radius-3.9)<0.14 or absf(radius-5.2)<0.14
+            for center in [-10.7,10.7]:
+                var medallion := Vector2(px,pz-center)
+                var distance := medallion.length()
+                inlay=inlay or absf(distance-3.1)<0.12 or absf(distance-2.4)<0.10
+                if distance<2.3:
+                    var angle := atan2(medallion.y,medallion.x)
+                    inlay=inlay or absf(distance-(1.45+0.65*cos(angle*8.0)))<0.08
+            if inlay:
+                pebble=Color("#c8c1ae").lerp(Color("#aaa397"),variation*0.45)
+            img.set_pixel(x,y,pebble)
+    img.generate_mipmaps()
+    return ImageTexture.create_from_image(img)
+
 static func surface(mat: StandardMaterial3D, tex: Texture2D, scale: float) -> void:
     mat.albedo_texture = tex
     mat.uv1_triplanar = true
