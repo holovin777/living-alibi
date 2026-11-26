@@ -43,8 +43,9 @@ final class PopulationLife {
         boolean freightRun=carrier && freightDestination!=null && !sick;
         boolean journalist=NewspaperLife.reporter(c);
         boolean foodWorker=RetailLife.foodRole(c.occupation);
+        boolean medicalWorker=c.workplace==TownLife.Place.CLINIC&&java.util.Set.of("Doctor","Nurse","Pharmacist").contains(c.occupation);
         boolean working=!child&&!retired&&c.employed && !sick && (foodWorker?(clock.day-1)%7!=0:workday) &&
-                (itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):foodWorker?(minute>=660&&minute<1140):
+                (itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):foodWorker?(minute>=660&&minute<1140):medicalWorker?(minute>=480&&minute<1020):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,clock.day,minute)!=null);
@@ -67,6 +68,7 @@ final class PopulationLife {
         else if(carrier && working)desired=c.workplace;
         else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
         else if(stallEmployee && working)desired=TownLife.Place.MARKET;
+        else if(medicalWorker && working && c.hunger<85 && c.thirst<85)desired=TownLife.Place.CLINIC;
         else if(marketOpen && needFood)desired=TownLife.Place.MARKET;
         else if(marketOpen && publicWater)desired=TownLife.Place.PARK;
         else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;
