@@ -1285,6 +1285,13 @@ func _exercise() -> void:
     talk_key.keycode = KEY_T
     talk_key.pressed = true
     world._unhandled_key_input(talk_key)
+    print("DIALOGUE TEST: connected=",world._connected,
+            " rebirth=",world._rebirth_active()," can_walk=",world._child_can_walk(),
+            " npc=",world._nearest_resident()," pending=",world._dialog_pending,
+            " api_busy=",world._api.is_busy()," guest=",world._guest_active,
+            " stairwell=",world._stairwell_active," phone=",world._phone.visible,
+            " intercom=",world._intercom.visible," action_menu=",world._action_panel.visible,
+            " chat=",world._dialog_panel.visible," target=",world._dialog_target)
     if not _check(world._dialog_panel.visible and not world._action_panel.visible
             and world._dialog_target == "marco",
             "T opens real text chat instead of the life choices menu"):
