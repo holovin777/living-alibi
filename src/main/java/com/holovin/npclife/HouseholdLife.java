@@ -99,11 +99,11 @@ final class HouseholdLife {
         return names.isEmpty()?(it?"Non c'è nessuno da presentarti adesso.":"There is nobody to introduce right now.")
                 :(it?"Ti presento: ":"Let me introduce you to: ")+String.join(", ",names)+".";
     }
-    record ResidentView(String id,int age,String activity,String name,String knownName,int conversations,String relationship){}
+    record ResidentView(String id,int age,String activity,String name,String knownName,int conversations,String relationship,int conversationMinutes,String conversationReason){}
     static ResidentView residentView(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         var contact=t.player.contacts.get(c.id);
         return new ResidentView(c.id,c.age,HomeRoutineLife.activity(t,c,day,minute),PlayerLife.displayName(t,c),
-                contact==null?null:contact.knownName,contact==null?0:contact.conversations,PlayerLife.relationship(contact));
+                contact==null?null:contact.knownName,contact==null?0:contact.conversations,PlayerLife.relationship(contact),ConversationAvailability.minutes(t,c,day,minute),ConversationAvailability.reason(c,day,minute));
     }
     record View(int members,int children,int present,int dinners,boolean dinnerNow,List<ResidentView> visibleResidents,ResidentView host){}
     static View view(TownLife.Town t,TownLife.Citizen host,int day,int minute){
