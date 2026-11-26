@@ -595,11 +595,11 @@ public final class GameSession implements AutoCloseable {
         }
         if(action!=null&&action.startsWith("intercom:")){
             String[] parts=action.split(":",4);
-            if(parts.length!=4||!java.util.Set.of("ring","visit","invite","enter","leave","talk","coffee","snack","rest").contains(parts[1])||!java.util.Set.of("1","2","3").contains(parts[2]))
+            if(parts.length!=4||!java.util.Set.of("ring","visit","invite","enter","leave","talk","coffee","snack","rest","dinner").contains(parts[1])||!java.util.Set.of("1","2","3").contains(parts[2]))
                 throw new IllegalArgumentException("Choose a known door and contact.");
             var copy=town.copy();
             int building=Integer.parseInt(parts[2]);
-            if(java.util.Set.of("talk","coffee","snack","rest").contains(parts[1])){
+            if(java.util.Set.of("talk","coffee","snack","rest","dinner").contains(parts[1])){
                 var result=IntercomLife.socialize(copy,parts[3],building,parts[1],state.day,state.minute);
                 return apply(copy,result.minutes(),result.message());
             }
@@ -615,7 +615,7 @@ public final class GameSession implements AutoCloseable {
         }
         if(action!=null&&action.startsWith("phone-out:")){
             String[] parts=action.split(":",3);
-            if(parts.length!=3||!java.util.Set.of("dial","hangup","invite-coffee").contains(parts[1]))throw new IllegalArgumentException("Choose an outgoing call action.");
+            if(parts.length!=3||!java.util.Set.of("dial","hangup","invite-coffee","ask-home-visit").contains(parts[1]))throw new IllegalArgumentException("Choose an outgoing call action.");
             var copy=town.copy();
             return apply(copy,1,PhoneLife.outgoing(copy,parts[2],parts[1],state.day,state.minute));
         }
@@ -855,6 +855,11 @@ public final class GameSession implements AutoCloseable {
     private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction) throws SQLException {
         if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Choose a family or use childhood actions first.");
         var candidateState=state.copy();
+        if("You shared dinner.".equals(message)){
+            var host=candidateTown.get("marco");
+            candidateState.food=host.food;candidateState.water=host.water;
+            candidateState.hunger=host.hunger;candidateState.thirst=host.thirst;
+        }
         ArchiveLife.transitions(town,candidateTown,state.day,state.minute);
         var events=new ArrayList<LifeSimulation.LifeEvent>();
         var truth=new ArrayList<TownLife.Event>();
