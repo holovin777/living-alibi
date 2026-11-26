@@ -2629,6 +2629,7 @@ func _build_college() -> void:
         for z in [4.35,9.55]:
             _room_furniture(classroom,Vector3(x,0,z),Vector3(0.95,0.72,0.65),wood)
             _room_furniture(classroom,Vector3(x,0,z+0.7),Vector3(0.45,0.42,0.45),Color("#65786e"))
+            _register_resident_seat(Vector3(x,0.45,z+0.7),0.0,"classroom")
             _box(classroom,Vector3(0.45,0.3,0.06),Color("#3a454a"),Vector3(x,0.9,z-0.2))
     _box(classroom,Vector3(0.12,1.25,3.1),Color("#415d53"),Vector3(-12.82,1.85,7))
     _box(classroom,Vector3(0.17,0.1,3.2),wood,Vector3(-12.75,1.2,7))
@@ -3637,7 +3638,7 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
         "MEDICAL":
             _box(prop,Vector3(0.18,0.035,0.24),Color("#4b626a"),Vector3.ZERO)
             _box(prop,Vector3(0.15,0.015,0.21),Color("#eae6dc"),Vector3(0,0.025,0))
-        "PAPERS":
+        "PAPERS","TEACHER":
             _box(prop,Vector3(0.22,0.035,0.30),Color("#a17e53"),Vector3.ZERO)
             _box(prop,Vector3(0.19,0.012,0.26),Color("#f1eee4"),Vector3(0,0.025,0))
     prop.show()
@@ -3780,10 +3781,42 @@ func _assign_medical_staff() -> void:
             person.position=_open_anchor(previous)
             person.remove_meta("pre_work_anchor")
 
+func _assign_school_staff() -> void:
+    var slots: Array[Vector3]=[Vector3(-11.9,0,7),Vector3(-9.4,0,7),Vector3(-11.9,0,8.1)]
+    for person in _residents_root.get_children():
+        var activity := str(person.get_meta("activity",""))
+        var kind := str(person.get_meta("work_visual",""))
+        var assigned := false
+        if activity=="WORKING" and kind=="TEACHER":
+            while not slots.is_empty():
+                var at: Vector3=slots.pop_front()
+                if not _can_stand(at,WALKER_RADIUS):continue
+                if not person.has_meta("pre_work_anchor"):person.set_meta("pre_work_anchor",person.get_meta("anchor",person.position))
+                person.position=at
+                person.set_meta("anchor",at)
+                person.rotation.y=-PI/2.0
+                assigned=true
+                break
+        if not assigned and person.has_meta("pre_work_anchor"):
+            var previous: Vector3=person.get_meta("pre_work_anchor")
+            person.set_meta("anchor",previous)
+            if int(person.get_meta("seat_index",-1))<0:person.position=_open_anchor(previous)
+            person.remove_meta("pre_work_anchor")
+        # More than four pupils can stand inside rather than idle outdoors.
+        if activity=="STUDYING" and int(person.get_meta("seat_index",-1))<0:
+            if person.position.x>-4.5 or person.position.z<3.5 or person.position.z>10.5:
+                for at in [Vector3(-6,0,4.5),Vector3(-6,0,9.5),Vector3(-10.6,0,7),Vector3(-6,0,6),Vector3(-6,0,8)]:
+                    if _resident_spawn_clear(at):
+                        person.position=at
+                        break
+
 func _assign_work_stations() -> void:
     if _apartment_active:return
     if _current_place=="CLINIC":
         _assign_medical_staff()
+        return
+    if _current_place=="SCHOOL":
+        _assign_school_staff()
         return
     if _current_place=="CENTRO":
         _assign_food_staff()
@@ -4385,15 +4418,16 @@ func _assign_resident_seats() -> void:
     for child in people:
         var person := child as Node3D
         var activity := str(person.get_meta("activity",""))
-        var eligible := activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"]
+        var eligible := activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING","STUDYING"]
+        var classroom_only := activity=="STUDYING"
         var old_index := int(person.get_meta("seat_index",-1))
         var chosen := -1
         if eligible:
-            if old_index>=0 and old_index<seats.size() and not used.has(old_index):
+            if old_index>=0 and old_index<seats.size() and not used.has(old_index) and (str(seats[old_index]["kind"])=="classroom")==classroom_only:
                 chosen = old_index
             else:
                 for i in range(seats.size()):
-                    if not used.has(i):
+                    if not used.has(i) and (str(seats[i]["kind"])=="classroom")==classroom_only:
                         chosen = i
                         break
         person.set_meta("seat_index",chosen)
@@ -4806,6 +4840,8 @@ func _animate_residents(delta: float) -> void:
                     angle=0.65+sin(gesture_time*4.0)*0.25 if limb=="ArmRight" else 0.35
                 else:
                     angle=0.8+sin(gesture_time*1.7)*0.18 if limb=="ArmRight" else 0.25
+            elif seated and activity=="STUDYING" and limb in ["ArmRight","ArmLeft"]:
+                angle=0.76+sin(gesture_time*3.4)*0.09 if limb=="ArmRight" else 0.55
             elif not walking and activity in ["WORKING","STUDYING"] and limb in ["ArmRight","ArmLeft"]:
                 angle=-0.22+sin(float(Time.get_ticks_msec())*0.003+phase)*0.12
             elif not walking and activity!="SLEEPING" and limb=="ArmRight":
