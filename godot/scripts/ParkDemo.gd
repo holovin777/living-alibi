@@ -80,6 +80,8 @@ var _host_activity := ""
 var _host_path: Array[Vector3] = []
 var _host_seated := false
 var _guest_sitting := false
+var _public_seat := -1
+var _public_stand_at := Vector3.ZERO
 var _guest_stand_at := Vector3.ZERO
 var _guest_feedback := ""
 var _guest_feedback_time := 0.0
@@ -260,7 +262,7 @@ func _process(delta: float) -> void:
     var direction := Vector3.ZERO
     var moved := 0.0
     # Do not move away from an open clickable interaction menu.
-    if not _guest_sitting and not _guest_pending and _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
+    if _public_seat<0 and not _guest_sitting and not _guest_pending and _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
             direction.z -= 1.0
         if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -397,6 +399,10 @@ func _process(delta: float) -> void:
         _hint.text = "T: talk to nearby resident · Esc: cursor."
     else:
         _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
+    if _public_seat>=0:
+        _hint.text=tr("R: stand up · E: rest 15 min")
+    elif _nearest_public_bench()>=0:
+        _hint.text+="\n"+tr("R: sit on bench")
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -413,6 +419,18 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        if _public_seat>=0:
+            if event.keycode in [KEY_R,KEY_ESCAPE]:
+                _stand_public_bench()
+            elif event.keycode==KEY_E and _connected and not _api.is_busy():
+                _api.rest_for(15)
+            get_viewport().set_input_as_handled()
+            return
+        if event.keycode==KEY_R and _nearest_public_bench()>=0:
+            _sit_public_bench()
+            get_viewport().set_input_as_handled()
+            return
     if event is InputEventKey and event.pressed and not event.echo:
         if _guest_active:
             if event.keycode==KEY_G and not _guest_sitting and _guest.near_exit(_avatar.position):
@@ -963,7 +981,7 @@ func _buy_bicycle() -> void:
         _api.buy_bicycle()
 
 func _foot_controls_available() -> bool:
-    return not _drive_active() and not _cycling() \
+    return _public_seat<0 and not _drive_active() and not _cycling() \
         and (not _rebirth_active() or _child_can_walk()) \
         and _road_pending.is_empty() and not _home_transition \
         and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
@@ -1029,7 +1047,7 @@ func _follow_player() -> void:
         var eye := EYE_HEIGHT
         if str(_last_snapshot.get("rebirth",{}).get("phase","ADULT")) == "CHILDHOOD":
             eye = lerpf(0.65,EYE_HEIGHT,clampf(float(_last_snapshot.get("rebirth",{}).get("age",0))/18.0,0.0,1.0))
-        _camera.position = _avatar.position + Vector3(0.0,1.12 if _guest_sitting else eye * (1.0 - 0.35 * _crouch_amount) + _jump_height + _step_bob,0.0)
+        _camera.position = _avatar.position + Vector3(0.0,1.12 if (_guest_sitting or _public_seat>=0) else eye * (1.0 - 0.35 * _crouch_amount) + _jump_height + _step_bob,0.0)
         _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
 func _set_graphics_quality(index: int) -> void:
@@ -3517,10 +3535,62 @@ func _register_resident_seat(at: Vector3, yaw: float, kind: String) -> void:
     seats.append({"at":at,"yaw":yaw,"kind":kind})
     _scenery.set_meta("resident_seats",seats)
 
+# The actual 3D bench seats are shared by the visitor and visible residents.
+func _nearest_public_bench() -> int:
+    if not _connected or _public_seat>=0 or _rebirth_active() or _guest_active or _stairwell_active or _apartment_active or _inside_guest_room() or _jump_elapsed>=0.0 or not _foot_controls_available():
+        return -1
+    return _find_free_bench()
+
+func _find_free_bench() -> int:
+    var seats: Array = _scenery.get_meta("resident_seats",[])
+    var used := {}
+    for child in _residents_root.get_children():
+        used[int(child.get_meta("seat_index",-1))]=true
+    var nearest := -1
+    var distance := 1.7
+    for i in range(seats.size()):
+        var seat: Dictionary = seats[i]
+        if seat.get("kind")!="bench" or used.has(i):continue
+        var at: Vector3 = seat["at"]
+        at.y=0.0
+        var facing := Basis(Vector3.UP,float(seat["yaw"]))*Vector3.FORWARD
+        # Only sit from the open front, not through the bench or backrest.
+        if (_avatar.position-at).dot(facing)<0.45:continue
+        var d := _avatar.position.distance_to(at)
+        if d<distance:
+            nearest=i
+            distance=d
+    return nearest
+
+func _sit_public_bench() -> void:
+    var index := _nearest_public_bench()
+    if index<0:return
+    _occupy_public_bench(index)
+
+func _occupy_public_bench(index: int) -> void:
+    var seats: Array = _scenery.get_meta("resident_seats",[])
+    var seat: Dictionary = seats[index]
+    _public_stand_at=_avatar.position
+    _public_seat=index
+    var at: Vector3=seat["at"]
+    _avatar.position=Vector3(at.x,0,at.z)
+    _view_yaw=float(seat["yaw"])
+    _view_pitch=0.0
+    _reset_locomotion()
+    _follow_player()
+
+func _stand_public_bench() -> void:
+    if _public_seat<0:return
+    _public_seat=-1
+    _avatar.position=_public_stand_at if _can_stand(_public_stand_at,WALKER_RADIUS) else _open_anchor(_public_stand_at)
+    _reset_locomotion()
+    _follow_player()
+
 func _assign_resident_seats() -> void:
     # Only residents present in the authoritative snapshot may sit.
     var seats: Array = [] if _apartment_active else _scenery.get_meta("resident_seats",[])
     var used: Dictionary = {}
+    if _public_seat>=0:used[_public_seat]=true
     var people := _residents_root.get_children()
     people.sort_custom(func(a,b): return str(a.get_meta("resident_id","")) < str(b.get_meta("resident_id","")))
     for child in people:
@@ -6209,9 +6279,14 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _connected = true
     var old_car_place := _car_place()
     var was_freight := _drive_freight
-    _last_snapshot = snapshot
+    var old_incarnation = _last_snapshot.get("player",{}).get("incarnation",1)
     var player: Dictionary = snapshot.get("player", {})
     var new_place := str(player.get("placeId", "PARK"))
+    if _public_seat>=0 and (new_place!=_current_place or player.get("incarnation",1)!=old_incarnation):
+        _stand_public_bench()
+    _last_snapshot = snapshot
+    if _public_seat>=0 and (_rebirth_active() or _cycling()):
+        _stand_public_bench()
     var truck_arrival := was_freight and _drive_pending and new_place==_drive_target and _truck_place()==new_place
     var continue_in_cabin := not was_freight and _drive_pending and not _drive_target.is_empty() and new_place==_drive_target and _car_place()==new_place
     if _drive_active() and not continue_in_cabin and (_drive_pending or new_place!=_current_place or _car_place()!=_current_place):
