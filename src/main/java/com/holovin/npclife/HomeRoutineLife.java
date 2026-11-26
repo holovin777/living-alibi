@@ -15,6 +15,7 @@ final class HomeRoutineLife {
     static String activity(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         if(!atHome(c))return "AWAY";
         if(Set.of("SLEEPING","SICK_LEAVE","RESTING_WHILE_SICK","WORKING").contains(c.activity))return c.activity;
+        if(HouseholdLife.dinnerNow(t,c,day,minute))return "FAMILY_DINNER";
         if(c.age<18)return "READING";
         if(c.hunger>=45&&c.food>0)return "COOKING";
         if(c.thirst>=45&&c.water>0)return "DRINKING";
