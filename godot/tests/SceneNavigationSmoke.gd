@@ -16,6 +16,23 @@ func _exercise() -> void:
     root.add_child(world)
     await process_frame
     world.GameLanguage.select_locale("en",false)
+    var score = world._music.stream
+    if not _check(score is AudioStreamWAV and score.loop_mode==AudioStreamWAV.LOOP_FORWARD
+            and score.data.size()>100000 and score.loop_end==score.data.size()/2,
+            "original music is a looping PCM stream"):
+        return
+    world._music.set_level(25.0,false)
+    if not _check(world._music.target_db(true)<world._music.target_db(false),"music ducks during spoken conversations"):
+        return
+    world._music.set_level(0.0,false)
+    if not _check(world._music.target_db(false)==-80.0,"music can be muted"):
+        return
+    world._music.set_level(25.0,false)
+    if not _check(world._main_panel.theme==world._dialog_panel.theme
+            and world._main_panel.theme.get_stylebox("panel","PanelContainer").bg_color.g
+                >world._main_panel.theme.get_stylebox("panel","PanelContainer").bg_color.r,
+            "HUD and chat share the custom town theme"):
+        return
 
     var clock = preload("res://scripts/LiveClock.gd").new()
     for i in range(5):

@@ -825,3 +825,7 @@ First steps now shows direction and distance to real public doorways in Portici,
 ### Public shop doors and opening hours
 
 Portici grocery (08:00–20:00), bakery (07:00–18:00) and cafe (07:00–21:00) have animated sliding entrances with visible open/closed hours. Doors remain open during business hours, close outside those hours and permit the visitor already inside to leave without getting trapped; the collision gate remains active until the panels are sufficiently open. Retail purchases are checked against the same bakery and grocery hours in Java for both visitor and linked-adult play. Visitor counter buttons show closing status and disable unavailable purchases. Only these three entrances have scheduled doors so far. NPC queueing, autonomous doorway traversal, and new clothing visuals are not part of this change. Tests cover door collision, safe exit and shop opening boundaries; CI and desktop tests pending. Depends on #96.
+
+### Music and interface
+
+The original procedural instrumental soundtrack plays locally, loops automatically, and can be adjusted or muted under More / settings → Background music. The preference is saved on this computer. Music fades down while a spoken conversation is open. The town HUD, chat, actions and phone share a warm green theme; advanced information remains in a scrollable collapsed section. No external soundtrack or microphone is needed.

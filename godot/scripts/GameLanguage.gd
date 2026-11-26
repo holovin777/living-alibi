@@ -507,6 +507,7 @@ const IT := {
     "Map (M)": "Mappa (M)",
     "Phone (H)": "Telefono (H)",
     "More / settings": "Altro / impostazioni",
+    "Background music": "Musica di sottofondo",
     "Write to this person...": "Scrivi a questa persona...",
     "Send message (Enter)": "Invia (Invio)",
     "More questions": "Altre domande",
