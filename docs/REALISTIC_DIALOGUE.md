@@ -146,7 +146,7 @@ Both participants' needs improve, affinity and trust increase, and the
 contact remembers the shared meal. This is a meal interaction, not
 a cooking minigame. A scheduled visit permits up to an hour inside while
 the host remains available. Existing household NPCs are visible according
-to the existing household rules. Introductions to family and birthdays remain separate future work.
+to the existing household rules. Birthdays and other celebrations remain separate future work.
 
 ## Hosting friends and cooking together
 
@@ -166,6 +166,26 @@ together (25 minutes). The real ingredients are consumed, both people's
 needs improve, trust and affinity increase and a shared-meal milestone
 is saved. This is a timed shared cooking action, not a cooking animation
 or minigame. Only one meal per guest per game day is allowed.
+
+## Meeting a friend's family
+
+During a valid private apartment visit, press T near a person or click on
+their model to open the ordinary typed dialogue. The host and visible
+household members use their own contact records and language abilities.
+Ask the host "Mi presenti la tua famiglia?" or "Can I meet your family?".
+Only actual partners, parents or children living in the same home who are
+awake, present, at least three years old and willing (based on initial
+sociability, mood and existing trust rules) can be introduced. Names remain
+unknown until introduced or disclosed in dialogue. The host does not pass
+the visitor's alias to the other relatives, nor does friendship transfer.
+A first introduction can be remembered after reload. The visitor must
+introduce themselves separately to each person. Ordinary conversation
+with a household member is available only during a valid visit and while
+the member is present; adult-only loans remain restricted.
+Children do not receive separate age-specific language models yet.
+Godot currently renders up to five other household members in the
+existing apartment scene. This does not create a new family or invent
+relatives if the host lives alone.
 
 Manual check:
 ```sh
