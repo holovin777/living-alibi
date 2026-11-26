@@ -28,7 +28,8 @@ class GameSessionTest {
             StreetCareLife.tick(town,state);StreetCareLife.tick(town,state);
             assertEquals(36,StreetCareLife.view(town).litter());
             assertEquals(32,StreetCareLife.view(town).gardenNeglect());
-            state.minute=480;town.employerFunds.put("city-maintenance",8);
+            state.minute=480;town.employerFunds.put(StreetCareLife.ACCOUNT,8);
+            int core=town.employerFunds.getOrDefault(MunicipalLife.CITY,0);
             int money=cleaner.money;
             var events=new java.util.ArrayList<TownLife.Event>();
             var observations=new java.util.ArrayList<TownLife.Observation>();
@@ -36,7 +37,8 @@ class GameSessionTest {
             StreetCareLife.payHourly(town,cleaner,state,events,observations);
             StreetCareLife.payHourly(town,gardener,state,events,observations);
             assertEquals(money+8,cleaner.money);
-            assertEquals(0,town.employerFunds.get("city-maintenance"));
+            assertEquals(0,town.employerFunds.get(StreetCareLife.ACCOUNT));
+            assertEquals(core,town.employerFunds.getOrDefault(MunicipalLife.CITY,0));
             assertEquals(26,StreetCareLife.view(town).litter());
             assertEquals(32,StreetCareLife.view(town).gardenNeglect());
             assertEquals("BROOM",GameSession.workVisual(cleaner));
