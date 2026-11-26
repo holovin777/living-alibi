@@ -29,6 +29,22 @@ func _ready() -> void:
     _box("Worktop",Vector3(2.7,0.09,0.82),Color("#777f80"),Vector3(-2.7*side,1.0,-3.35))
     _box("Sink",Vector3(0.55,0.06,0.50),Color("#b4c1c5"),Vector3(-2.7*side,1.06,-3.35))
     _furniture("Table",Vector3(-2.5*side,0,-0.8),Vector3(1.25,0.75,0.9),wood)
+    var dinner := Node3D.new()
+    dinner.name="FamilyDinner"
+    add_child(dinner)
+    for n in range(4):
+        var plate := MeshInstance3D.new()
+        var mesh := CylinderMesh.new()
+        mesh.top_radius=0.18
+        mesh.bottom_radius=0.16
+        mesh.height=0.025
+        plate.mesh=mesh
+        plate.position=Vector3(-2.5*side+(-0.30 if n%2==0 else 0.30),0.77,-0.8+(-0.22 if n<2 else 0.22))
+        var material := StandardMaterial3D.new()
+        material.albedo_color=Color("#eee6d7")
+        plate.material_override=material
+        dinner.add_child(plate)
+    dinner.hide()
     _furniture("Sofa",Vector3(2.9*side,0,1.8),Vector3(1.2,0.65,1.9),fabric)
     _box("SofaBack",Vector3(0.18,0.65,1.9),fabric,Vector3(3.38*side,0.9,1.8))
     # Small shared tray, visible only after the server accepts coffee.
@@ -133,6 +149,7 @@ func routine_anchor(activity: String) -> Vector3:
         "COOKING","DRINKING":return Vector3(-2.7*side,0,-2.25)
         "READING","WATCHING_TV","RESTING":return Vector3(-1.15*side,0,2.8)
         "CLEANING":return Vector3(0,0,-1.25)
+        "FAMILY_DINNER":return Vector3(-2.5*side,0,0.15)
     return host_anchor()
 
 func routine_seat() -> Vector3:
@@ -160,3 +177,9 @@ func host_path(from: Vector3,to: Vector3) -> Array[Vector3]:
         result.append(Vector3(id.x*0.25,0,id.y*0.25))
     if not result.is_empty():result.append(to)
     return result
+
+func update_household(household: Dictionary) -> void:
+    var dinner := get_node("FamilyDinner") as Node3D
+    dinner.visible=bool(household.get("dinnerNow",false))
+    for i in range(dinner.get_child_count()):
+        dinner.get_child(i).visible=i<mini(4,int(household.get("present",0)))

@@ -292,6 +292,11 @@ func _process(delta: float) -> void:
         _animate_guest_host(delta)
         var hints := tr("Visiting %s") % _guest.resident_name
         if not _host_activity.is_empty():hints += "\n"+tr("Host: %s") % tr(_host_activity.capitalize().replace("_"," "))
+        var visit = _last_snapshot.get("apartmentVisit",{})
+        if visit is Dictionary:
+            var household = visit.get("household",{})
+            if household is Dictionary and int(household.get("members",0))>1:
+                hints += "\n"+tr("Household: %s · at home: %s") % [household.get("members",0),household.get("present",0)]
         if _guest_sitting:
             hints += "\n"+tr("E: stand up · R: relax")
         else:
@@ -5819,6 +5824,8 @@ func _toggle_guest_seat() -> void:
 func _sync_host_routine(invitation: Dictionary) -> void:
     if not is_instance_valid(_guest_host):return
     _guest.update_cleanliness(int(invitation.get("cleanliness",100)))
+    var household = invitation.get("household",{})
+    if household is Dictionary:_guest.update_household(household)
     var next := str(invitation.get("activity",""))
     if next==_host_activity:return
     if _host_seated:

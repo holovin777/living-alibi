@@ -46,7 +46,7 @@ final class IntercomLife {
         put(t,id,"until",Math.addExact(time,10));
         return "Hello! We can chat at the entrance for a few minutes.";
     }
-    record ApartmentVisit(String residentId,String name,int unit,int level,String style,String status,int until,String activity,int cleanliness) {}
+    record ApartmentVisit(String residentId,String name,int unit,int level,String style,String status,int until,String activity,int cleanliness,HouseholdLife.View household) {}
     private static int unit(TownLife.Town t,TownLife.Citizen c){
         if(c.id.equals("marco"))return 1;
         String key="intercom:unit:"+c.homeUnit;
@@ -85,7 +85,7 @@ final class IntercomLife {
                     contact.trust<80||contact.affinity<35)continue;
             int level=c.money>=250?2:c.money>=90?1:0;
             String style=c.carefulness>=65?"tiglio":c.sociability>=65?"rosa":"olmo";
-            return new ApartmentVisit(id,c.name,get(t,id,"unit"),level,style,get(t,id,"inside")>0?"VISITING":"INVITED",get(t,id,"inside-until"),HomeRoutineLife.activity(t,c,day,minute),HomeRoutineLife.cleanliness(t,c));
+            return new ApartmentVisit(id,c.name,get(t,id,"unit"),level,style,get(t,id,"inside")>0?"VISITING":"INVITED",get(t,id,"inside-until"),HomeRoutineLife.activity(t,c,day,minute),HomeRoutineLife.cleanliness(t,c),HouseholdLife.view(t,c,day,minute));
         }
         return null;
     }

@@ -13,6 +13,46 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void autonomousFamilyCohabitsAndSharesDinnerWithoutCreatingMoney() throws Exception {
+        Path file=directory.resolve("autonomous-household.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var pair=PopulationGenerator.add(town,2);
+            var first=pair.get(0);var second=pair.get(1);id=first.id;
+            for(var p:pair){
+                p.age=30;p.alive=true;p.money=100;p.food=4;p.hunger=50;p.fatigue=20;
+                p.place=p.home;p.destination=p.home;p.travelRemaining=0;p.activity="FREE_TIME";
+            }
+            var relationship=new SocialLife.Relationship(first.id,second.id);
+            relationship.affinity=80;relationship.trust=80;relationship.tension=0;
+            town.peerRelationships.put(SocialNetwork.key(first.id,second.id),relationship);
+            assertTrue(DemographyLife.pair(town,first,second,1));
+            state.day=36;state.minute=360;
+            HouseholdLife.tick(town,state);
+            assertEquals(first.homeUnit,second.homeUnit);
+            second.place=first.home;second.destination=first.home;
+            state.minute=1080;
+            HouseholdLife.tick(town,state);
+            assertEquals(6,first.food+second.food);
+            assertEquals(15,first.hunger);assertEquals(15,second.hunger);
+            assertEquals(180,first.money+second.money);
+            assertEquals(20,FamilyBudgetLife.savings(town,first)+FamilyBudgetLife.savings(town,second));
+            assertEquals("FAMILY_DINNER",HomeRoutineLife.activity(town,first,36,1080));
+            assertEquals(1,HouseholdLife.view(town,first,36,1080).dinners());
+            state.minute=1110;HouseholdLife.tick(town,state);
+            assertEquals(6,first.food+second.food);
+            assertFalse(HouseholdLife.view(town,first,36,1110).dinnerNow());
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(1,HouseholdLife.view(town,town.get(id),36,1110).dinners());
+        }
+    }
+
+
+    @Test
     void homeRoutineRunsWithoutVisitorAndPersistsCleanliness() throws Exception {
         Path file=directory.resolve("home-routine.db");
         try(var db=new WorldDatabase(file)){
