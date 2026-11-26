@@ -86,6 +86,8 @@ const IT := {
     "Sorry, I have no water for coffee.": "Mi dispiace, non ho acqua per il caffè.",
     "Sorry, I have no food to share.": "Mi dispiace, non ho cibo da offrire.",
     "You need an active apartment visit.": "Devi essere in visita nell’appartamento.",
+    "Family dinner": "Cena in famiglia",
+    "Household: %s · at home: %s": "Famiglia: %s · in casa: %s",
     "Host: %s": "Ospite: %s",
     "Cooking": "Cucina",
     "Drinking": "Beve",
