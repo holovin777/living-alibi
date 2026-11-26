@@ -48,8 +48,11 @@ public final class PopulationSmokeTest {
         var more=PopulationGenerator.add(copy,10);
         check(more.getFirst().id.equals("resident-0021"),"IDs advance without collisions");
         check(town.people.size()==22,"copy modified separately");
-        try { PopulationGenerator.add(copy,20); throw new AssertionError("limit not enforced"); }
-        catch(IllegalArgumentException expected) { /* max is 40 */ }
+        int remaining=PopulationGenerator.MAX_GENERATED-(int)DemographyLife.living(copy);
+        while(remaining>0){int batch=Math.min(20,remaining);PopulationGenerator.add(copy,batch);remaining-=batch;}
+        check(DemographyLife.living(copy)==PopulationGenerator.MAX_GENERATED,"larger world reaches bounded capacity");
+        try { PopulationGenerator.add(copy,1); throw new AssertionError("limit not enforced"); }
+        catch(IllegalArgumentException expected) { /* configured maximum */ }
         System.out.println("PopulationSmokeTest: ALL CHECKS PASSED (20 residents; 30 days)");
     }
     private static void emotionalChanges() {
