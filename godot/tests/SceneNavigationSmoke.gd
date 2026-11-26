@@ -296,7 +296,9 @@ func _exercise() -> void:
     world._avatar.position=barber_saved_position
     var square := centro_root.get_node("PiazzaCentrale")
     var paving := square.get_node("DucalePebbleMosaic") as MeshInstance3D
-    if not _check(paving.mesh is PlaneMesh and paving.mesh.material.albedo_texture != null and square.has_node("Facade_0")
+    var mosaic := paving.mesh as PlaneMesh
+    var mosaic_material := mosaic.material as StandardMaterial3D if mosaic!=null else null
+    if not _check(mosaic_material!=null and mosaic_material.albedo_texture != null and square.has_node("Facade_0")
             and square.has_node("Facade_3") and square.has_node("CortileDeiFiori") and square.has_node("DuomoInspiredFacade"),
             "historic square has a textured pebble mosaic, arcades, a cathedral facade and a garden court"):
         return
