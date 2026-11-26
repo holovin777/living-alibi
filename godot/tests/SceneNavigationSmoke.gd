@@ -279,6 +279,21 @@ func _exercise() -> void:
     if not _check(entered.x > 6.8 and not world._can_stand(Vector3(4.4,0,3.2),world.WALKER_RADIUS),
             "walk through open grocery door, but not through its wall"):
         return
+    world._avatar.position=world.GROCERY_COUNTER
+    if not _check(world._can_stand(world.GROCERY_COUNTER,world.WALKER_RADIUS) and world._near_public_counter() and world._near_kiosk(),"visitor reaches unobstructed grocery checkout"):
+        return
+    var visitor_bakery := _world("BAKERY","Bakery")
+    visitor_bakery["shop"]=[{"id":"bread","label":"Bread","price":3,"stock":5}]
+    world._on_world_updated(visitor_bakery)
+    world._avatar.position=world.BAKERY_COUNTER
+    world._toggle_actions()
+    if not _check(world._near_public_counter() and world._action_panel.visible and _has_button(world._action_choices,"Buy Bread"),"ordinary visitor can use bakery checkout"):
+        return
+    world._on_world_updated(_world("LIBRARY","Library"))
+    var library_walk: Vector3=world._move_on_ground(Vector3(-7,0,2.8),Vector3(0,0,3.3),world.WALKER_RADIUS)
+    world._avatar.position=library_walk
+    if not _check(world._scenery.has_node("BibliotecaComunale") and library_walk.z>5.8 and world._near_public_counter() and not world._can_stand(Vector3(-10,0,4),world.WALKER_RADIUS),"library doorway and reception accessible, walls remain solid"):
+        return
     world._on_world_updated(_world("PARK","Park"))
 
     var guest := _world("NORTH_RESIDENCES","North residences")
