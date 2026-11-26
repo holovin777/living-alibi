@@ -3865,7 +3865,7 @@ func _assign_school_staff() -> void:
     people.sort_custom(func(a,b): return str(a.get_meta("resident_id","")) < str(b.get_meta("resident_id","")))
     for child in people:
         var person := child as Node3D
-        var teaching := str(person.get_meta("activity",""))=="WORKING" and str(person.get_meta("work_visual",""))=="TEACHING" and not person.get_meta("dojo_member",false)
+        var teaching: bool = str(person.get_meta("activity",""))=="WORKING" and str(person.get_meta("work_visual",""))=="TEACHING" and not person.get_meta("dojo_member",false)
         if teaching:
             while not spots.is_empty():
                 var at: Vector3 = spots.pop_front()
@@ -4436,8 +4436,8 @@ func _assign_resident_seats() -> void:
         var person := child as Node3D
         var activity := str(person.get_meta("activity",""))
         var school := _current_place=="SCHOOL" and not _apartment_active
-        var in_class := school and activity=="STUDYING" and not person.get_meta("dojo_member",false)
-        var eligible := in_class if school else activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"]
+        var in_class: bool = school and activity=="STUDYING" and not person.get_meta("dojo_member",false)
+        var eligible: bool = in_class if school else activity in ["RELAXING","RESTING","FREE_TIME","EATING","DRINKING"]
         var old_index := int(person.get_meta("seat_index",-1))
         var chosen := -1
         if eligible:
@@ -4749,7 +4749,6 @@ func _animate_residents(delta: float) -> void:
         var pace := float(appearance.get("pace",1.0))*ResidentAppearance.pace_factor(str(person.get_meta("appearance_stage","ADULT")))
         var stride := float(appearance.get("stride",0.42))
         var seated := int(person.get_meta("seat_index",-1)) >= 0
-        var studying := seated and str(person.get_meta("seat_kind",""))=="classroom"
         var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
         var queued := person.has_meta("market_queue_target")
         var queue_target: Vector3 = person.get_meta("market_queue_target",person.position)
