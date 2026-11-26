@@ -85,7 +85,7 @@ public final class Launcher {
             }
             if (!ready) throw new IOException("Server failed to start; see " + data.resolve("server.log"));
             var command = new ArrayList<>(List.of(game.toString()));
-            if (smoke) command.addAll(List.of("--headless", "--quit-after", "180"));
+            if (smoke) command.addAll(List.of("--headless", "--max-fps", "60", "--quit-after", "180", "--", "--packaged-smoke"));
             var builder = new ProcessBuilder(command).directory(root.toFile()).redirectErrorStream(true)
                 .redirectOutput(data.resolve("game.log").toFile());
             builder.environment().put("LIVING_ALIBI_LOCAL_PORT", Integer.toString(port));
@@ -98,6 +98,7 @@ public final class Launcher {
                 String log = Files.readString(data.resolve("game.log"));
                 if (log.contains("SCRIPT ERROR") || log.contains("Parse Error") || log.contains("Failed loading resource"))
                     throw new IOException("Exported Godot game reported script/resource errors.");
+                if (!log.contains("PACKAGED_WORLD_CONNECTED")) throw new IOException("Exported game never received the world snapshot.");
                 if (!Files.isRegularFile(data.resolve("world.db"))) throw new IOException("No world database created.");
                 System.out.println("Packaged game smoke passed.");
             }
