@@ -5362,6 +5362,8 @@ func _create_interface() -> void:
     _phone.alarm_rang.connect(_on_phone_alarm)
     _phone.sms_received.connect(_on_phone_alarm)
     _phone.sms_reply_requested.connect(_reply_phone_sms)
+    _phone.call_received.connect(_on_phone_alarm)
+    _phone.call_action_requested.connect(_reply_phone_call)
     _phone_alert = Label.new()
     _phone_alert.position = Vector2(480,12)
     _phone_alert.add_theme_font_size_override("font_size",24)
@@ -7293,7 +7295,7 @@ func _toggle_phone() -> void:
     _action_panel.hide()
     _phone.update_data(_last_snapshot,_job_offers,_locations)
     _phone.show()
-    _phone.open_app("home")
+    _phone.open_app("calls" if _phone.has_ringing_call() else "home")
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func _close_phone() -> void:
@@ -7306,6 +7308,10 @@ func _on_phone_alarm(message: String) -> void:
     _phone_alert_remaining = 8.0
     _phone_alert.show()
     _town_audio.play_alarm()
+
+func _reply_phone_call(resident_id: String,action: String) -> void:
+    if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
+        _api.garden_action("phone-call:%s:%s" % [action,resident_id])
 
 func _reply_phone_sms(resident_id: String,choice: int) -> void:
     if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
