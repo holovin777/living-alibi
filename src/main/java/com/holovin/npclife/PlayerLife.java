@@ -111,12 +111,16 @@ final class PlayerLife {
         int lastDay;
         int lastMinute;
         String lastHeard;
+        final List<ConversationMemory.Turn> dialogue=new ArrayList<>();
+        final Map<ConversationMemory.Milestone,ConversationMemory.Turn> important=new java.util.EnumMap<>(ConversationMemory.Milestone.class);
         Contact(String residentId) {this.residentId=residentId;}
         Contact copy() {
             Contact c=new Contact(residentId);
             c.knownName=knownName;c.conversations=conversations;
             c.trust=trust;c.affinity=affinity;c.lastPositiveDay=lastPositiveDay;
             c.lastDay=lastDay;c.lastMinute=lastMinute;c.lastHeard=lastHeard;
+            c.dialogue.addAll(dialogue);
+            c.important.putAll(important);
             return c;
         }
     }
@@ -261,7 +265,7 @@ final class PlayerLife {
     }
     static List<TownLife.Citizen> visible(TownLife.Town town) {
         List<TownLife.Citizen> people=new ArrayList<>();
-        if(!town.player.alive)return people;
+        if(!town.player.alive||JusticeLife.confined(town))return people;
         if(town.player.travelRemaining>0)return people;
         String scene=TownLife.publicSpace(town.player.place);
         for(var citizen:town.people.values()) {
@@ -289,6 +293,14 @@ final class PlayerLife {
         if(!visible(town).contains(person))
             throw new IllegalArgumentException(person.name+" is not in your current public space. Use look to see nearby people.");
         return person;
+    }
+    static TownLife.Citizen nearby(TownLife.Town town,String residentId,int day,int minute){
+        if(IntercomLife.insideVisit(town,day,minute)){
+            var resident=IntercomLife.visitingResident(town,residentId,day,minute);
+            if(resident==null)throw new IllegalArgumentException("This resident is not in the apartment with you.");
+            return resident;
+        }
+        return nearby(town,residentId);
     }
     static String validateName(String name) {
         String n=name.strip();
@@ -337,7 +349,7 @@ final class PlayerLife {
     }
 
     static String speak(TownLife.Town town,String id,String message,int day,int minute) {
-        TownLife.Citizen resident=nearby(town,id);
+        TownLife.Citizen resident=nearby(town,id,day,minute);
         String spoken=message.strip();
         if(spoken.isEmpty()||spoken.length()>1000)
             throw new IllegalArgumentException("Speak 1–1000 characters.");
@@ -368,6 +380,7 @@ final class PlayerLife {
         boolean support=spoken.equalsIgnoreCase("I'm here for you.") || spoken.equalsIgnoreCase("Ti sono vicino.");
         boolean recall=spoken.equalsIgnoreCase("What do you remember about me?") || spoken.equalsIgnoreCase("Cosa ricordi di me?");
         if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan")||spoken.equalsIgnoreCase("Repay personal loan")) {
+            if(resident.age<18)throw new IllegalArgumentException("Personal loans require an adult resident.");
             if(RebirthLife.active(town))throw new IllegalArgumentException("Personal loans are available to visitors only.");
             if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan"))return PersonalLoanLife.borrow(town,resident,contact,day);
             return PersonalLoanLife.repay(town,resident,contact,day);

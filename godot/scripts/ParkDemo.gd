@@ -218,6 +218,7 @@ var _dialog_attitude: Label
 var _dialog_style: Label
 var _language_selector: OptionButton
 var _dialog_input: LineEdit
+var _dialog_language: OptionButton
 var _dialog_history: RichTextLabel
 var _dialog_more_scroll: ScrollContainer
 var _spoken_dialog_enabled := true
@@ -228,6 +229,13 @@ var _music: AudioStreamPlayer
 var _music_value: Label
 var _dialog_target := ""
 var _dialog_pending := false
+var _custody_panel: PanelContainer
+var _custody_label: Label
+var _custody_cell: Node3D
+var _custody_active := false
+var _dialog_started_at := 0
+var _dialog_end_remaining := 0.0
+var _dialog_farewell := ""
 var _action_title: Label
 var _action_choices: VBoxContainer
 
@@ -254,6 +262,9 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    if _custody_active:
+        return
+    _tick_dialog_autonomy(delta)
     _music.update_mix(delta,_dialog_panel.visible and _spoken_dialog_enabled)
     _tick_public_door(delta)
     if _phone_alert_remaining>0.0:
@@ -318,9 +329,11 @@ func _process(delta: float) -> void:
         else:
             if _guest.near_exit(_avatar.position):hints += "\n"+tr("G: leave apartment")
             if _guest.near_sofa(_avatar.position):hints += "\n"+tr("E: sit on sofa")
-            if _guest.near_table(_avatar.position):hints += "\n"+tr("C: coffee · F: snack")
+            if _guest.near_table(_avatar.position):hints += "\n"+tr("C: coffee · F: snack · V: dinner")
+        if not _nearest_resident().is_empty():
+            hints += "\n"+tr("T or click: talk to a person")
         if is_instance_valid(_guest_host) and _avatar.position.distance_to(_guest_host.position)<2.5:
-            hints += "\n"+tr("T: talk to host")
+            hints += "\n"+tr("Ask the host to introduce their family.")
         _guest_feedback_time = maxf(0.0,_guest_feedback_time-delta)
         if _guest_feedback_time>0.0:hints += "\n"+_guest_feedback
         _stairwell_hint.text = hints
@@ -419,6 +432,7 @@ func _process(delta: float) -> void:
         _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
 
 func _unhandled_input(event: InputEvent) -> void:
+    if _custody_active:return
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         if _drive_active():
             _drive_look = clampf(_drive_look-event.relative.x*MOUSE_SENSITIVITY,-1.05,1.05)
@@ -439,6 +453,7 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if _custody_active:return
     if _dialog_panel.visible and event is InputEventKey and event.pressed and not event.echo:
         if event.keycode == KEY_ESCAPE:
             _close_dialog()
@@ -451,11 +466,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
             elif event.keycode==KEY_E and not _guest_pending:
                 _toggle_guest_seat()
             elif event.keycode==KEY_T:
-                _guest_action("talk")
+                _open_dialog()
             elif event.keycode==KEY_C:
                 _guest_action("coffee")
             elif event.keycode==KEY_F:
                 _guest_action("snack")
+            elif event.keycode==KEY_V:
+                _guest_action("dinner")
             elif event.keycode==KEY_R:
                 _guest_action("rest")
             get_viewport().set_input_as_handled()
@@ -490,6 +507,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         if _can_jump():
             _jump_elapsed = 0.0
             get_viewport().set_input_as_handled()
+        return
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_X:
+        _try_strike()
+        get_viewport().set_input_as_handled()
         return
     if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_Q:
         if _foot_controls_available():
@@ -3601,6 +3622,8 @@ func _render_residents() -> void:
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
+        person.set_meta("conversation_minutes",int(resident.get("conversationMinutes",10)))
+        person.set_meta("conversation_reason",str(resident.get("conversationReason","PERSONAL")))
         person.set_meta("mood",str(resident.get("mood","CALM")))
         person.set_meta("walking_companion",str(resident.get("walkingCompanion","")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
@@ -3628,6 +3651,35 @@ func _render_residents() -> void:
     _assign_work_stations()
     _assign_market_queues()
     _sync_office_joker()
+    _sync_hosted_guest()
+
+func _sync_hosted_guest() -> void:
+    var active_id := ""
+    var phone_data = _last_snapshot.get("phone")
+    if _current_place=="SOUTH_RESIDENCES" and _owns_house() and phone_data is Dictionary:
+        for meeting in phone_data.get("meetings",[]):
+            if bool(meeting.get("guestPresent",false)):
+                active_id=str(meeting.get("residentId",""))
+                break
+    for person in _residents_root.get_children():
+        var visiting: bool = str(person.get_meta("resident_id",""))==active_id
+        var was_visiting: bool = bool(person.get_meta("hosted_guest",false))
+        if visiting and not was_visiting:
+            person.set_meta("original_anchor",person.get_meta("anchor",person.position))
+            var at := _open_anchor(Vector3(-6.5,0,8.5))
+            person.set_meta("anchor",at)
+            person.position=at
+        elif was_visiting and not visiting:
+            var at: Vector3 = person.get_meta("original_anchor",Vector3.ZERO)
+            person.set_meta("anchor",at)
+            person.position=_open_anchor(at)
+        person.set_meta("hosted_guest",visiting)
+        if visiting:
+            if int(person.get_meta("seat_index",-1))>=0:
+                person.position=person.get_meta("anchor",person.position)
+            person.set_meta("seat_index",-1)
+            person.set_meta("activity","SOCIALIZING")
+            person.set_meta("walking_companion","")
 
 # Presentation follows the server's current visible work equipment, never a guessed identity.
 func _sync_work_prop(person: Node3D, kind: String) -> void:
@@ -4749,7 +4801,7 @@ func _animate_residents(delta: float) -> void:
         var pace := float(appearance.get("pace",1.0))*ResidentAppearance.pace_factor(str(person.get_meta("appearance_stage","ADULT")))
         var stride := float(appearance.get("stride",0.42))
         var seated := int(person.get_meta("seat_index",-1)) >= 0
-        var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
+        var talking := _dialog_panel.visible and _dialog_end_remaining<=0.0 and str(person.get_meta("resident_id","")) == _dialog_target
         var queued := person.has_meta("market_queue_target")
         var queue_target: Vector3 = person.get_meta("market_queue_target",person.position)
         if queued and person.position.distance_to(queue_target)<0.12:
@@ -4767,7 +4819,7 @@ func _animate_residents(delta: float) -> void:
             var facing: Vector3=person.get_meta("peer_face")-person.position
             if facing.length_squared()>0.001:
                 person.rotation.y=lerp_angle(person.rotation.y,atan2(-facing.x,-facing.z),minf(delta*6.0,1.0))
-        if talking or seated:
+        if talking or seated or bool(person.get_meta("hosted_guest",false)):
             walking = false
         if talking and not seated:
             var toward := _avatar.position-person.position
@@ -5272,6 +5324,14 @@ func _create_interface() -> void:
     _dialog_history.custom_minimum_size = Vector2(370,140)
     _dialog_history.scroll_following = true
     dialog_col.add_child(_dialog_history)
+    var spoken_label := Label.new()
+    spoken_label.text = "Parlo / I speak"
+    dialog_col.add_child(spoken_label)
+    _dialog_language = OptionButton.new()
+    _dialog_language.add_item("Italiano")
+    _dialog_language.add_item("English")
+    _dialog_language.select(0)
+    dialog_col.add_child(_dialog_language)
     _dialog_input = LineEdit.new()
     _dialog_input.placeholder_text = tr("Write to this person...")
     _dialog_input.max_length = 1000
@@ -5353,6 +5413,8 @@ func _create_interface() -> void:
     _phone.alarm_rang.connect(_on_phone_alarm)
     _phone.sms_received.connect(_on_phone_alarm)
     _phone.sms_reply_requested.connect(_reply_phone_sms)
+    _phone.call_received.connect(_on_phone_alarm)
+    _phone.call_action_requested.connect(_reply_phone_call)
     _phone_alert = Label.new()
     _phone_alert.position = Vector2(480,12)
     _phone_alert.add_theme_font_size_override("font_size",24)
@@ -5430,12 +5492,29 @@ func _replace_choices(parent: Control, keep_header: bool = false) -> void:
         parent.remove_child(children[i])
         children[i].queue_free()
 
+func _dialog_candidates() -> Array:
+    if _guest_active and is_instance_valid(_guest):
+        var people: Array = []
+        if is_instance_valid(_guest_host):
+            people.append(_guest_host)
+        var family := _guest.get_node_or_null("GuestFamily") as Node3D
+        if family!=null:
+            people.append_array(family.get_children())
+        return people
+    return _residents_root.get_children() if is_instance_valid(_residents_root) and not _stairwell_active else []
+
+func _dialog_person(id: String) -> Node3D:
+    for child in _dialog_candidates():
+        if str(child.get_meta("resident_id",""))==id:
+            return child as Node3D
+    return null
+
 func _nearest_resident() -> String:
     if not is_instance_valid(_residents_root):
         return ""
     var nearest := ""
     var best := 2.5
-    for child in _residents_root.get_children():
+    for child in _dialog_candidates():
         var person := child as Node3D
         if person == null or str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:
             continue
@@ -5451,13 +5530,13 @@ func _looked_at_resident() -> String:
     var center := get_viewport().get_visible_rect().size*0.5
     var selected := ""
     var best := 90.0
-    for child in _residents_root.get_children():
+    for child in _dialog_candidates():
         var person := child as Node3D
         if person == null or str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:
             continue
         if _avatar.position.distance_to(person.position) >= 2.5:
             continue
-        var head := person.global_position + Vector3(0,1.35,0)
+        var head := person.global_position + Vector3(0,1.35*person.scale.y,0)
         if _camera.is_position_behind(head):
             continue
         var distance := _camera.unproject_position(head).distance_to(center)
@@ -5481,7 +5560,7 @@ func _open_dialog(preferred_id: String = "") -> void:
     if id.is_empty():
         _message.text = tr("Approach a resident to talk.")
         return
-    var person := _residents_root.get_node_or_null("Resident_"+id) as Node3D
+    var person := _dialog_person(id)
     if person == null or _avatar.position.distance_to(person.position) >= 2.5:
         _message.text = tr("Approach a resident to talk.")
         return
@@ -5499,6 +5578,9 @@ func _open_dialog(preferred_id: String = "") -> void:
     _dialog_input.clear()
     _dialog_history.clear()
     _dialog_history.append_text(_dialog_reply.text+"\n")
+    _dialog_started_at = _dialog_world_minute()
+    _dialog_end_remaining = 0.0
+    _dialog_farewell = ""
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
     _dialog_input.grab_focus()
@@ -5513,36 +5595,85 @@ func _render_dialog_mood(person: Node3D) -> void:
         if int(_last_snapshot.get("day",1))>due:
             _dialog_style.text += " · "+tr("Overdue")
 
+# The spoken language is independent of TranslationServer's interface locale.
+func _reply_translate(source: String) -> String:
+    if _api.dialogue_language == "it":
+        return str(GameLanguage.IT.get(source,source))
+    if _api.dialogue_language == "en":
+        return source
+    return tr(source)
+
 func _localized_resident_reply(message: String) -> String:
-    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    var person := _dialog_person(_dialog_target)
     if person==null:return message
     var separator := message.find(": ")
-    if separator<0:return tr(message)
+    if separator<0:return _reply_translate(message)
     var spoken := message.substr(separator+2)
+    if _api.dialogue_rendered:
+        return spoken
     if spoken.begins_with("I live at ") and spoken.ends_with("."):
-        return tr("I live at %s.") % spoken.substr(10,spoken.length()-11)
+        return _reply_translate("I live at %s.") % spoken.substr(10,spoken.length()-11)
     if spoken.begins_with("My name is ") and spoken.ends_with("."):
-        return tr("My name is %s.") % spoken.substr(11,spoken.length()-12)
+        return _reply_translate("My name is %s.") % spoken.substr(11,spoken.length()-12)
     if spoken.begins_with("I work as ") and spoken.ends_with("."):
-        return tr("I work as %s.") % tr(spoken.substr(10,spoken.length()-11))
+        return _reply_translate("I work as %s.") % _reply_translate(spoken.substr(10,spoken.length()-11))
     if spoken.begins_with("My workplace is ") and spoken.ends_with("."):
-        return tr("My workplace is %s.") % tr(spoken.substr(16,spoken.length()-17))
+        return _reply_translate("My workplace is %s.") % _reply_translate(spoken.substr(16,spoken.length()-17))
     if spoken.begins_with("Look for ") and spoken.ends_with(" on your town map."):
-        return tr("Look for %s on your town map.") % tr(spoken.substr(9,spoken.length()-27))
+        return _reply_translate("Look for %s on your town map.") % _reply_translate(spoken.substr(9,spoken.length()-27))
     if spoken.begins_with("Nice to meet you, ") and spoken.ends_with("."):
-        return tr("Nice to meet you, %s.") % spoken.substr(18,spoken.length()-19)
+        return _reply_translate("Nice to meet you, %s.") % spoken.substr(18,spoken.length()-19)
     if spoken.begins_with("It's ") and spoken.ends_with(".") and spoken.contains(":"):
-        return tr("It's %s.") % spoken.substr(5,spoken.length()-6)
+        return _reply_translate("It's %s.") % spoken.substr(5,spoken.length()-6)
     if spoken.begins_with("Hello, ") and spoken.ends_with(". Nice to meet someone around here."):
-        return tr("Hello, %s. Nice to meet someone around here.") % tr(spoken.substr(7,spoken.length()-42))
+        return _reply_translate("Hello, %s. Nice to meet someone around here.") % _reply_translate(spoken.substr(7,spoken.length()-42))
     if spoken.begins_with("Good to see you again, ") and spoken.ends_with("."):
-        return tr("Good to see you again, %s.") % tr(spoken.substr(23,spoken.length()-24))
-    return tr(spoken)
+        return _reply_translate("Good to see you again, %s.") % _reply_translate(spoken.substr(23,spoken.length()-24))
+    return _reply_translate(spoken)
+
+func _dialog_world_minute() -> int:
+    return (int(_last_snapshot.get("day",1))-1)*1440+int(_last_snapshot.get("minute",0))
+
+func _dialog_patience(person: Node3D) -> int:
+    if person.has_meta("conversation_minutes"):
+        return int(person.get_meta("conversation_minutes"))
+    var activity := str(person.get_meta("activity",""))
+    if activity in ["SLEEPING","TRAVELING","SICK_LEAVE","RESTING_WHILE_SICK"]:
+        return 1
+    if activity in ["WORKING","STUDYING","JOB_SEARCH","SHOPPING"]:
+        return 4
+    if str(person.get_meta("relationship",""))=="FRIENDLY":
+        return 18
+    return 10
+
+func _finish_dialog_autonomously(farewell: String) -> void:
+    _close_dialog()
+    _message.text = farewell
+    _phone.add_notification(farewell)
+
+func _tick_dialog_autonomy(delta: float) -> void:
+    if not _dialog_panel.visible or _dialog_pending:return
+    if _dialog_end_remaining>0.0:
+        _dialog_end_remaining=maxf(0.0,_dialog_end_remaining-delta)
+        if _dialog_end_remaining<=0.0:
+            _finish_dialog_autonomously(_dialog_farewell)
+        return
+    var person := _dialog_person(_dialog_target)
+    if person==null:
+        _finish_dialog_autonomously(tr("They had to leave."))
+        return
+    if _dialog_world_minute()-_dialog_started_at>=_dialog_patience(person):
+        var reason := str(person.get_meta("conversation_reason","PERSONAL"))
+        var farewell := tr("They have other things to do. Talk later.")
+        if reason=="SHIFT":farewell=tr("They have to get back to their shift.")
+        elif reason=="NEEDS":farewell=tr("They need to take care of themselves.")
+        _finish_dialog_autonomously(farewell)
 
 func _close_dialog() -> void:
     var was_open := _dialog_panel.visible
     _dialog_panel.visible = false
     _dialog_target = ""
+    _dialog_end_remaining = 0.0
     _dialog_input.release_focus()
     if was_open:
         DisplayServer.tts_stop()
@@ -5560,10 +5691,18 @@ func _set_dialog_voice(enabled: bool) -> void:
 func _speak_resident_reply(reply: String) -> void:
     if not _spoken_dialog_enabled or reply.is_empty():
         return
-    var language := "it" if TranslationServer.get_locale().begins_with("it") else "en"
-    var voices := DisplayServer.tts_get_voices_for_language(language)
+    var language: String = _api.dialogue_language
+    if language not in ["it","en"]:
+        language = "it" if TranslationServer.get_locale().begins_with("it") else "en"
+    var locale: String = _api.dialogue_locale
+    var voices := PackedStringArray()
+    if not locale.is_empty() and locale != "<null>":
+        # Prefer the actual region when the platform has a matching voice.
+        for voice in DisplayServer.tts_get_voices():
+            if str(voice.get("language","")).replace("_","-").to_lower()==locale.to_lower():
+                voices.append(str(voice.get("id","")))
     if voices.is_empty():
-        voices = DisplayServer.tts_get_voices_for_language("en")
+        voices = DisplayServer.tts_get_voices_for_language(language)
     if voices.is_empty():
         _message.text = tr("No system speech voice is available. Text chat still works.")
         return
@@ -5577,12 +5716,12 @@ func _send_typed_dialog() -> void:
     _send_dialog(_dialog_input.text)
 
 func _send_dialog(message: String) -> void:
-    if not _dialog_panel.visible or _dialog_pending or not _connected:
+    if not _dialog_panel.visible or _dialog_pending or _dialog_end_remaining>0.0 or not _connected:
         return
     if _api.is_busy():
         _dialog_reply.text = tr("The world is updating. Try sending again.")
         return
-    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    var person := _dialog_person(_dialog_target)
     if person == null or _avatar.position.distance_to(person.position) >= 2.5:
         _close_dialog()
         return
@@ -5590,7 +5729,7 @@ func _send_dialog(message: String) -> void:
         return
     _dialog_pending = true
     _dialog_history.append_text(tr("You")+": "+message.strip_edges()+"\n")
-    _api.speak_to(_dialog_target,message)
+    _api.speak_to(_dialog_target,message,"en" if _dialog_language.selected==1 else "it")
 
 func _toggle_map() -> void:
     _close_dialog()
@@ -6159,6 +6298,10 @@ func _render_barber() -> void:
 
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
+    if _custody_active:return
+    var justice: Dictionary = _last_snapshot.get("player",{}).get("justice",{})
+    if _current_place=="OFFICE" and int(justice.get("fineOutstanding",0))>0 and not _rebirth_active():
+        _action_choices.add_child(_button(tr("Pay outstanding fine"),_pay_justice_fine))
     if _near_barber() and not _rebirth_active():
         _render_barber()
         return
@@ -6640,6 +6783,11 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Sleep in your house · 2h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in your house · 8h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 8h",_sleep_room.bind(8)))
             elif _near_kitchen():
+                var phone_data = _last_snapshot.get("phone")
+                if _owns_house() and phone_data is Dictionary:
+                    for meeting in phone_data.get("meetings",[]):
+                        if bool(meeting.get("guestPresent",false)) and not bool(meeting.get("mealServed",false)) and int(_last_snapshot.get("minute",0))<1145:
+                            _action_choices.add_child(_button(tr("Cook pasta together · 25m"),_garden_action.bind("host-cook:"+str(meeting.get("residentId","")))))
                 var bag: Dictionary = player.get("bag",{"bread":player.get("bread",0),"water":player.get("bottledWater",0)})
                 var pantry: Dictionary = player.get("pantry",{"bread":player.get("storedBread",0),"water":player.get("storedWater",0)})
                 var stock := Label.new()
@@ -6694,6 +6842,8 @@ func _render_actions() -> void:
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
             if _current_place == "MARKET":
+                if not bool(_last_snapshot.get("player",{}).get("ownsBaton",false)):
+                    _action_choices.add_child(_button(tr("Buy training baton · 12 EUR"),_buy_training_baton))
                 var stall: Dictionary = _last_snapshot.get("stall",{})
                 if not bool(stall.get("registered",false)):
                     _action_choices.add_child(_button("Register private stall · 20 EUR",_garden_action.bind("stall-register")))
@@ -7136,10 +7286,26 @@ func _set_hands_enabled(enabled: bool) -> void:
     _hands.enabled = enabled
     _hands.update_pose(0.0,_step_bob,not _drive_active() and not _cycling())
 
+func _try_strike() -> void:
+    if not _foot_controls_available() or _rebirth_active() or _guest_active or _stairwell_active or not _connected or _api.is_busy():return
+    if not _hands.held_item in ["","baton"]:
+        _message.text=tr("Select empty hands or the training baton with Q.")
+        return
+    var id := _looked_at_resident()
+    if id.is_empty():return
+    _hands.strike()
+    _api.garden_action("combat-strike:%s:%s" % ["baton" if _hands.held_item=="baton" else "fists",id])
+
+func _buy_training_baton() -> void:
+    if _current_place=="MARKET" and _near_kiosk() and _connected and not _api.is_busy():
+        _api.garden_action("combat-buy-baton")
+
 func _holdable_items() -> Array[String]:
     var player: Dictionary = _last_snapshot.get("player",{})
     var bag: Dictionary = player.get("bag",{"bread":player.get("bread",0),"water":player.get("bottledWater",0)})
     var choices: Array[String] = [""]
+    if bool(player.get("ownsBaton",false)):
+        choices.append("baton")
     for id in ["bread","water","grape-juice"]:
         if int(bag.get(id,0))>0:
             choices.append(id)
@@ -7150,6 +7316,8 @@ func _refresh_held_item() -> void:
         _hands.set_item("")
     if is_instance_valid(_held_label):
         _held_label.text = tr("Held item (Q): %s") % (tr("Empty hands") if _hands.held_item.is_empty() else tr(str(_hands.held_item).capitalize()))
+        if not _rebirth_active() and _hands.held_item in ["","baton"]:
+            _held_label.text += " · "+tr("X: strike")
 
 func _cycle_held_item() -> void:
     var choices := _holdable_items()
@@ -7266,7 +7434,7 @@ func _toggle_phone() -> void:
     _action_panel.hide()
     _phone.update_data(_last_snapshot,_job_offers,_locations)
     _phone.show()
-    _phone.open_app("home")
+    _phone.open_app("calls" if _phone.has_ringing_call() else "home")
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func _close_phone() -> void:
@@ -7279,6 +7447,11 @@ func _on_phone_alarm(message: String) -> void:
     _phone_alert_remaining = 8.0
     _phone_alert.show()
     _town_audio.play_alarm()
+
+func _reply_phone_call(resident_id: String,action: String) -> void:
+    if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
+        var route := "phone-out" if action in ["dial","hangup","invite-coffee","ask-home-visit","invite-my-home"] else "phone-call"
+        _api.garden_action("%s:%s:%s" % [route,action,resident_id])
 
 func _reply_phone_sms(resident_id: String,choice: int) -> void:
     if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
@@ -7313,7 +7486,7 @@ func _tick_live_clock(delta: float) -> void:
         return
     var eligible: bool = _connected and not _api.is_busy() and not _clock_pending \
             and _road_pending.is_empty() and not _travel_panel.visible \
-            and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _intercom.visible
+            and not _action_panel.visible and not _map_panel.visible and not _intercom.visible
     if _clock.advance(delta, eligible):
         _clock_pending = true
         # The existing atomic Java action advances needs, NPCs and SQLite.
@@ -7366,7 +7539,7 @@ func _guest_action(action: String) -> void:
     if action=="leave" and (not _guest_active or not _guest.near_exit(_avatar.position)):return
     if action in ["talk","coffee","snack","rest"] and not _guest_active:return
     if action=="talk" and (not is_instance_valid(_guest_host) or _avatar.position.distance_to(_guest_host.position)>=2.5):return
-    if action in ["coffee","snack"] and not _guest.near_table(_avatar.position):return
+    if action in ["coffee","snack","dinner"] and not _guest.near_table(_avatar.position):return
     if action=="rest" and not _guest_sitting:return
     _guest_requested_action = action
     _guest_pending = true
@@ -7412,6 +7585,7 @@ func _open_guest(invitation: Dictionary) -> void:
 
 func _close_guest() -> void:
     if not _guest_active:return
+    _close_dialog()
     _guest_active = false
     _guest_sitting = false
     _guest_host = null
@@ -7444,6 +7618,8 @@ func _sync_host_routine(invitation: Dictionary) -> void:
     var household = invitation.get("household",{})
     if household is Dictionary:
         _guest.update_household(household)
+        if household.get("host") is Dictionary:
+            _sync_guest_contact(_guest_host,household["host"])
         _sync_guest_family(household)
     var next := str(invitation.get("activity",""))
     if next==_host_activity:return
@@ -7455,6 +7631,15 @@ func _sync_host_routine(invitation: Dictionary) -> void:
 
 # The household list is authoritative and contains only awake, present residents.
 # Guests see models, not automatically learned names or a second copy of the host.
+func _sync_guest_contact(person: Node3D,entry: Dictionary) -> void:
+    person.set_meta("conversation_minutes",int(entry.get("conversationMinutes",10)))
+    person.set_meta("conversation_reason",str(entry.get("conversationReason","PERSONAL")))
+    person.set_meta("display_name",str(entry.get("name","Unknown resident")))
+    person.set_meta("known_name",str(entry.get("knownName","")) if entry.get("knownName")!=null else "")
+    person.set_meta("conversations",int(entry.get("conversations",0)))
+    person.set_meta("relationship",str(entry.get("relationship","STRANGER")))
+    person.get_node("ResidentName").hide()
+
 func _sync_guest_family(household: Dictionary) -> void:
     var root := _guest.get_node_or_null("GuestFamily") as Node3D
     if root == null:
@@ -7514,6 +7699,7 @@ func _sync_guest_family(household: Dictionary) -> void:
             var toy := hand.get_child(hand.get_child_count()-1) as Node3D
             toy.name="FamilyToy"
             toy.hide()
+        _sync_guest_contact(person,entry)
         _sync_resident_appearance(person,ResidentAppearance.stage_for_age(int(entry.get("age",18))))
         if not person.has_meta("family_goal") or person.get_meta("family_goal")!=goal:
             var path: Array[Vector3] = _guest.host_path(person.position,goal)
@@ -7533,7 +7719,8 @@ func _animate_guest_family(delta: float) -> void:
         var activity := str(person.get_meta("activity","RESTING"))
         var path: Array = person.get_meta("family_path",[])
         var walking := false
-        if not path.is_empty():
+        var engaged := _dialog_panel.visible and _dialog_end_remaining<=0.0 and str(person.get_meta("resident_id",""))==_dialog_target
+        if not engaged and not path.is_empty():
             var target: Vector3 = path[0]
             var motion := target-person.position
             if motion.length()>0.025:
@@ -7549,8 +7736,14 @@ func _animate_guest_family(delta: float) -> void:
                 path.pop_front()
         person.set_meta("family_path",path)
         var now := float(Time.get_ticks_msec())*0.001
-        _animate_resident_face(person,delta,now,false)
-        _animate_resident_head(person,delta,now,false,walking)
+        var reply_left := maxf(0.0,float(person.get_meta("reply_remaining",0.0))-delta)
+        person.set_meta("reply_remaining",reply_left)
+        _animate_resident_face(person,delta,now,engaged and reply_left>0.0)
+        if engaged:
+            var toward := _avatar.position-person.position
+            if toward.length_squared()>0.001:
+                person.rotation.y=lerp_angle(person.rotation.y,atan2(-toward.x,-toward.z),minf(delta*4.0,1.0))
+        _animate_resident_head(person,delta,now,engaged,walking)
         var phase := now+float(person.get_meta("phase",0.0))
         var swing := sin(phase*9.0)*0.4 if walking else 0.0
         for limb in ["LegLeft","LegRight"]:
@@ -7571,8 +7764,11 @@ func _animate_guest_host(delta: float) -> void:
     if not is_instance_valid(_guest_host):return
     _animate_guest_family(delta)
     var walking := false
-    var talking := _guest_feedback_time>0.0
-    _animate_resident_face(_guest_host,delta,float(Time.get_ticks_msec())*0.001,talking)
+    var engaged := _dialog_panel.visible and _dialog_end_remaining<=0.0 and str(_guest_host.get_meta("resident_id",""))==_dialog_target
+    var reply_left := maxf(0.0,float(_guest_host.get_meta("reply_remaining",0.0))-delta)
+    _guest_host.set_meta("reply_remaining",reply_left)
+    var talking := _guest_feedback_time>0.0 or engaged
+    _animate_resident_face(_guest_host,delta,float(Time.get_ticks_msec())*0.001,_guest_feedback_time>0.0 or (engaged and reply_left>0.0))
     _animate_resident_head(_guest_host,delta,float(Time.get_ticks_msec())*0.001,talking,not _host_path.is_empty())
     if not talking and not _host_path.is_empty():
         var target: Vector3 = _host_path[0]
@@ -7687,6 +7883,86 @@ func _set_apartment(active: bool) -> void:
         _avatar.position=Vector3.ZERO
     _follow_player()
 
+func _sync_custody(justice: Dictionary) -> void:
+    var status := str(justice.get("status","NONE"))
+    var locked := status in ["DETAINED","PRISON"]
+    if not locked:
+        if _custody_active:
+            _custody_active=false
+            (_custody_panel.get_parent() as Control).hide()
+            if is_instance_valid(_custody_cell):_custody_cell.queue_free()
+            _custody_cell=null
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+            _follow_player()
+            _message.text=tr("You have been released.")
+        return
+    if not _custody_active:
+        _close_dialog()
+        _close_phone()
+        _close_intercom()
+        _action_panel.hide()
+        _map_panel.hide()
+        _travel_panel.hide()
+        _custody_active=true
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+        if not is_instance_valid(_custody_panel):
+            var layer := CanvasLayer.new()
+            layer.layer=90
+            add_child(layer)
+            var blocker := Control.new()
+            layer.add_child(blocker)
+            blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+            blocker.mouse_filter=Control.MOUSE_FILTER_STOP
+            blocker.name="CustodyBlocker"
+            _custody_panel=PanelContainer.new()
+            blocker.add_child(_custody_panel)
+            _custody_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+            _custody_panel.offset_left=-235
+            _custody_panel.offset_right=235
+            _custody_panel.offset_top=-245
+            _custody_panel.offset_bottom=-15
+            var col := VBoxContainer.new()
+            _custody_panel.add_child(col)
+            _custody_label=Label.new()
+            _custody_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+            col.add_child(_custody_label)
+            col.add_child(_button(tr("Wait one hour in custody"),_wait_custody.bind(60)))
+            col.add_child(_button(tr("Serve one day"),_wait_custody.bind(1440)))
+        (_custody_panel.get_parent() as Control).show()
+        _custody_panel.show()
+        _custody_cell=Node3D.new()
+        add_child(_custody_cell)
+        _custody_cell.position=Vector3(0,120,0)
+        var wall := Color("#999b9a")
+        _box(_custody_cell,Vector3(5,0.2,6),Color("#55595a"),Vector3(0,-0.1,0))
+        _box(_custody_cell,Vector3(5,0.2,6),wall,Vector3(0,3.1,0))
+        _box(_custody_cell,Vector3(5,3,0.2),wall,Vector3(0,1.5,-3))
+        _box(_custody_cell,Vector3(0.2,3,6),wall,Vector3(-2.5,1.5,0))
+        _box(_custody_cell,Vector3(0.2,3,6),wall,Vector3(2.5,1.5,0))
+        _box(_custody_cell,Vector3(1,0.45,2),Color("#62686e"),Vector3(-1.65,0.25,-1.4))
+        _box(_custody_cell,Vector3(1,0.15,2),Color("#b2b5b1"),Vector3(-1.65,0.55,-1.4))
+        for i in range(13):
+            _box(_custody_cell,Vector3(0.07,3,0.07),Color("#44484a"),Vector3(-2.4+i*0.4,1.5,2.9))
+        var light := OmniLight3D.new()
+        light.position=Vector3(0,2.6,0)
+        light.omni_range=8.0
+        light.light_energy=1.4
+        _custody_cell.add_child(light)
+    _custody_label.text=tr("Detained: waiting for court") if status=="DETAINED" else tr("Prison sentence")
+    _custody_label.text+="\n"+tr("Time remaining: %s h %s min") % [int(justice.get("minutesRemaining",0))/60,int(justice.get("minutesRemaining",0))%60]
+    _custody_label.text+="\n"+tr("Convictions: %s · Fine outstanding: %s EUR") % [justice.get("convictions",0),justice.get("fineOutstanding",0)]
+    _custody_label.text+="\n"+tr("The town continues while you serve your sentence.")
+    _camera.global_position=Vector3(0,121.65,-1.9)
+    _camera.global_rotation=Vector3(0,PI,0)
+
+func _pay_justice_fine() -> void:
+    if not _custody_active and _current_place=="OFFICE" and _near_kiosk() and not _api.is_busy():
+        _api.garden_action("justice-pay-fine")
+
+func _wait_custody(minutes: int) -> void:
+    if _custody_active and _connected and not _api.is_busy():
+        _api.wait_for(minutes)
+
 func _render_hud_summary(snapshot: Dictionary) -> void:
     var player: Dictionary = snapshot.get("player", {})
     var job = player.get("jobId")
@@ -7710,6 +7986,11 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
         str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
     ]
     _needs.text += tr(" | Hygiene %s") % str(player.get("hygiene",100))
+    var justice: Dictionary = player.get("justice",{})
+    if str(justice.get("status","NONE"))!="NONE":
+        _needs.text += "\n"+tr("Convictions: %s · Fine outstanding: %s EUR") % [justice.get("convictions",0),justice.get("fineOutstanding",0)]
+        if str(justice.get("status",""))=="REPORTED":
+            _needs.text+=" · "+tr("Assault reported to police")
     var utilities: Dictionary = snapshot.get("services", {})
     var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
     var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
@@ -7783,6 +8064,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _park_in_cabin()
 
     _render_hud_summary(snapshot)
+    _sync_custody(player.get("justice",{}))
     var home = snapshot.get("rebirth",{}).get("homeOptions")
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
@@ -7811,9 +8093,9 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _town_map.update_world(_current_place, _locations)
     _render_residents()
     if _dialog_panel.visible:
-        var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+        var person := _dialog_person(_dialog_target)
         if person == null:
-            _close_dialog()
+            _finish_dialog_autonomously(_dialog_farewell if not _dialog_farewell.is_empty() else tr("They had to leave."))
         else:
             _dialog_title.text = _resident_caption(person)
             _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
@@ -7834,7 +8116,10 @@ func _on_world_updated(snapshot: Dictionary) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible or _phone.visible else Input.MOUSE_MODE_CAPTURED)
         elif walking_transition:
             _action_panel.visible = false
-    if _api != null and not _api.is_busy() and not clock_update:
+    if _custody_active:
+        _camera.global_position=Vector3(0,121.65,-1.9)
+        _camera.global_rotation=Vector3(0,PI,0)
+    elif _api != null and not _api.is_busy() and not clock_update:
         _api.list_locations()
 
 func _set_weather_visuals(enabled: bool) -> void:
@@ -8063,11 +8348,24 @@ func _on_action_feedback(message: String) -> void:
         if _dialog_panel.visible:
             _dialog_reply.text = _localized_resident_reply(message)
             _dialog_history.append_text(_dialog_reply.text+"\n")
-            _speak_resident_reply(_dialog_reply.text)
-            var speaker := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+            var raw_reply := message.substr(message.find(": ")+2) if message.contains(": ") else message
+            if _api.dialogue_language=="it" and not _api.dialogue_rendered and _dialog_reply.text==raw_reply:
+                # An untranslated engine response is a subtitle, not Italian speech.
+                _dialog_reply.text += "\n[Traduzione non disponibile / Translation unavailable]"
+            else:
+                _speak_resident_reply(_dialog_reply.text)
+            var speaker := _dialog_person(_dialog_target)
             _begin_resident_reply(speaker,_dialog_reply.text)
             _dialog_input.clear()
-            _dialog_input.grab_focus()
+            if not _api.dialogue_farewell.is_empty():
+                _dialog_farewell=_api.dialogue_farewell
+                _dialog_end_remaining=4.0
+                if _dialog_reply.text!=_dialog_farewell:
+                    _dialog_history.append_text(_dialog_farewell+"\n")
+                    _dialog_reply.text+="\n"+_dialog_farewell
+                _dialog_input.release_focus()
+            else:
+                _dialog_input.grab_focus()
     if not _clock_pending:
         _message.text = tr(message)
         _phone.add_notification(message)

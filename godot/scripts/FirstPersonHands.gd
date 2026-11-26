@@ -6,6 +6,7 @@ var _left: Node3D
 var _right: Node3D
 var _props: Dictionary = {}
 var _reach := 0.0
+var _strike := 0.0
 
 func _ready() -> void:
     name = "FirstPersonHands"
@@ -13,12 +14,14 @@ func _ready() -> void:
     var skin := Color("#d0a17e")
     _left = _arm(-1.0,sleeve,skin)
     _right = _arm(1.0,sleeve,skin)
-    for id in ["bread","water","grape-juice"]:
+    for id in ["bread","water","grape-juice","baton"]:
         var prop := Node3D.new()
         prop.name = id
         _right.add_child(prop)
         prop.position = Vector3(-0.015,0.065,-0.055)
-        if id=="bread":
+        if id=="baton":
+            _shape(prop,Vector3(0.055,0.42,0.055),Color("#73513c"),Vector3(0,0.15,0),false)
+        elif id=="bread":
             _shape(prop,Vector3(0.11,0.07,0.17),Color("#b17c3f"),Vector3.ZERO,true)
             _shape(prop,Vector3(0.095,0.015,0.13),Color("#e9c791"),Vector3(0,0.036,0),true)
         else:
@@ -67,6 +70,9 @@ func set_item(id: String) -> void:
 func reach() -> void:
     _reach = 0.45
 
+func strike() -> void:
+    _strike = 0.35
+
 func update_pose(delta: float,bob: float,available: bool) -> void:
     visible = enabled and available
     _reach = maxf(0.0,_reach-maxf(delta,0.0))
@@ -75,5 +81,9 @@ func update_pose(delta: float,bob: float,available: bool) -> void:
     _right.position = Vector3(0.26-0.12*reach_amount,-0.34+bob*0.55+0.14*reach_amount,-0.44-0.12*reach_amount)
     _left.rotation = Vector3(-0.62,0,-0.12)
     _right.rotation = Vector3(-0.62-0.25*reach_amount,0,0.12)
+    _strike = maxf(0.0,_strike-maxf(delta,0.0))
+    var swing := sin(PI*_strike/0.35)
+    _right.position += Vector3(-0.12*swing,0.08*swing,-0.35*swing)
+    _right.rotation.x -= 0.9*swing
     if not held_item.is_empty():
         _right.position += Vector3(-0.07,0.075,-0.035)

@@ -18,6 +18,10 @@ const BASE_URL := "http://127.0.0.1:8080/api/v1"
 var http_request: HTTPRequest
 var _busy := false
 var _pending_route := ""
+var dialogue_language := ""
+var dialogue_locale := ""
+var dialogue_rendered := false
+var dialogue_farewell := ""
 
 func _ready() -> void:
     http_request = HTTPRequest.new()
@@ -84,8 +88,8 @@ func work_shift() -> void:
 func prospect() -> void:
     _send("/actions/prospect", HTTPClient.METHOD_POST, {})
 
-func speak_to(resident_id: String, message: String) -> void:
-    _send("/actions/speak", HTTPClient.METHOD_POST, {"residentId": resident_id, "message": message})
+func speak_to(resident_id: String, message: String, language: String = "it") -> void:
+    _send("/actions/speak", HTTPClient.METHOD_POST, {"residentId": resident_id, "message": message, "language": language})
 
 func car_action(action: String) -> void:
     _send("/actions/car",HTTPClient.METHOD_POST,{"action":action})
@@ -204,6 +208,10 @@ func _on_request_completed(
         business_updated.emit(response)
         return
     if route.begins_with("/actions/"):
+        dialogue_language = str(response.get("dialogueLanguage","")) if route=="/actions/speak" else ""
+        dialogue_locale = str(response.get("dialogueLocale","")) if route=="/actions/speak" else ""
+        dialogue_rendered = bool(response.get("dialogueRendered",false)) if route=="/actions/speak" else false
+        dialogue_farewell = str(response.get("dialogueFarewell")) if route=="/actions/speak" and response.get("dialogueFarewell")!=null else ""
         action_feedback.emit(str(response.get("message", "Action completed.")))
     var snapshot = response.get("world", response)
     if typeof(snapshot) != TYPE_DICTIONARY:

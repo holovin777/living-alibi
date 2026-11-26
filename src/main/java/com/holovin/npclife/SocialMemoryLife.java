@@ -21,10 +21,17 @@ final class SocialMemoryLife {
     static boolean unresolved(TownLife.Town town,String resident) {
         return last(town,resident,Kind.UNRESOLVED)>0;
     }
+    /** An ordinary slight can lose its emotional force; keep the event itself. */
+    static void relaxHurt(TownLife.Town town,String resident,int day,boolean serious){
+        int hurt=last(town,resident,Kind.HURT);
+        if(!serious&&unresolved(town,resident)&&hurt>0&&day-hurt>=90)
+            town.industryStocks.put(key(town,resident,Kind.UNRESOLVED),0);
+    }
     static String recollection(TownLife.Town town,String resident) {
         if(unresolved(town,resident))return "I remember how you treated me. Trust takes time.";
         if(last(town,resident,Kind.APOLOGY)>0)return "I remember your apology. We can move forward.";
         if(last(town,resident,Kind.SUPPORT)>0)return "I remember when you were there for me. Thank you.";
+        if(last(town,resident,Kind.HURT)>0)return "I remember we had a disagreement, but it was a while ago.";
         return "We haven't shared anything like that yet.";
     }
 }

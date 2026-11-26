@@ -74,7 +74,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
                              int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
-                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse) { }
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse,boolean ownsBaton,int policeReports,JusticeLife.View justice) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -86,7 +86,7 @@ public final class GameSession implements AutoCloseable {
                                 String phase,int condition,int completedDay,
                                 String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
-    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual,String appearanceStage,String walkingCompanion) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual,String appearanceStage,String walkingCompanion,int conversationMinutes,String conversationReason) { }
     // Observable equipment, not a disclosure of a stranger's name or private employment record.
     static String workVisual(TownLife.Citizen c){
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
@@ -262,7 +262,11 @@ public final class GameSession implements AutoCloseable {
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber) { }
-    public record ActionView(String message,WorldView world) { }
+    public record ActionView(String message,WorldView world,String dialogueLanguage,boolean dialogueRendered,String dialogueLocale,String dialogueFarewell) {
+        public ActionView(String message,WorldView world){this(message,world,null,false,null,null);}
+        public ActionView(String message,WorldView world,String language,boolean rendered,String locale){this(message,world,language,rendered,locale,null);}
+        public ActionView(String message,WorldView world,String language,boolean rendered){this(message,world,language,rendered,language==null?null:WorldSpeechRegion.CURRENT.localeFor(language));}
+    }
 
     public synchronized WorldView snapshot() {
         var p=town.player;
@@ -274,7 +278,7 @@ public final class GameSession implements AutoCloseable {
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,controlled?RebirthLife.hygiene(town,linked):p.hygiene,
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
-                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
+                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse,CombatLife.ownsBaton(town),CombatLife.reports(town),JusticeLife.view(town,state));
         var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
         var companions=walkingCompanions(town,visible,state.minute);
         var residents=visible.stream()
@@ -282,7 +286,7 @@ public final class GameSession implements AutoCloseable {
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
                             contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""));
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""),ConversationAvailability.minutes(town,c,state.day,state.minute),ConversationAvailability.reason(c,state.day,state.minute));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
@@ -293,7 +297,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,MutualAidLife.notices(town,state.day),services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute),peerEncounters(town,visible,(long)(state.day-1)*1440L+state.minute,recentPeerEvents),barberView(town,state.minute));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town,state.day,state.minute),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute),peerEncounters(town,visible,(long)(state.day-1)*1440L+state.minute,recentPeerEvents),barberView(town,state.minute));
     }
 
     public synchronized BusinessView business() {
@@ -423,11 +427,77 @@ public final class GameSession implements AutoCloseable {
 
     /** Reuses the existing per-visitor, per-resident memory and atomic save. */
     public synchronized ActionView speak(String residentId,String message) throws SQLException {
+        return speak(residentId,message,null);
+    }
+    /** A declared spoken language is separate from the UI locale. Null preserves legacy clients. */
+    public synchronized ActionView speak(String residentId,String message,String spokenLanguage) throws SQLException {
+        JusticeLife.requireFree(town);
         if(residentId==null || message==null)
             throw new IllegalArgumentException("Resident and message are required.");
         var copy=town.copy();
-        var resident=PlayerLife.nearby(copy,residentId);
-        String reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")?NewspaperLife.interview(copy,resident,state.day,state.minute):PlayerLife.speak(copy,residentId,message,state.day,state.minute);
+        var resident=PlayerLife.nearby(copy,residentId,state.day,state.minute);
+        var region=WorldSpeechRegion.CURRENT;
+        String language=spokenLanguage==null?null:ResidentLanguages.normalize(spokenLanguage);
+        if(message.isBlank()||message.strip().length()>1000)
+            throw new IllegalArgumentException("Speak 1–1000 characters.");
+        if(!ConversationAvailability.allowed(copy,resident,state.day,state.minute)){
+            String actual=language!=null&&!ResidentLanguages.speaks(region,resident.id,language)?region.nativeLanguage():language;
+            String farewell=ConversationAvailability.farewell(resident,state.day,state.minute,actual);
+            var refused=applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+farewell,RebirthLife.active(town));
+            return new ActionView(refused.message(),refused.world(),actual,true,actual==null?null:region.localeFor(actual),farewell);
+        }
+        String reply=null;
+        boolean rendered=false;
+        boolean understood=true;
+        var existingContact=copy.player.contacts.get(resident.id);
+        var prior=existingContact==null?null:existingContact.copy();
+        if(language!=null){
+            if(message.isBlank()||message.strip().length()>1000)
+                throw new IllegalArgumentException("Speak 1–1000 characters.");
+            if("SLEEPING".equals(resident.activity)||"TRAVELING".equals(resident.activity))
+                throw new IllegalArgumentException("This person is not available for a conversation.");
+            if(!ResidentLanguages.speaks(region,resident.id,language)){
+                understood=false;
+                reply=ResidentLanguages.misunderstanding(region,language);
+                language=region.nativeLanguage();
+                rendered=true;
+            } else {
+                reply=ResidentLanguages.languageQuestion(region,message,resident.id,language);
+                rendered=reply!=null;
+            }
+        }
+        if(reply==null&&understood&&java.util.Set.of("can i meet your family","introduce me to your family","mi presenti la tua famiglia","posso conoscere la tua famiglia","mi fai conoscere la tua famiglia").contains(NaturalDialogue.normalize(message))){
+            reply=IntercomLife.introduceFamily(copy,resident.id,state.day,state.minute,language);
+            rendered=language!=null;
+        }
+        if(reply==null&&understood&&java.util.Set.of("can i give you my number","can i give you my phone number","ti posso dare il mio numero","posso darti il mio numero","share phone number").contains(NaturalDialogue.normalize(message))){
+            boolean shared=PhoneLife.shareNumber(copy,resident);
+            reply="it".equals(language)?(shared?"Certo, ti chiamerò ogni tanto.":"Preferisco aspettare di conoscerti meglio."):(shared?"Sure, I'll call you sometime.":"I'd rather get to know you better first.");
+            rendered=language!=null;
+        }
+        if(reply==null){
+            String previous=prior==null?null:prior.lastHeard;
+            boolean recall=ConversationMemory.recallQuestion(message);
+            reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")
+                    ?NewspaperLife.interview(copy,resident,state.day,state.minute)
+                    :PlayerLife.speak(copy,residentId,message,state.day,state.minute);
+            if(ConversationMemory.importantQuestion(message)){
+                reply=ConversationMemory.firstMeeting(prior,language);
+                rendered=language!=null;
+            } else if(recall){
+                reply=ConversationMemory.recall(prior,language);
+                rendered=language!=null;
+            } else if(language!=null&&reply.equals("I'm not sure I understood. Could you ask me in a different way?")){
+                String generated=LocalDialogue.smallTalk(resident,prior,previous,message,region,language,false);
+                if(generated!=null){reply=generated;rendered=true;}
+            }
+        }
+        if(understood){
+            var contact=copy.player.contacts.computeIfAbsent(resident.id,PlayerLife.Contact::new);
+            contact.lastDay=state.day;contact.lastMinute=state.minute;
+            ConversationMemory.remember(contact,state.day,state.minute,language,message.strip(),reply);
+            ConversationMemory.captureMilestones(town,copy,prior,contact,contact.dialogue.getLast());
+        }
         var controlled=RebirthLife.child(copy);
         if(RebirthLife.linkedAdult(copy,controlled)&&!RebirthLife.atHome(controlled)
                 &&PlayerLife.publicPlaces().contains(controlled.place)) {
@@ -437,18 +507,27 @@ public final class GameSession implements AutoCloseable {
             // "Resume work and daily routine" restores autonomous scheduling.
             RebirthLife.holdPublicPlace(copy,controlled);
         }
-        // A real conversation occupies the other person's next one-minute
-        // simulation tick. Their schedule resumes as soon as this turn ends.
-        copy.industryStocks.put(TownLife.conversationHoldKey(resident.id),1);
+        boolean ending=ConversationAvailability.record(copy,resident,state.day,state.minute);
+        String farewell=ending?ConversationAvailability.farewell(resident,state.day,state.minute,language):null;
+        // A brief reply never reserves a working or urgently occupied resident.
+        // Only a willing leisure contact may pause for a single simulation minute.
+        if(!ending&&!ConversationAvailability.duty(resident,state.day,state.minute)
+                &&!ConversationAvailability.urgent(resident))
+            copy.industryStocks.put(TownLife.conversationHoldKey(resident.id),1);
         // Conversation is valid in both a visitor life and a born/linked
         // life. The latter must use the rebirth-aware time/commit path.
-        return applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+reply,
+        ActionView applied=applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+reply,
                 RebirthLife.active(town));
+        return new ActionView(applied.message(),applied.world(),language,rendered,language==null?null:region.localeFor(language),farewell);
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
         if(minutes<1 || minutes>1440)
             throw new IllegalArgumentException("Wait between 1 and 1440 game minutes.");
+        if(JusticeLife.confined(town)){
+            int duration=JusticeLife.waitDuration(town,state,minutes);
+            return applyInternal(town.copy(),duration,"Time passed in custody.",false,state.copy(),new ArrayList<>(),new ArrayList<>(),true);
+        }
         return apply(town.copy(),minutes,"Waited "+minutes+" minute(s).");
     }
 
@@ -531,6 +610,22 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if("justice-pay-fine".equals(action)){
+            var copy=town.copy();return apply(copy,1,JusticeLife.payFine(copy));
+        }
+        JusticeLife.requireFree(town);
+        if("combat-buy-baton".equals(action)){
+            var copy=town.copy();
+            return apply(copy,2,CombatLife.buyBaton(copy,state));
+        }
+        if(action!=null&&action.startsWith("combat-strike:")){
+            String[] parts=action.split(":",3);
+            if(parts.length!=3)throw new IllegalArgumentException("Choose an attack and resident.");
+            var copy=town.copy();var clock=state.copy();
+            var truth=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
+            var result=CombatLife.strike(copy,clock,parts[2],parts[1],truth,observations);
+            return applyInternal(copy,result.minutes(),result.message(),false,clock,truth,observations);
+        }
         if(action!=null&&action.startsWith("barber-")){
             var copy=town.copy();
             var service=barberVisit(copy,action.substring(7),state.minute);
@@ -538,11 +633,11 @@ public final class GameSession implements AutoCloseable {
         }
         if(action!=null&&action.startsWith("intercom:")){
             String[] parts=action.split(":",4);
-            if(parts.length!=4||!java.util.Set.of("ring","visit","invite","enter","leave","talk","coffee","snack","rest").contains(parts[1])||!java.util.Set.of("1","2","3").contains(parts[2]))
+            if(parts.length!=4||!java.util.Set.of("ring","visit","invite","enter","leave","talk","coffee","snack","rest","dinner").contains(parts[1])||!java.util.Set.of("1","2","3").contains(parts[2]))
                 throw new IllegalArgumentException("Choose a known door and contact.");
             var copy=town.copy();
             int building=Integer.parseInt(parts[2]);
-            if(java.util.Set.of("talk","coffee","snack","rest").contains(parts[1])){
+            if(java.util.Set.of("talk","coffee","snack","rest","dinner").contains(parts[1])){
                 var result=IntercomLife.socialize(copy,parts[3],building,parts[1],state.day,state.minute);
                 return apply(copy,result.minutes(),result.message());
             }
@@ -555,6 +650,24 @@ public final class GameSession implements AutoCloseable {
                 default -> IntercomLife.ring(copy,parts[3],building,state.day,state.minute);
             };
             return apply(copy,visit?5:1,reply);
+        }
+        if(action!=null&&action.startsWith("host-cook:")){
+            var copy=town.copy();
+            String id=action.substring("host-cook:".length());
+            String result=PhoneLife.cookTogether(copy,id,state.day,state.minute);
+            return apply(copy,25,result);
+        }
+        if(action!=null&&action.startsWith("phone-out:")){
+            String[] parts=action.split(":",3);
+            if(parts.length!=3||!java.util.Set.of("dial","hangup","invite-coffee","ask-home-visit","invite-my-home").contains(parts[1]))throw new IllegalArgumentException("Choose an outgoing call action.");
+            var copy=town.copy();
+            return apply(copy,1,PhoneLife.outgoing(copy,parts[2],parts[1],state.day,state.minute));
+        }
+        if(action!=null&&action.startsWith("phone-call:")){
+            String[] parts=action.split(":",3);
+            if(parts.length!=3||!java.util.Set.of("answer","decline","accept").contains(parts[1]))throw new IllegalArgumentException("Choose a call action.");
+            var copy=town.copy();
+            return apply(copy,1,PhoneLife.answerCall(copy,parts[2],parts[1],state.day,state.minute));
         }
         if(action!=null&&action.startsWith("phone-reply:")){
             String[] parts=action.split(":",3);
@@ -784,18 +897,31 @@ public final class GameSession implements AutoCloseable {
         return applyInternal(candidateTown,minutes,message,false);
     }
     private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction) throws SQLException {
+        return applyInternal(candidateTown,minutes,message,rebirthAction,state.copy(),new ArrayList<>(),new ArrayList<>());
+    }
+    private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction,
+            WorldState candidateState,List<TownLife.Event> truth,List<TownLife.Observation> observations) throws SQLException {
+        return applyInternal(candidateTown,minutes,message,rebirthAction,candidateState,truth,observations,false);
+    }
+    private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction,
+            WorldState candidateState,List<TownLife.Event> truth,List<TownLife.Observation> observations,boolean custodyWait) throws SQLException {
+        if(!custodyWait)JusticeLife.requireFree(town);
         if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Choose a family or use childhood actions first.");
-        var candidateState=state.copy();
+        if("You shared dinner.".equals(message)||"You cooked and ate together.".equals(message)){
+            var host=candidateTown.get("marco");
+            candidateState.food=host.food;candidateState.water=host.water;
+            candidateState.hunger=host.hunger;candidateState.thirst=host.thirst;
+        }
         ArchiveLife.transitions(town,candidateTown,state.day,state.minute);
         var events=new ArrayList<LifeSimulation.LifeEvent>();
-        var truth=new ArrayList<TownLife.Event>();
-        var observations=new ArrayList<TownLife.Observation>();
         var interactions=new ArrayList<SocialLife.Interaction>();
+        boolean initiallyConfined=JusticeLife.confined(candidateTown);
         int initialPhase=RebirthLife.phase(candidateTown);
         int initialMaxDays=RebirthLife.maxWaitDays(candidateTown);
         events.addAll(LifeSimulation.advance(candidateState,minutes,
                 current->TownLife.tick(candidateTown,current,truth,observations,interactions),
-                ()->!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays))));
+                ()->(initiallyConfined||!JusticeLife.confined(candidateTown))&&(!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays)))));
+        if(!initiallyConfined&&JusticeLife.confined(candidateTown))message+=" Police detained you.";
         TownLife.clearConversationHolds(candidateTown);
         if(rebirthAction&&minutes>1){ // Keep one-minute dialogue replies free of clock diagnostics.
             long elapsed=(candidateState.day-(long)state.day)*1440+candidateState.minute-state.minute;
