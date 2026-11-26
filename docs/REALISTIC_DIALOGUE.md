@@ -126,8 +126,29 @@ lasts up to ten game minutes; hang up or invite the contact for coffee.
 Acceptance creates tomorrow's 18:00 cafe meeting in the existing scheduler.
 The latest outgoing call per contact is persisted separately from incoming
 calls. Outgoing calls are deterministic text interactions, not open-ended
-phone conversations. Home invitations and choosing meeting time/place are
-not yet implemented.
+phone conversations. Inviting friends to the player's own home and choosing arbitrary meeting times
+are not yet implemented.
+
+## Visiting friends at home
+
+Close friends whose address has been shared and whose building has an
+implemented interior (currently building 1) may invite the player home by
+phone, or agree when asked via Contacts > Ask to visit at home. Visits are
+scheduled for the following day at 18:00, with arrival by 18:30.
+The host's schedule prefers their home from 17:30 to 19:30, subject to
+work and other essential needs. The player must travel to the correct
+building, use the intercom and obtain permission to enter. Entering marks
+the appointment met; an expired appointment is missed. No teleportation
+or automatic access to private rooms is granted.
+
+At the table, press V to share dinner between 18:00 and 21:00 if the
+host has two food and two water units and enough visit time remains.
+Both participants' needs improve, affinity and trust increase, and the
+contact remembers the shared meal. This is a meal interaction, not
+a cooking minigame. A scheduled visit permits up to an hour inside while
+the host remains available. Existing household NPCs are visible according
+to the existing household rules. Hosting friends in the player's own
+home, introductions to family and birthdays remain separate future work.
 
 Manual check:
 ```sh
