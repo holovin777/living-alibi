@@ -187,7 +187,10 @@ func _exercise() -> void:
     if not _check("99" in world._phone._body.text and "42" in world._phone._body.text,
             "phone wallet reflects server snapshot"):
         return
+    world._phone.update_data({"player":{"incarnation":1},"contacts":[{"residentId":"test-contact","name":"Test Resident","address":"Via delle Magnolie 12"}]},[],[])
     world._phone.open_app("contacts")
+    if not _check("Via delle Magnolie 12" in world._phone._body.text,"phone shows shared address from Java"):
+        return
     if not _check("Test Resident" in world._phone._body.text,
             "known residents appear in session contacts"):
         return
@@ -222,6 +225,8 @@ func _exercise() -> void:
             return
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
     var park_root: Node3D = world._chunks["PARK"]["root"]
+    if not _check(park_root.has_node("StreetMarker/PhysicalSign"),"park street has physical name sign"):
+        return
     if not _check(school_root.position == Vector3(0,0,-48)
             and park_root.position == Vector3.ZERO,
             "neighbour geometry aligns with the public map coordinates"):
