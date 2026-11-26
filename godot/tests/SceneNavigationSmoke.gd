@@ -17,6 +17,15 @@ func _exercise() -> void:
     await process_frame
     world.GameLanguage.select_locale("en",false)
 
+    if not _check(world._npc_speech.player is AudioStreamPlayer3D and is_equal_approx(world._npc_speech.player.max_distance,5.0),"NPC voice has a positional emitter"):
+        return
+    var mic = preload("res://scripts/VoiceInput.gd").new()
+    if not _check(mic.stage.is_empty() and mic.poll().is_empty(),"microphone is idle until explicitly requested"):
+        return
+    if not _check(not mic.start("it").is_empty() and mic.stage.is_empty(),"headless microphone refuses capture safely"):
+        return
+    mic.cleanup()
+
     var clock = preload("res://scripts/LiveClock.gd").new()
     for i in range(5):
         if not _check(not clock.advance(1.0,true), "1:10 waits six real seconds"):
