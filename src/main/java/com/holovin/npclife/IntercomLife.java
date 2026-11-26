@@ -85,7 +85,7 @@ final class IntercomLife {
                     contact.trust<80||contact.affinity<35)continue;
             int level=c.money>=250?2:c.money>=90?1:0;
             String style=c.carefulness>=65?"tiglio":c.sociability>=65?"rosa":"olmo";
-            return new ApartmentVisit(id,c.name,get(t,id,"unit"),level,style,get(t,id,"inside")>0?"VISITING":"INVITED",get(t,id,"inside-until"),HomeRoutineLife.activity(t,c,day,minute),HomeRoutineLife.cleanliness(t,c),HouseholdLife.view(t,c,day,minute));
+            return new ApartmentVisit(id,c.name,get(t,id,"unit"),level,style,get(t,id,"inside")>0?"VISITING":"INVITED",get(t,id,"inside-until"),HomeRoutineLife.activity(t,c,day,minute),HomeRoutineLife.cleanliness(t,c),HouseholdLife.view(t,c,day,minute,get(t,id,"inside")>0));
         }
         return null;
     }
