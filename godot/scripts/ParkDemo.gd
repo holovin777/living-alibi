@@ -6231,12 +6231,13 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
         int(snapshot.get("minute", 450))%60, tr(str(snapshot.get("season", "SPRING"))),
         tr(str(climate.get("sky", "CLEAR"))), str(climate.get("temperatureC", 0))
     ]
+    var character_needs: Dictionary = snapshot.get("characterNeeds",player)
     _needs.text = tr("Hunger %s  Thirst %s  Fatigue %s  Health %s  Eng %s  Inv %s") % [
-        str(player.get("hunger", 0)), str(player.get("thirst", 0)),
-        str(player.get("fatigue", 0)), str(player.get("health", 100)),
+        str(character_needs.get("hunger", 0)), str(character_needs.get("thirst", 0)),
+        str(character_needs.get("fatigue", 0)), str(character_needs.get("health", 100)),
         str(player.get("engineeringSkill", 0)), str(player.get("investigationSkill", 0))
     ]
-    _needs.text += tr(" | Hygiene %s") % str(player.get("hygiene",100))
+    _needs.text += tr(" | Hygiene %s") % str(character_needs.get("hygiene",100))
     var utilities: Dictionary = snapshot.get("services", {})
     var fountain := "working" if utilities.get("fountainWorking", false) else "closed"
     var lighting := "lit" if utilities.get("lightsWorking", false) else "dark"
