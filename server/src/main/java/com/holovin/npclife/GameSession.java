@@ -122,7 +122,7 @@ public final class GameSession implements AutoCloseable {
         var residents=(RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town)).stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
-                    return new ResidentView(c.id,c.name,c.activity,
+                    return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
                             contact==null?null:contact.knownName,
                             contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id));
                 }).toList();
@@ -270,7 +270,7 @@ public final class GameSession implements AutoCloseable {
         var copy=town.copy();
         var resident=PlayerLife.nearby(copy,residentId);
         String reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")?NewspaperLife.interview(copy,resident,state.day,state.minute):PlayerLife.speak(copy,residentId,message,state.day,state.minute);
-        return apply(copy,1,resident.name+": "+reply);
+        return apply(copy,1,PlayerLife.displayName(copy,resident)+": "+reply);
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
