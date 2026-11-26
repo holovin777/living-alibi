@@ -27,7 +27,7 @@ final class FamilyOutingLife {
                 !well(guardian)||!HomeRoutineLife.atHome(guardian)||!child.homeUnit.equals(guardian.homeUnit)||
                 EmploymentLife.sick(guardian,clock.day)||EmploymentLife.sick(child,clock.day)||
                 Set.of("WORKING","SLEEPING","SICK_LEAVE").contains(guardian.activity)||
-                PhoneLife.meetingWindow(t,guardian,clock)||RebirthLife.manualDestination(t,guardian)!=null)continue;
+                LogisticsLife.activeDriverDestination(t,guardian)!=null||PhoneLife.meetingWindow(t,guardian,clock)||RebirthLife.manualDestination(t,guardian)!=null)continue;
             put(t,child,"day",clock.day);put(t,child,"guardian",guardian.generationIndex);
             put(t,guardian,"day",clock.day);put(t,guardian,"guardian",guardian.generationIndex);
         }
@@ -38,15 +38,21 @@ final class FamilyOutingLife {
     static TownLife.Place destination(TownLife.Town t,TownLife.Citizen c,WorldState clock){
         if(!planned(t,c,clock.day)||controlled(t,c)||clock.minute<START||clock.minute>=RETURN_END)return null;
         var guardian=DemographyLife.byIndex(t,get(t,c,"guardian"));
-        if(clock.minute>=END||guardian==null||!well(guardian)||!well(c)||EmploymentLife.sick(guardian,clock.day)||EmploymentLife.sick(c,clock.day))
+        if(guardian==null)return c.home;
+        boolean returning=clock.minute>=END||get(t,guardian,"return-day")==clock.day||
+            t.people.values().stream().anyMatch(member->planned(t,member,clock.day)&&
+                get(t,member,"guardian")==guardian.generationIndex&&(!well(member)||EmploymentLife.sick(member,clock.day)));
+        if(returning){
+            put(t,guardian,"return-day",clock.day);
             return c.home;
+        }
         return TownLife.Place.PARK;
     }
     static String role(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         if(!planned(t,c,day)||minute<START||minute>=END||!well(c)||!c.presentAt(TownLife.Place.PARK)||
             !c.currentSpace().equals(TownLife.publicSpace(c.place))||controlled(t,c))return "";
         var guardian=DemographyLife.byIndex(t,get(t,c,"guardian"));
-        if(guardian==null||!well(guardian)||!guardian.presentAt(TownLife.Place.PARK)||!guardian.currentSpace().equals(TownLife.publicSpace(guardian.place)))return "";
+        if(guardian==null||get(t,guardian,"return-day")==day||!well(guardian)||!guardian.presentAt(TownLife.Place.PARK)||!guardian.currentSpace().equals(TownLife.publicSpace(guardian.place)))return "";
         if(c==guardian){
             return t.people.values().stream().anyMatch(child->child!=guardian&&planned(t,child,day)&&
                 get(t,child,"guardian")==guardian.generationIndex&&well(child)&&child.presentAt(TownLife.Place.PARK)&&child.currentSpace().equals(TownLife.publicSpace(child.place)))?"GUARDIAN":"";
