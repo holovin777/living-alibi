@@ -741,3 +741,7 @@ The family apartment entrance now swings on a hinge in about 0.55 seconds. The d
 ## In-game smartphone preview
 
 Press H or Open phone in the HUD while stationary/on foot to open the smartphone. Home shows current game time, place and cash; Jobs uses existing server listings; Map shows available destinations and opens the existing map; Bank displays the committed cash and bank balances read-only; Contacts remembers residents spoken to during this session; Notifications shows up to 20 actual action feedback messages in this session. Closing returns to first-person controls. Phone is unavailable while driving, cycling, airborne, in transit, or before age 12 in childhood. The prototype is free and has no battery, ownership persistence, remote calls, SMS, or banking transactions. Jobs still require in-person applications, and remote interaction restrictions are unchanged. English and Italian UI labels are included.
+
+### Phone planner
+
+Calendar shows the engine's year, day-of-year, season and occupation (no invented shift schedule). Weather shows the current committed sky, temperature and precipitation, not a forecast. Set a one-shot alarm by hour and minute; a passed time schedules the next day. It fires once on the next committed snapshot crossing the target, including when the phone is closed or a wait action skips across the alarm. A HUD alert and notification accompany a sound controlled by Town sound. Cancel from the Alarm app. Alarms are session-only, reset with a new life, and cannot advance game time or wake a sleeping character by themselves.

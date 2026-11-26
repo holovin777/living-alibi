@@ -127,6 +127,8 @@ var _town_audio: Node3D
 var _hands: Node3D
 var _held_label: Label
 var _phone: PanelContainer
+var _phone_alert: Label
+var _phone_alert_remaining := 0.0
 var _api
 var _current_place := ""
 var _road_links: Dictionary = {}
@@ -213,6 +215,10 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    if _phone_alert_remaining>0.0:
+        _phone_alert_remaining = maxf(0.0,_phone_alert_remaining-delta)
+        if _phone_alert_remaining<=0.0:
+            _phone_alert.hide()
     if _drive_active():
         _reset_jump()
         _reset_locomotion()
@@ -3703,6 +3709,16 @@ func _create_interface() -> void:
     _phone.close_requested.connect(_close_phone)
     _phone.jobs_requested.connect(_phone_request_jobs)
     _phone.map_requested.connect(_phone_open_map)
+    _phone.alarm_rang.connect(_on_phone_alarm)
+    _phone_alert = Label.new()
+    _phone_alert.position = Vector2(480,12)
+    _phone_alert.add_theme_font_size_override("font_size",24)
+    _phone_alert.add_theme_color_override("font_color",Color("#ffe4a0"))
+    _phone_alert.add_theme_color_override("font_shadow_color",Color.BLACK)
+    _phone_alert.add_theme_constant_override("shadow_offset_x",2)
+    _phone_alert.add_theme_constant_override("shadow_offset_y",2)
+    _phone_alert.hide()
+    canvas.add_child(_phone_alert)
 
 func _on_language_selected(index: int) -> void:
     GameLanguage.select_locale("it" if index==1 else "en")
@@ -5388,6 +5404,12 @@ func _close_phone() -> void:
     if _phone.visible:
         _phone.hide()
         Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _on_phone_alarm(message: String) -> void:
+    _phone_alert.text = message
+    _phone_alert_remaining = 8.0
+    _phone_alert.show()
+    _town_audio.play_alarm()
 
 func _phone_request_jobs() -> void:
     if _connected and not _api.is_busy():

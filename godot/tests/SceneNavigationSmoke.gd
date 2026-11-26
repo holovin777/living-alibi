@@ -194,7 +194,26 @@ func _exercise() -> void:
     world._phone.update_data({"player":{"incarnation":2}},[],[])
     if not _check(world._phone._contacts.is_empty(),"new life clears local contacts"):
         return
+    world._phone.update_data({"day":5,"minute":1435,"player":{"incarnation":2},
+        "weather":{"sky":"RAIN","temperatureC":12,"raining":true},"year":1,"dayOfYear":5},[],[])
+    world._phone.open_app("weather")
+    if not _check("12" in world._phone._body.text,"phone displays committed weather"):
+        return
+    world._phone.set_alarm(0,5)
+    if not _check(world._phone.alarm_at==5*1440+5,"past hour schedules tomorrow"):
+        return
     world._close_phone()
+    world._phone.update_data({"day":6,"minute":10,"player":{"incarnation":2}},[],[])
+    if not _check(world._phone.alarm_at==-1 and world._phone_alert.visible
+            and world._phone._messages.size()==1,"alarm rings once when committed time crosses target even with phone closed"):
+        return
+    world._phone.update_data({"day":6,"minute":11,"player":{"incarnation":2}},[],[])
+    if not _check(world._phone._messages.size()==1,"alarm does not repeat"):
+        return
+    world._phone.set_alarm(7,0)
+    world._phone.cancel_alarm()
+    if not _check(world._phone.alarm_at==-1,"alarm can be canceled"):
+        return
     if not _check(not world._phone.visible,"phone closes"):
         return
     var school_root: Node3D = world._chunks["SCHOOL"]["root"]
