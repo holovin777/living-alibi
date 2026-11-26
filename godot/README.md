@@ -50,6 +50,16 @@ Press **Esc** to release the cursor. Pressing **E** at the travel gate
 or **F** at a local kiosk also releases the cursor whenever the
 clickable action menu opens. WASD movement remains camera-relative.
 
+## Market life
+
+Market stalls have solid counters and visible goods. Residents reported as
+working vendors occupy the staff side; actual shopping residents walk toward
+distinct waiting positions in front of staffed counters and stop there.
+Queues dissolve when staff finish work or residents stop shopping. This is
+a local visual representation of Java's existing activities, not a new
+checkout transaction or an independent purchase simulation. Unstaffed
+counters never generate fake customers.
+
 ## Controls
 
 - **WASD / arrow keys:** walk relative to the camera inside the visible
