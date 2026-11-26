@@ -56,6 +56,12 @@ final class HouseholdLife {
             for(var c:members)c.hunger=Math.max(0,c.hunger-35);
             put(t,unit,"meal-day",day);put(t,unit,"meal-minute",minute);
             put(t,unit,"meals",get(t,unit,"meals")+1);
+            // Freeze the dinner topic with the existing meal event.
+            boolean strainedDinner=members.stream().anyMatch(a->members.stream().anyMatch(b->
+                a!=b&&related(t,a,b)&&(a.fatigue+b.fatigue>=160||a.unpaidBills+b.unpaidBills>=100)));
+            int topic=strainedDinner?1:members.stream().anyMatch(c->c.age>=6&&c.age<18)?2:
+                members.stream().anyMatch(c->c.sociability>=70)?3:4;
+            put(t,unit,"meal-topic",topic);
             for(var a:members)for(var b:members){
                 if(a.generationIndex>=b.generationIndex||!related(t,a,b))continue;
                 var relation=t.peerRelationships.computeIfAbsent(SocialNetwork.key(a.id,b.id),k->new SocialLife.Relationship(a.id,b.id));
@@ -76,7 +82,35 @@ final class HouseholdLife {
         return awake(c)&&get(t,c.homeUnit,"meal-day")==day&&minute>=start&&minute<start+20;
     }
     record ResidentView(String id,int age,String activity){}
-    record View(int members,int children,int present,int dinners,boolean dinnerNow,List<ResidentView> visibleResidents){}
+    record Speech(String speakerId,String english,String italian){}
+    record View(int members,int children,int present,int dinners,boolean dinnerNow,List<ResidentView> visibleResidents,Speech speech){}
+    // Read-only, time-derived dialogue for an already committed dinner. No
+    // new social event, inferred identity, inventory change or private log.
+    private static Speech speech(TownLife.Town t,TownLife.Citizen host,int day,int minute,
+                                 boolean inside,List<ResidentView> visible){
+        if(!inside||!dinnerNow(t,host,day,minute)||host.age<6)return null;
+        int topic=get(t,host.homeUnit,"meal-topic");
+        if(topic<1||topic>4)return null;
+        var other=visible.stream().filter(c->c.age()>=6)
+            .filter(c->topic!=2||c.age()<18||host.age<18)
+            .findFirst().orElse(null);
+        if(other==null)return null;
+        boolean reply=minute-get(t,host.homeUnit,"meal-minute")>=10;
+        String speaker=reply?other.id():host.id;
+        return switch(topic){
+            case 1 -> reply?new Speech(speaker,"I know. We can talk about it after dinner.","Lo so. Ne parliamo dopo cena."):
+                new Speech(speaker,"It's been a tiring day. We need to talk.","È stata una giornata faticosa. Dobbiamo parlare.");
+            case 2 -> {
+                boolean childSpeaker=(reply?other.age():host.age)<18;
+                yield childSpeaker?new Speech(speaker,"Can I finish my homework after dinner?","Posso finire i compiti dopo cena?"):
+                    new Speech(speaker,"Have you got any homework left?","Hai ancora dei compiti da fare?");
+            }
+            case 3 -> reply?new Speech(speaker,"Then you'd better do the dishes too!","Allora ti tocca anche lavare i piatti!"):
+                new Speech(speaker,"I'm the family's official food taster.","Sono l'assaggiatore ufficiale della famiglia.");
+            default -> reply?new Speech(speaker,"A quiet evening sounds good to me.","Una serata tranquilla mi farebbe bene."):
+                new Speech(speaker,"Shall we take it easy this evening?","Facciamo una serata tranquilla?");
+        };
+    }
     static View view(TownLife.Town t,TownLife.Citizen host,int day,int minute){
         return view(t,host,day,minute,false);
     }
@@ -89,6 +123,6 @@ final class HouseholdLife {
         String unit=host.homeUnit;
         return new View(members.size(),(int)members.stream().filter(c->c.age<18).count(),
             (int)members.stream().filter(HouseholdLife::awake).count(),get(t,unit,"meals"),
-            dinnerNow(t,host,day,minute),visible);
+            dinnerNow(t,host,day,minute),visible,speech(t,host,day,minute,inside,visible));
     }
 }
