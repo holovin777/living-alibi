@@ -438,12 +438,16 @@ public final class GameSession implements AutoCloseable {
         String language=spokenLanguage==null?null:ResidentLanguages.normalize(spokenLanguage);
         String reply=null;
         boolean rendered=false;
+        boolean understood=true;
+        var existingContact=copy.player.contacts.get(resident.id);
+        var prior=existingContact==null?null:existingContact.copy();
         if(language!=null){
             if(message.isBlank()||message.strip().length()>1000)
                 throw new IllegalArgumentException("Speak 1–1000 characters.");
             if("SLEEPING".equals(resident.activity)||"TRAVELING".equals(resident.activity))
                 throw new IllegalArgumentException("This person is not available for a conversation.");
             if(!ResidentLanguages.speaks(region,resident.id,language)){
+                understood=false;
                 reply=ResidentLanguages.misunderstanding(region,language);
                 language=region.nativeLanguage();
                 rendered=true;
@@ -453,15 +457,22 @@ public final class GameSession implements AutoCloseable {
             }
         }
         if(reply==null){
-            var prior=copy.player.contacts.get(resident.id);
             String previous=prior==null?null:prior.lastHeard;
+            boolean recall=ConversationMemory.recallQuestion(message);
             reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")
                     ?NewspaperLife.interview(copy,resident,state.day,state.minute)
                     :PlayerLife.speak(copy,residentId,message,state.day,state.minute);
-            if(language!=null&&reply.equals("I'm not sure I understood. Could you ask me in a different way?")){
-                String generated=LocalDialogue.smallTalk(resident,copy.player.contacts.get(resident.id),previous,message,region,language);
+            if(recall){
+                reply=ConversationMemory.recall(prior,language);
+                rendered=language!=null;
+            } else if(language!=null&&reply.equals("I'm not sure I understood. Could you ask me in a different way?")){
+                String generated=LocalDialogue.smallTalk(resident,prior,previous,message,region,language,false);
                 if(generated!=null){reply=generated;rendered=true;}
             }
+        }
+        if(understood){
+            var contact=copy.player.contacts.computeIfAbsent(resident.id,PlayerLife.Contact::new);
+            ConversationMemory.remember(contact,state.day,state.minute,language,message.strip(),reply);
         }
         var controlled=RebirthLife.child(copy);
         if(RebirthLife.linkedAdult(copy,controlled)&&!RebirthLife.atHome(controlled)
