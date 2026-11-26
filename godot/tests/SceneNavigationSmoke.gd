@@ -972,6 +972,21 @@ func _exercise() -> void:
             and world._idle_arm_pose("CHECK_WATCH",false,0.0).z>0.0,
             "stretch and wrist check use distinct arm poses"):
         return
+    if not _check(world._peer_reaction_phase("LAUGH",7.0)=="CHAT"
+            and world._peer_reaction_phase("LAUGH",4.5)=="LAUGH"
+            and world._peer_reaction_phase("ARGUMENT",4.5)=="ARGUMENT"
+            and world._peer_reaction_phase("RECONCILE",1.5)=="PEACE_GESTURE",
+            "social reaction phases distinguish laughter, conflict and reconciliation"):
+        return
+    marco.set_meta("peer_expression","ENTHUSIASTIC")
+    marco.set_meta("peer_reaction","LAUGH")
+    world._animate_resident_face(marco,1.0,2.0,false)
+    if not _check(marco.get_node("Head/Mouth/Opening").visible
+            and marco.get_node("Head/Mouth/Right").rotation.z>0.0,
+            "shared laughter opens smiling mouth even when not speaking"):
+        return
+    marco.remove_meta("peer_expression")
+    marco.remove_meta("peer_reaction")
     var peer_old_marco: Vector3=marco.position
     var peer_old_elena: Vector3=elena.position
     var peer_old_activity: String=str(elena.get_meta("activity",""))
