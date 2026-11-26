@@ -84,6 +84,10 @@ var _guest_stand_at := Vector3.ZERO
 var _guest_feedback := ""
 var _guest_feedback_time := 0.0
 var _guest_requested_action := ""
+var _npc_speech := preload("res://scripts/NpcSpeech.gd").new()
+var _town_subtitle: Label
+var _public_speech_slot := ""
+var _public_speech_pair: Array[String] = []
 var _home_entrance: Node3D
 var _home_transition := false
 var _grocery_menu := false
@@ -240,6 +244,7 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    _update_npc_speech()
     if _phone_alert_remaining>0.0:
         _phone_alert_remaining = maxf(0.0,_phone_alert_remaining-delta)
         if _phone_alert_remaining<=0.0:
@@ -3857,6 +3862,15 @@ func _create_interface() -> void:
     sound_toggle.button_pressed = true
     sound_toggle.toggled.connect(_set_town_audio)
     column.add_child(sound_toggle)
+    var voice_toggle := CheckButton.new()
+    voice_toggle.text = "NPC voices / Voci PNG"
+    voice_toggle.button_pressed = true
+    voice_toggle.toggled.connect(_npc_speech.set_enabled)
+    column.add_child(voice_toggle)
+    _town_subtitle = Label.new()
+    _town_subtitle.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _town_subtitle.hide()
+    column.add_child(_town_subtitle)
     var head_bob_toggle := CheckButton.new()
     head_bob_toggle.text = tr("Camera motion")
     head_bob_toggle.button_pressed = _head_bob_enabled
@@ -5940,6 +5954,88 @@ func _guest_family_subtitle(household) -> String:
     var line := str(speech.get("italian" if italian else "english",""))
     if line.is_empty():return ""
     return "— "+line
+
+# Public small talk is an ambient visual/audio layer only: both speakers
+# must be present in the authoritative district snapshot and locally nearby.
+func _public_speech_eligible(person: Node3D) -> bool:
+    var activity := str(person.get_meta("activity",""))
+    return activity in ["FREE_TIME","RELAXING","RESTING","SHOPPING","WORKING","EATING","DRINKING","SOCIALIZING"] and not str(person.get_meta("resident_id","")).is_empty()
+
+func _public_dialogue() -> Dictionary:
+    if not _connected or not is_instance_valid(_residents_root):return {}
+    var day := int(_last_snapshot.get("day",1))
+    var minute := int(_last_snapshot.get("minute",0))
+    var slot := "%s:%d:%d" % [_current_place,day,floori(minute/12.0)]
+    if slot!=_public_speech_slot:
+        _public_speech_slot=slot
+        _public_speech_pair.clear()
+    if _public_speech_pair.is_empty():
+        var candidates: Array[Node3D] = []
+        for child in _residents_root.get_children():
+            var person := child as Node3D
+            if person!=null and _public_speech_eligible(person) and person.position.distance_to(_avatar.position)<=4.5:
+                candidates.append(person)
+        var best := 3.5
+        for i in range(candidates.size()):
+            for j in range(i+1,candidates.size()):
+                var distance := candidates[i].position.distance_to(candidates[j].position)
+                if distance<best:
+                    best=distance
+                    _public_speech_pair=[str(candidates[i].get_meta("resident_id")),str(candidates[j].get_meta("resident_id"))]
+    if _public_speech_pair.size()!=2:return {}
+    var first := _residents_root.get_node_or_null("Resident_"+_public_speech_pair[0]) as Node3D
+    var second := _residents_root.get_node_or_null("Resident_"+_public_speech_pair[1]) as Node3D
+    if not is_instance_valid(first) or not is_instance_valid(second):return {}
+    if not _public_speech_eligible(first) or not _public_speech_eligible(second) or first.position.distance_to(second.position)>3.5:return {}
+    if first.position.distance_to(_avatar.position)>4.5 or second.position.distance_to(_avatar.position)>4.5:return {}
+    var lines := public_dialogue_lines(_current_place,str(first.get_meta("activity",""))=="WORKING" and str(second.get_meta("activity",""))=="WORKING",int(day+floori(minute/12.0)))
+    var turn := 0 if minute%12<6 else 1
+    var speaker := first if turn==0 else second
+    var language := "it" if TranslationServer.get_locale().begins_with("it") else "en"
+    return {"key":slot+":"+str(turn)+":"+language,"id":str(speaker.get_meta("resident_id")),"text":lines[turn][1 if language=="it" else 0],"distance":speaker.position.distance_to(_avatar.position)}
+
+func public_dialogue_lines(place: String,working: bool,variant: int) -> Array:
+    if working:
+        return [["How is work going today?","Come va il lavoro oggi?"],["One thing at a time!","Una cosa alla volta!"]]
+    if place=="CAFE":
+        return [["Shall we have a coffee?","Prendiamo un caffè?"],["Good idea, I could use a break.","Buona idea, mi ci vuole una pausa."]]
+    if place in ["MARKET","BAKERY","PORTICI"]:
+        return [["Have you finished your shopping?","Hai finito di fare la spesa?"],["Almost. Just a couple of things left.","Quasi. Mi mancano solo un paio di cose."]]
+    if variant%2==0:
+        return [["It's nice to get some fresh air.","Fa bene prendere un po' d'aria."],["Yes, a little walk is always nice.","Sì, una passeggiata fa sempre bene."]]
+    return [["How is your day going?","Come va la giornata?"],["Not bad, thanks. And yours?","Non male, grazie. E la tua?"]]
+
+func _update_npc_speech() -> void:
+    if not is_instance_valid(_town_subtitle):return
+    _town_subtitle.hide()
+    if not _connected or _drive_active() or _travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible or _intercom.visible:
+        _npc_speech.stop()
+        return
+    var language := "it" if TranslationServer.get_locale().begins_with("it") else "en"
+    if _guest_active:
+        var visit = _last_snapshot.get("apartmentVisit",{})
+        var household = visit.get("household",{}) if visit is Dictionary else {}
+        var subtitle := _guest_family_subtitle(household)
+        if subtitle.is_empty() or _guest_feedback_time>0.0:
+            _npc_speech.stop()
+            return
+        var speech: Dictionary = household["speech"]
+        var id := str(speech.get("speakerId",""))
+        var speaker := _guest_host if str(_guest_host.get_meta("resident_id",""))==id else _guest.get_node_or_null("GuestFamily/Resident_"+id) as Node3D
+        var line := str(speech.get("italian" if language=="it" else "english",""))
+        var key := "home:%s:%s:%s:%s" % [_last_snapshot.get("day",1),id,language,line]
+        _npc_speech.present(key,line,id,speaker.position.distance_to(_avatar.position),language)
+        return
+    if _stairwell_active or _apartment_active or _inside_guest_room() or not _road_pending.is_empty():
+        _npc_speech.stop()
+        return
+    var dialogue := _public_dialogue()
+    if dialogue.is_empty():
+        _npc_speech.stop()
+        return
+    _town_subtitle.text="— "+str(dialogue["text"])
+    _town_subtitle.show()
+    _npc_speech.present(str(dialogue["key"]),str(dialogue["text"]),str(dialogue["id"]),float(dialogue["distance"]),language)
 
 func _sync_host_routine(invitation: Dictionary) -> void:
     if not is_instance_valid(_guest_host):return
