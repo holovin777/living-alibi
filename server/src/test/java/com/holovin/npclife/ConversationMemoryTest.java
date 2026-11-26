@@ -50,6 +50,34 @@ class ConversationMemoryTest {
     }
 
     @Test
+    void importantMemoriesSurviveOrdinaryForgettingAndRestart() throws Exception {
+        Path file=directory.resolve("milestones.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var contact=new PlayerLife.Contact("marco");
+            town.player.contacts.put("marco",contact);
+            ConversationMemory.remember(contact,1,720,"it","Ciao, mi chiamo Luca.","Piacere.");
+            ConversationMemory.mark(contact,ConversationMemory.Milestone.FIRST_MEETING,contact.dialogue.getLast());
+            for(int day=2;day<=100;day++)ConversationMemory.remember(contact,day,720,"it","Ciao "+day,"Ciao.");
+            assertEquals(32,contact.dialogue.size());
+            assertFalse(contact.dialogue.stream().anyMatch(t->t.day()==1));
+            assertTrue(ConversationMemory.firstMeeting(contact,"it").contains("Luca"));
+            assertEquals(contact.important,contact.copy().important);
+            assertNotSame(contact.important,contact.copy().important);
+            db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertTrue(ConversationMemory.firstMeeting(town.player.contacts.get("marco"),"it").contains("Luca"));
+            assertFalse(ConversationMemory.firstMeeting(town.player.contacts.get("elena"),"it").contains("Luca"));
+            var legacy=new PlayerLife.Contact("elena");
+            ConversationMemory.decode(legacy,"[]");
+            assertTrue(legacy.important.isEmpty());
+            assertTrue(legacy.dialogue.isEmpty());
+        }
+    }
+
+    @Test
     void gameStoresOnlyUnderstoodTurns() throws Exception {
         Path file=directory.resolve("game-memory.db");
         try(var game=new GameSession(file)){}
@@ -69,6 +97,8 @@ class ConversationMemoryTest {
             var c=db.loadTown(db.load()).player.contacts.get("marco");
             assertEquals("Luca",c.knownName);
             assertEquals(2,c.dialogue.size());
+            assertEquals("Mi chiamo Luca.",c.important.get(ConversationMemory.Milestone.FIRST_MEETING).player());
+            assertEquals("Mi chiamo Luca.",c.important.get(ConversationMemory.Milestone.INTRODUCTION).player());
             assertTrue(c.dialogue.stream().noneMatch(t->t.player().contains("Alex")));
         }
     }
