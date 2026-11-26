@@ -915,11 +915,13 @@ public final class GameSession implements AutoCloseable {
         ArchiveLife.transitions(town,candidateTown,state.day,state.minute);
         var events=new ArrayList<LifeSimulation.LifeEvent>();
         var interactions=new ArrayList<SocialLife.Interaction>();
+        boolean initiallyConfined=JusticeLife.confined(candidateTown);
         int initialPhase=RebirthLife.phase(candidateTown);
         int initialMaxDays=RebirthLife.maxWaitDays(candidateTown);
         events.addAll(LifeSimulation.advance(candidateState,minutes,
                 current->TownLife.tick(candidateTown,current,truth,observations,interactions),
-                ()->!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays))));
+                ()->(initiallyConfined||!JusticeLife.confined(candidateTown))&&(!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays)))));
+        if(!initiallyConfined&&JusticeLife.confined(candidateTown))message+=" Police detained you.";
         TownLife.clearConversationHolds(candidateTown);
         if(rebirthAction&&minutes>1){ // Keep one-minute dialogue replies free of clock diagnostics.
             long elapsed=(candidateState.day-(long)state.day)*1440+candidateState.minute-state.minute;
