@@ -5308,6 +5308,14 @@ func _render_actions() -> void:
                     instruction.text = "Your room is across the street. Walk to the bed."
                     _action_choices.add_child(instruction)
         "MARKET", "PORTICI", "FUEL_STATION", "BAKERY":
+            var minute := int(_last_snapshot.get("minute",0))
+            var start := 420 if _current_place=="BAKERY" else 480
+            var finish := 1080 if _current_place=="BAKERY" else 1200
+            var shop_open := minute>=start and minute+2<=finish
+            var shop_status := Label.new()
+            shop_status.text=tr("Open") if shop_open else tr("Closed")
+            shop_status.text+=" · "+("%02d:%02d–%02d:%02d" % [floori(start/60.0),start%60,floori(finish/60.0),finish%60])
+            _action_choices.add_child(shop_status)
             if _current_place=="MARKET" and employed!="shop-assistant":
                 _action_choices.add_child(_button("Apply: market assistant",_apply_job.bind("shop-assistant")))
             for item in _last_snapshot.get("shop",[]):
@@ -5315,7 +5323,7 @@ func _render_actions() -> void:
                 var stock := int(item.get("stock",0))
                 var choice := _button("Buy %s · %s EUR (%s left)" % [
                     str(item.get("label",id)),str(item.get("price",0)),stock],_buy_product.bind(id))
-                choice.disabled = stock <= 0
+                choice.disabled = stock <= 0 or not shop_open or int(player.get("money",0))<int(item.get("price",0))
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
             if _current_place == "MARKET":
