@@ -3275,6 +3275,9 @@ func _assign_work_stations() -> void:
         "FACTORY":
             stations=[Vector3(-8,0,0.8),Vector3(-5,0,0.8),Vector3(-2,0,0.8)]
             yaw=PI
+        "WORKSHOP":
+            stations=[Vector3(12.5,0,9.5),Vector3(7.5,0,10.0)]
+            yaw=PI
         "MARKET":
             stations=[Vector3(-9,0,2.3),Vector3(-7,0,2.3),Vector3(-5,0,2.3)]
             yaw=PI
