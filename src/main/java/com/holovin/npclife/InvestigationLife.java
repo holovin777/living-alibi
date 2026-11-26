@@ -374,6 +374,7 @@ final class InvestigationLife {
             return "Insufficient investigation: inspect the scene and interview at least two people first.";
         if(accused.id.equals(c.offenderId)) {
             c.solved=true;
+            NpcJusticeLife.queue(town,c);
             return "Case solved: the simulation confirmed your accusation against "+accused.name+
                     ". (Prototype resolution; legal evidence standards are not simulated.)";
         }

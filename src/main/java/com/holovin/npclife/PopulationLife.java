@@ -20,6 +20,10 @@ final class PopulationLife {
     private static void lifeTick(TownLife.Town town,TownLife.Citizen c,WorldState clock,
                                  List<TownLife.Event> events,List<TownLife.Observation> observations) {
         int minute=clock.minute;
+        if(NpcJusticeLife.confined(town,c,clock)){
+            NpcJusticeLife.custody(c);
+            return;
+        }
         // A resident who agreed to speak stays here for this conversation
         // minute, rather than starting their autonomous commute mid-sentence.
         // GameSession removes this transient flag before persisting the world.
