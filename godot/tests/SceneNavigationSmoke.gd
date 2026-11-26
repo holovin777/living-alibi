@@ -303,8 +303,11 @@ func _exercise() -> void:
     world._open_guest({"unit":1,"level":2,"style":"rosa","name":"Marco","activity":"COOKING","cleanliness":65})
     if not _check(world._host_activity=="COOKING" and not world._host_path.is_empty() and world._guest.get_node("Clutter").visible,"server home routine generates a route and cleanliness decor"):
         return
-    world._sync_host_routine({"activity":"FAMILY_DINNER","cleanliness":95,"household":{"members":3,"present":3,"dinnerNow":true}})
+    world._sync_host_routine({"activity":"FAMILY_DINNER","cleanliness":95,"household":{"members":3,"present":3,"dinnerNow":true,"visibleResidents":[{"id":"guest-child","age":8,"activity":"FAMILY_DINNER"},{"id":"guest-adult","age":35,"activity":"FAMILY_DINNER"}]}})
     if not _check(world._host_activity=="FAMILY_DINNER" and world._guest.get_node("FamilyDinner").visible and not world._guest.get_node("FamilyDinner").get_child(3).visible,"family dinner places match present household"):
+        return
+    var family := world._guest.get_node("GuestFamily") as Node3D
+    if not _check(family.get_child_count()==2 and not family.get_child(0).get_node("ResidentName").visible and world._guest.can_stand(family.get_child(0).position,0.3),"present relatives appear without names at clear positions"):
         return
     if not _check(not world._host_path.is_empty() and world._guest.can_stand(world._guest.routine_anchor("FAMILY_DINNER"),0.25),"dinner chair has a navigable approach"):
         return
@@ -314,6 +317,8 @@ func _exercise() -> void:
         return
     world._sync_host_routine({"activity":"READING","cleanliness":95,"household":{"members":3,"present":1,"dinnerNow":false}})
     if not _check(not world._host_seated and world._guest_host.position.is_equal_approx(world._guest.routine_anchor("FAMILY_DINNER")),"host stands at safe approach when dinner ends"):
+        return
+    if not _check(family.get_child_count()==0,"departed family members disappear from apartment"):
         return
     if not _check(not world._guest.get_node("FamilyDinner").visible,"finished dinner clears table preview"):
         return
