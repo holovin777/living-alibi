@@ -75,12 +75,20 @@ final class HouseholdLife {
         int start=get(t,c.homeUnit,"meal-minute");
         return awake(c)&&get(t,c.homeUnit,"meal-day")==day&&minute>=start&&minute<start+20;
     }
-    record View(int members,int children,int present,int dinners,boolean dinnerNow){}
+    record ResidentView(String id,int age,String activity){}
+    record View(int members,int children,int present,int dinners,boolean dinnerNow,List<ResidentView> visibleResidents){}
     static View view(TownLife.Town t,TownLife.Citizen host,int day,int minute){
+        return view(t,host,day,minute,false);
+    }
+    static View view(TownLife.Town t,TownLife.Citizen host,int day,int minute,boolean inside){
         var members=t.people.values().stream().filter(c->c.alive&&host.homeUnit.equals(c.homeUnit)).toList();
+        var visible=inside?members.stream()
+            .filter(c->!c.id.equals(host.id)&&awake(c)&&c.age>=3)
+            .map(c->new ResidentView(c.id,c.age,HomeRoutineLife.activity(t,c,day,minute))).toList()
+            :List.<ResidentView>of();
         String unit=host.homeUnit;
         return new View(members.size(),(int)members.stream().filter(c->c.age<18).count(),
             (int)members.stream().filter(HouseholdLife::awake).count(),get(t,unit,"meals"),
-            dinnerNow(t,host,day,minute));
+            dinnerNow(t,host,day,minute),visible);
     }
 }
