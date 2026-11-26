@@ -62,8 +62,18 @@ class GameSessionTest {
             assertEquals(1,visible.size());
             assertEquals(second.id,visible.getFirst().id());
             assertEquals("FAMILY_DINNER",visible.getFirst().activity());
+            assertNull(HouseholdLife.view(town,first,36,1080).speech());
+            var speech=HouseholdLife.view(town,first,36,1080,true).speech();
+            assertNotNull(speech);
+            assertEquals(first.id,speech.speakerId());
+            assertFalse(speech.english().isBlank());
+            assertFalse(speech.italian().isBlank());
+            assertEquals(speech,HouseholdLife.view(town,first,36,1080,true).speech());
+            assertEquals(second.id,HouseholdLife.view(town,first,36,1090,true).speech().speakerId());
+            assertNull(HouseholdLife.view(town,first,36,1100,true).speech());
             second.travelRemaining=1;
             assertTrue(HouseholdLife.view(town,first,36,1080,true).visibleResidents().isEmpty());
+            assertNull(HouseholdLife.view(town,first,36,1080,true).speech());
             second.travelRemaining=0;
             state.minute=1110;HouseholdLife.tick(town,state);
             assertEquals(6,first.food+second.food);
