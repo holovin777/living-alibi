@@ -71,7 +71,7 @@ final class IntercomLife {
         int number=unit(t,c);
         if(number==0)return "This apartment is not accessible yet.";
         put(t,id,"unit",number);
-        put(t,id,"inside-until",Math.addExact(time,30));
+        put(t,id,"inside-until",Math.addExact(time,PhoneLife.homeInvitation(t,id,day,minute)?60:30));
         put(t,id,"inside",0);
         put(t,id,"until",0);
         return "Come in! Apartment "+number+".";
@@ -94,6 +94,7 @@ final class IntercomLife {
         var invitation=apartment(t,day,minute);
         if(invitation==null||!invitation.residentId().equals(id))throw new IllegalArgumentException("No valid apartment invitation.");
         put(t,id,"inside",1);
+        PhoneLife.visitArrived(t,id,day,minute);
         return "Welcome inside.";
     }
     record SocialResult(int minutes,String message) {}
@@ -106,6 +107,7 @@ final class IntercomLife {
             case "talk" -> 5;
             case "coffee" -> 5;
             case "snack" -> 8;
+            case "dinner" -> 15;
             case "rest" -> 10;
             default -> throw new IllegalArgumentException("Unknown guest activity.");
         };
@@ -133,12 +135,25 @@ final class IntercomLife {
                 t.player.hunger=Math.max(0,t.player.hunger-25);
                 message="You shared a snack.";
             }
+            case "dinner" -> {
+                if(minute<1080||minute>=1260)throw new IllegalArgumentException("Dinner is served between 18:00 and 21:00.");
+                if(host.food<2||host.water<2)throw new IllegalArgumentException("Sorry, I do not have enough food for dinner.");
+                host.food-=2;host.water-=2;
+                host.hunger=Math.max(0,host.hunger-35);host.thirst=Math.max(0,host.thirst-20);
+                t.player.hunger=Math.max(0,t.player.hunger-35);t.player.thirst=Math.max(0,t.player.thirst-20);
+                message="You shared dinner.";
+            }
             default -> {
                 t.player.fatigue=Math.max(0,t.player.fatigue-12);
                 message="You relaxed together on the sofa.";
             }
         }
         put(t,id,"social-"+action,day);
+        contact.lastDay=day;contact.lastMinute=minute;
+        if("dinner".equals(action)){
+            ConversationMemory.remember(contact,day,minute,"und","Shared dinner at home",message);
+            ConversationMemory.mark(contact,ConversationMemory.Milestone.SUPPORT,contact.dialogue.getLast());
+        }
         contact.trust=Math.min(100,contact.trust+1);
         contact.affinity=Math.min(100,contact.affinity+2);
         return new SocialResult(duration,message);
