@@ -97,6 +97,26 @@ Past names, milestones, debts and other world facts are unaffected.
 Only player-contact relationships use this rule; NPC-to-NPC relationships
 retain their existing simulation.
 
+## Incoming NPC calls
+
+In the current Italian town, ask a known and trusted adult in person
+"Posso darti il mio numero?" (or "Can I give you my number?"). Sharing is
+stored for this contact and player incarnation. Calls require consent,
+trust of at least 65, affinity of at least 20, and a living, sociable,
+free resident. There is at most one new incoming call per game day and
+a seven-day cooldown per caller. Calls are available in the visitor
+life stage, from 10:00 to 19:00, and expire after five in-game minutes.
+
+The existing phone alert sounds when a call arrives. Press H to open the
+phone's Calls screen; answer or decline. A friendly caller may offer
+coffee tomorrow at 18:00. Accepting creates a real appointment in the
+existing calendar and NPC meeting scheduler. Unanswered calls become
+missed; the latest call per contact is persisted. Answering currently
+shows a short deterministic Italian line as text, not a continuous
+voice conversation. Existing SMS behavior is unchanged. Outgoing calls,
+number revocation, and free-form voice or microphone calls remain future
+work. All calls are simulated in the game; no real phone numbers needed.
+
 Manual check:
 ```sh
 ollama pull qwen2.5:3b
