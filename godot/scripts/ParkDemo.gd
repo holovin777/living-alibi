@@ -3276,6 +3276,10 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
     prop.position=Vector3(0,-0.48,-0.12)
     hand.add_child(prop)
     match kind:
+        "ELECTRIC_TOOL":
+            _box(prop,Vector3(0.13,0.22,0.07),Color("#d6a644"),Vector3.ZERO)
+            _box(prop,Vector3(0.09,0.065,0.015),Color("#52686c"),Vector3(0,0.06,-0.04))
+            _box(prop,Vector3(0.045,0.04,0.015),Color("#31393d"),Vector3(0,-0.03,-0.04))
         "HAMMER":
             _box(prop,Vector3(0.045,0.34,0.045),Color("#a78155"),Vector3(0,-0.13,0))
             _box(prop,Vector3(0.23,0.09,0.08),Color("#676d70"),Vector3(0,-0.31,0))
@@ -3312,6 +3316,7 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
 func _assign_work_stations() -> void:
     if _apartment_active:return
     var stations: Array[Vector3] = []
+    var electric_stations: Array[Vector3] = [Vector3(-3,0,-8.1),Vector3(3,0,-2.1)]
     var yaw := 0.0
     match _current_place:
         "NORTH_RESIDENCES":
@@ -3348,14 +3353,15 @@ func _assign_work_stations() -> void:
         var kind := str(person.get_meta("work_visual",""))
         var eligible := str(person.get_meta("activity",""))=="WORKING" and not kind.is_empty()
         if eligible:
-            while not stations.is_empty():
-                var at: Vector3 = stations.pop_front()
+            var available: Array[Vector3] = electric_stations if kind=="ELECTRIC_TOOL" else stations
+            while not available.is_empty():
+                var at: Vector3 = available.pop_front()
                 if not _can_stand(at,WALKER_RADIUS):continue
                 if not person.has_meta("pre_work_anchor"):
                     person.set_meta("pre_work_anchor",person.get_meta("anchor",person.position))
                 person.position=at
                 person.set_meta("anchor",at)
-                person.rotation.y=yaw
+                person.rotation.y=0.0 if kind=="ELECTRIC_TOOL" else yaw
                 break
         elif person.has_meta("pre_work_anchor"):
             var at: Vector3 = person.get_meta("pre_work_anchor")
@@ -3666,6 +3672,8 @@ func _animate_residents(delta: float) -> void:
                 var kind := str(person.get_meta("work_visual",""))
                 if kind=="PICK":
                     angle=0.9+sin(gesture_time*3.0)*0.8 if limb=="ArmRight" else 0.55
+                elif kind=="ELECTRIC_TOOL":
+                    angle=0.95+sin(gesture_time*2.1)*0.13 if limb=="ArmRight" else 0.65
                 elif kind=="HAMMER":
                     angle=0.8+sin(gesture_time*3.5)*0.65 if limb=="ArmRight" else 0.35
                 elif kind=="BROOM":
