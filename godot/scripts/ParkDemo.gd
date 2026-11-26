@@ -5825,7 +5825,9 @@ func _sync_host_routine(invitation: Dictionary) -> void:
     if not is_instance_valid(_guest_host):return
     _guest.update_cleanliness(int(invitation.get("cleanliness",100)))
     var household = invitation.get("household",{})
-    if household is Dictionary:_guest.update_household(household)
+    if household is Dictionary:
+        _guest.update_household(household)
+        _sync_guest_family(household)
     var next := str(invitation.get("activity",""))
     if next==_host_activity:return
     if _host_seated:
@@ -5834,7 +5836,71 @@ func _sync_host_routine(invitation: Dictionary) -> void:
     _host_activity = next
     _host_path = _guest.host_path(_guest_host.position,_guest.routine_anchor(next))
 
+# The household list is authoritative and contains only awake, present residents.
+# Guests see models, not automatically learned names or a second copy of the host.
+func _sync_guest_family(household: Dictionary) -> void:
+    var root := _guest.get_node_or_null("GuestFamily") as Node3D
+    if root == null:
+        root = Node3D.new()
+        root.name = "GuestFamily"
+        _guest.add_child(root)
+    var residents = household.get("visibleResidents",[])
+    if not residents is Array:
+        residents = []
+    var side := -1.0 if _guest.unit%2==1 else 1.0
+    var spots: Array[Vector3] = []
+    for at in [Vector3(-0.65*side,0,-2.0),Vector3(0.65*side,0,1.25),Vector3(2.85*side,0,-0.1),Vector3(-1.15*side,0,1.55),Vector3(0.0,0,-0.35)]:
+        if _guest.can_stand(at,0.3):
+            spots.append(at)
+    var desired := {}
+    for entry in residents:
+        if not entry is Dictionary:continue
+        var id := str(entry.get("id",""))
+        if id.is_empty() or desired.has(id) or desired.size()>=spots.size():continue
+        desired[id] = {"entry":entry,"position":spots[desired.size()]}
+    var existing := {}
+    for child in root.get_children():
+        var id := str(child.get_meta("resident_id",""))
+        if not desired.has(id):
+            root.remove_child(child)
+            child.queue_free()
+        else:
+            existing[id] = child
+    for id in desired:
+        var data: Dictionary = desired[id]
+        var entry: Dictionary = data["entry"]
+        var person := existing.get(id) as Node3D
+        if person == null:
+            var old_root := _residents_root
+            _residents_root = root
+            person = _make_resident(id,0,"")
+            _residents_root = old_root
+            var age := int(entry.get("age",18))
+            var size := 0.56 if age<6 else 0.72 if age<12 else 0.90 if age<18 else 1.0
+            person.scale *= size
+        person.position = data["position"]
+        person.set_meta("activity",str(entry.get("activity","RESTING")))
+        var face := _guest.routine_anchor("FAMILY_DINNER")-person.position
+        if face.length_squared()>0.01:
+            person.rotation.y = atan2(-face.x,-face.z)
+
+func _animate_guest_family(delta: float) -> void:
+    var root := _guest.get_node_or_null("GuestFamily") as Node3D
+    if root == null:return
+    for child in root.get_children():
+        var person := child as Node3D
+        var activity := str(person.get_meta("activity","RESTING"))
+        var phase := float(Time.get_ticks_msec())*0.001+float(person.get_meta("phase",0.0))
+        var gesture := 0.0
+        match activity:
+            "PLAYING":gesture=0.55+sin(phase*5.0)*0.5
+            "HOMEWORK","READING":gesture=0.65+sin(phase*2.0)*0.15
+            "COOKING","CLEANING","DRINKING","FAMILY_DINNER":gesture=0.65+sin(phase*3.0)*0.25
+        var arm := person.get_node("ArmRight") as Node3D
+        arm.rotation.x=lerpf(arm.rotation.x,gesture,minf(delta*6.0,1.0))
+
 func _animate_guest_host(delta: float) -> void:
+    _animate_guest_family(delta)
     if not is_instance_valid(_guest_host):return
     var walking := false
     var talking := _guest_feedback_time>0.0
