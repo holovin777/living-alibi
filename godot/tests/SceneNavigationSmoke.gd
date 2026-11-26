@@ -283,6 +283,19 @@ func _exercise() -> void:
 
     var guest := _world("NORTH_RESIDENCES","North residences")
     world._on_world_updated(guest)
+    guest["contacts"]=[{"residentId":"marco","name":"Marco","address":"Via delle Magnolie 12"}]
+    world._on_world_updated(guest)
+    var bell_position := Vector3(12.2,0,-2.8)
+    world._avatar.position=bell_position
+    if not _check(world._near_intercom()==1,"intercom detects the correct nearby facade"):
+        return
+    world._open_intercom()
+    if not _check(world._intercom.visible and world._intercom_contacts.item_count==1 and not world._foot_controls_available(),"intercom lists only shared contacts and blocks movement"):
+        return
+    world._close_intercom()
+    world._avatar.position=Vector3.ZERO
+    if not _check(world._near_intercom()==0,"door cannot be called from across the district"):
+        return
     if not _check(world._scenery.has_node("ViaDelleMagnolie/CasaMagnolia/HomeApproach")
             and world._scenery.has_node("ViaDelleMagnolie/CasaTiglio")
             and world._can_stand(Vector3(11,0,-2.8),world.WALKER_RADIUS)
