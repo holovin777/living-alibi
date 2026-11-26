@@ -7889,7 +7889,7 @@ func _sync_custody(justice: Dictionary) -> void:
     if not locked:
         if _custody_active:
             _custody_active=false
-            _custody_panel.hide()
+            (_custody_panel.get_parent() as Control).hide()
             if is_instance_valid(_custody_cell):_custody_cell.queue_free()
             _custody_cell=null
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -7909,8 +7909,13 @@ func _sync_custody(justice: Dictionary) -> void:
             var layer := CanvasLayer.new()
             layer.layer=90
             add_child(layer)
+            var blocker := Control.new()
+            layer.add_child(blocker)
+            blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+            blocker.mouse_filter=Control.MOUSE_FILTER_STOP
+            blocker.name="CustodyBlocker"
             _custody_panel=PanelContainer.new()
-            layer.add_child(_custody_panel)
+            blocker.add_child(_custody_panel)
             _custody_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
             _custody_panel.offset_left=-235
             _custody_panel.offset_right=235
@@ -7923,12 +7928,14 @@ func _sync_custody(justice: Dictionary) -> void:
             col.add_child(_custody_label)
             col.add_child(_button(tr("Wait one hour in custody"),_wait_custody.bind(60)))
             col.add_child(_button(tr("Serve one day"),_wait_custody.bind(1440)))
+        (_custody_panel.get_parent() as Control).show()
         _custody_panel.show()
         _custody_cell=Node3D.new()
         add_child(_custody_cell)
         _custody_cell.position=Vector3(0,120,0)
         var wall := Color("#999b9a")
         _box(_custody_cell,Vector3(5,0.2,6),Color("#55595a"),Vector3(0,-0.1,0))
+        _box(_custody_cell,Vector3(5,0.2,6),wall,Vector3(0,3.1,0))
         _box(_custody_cell,Vector3(5,3,0.2),wall,Vector3(0,1.5,-3))
         _box(_custody_cell,Vector3(0.2,3,6),wall,Vector3(-2.5,1.5,0))
         _box(_custody_cell,Vector3(0.2,3,6),wall,Vector3(2.5,1.5,0))
