@@ -1070,6 +1070,18 @@ func _exercise() -> void:
     if not _check(_has_button(world._action_choices, "Apply: quarry miner"),
             "quarry offers a real paid mining career"):
         return
+    var dirty_square := _world("CENTRO","Centro")
+    dirty_square["streetCare"]={"litter":80,"gardenNeglect":30}
+    dirty_square["residents"]=[{"id":"cleaner","activity":"WORKING","workVisual":"BROOM"}]
+    world._on_world_updated(dirty_square)
+    var street_decor := world._scenery.get_node("StreetCareDecor") as Node3D
+    var street_worker := world._residents_root.get_node("Resident_cleaner") as Node3D
+    if not _check(street_decor.get_child(7).visible and not street_decor.get_child(8).visible and street_worker.has_node("ArmRight/WorkProp"),"dirty square shows litter and a working cleaner"):
+        return
+    dirty_square["streetCare"]["litter"]=10
+    world._on_world_updated(dirty_square)
+    if not _check(street_decor.get_child(0).visible and not street_decor.get_child(1).visible,"committed cleanup reduces visible litter"):
+        return
     var crew := _world("QUARRY","Quarry")
     crew["residents"]=[{"id":"miner-a","activity":"WORKING","workVisual":"PICK"},{"id":"miner-b","activity":"WORKING","workVisual":"PICK"}]
     world._on_world_updated(crew)
