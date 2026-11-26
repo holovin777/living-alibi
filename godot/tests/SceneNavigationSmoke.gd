@@ -945,6 +945,33 @@ func _exercise() -> void:
     marco.position=presence_old
     marco.rotation.y=presence_yaw
     world._avatar.position=presence_avatar
+    if not _check(world._idle_gesture_choice("relaxed","TIRED","ADULT",0)=="STRETCH"
+            and world._idle_gesture_choice("quiet","STRESSED","ADULT",0)=="TAP_FOOT"
+            and world._idle_gesture_choice("perfectionist","CALM","ADULT",3)=="CHECK_WATCH"
+            and world._idle_gesture_choice("perfectionist","CALM","CHILD",3)=="SCRATCH_HEAD",
+            "idle gestures depend on mood, personality and age"):
+        return
+    marco.set_meta("idle_wait",0.0)
+    var first_idle: String=world._tick_idle_gesture(marco,0.1,true)
+    if not _check(not first_idle.is_empty()
+            and world._tick_idle_gesture(marco,0.2,true)==first_idle
+            and world._tick_idle_gesture(marco,0.1,false).is_empty(),
+            "idle gesture persists briefly but stops when another action takes priority"):
+        return
+    if not _check(world._tick_idle_gesture(marco,0.1,true).is_empty(),
+            "idle gesture has a cooldown"):
+        return
+    marco.set_meta("idle_wait",0.0)
+    world._tick_idle_gesture(marco,0.1,true)
+    if not _check(world._tick_idle_gesture(marco,3.0,true).is_empty(),
+            "idle gesture ends without becoming a looping action"):
+        return
+    var stretch_pose: Vector3=world._idle_arm_pose("STRETCH",true,0.0)
+    if not _check(stretch_pose.x>2.0
+            and world._idle_arm_pose("CHECK_WATCH",true,0.0)==Vector3.ZERO
+            and world._idle_arm_pose("CHECK_WATCH",false,0.0).z>0.0,
+            "stretch and wrist check use distinct arm poses"):
+        return
     var right_arm := marco.get_node("ArmRight") as Node3D
     var right_elbow := right_arm.get_node("Elbow") as Node3D
     var right_foot := marco.get_node("LegRight/Knee/Foot") as Node3D

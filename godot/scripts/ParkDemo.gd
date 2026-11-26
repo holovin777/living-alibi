@@ -3936,6 +3936,13 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         var thumb := _sphere(fingers,0.017,skin,Vector3(-float(side)*0.041,0.025,-0.019))
         thumb.scale.y=1.65
         thumb.rotation.z=float(side)*0.45
+        if side<0 and str(person.get_meta("personality",""))=="perfectionist":
+            var watch := Node3D.new()
+            watch.name="Wristwatch"
+            elbow.add_child(watch)
+            _cylinder(watch,0.057,0.034,Color("#34383c"),Vector3(0,-0.21,0))
+            _box(watch,Vector3(0.065,0.055,0.019),Color("#a6a8ab"),Vector3(0,-0.21,-0.055))
+            _box(watch,Vector3(0.048,0.04,0.009),Color("#273d43"),Vector3(0,-0.21,-0.069))
     var hand := person.get_node("ArmRight") as Node3D
     var phone := Node3D.new()
     phone.name = "Phone"
@@ -4211,6 +4218,68 @@ func _animate_resident_elbow(arm: Node3D,delta: float,bend: float,grip: bool) ->
         var pivot := elbow.position
         child.transform=Transform3D(elbow.basis*rest.basis,pivot+elbow.basis*(rest.origin-pivot))
 
+# Presentation-only habits: no invented transactions, needs or social outcomes.
+func _idle_gesture_choice(personality: String,mood: String,stage: String,index: int) -> String:
+    var choices: Array[String]=["ADJUST_COLLAR","LOOK_HANDS","SCRATCH_HEAD"]
+    match mood:
+        "TIRED":choices=["STRETCH","RUB_NECK"]
+        "STRESSED","IRRITATED":choices=["TAP_FOOT","RUB_NECK","SCRATCH_HEAD"]
+        "HAPPY","ENTHUSIASTIC":
+            choices=["ADJUST_COLLAR","STRETCH","HAIR_FIX"]
+    if mood in ["CALM","HAPPY","ENTHUSIASTIC"]:
+        match personality:
+            "perfectionist":choices.append("CHECK_WATCH")
+            "relaxed":choices.append("STRETCH")
+            "quiet":choices.append("LOOK_HANDS")
+            "joker","talkative":choices.append("HAIR_FIX")
+    if stage in ["PRESCHOOL","CHILD"]:
+        choices=["SCRATCH_HEAD","LOOK_HANDS","HAIR_FIX"]
+    return choices[posmod(index,choices.size())]
+
+func _tick_idle_gesture(person: Node3D,delta: float,eligible: bool) -> String:
+    var seed := absi(str(person.get_meta("resident_id","")).hash())
+    var wait := float(person.get_meta("idle_wait",5.0+float(seed%15)))
+    var left := float(person.get_meta("idle_left",0.0))
+    var gesture := str(person.get_meta("idle_gesture",""))
+    if not eligible:
+        if not gesture.is_empty():wait=8.0+float(seed%8)
+        gesture=""
+        left=0.0
+    elif left>0.0:
+        left=maxf(0.0,left-delta)
+        if left<=0.0:gesture=""
+    else:
+        wait-=delta
+        if wait<=0.0:
+            var serial := int(person.get_meta("idle_serial",0))
+            gesture=_idle_gesture_choice(str(person.get_meta("personality","quiet")),str(person.get_meta("mood","CALM")),str(person.get_meta("appearance_stage","ADULT")),seed+serial)
+            person.set_meta("idle_serial",serial+1)
+            left=2.4 if gesture=="STRETCH" else 1.8
+            wait=12.0+float((seed+serial*7)%19)
+    person.set_meta("idle_wait",wait)
+    person.set_meta("idle_left",left)
+    person.set_meta("idle_gesture",gesture)
+    return gesture
+
+# Shoulder pitch, shoulder roll and elbow pitch in radians.
+func _idle_arm_pose(gesture: String,right: bool,now: float) -> Vector3:
+    match gesture:
+        "SCRATCH_HEAD":
+            if right:return Vector3(1.50,0.55,1.55+0.12*sin(now*12.0))
+        "HAIR_FIX":
+            if right:return Vector3(1.65,0.42,1.40+0.10*sin(now*5.0))
+        "RUB_NECK":
+            if right:return Vector3(1.30,0.60,1.70)
+        "CHECK_WATCH":
+            if not right:return Vector3(0.72,-0.35,0.85)
+        "LOOK_HANDS":
+            return Vector3(0.45,0.16 if right else -0.16,0.78)
+        "ADJUST_COLLAR":
+            if right:return Vector3(0.85,-0.22,1.22)
+        "STRETCH":
+            return Vector3(2.40,0.50 if right else -0.50,0.25)
+    return Vector3.ZERO
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
@@ -4277,7 +4346,14 @@ func _animate_residents(delta: float) -> void:
             var to_visitor := _avatar.position-person.position
             if to_visitor.length_squared()>0.001:
                 person.rotation.y=lerp_angle(person.rotation.y,atan2(-to_visitor.x,-to_visitor.z),minf(delta*5.0,1.0))
-        var guarded := not walking and not seated and not talking and not phone and not coffee and not umbrella and not wave and activity in ["RELAXING","RESTING","FREE_TIME"] and str(person.get_meta("mood","")) in ["IRRITATED","STRESSED"]
+        var idle_ok := not walking and not seated and not talking and not phone and not coffee and not umbrella and not wave and not joke and not queued and activity in ["RELAXING","RESTING","FREE_TIME"]
+        var idle_gesture := _tick_idle_gesture(person,delta,idle_ok)
+        var guarded := idle_ok and idle_gesture.is_empty() and str(person.get_meta("mood","")) in ["IRRITATED","STRESSED"]
+        if idle_gesture in ["CHECK_WATCH","LOOK_HANDS"]:
+            var head := person.get_node("Head") as Node3D
+            head.rotation.x=lerpf(head.rotation.x,0.24,minf(delta*7.0,1.0))
+            var pivot := Vector3(0,1.49,0)
+            head.position=pivot-head.basis*pivot
         person.get_node("ArmRight/Phone").visible = phone
         person.get_node("ArmRight/CoffeeCup").visible = coffee
         var work_prop := person.get_node_or_null("ArmRight/WorkProp") as Node3D
@@ -4289,7 +4365,15 @@ func _animate_residents(delta: float) -> void:
                 _animate_resident_leg(part,delta,gait+(0.0 if limb=="LegLeft" else PI),walking,seated)
                 if seated:
                     angle = PI/2.0
-            if wave and limb=="ArmRight":
+                elif idle_gesture=="TAP_FOOT" and limb=="LegRight":
+                    var foot := part.get_node("Knee/Foot") as Node3D
+                    foot.rotation.x=0.12*maxf(0.0,sin(now*12.0))
+            var idle_pose := Vector3.ZERO
+            if limb in ["ArmLeft","ArmRight"]:
+                idle_pose=_idle_arm_pose(idle_gesture,limb=="ArmRight",now)
+            if idle_pose!=Vector3.ZERO:
+                angle=idle_pose.x
+            elif wave and limb=="ArmRight":
                 angle=-2.25+sin(gesture_time*11.0)*0.22
             elif guarded and limb in ["ArmLeft","ArmRight"]:
                 angle=-0.95
@@ -4323,12 +4407,13 @@ func _animate_residents(delta: float) -> void:
             if limb in ["ArmLeft","ArmRight"]:
                 var roll := (-0.42 if limb=="ArmRight" else 0.42) if guarded else (0.30 if wave and limb=="ArmRight" else 0.0)
                 var shoulder_sway := 0.035*sin(gait+(0.0 if limb=="ArmLeft" else PI)) if walking else 0.0
-                part.rotation.z=lerpf(part.rotation.z,roll+shoulder_sway,minf(delta*8.0,1.0))
+                part.rotation.z=lerpf(part.rotation.z,idle_pose.y if idle_pose!=Vector3.ZERO else roll+shoulder_sway,minf(delta*8.0,1.0))
                 var grip: bool = limb=="ArmRight" and (phone or coffee or (work_prop!=null and work_prop.visible))
                 var elbow_bend := -0.12-0.18*maxf(0.0,sin(gait+(PI if limb=="ArmLeft" else 0.0))) if walking else 0.0
                 if grip:elbow_bend=-0.20
                 elif wave and limb=="ArmRight":elbow_bend=-0.36
                 elif guarded:elbow_bend=-0.55
+                if idle_pose!=Vector3.ZERO:elbow_bend=idle_pose.z
                 _animate_resident_elbow(part,delta,elbow_bend,grip)
 
 func _building(_title: String, wall_color: Color) -> void:
