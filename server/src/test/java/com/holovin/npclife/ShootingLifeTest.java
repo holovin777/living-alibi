@@ -24,6 +24,22 @@ class ShootingLifeTest {
         assertFalse(WeaponLicenseLife.view(t,s).ownsSportWeapon());
         assertThrows(IllegalArgumentException.class,()->CombatLife.fire(t,s,"",truth,observations));
     }
+    @Test void finitePracticeSupplyAndRefill(){
+        var s=new WorldState();var t=TownLife.create(s);s.minute=720;t.player.money=200;
+        t.player.place=TownLife.Place.OFFICE;WeaponLicenseLife.apply(t,s);
+        t.player.place=TownLife.Place.MARKET;WeaponLicenseLife.buySport(t,s);
+        t.player.place=TownLife.Place.WORKSHOP;
+        assertThrows(IllegalArgumentException.class,()->WeaponLicenseLife.refill(t,s));
+        for(int i=0;i<WeaponLicenseLife.CAPACITY;i++)WeaponLicenseLife.practice(t,s);
+        var report=WeaponLicenseLife.view(t,s);
+        assertEquals(0,report.rounds());assertEquals(1,report.practiceSessions());
+        assertEquals(0,WeaponLicenseLife.view(t.copy(),s).rounds());
+        assertThrows(IllegalArgumentException.class,()->WeaponLicenseLife.practice(t,s));
+        assertTrue(report.canRefill());
+        int money=t.player.money;WeaponLicenseLife.refill(t,s);
+        assertEquals(money-WeaponLicenseLife.REFILL_PRICE,t.player.money);
+        assertEquals(WeaponLicenseLife.CAPACITY,WeaponLicenseLife.view(t,s).rounds());
+    }
     @Test void residentHitUsesExistingNonlethalJusticeFlow(){
         var s=new WorldState();var t=TownLife.create(s);s.minute=720;t.player.money=200;
         t.player.place=TownLife.Place.OFFICE;WeaponLicenseLife.apply(t,s);

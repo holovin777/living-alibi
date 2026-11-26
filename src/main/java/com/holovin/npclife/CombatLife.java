@@ -42,6 +42,7 @@ final class CombatLife {
             var target=PlayerLife.nearby(t,id);
             if(target.age>=18&&target.health>20)return strike(t,clock,id,"sport",truth,observations);
         }
+        WeaponLicenseLife.spendRound(t);
         TownLife.publish(t,clock,"visitor:"+t.player.incarnation,t.player.place,
                 "A shot was fired in a public space.",truth,observations);
         boolean officer=PlayerLife.visible(t).stream().anyMatch(c->PoliceLife.scheduled(c,clock.day,clock.minute));
@@ -59,6 +60,7 @@ final class CombatLife {
         if(victim.age<18||victim.health<=20)throw new IllegalArgumentException("This person cannot be attacked.");
         int last=t.industryStocks.getOrDefault(key(t,"last-strike"),0);
         if(last>0&&now(clock)-last<2)throw new IllegalArgumentException("You need a moment to recover.");
+        if("sport".equals(weapon))WeaponLicenseLife.spendRound(t);
         int damage="sport".equals(weapon)?18:"baton".equals(weapon)?12:6;
         victim.health=Math.max(20,victim.health-damage);
         if("marco".equals(id))clock.health=victim.health;

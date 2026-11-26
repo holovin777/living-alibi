@@ -6411,19 +6411,25 @@ func _render_actions() -> void:
     var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
     if _current_place=="WORKSHOP" and not _rebirth_active() and bool(permit.get("ownsSportWeapon",false)):
         var practice_info := Label.new()
-        practice_info.text=tr("Training counter · 08:00–18:00")
+        practice_info.text=tr("Training counter · 08:00–18:00")+"\n"+tr("Practice shots: %s · Sessions: %s") % [permit.get("practiceShots",0),permit.get("practiceSessions",0)]
         _action_choices.add_child(practice_info)
         var practice_btn := _button(tr("Practice shot"),_weapon_license_action.bind("weapon-practice"))
         var practice_minute := int(_last_snapshot.get("minute",0))
-        practice_btn.disabled = not bool(permit.get("valid",false)) or practice_minute<480 or practice_minute+2>1080
+        practice_btn.disabled = not bool(permit.get("valid",false)) or practice_minute<480 or practice_minute+2>1080 or int(permit.get("rounds",0))<=0
+        practice_btn.set_meta("sold_out",practice_btn.disabled)
         _action_choices.add_child(practice_btn)
+        var refill_btn := _button(tr("Replenish training supply · 3 EUR"),_weapon_license_action.bind("weapon-refill"))
+        refill_btn.disabled=not bool(permit.get("canRefill",false))
+        refill_btn.set_meta("sold_out",refill_btn.disabled)
+        _action_choices.add_child(refill_btn)
     if _current_place=="OFFICE" and not _rebirth_active():
         var permit_info := Label.new()
-        permit_info.text = tr("Weapon license: active") if bool(permit.get("valid",false)) else tr("Weapon license: inactive")
+        permit_info.text = tr("Weapon license: active")+" · "+tr("%s days left") % permit.get("daysRemaining",0) if bool(permit.get("valid",false)) else tr("Weapon license: inactive")
         _action_choices.add_child(permit_info)
         if not bool(permit.get("valid",false)):
             var request_permit := _button(tr("Apply for weapon license · 10 EUR"),_weapon_license_action.bind("weapon-license-apply"))
             request_permit.disabled = not bool(permit.get("canApply",false))
+            request_permit.set_meta("sold_out",request_permit.disabled)
             _action_choices.add_child(request_permit)
     if _current_place=="OFFICE" and int(justice.get("fineOutstanding",0))>0 and not _rebirth_active():
         _action_choices.add_child(_button(tr("Pay outstanding fine"),_pay_justice_fine))
@@ -6970,10 +6976,12 @@ func _render_actions() -> void:
                 if not bool(_last_snapshot.get("player",{}).get("ownsBaton",false)):
                     var baton_button := _button(tr("Buy training baton · 12 EUR"),_buy_training_baton)
                     baton_button.disabled = not bool(permit.get("valid",false)) or not shop_open or int(player.get("money",0))<12
+                    baton_button.set_meta("sold_out",baton_button.disabled)
                     _action_choices.add_child(baton_button)
                 if not bool(permit.get("ownsSportWeapon",false)):
                     var sport_button := _button(tr("Buy registered sporting weapon · 80 EUR"),_weapon_license_action.bind("weapon-buy-sport"))
                     sport_button.disabled = not bool(permit.get("canBuySport",false))
+                    sport_button.set_meta("sold_out",sport_button.disabled)
                     _action_choices.add_child(sport_button)
                 else:
                     var owned_sport := Label.new()
@@ -7439,12 +7447,15 @@ func _try_shoot() -> void:
     if not _foot_controls_available() or _rebirth_active() or _guest_active or _stairwell_active or not _connected or _api.is_busy():return
     var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
     if not bool(permit.get("valid",false)) or not bool(permit.get("ownsSportWeapon",false)):return
+    if int(permit.get("rounds",0))<=0:
+        _message.text=tr("No game rounds remaining.")
+        return
     var id := _looked_at_resident()
     _api.garden_action("weapon-fire" if id.is_empty() else "weapon-fire:"+id)
 
 func _weapon_license_action(action: String) -> void:
     if not _connected or _api.is_busy() or not _near_kiosk():return
-    if (action=="weapon-license-apply" and _current_place=="OFFICE") or (action=="weapon-buy-sport" and _current_place=="MARKET") or (action=="weapon-practice" and _current_place=="WORKSHOP"):
+    if (action=="weapon-license-apply" and _current_place=="OFFICE") or (action=="weapon-buy-sport" and _current_place=="MARKET") or (action in ["weapon-practice","weapon-refill"] and _current_place=="WORKSHOP"):
         _api.garden_action(action)
 
 func _buy_training_baton() -> void:
@@ -7473,7 +7484,8 @@ func _refresh_held_item() -> void:
         if not _rebirth_active() and _hands.held_item in ["","baton"]:
             _held_label.text += " · "+tr("X: strike")
         elif _hands.held_item=="sport":
-            _held_label.text += " · "+tr("Left click / X: fire")
+            var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
+            _held_label.text += " · "+tr("Rounds: %s/%s") % [permit.get("rounds",0),permit.get("capacity",5)]+" · "+tr("Left click / X: fire")
 
 func _cycle_held_item() -> void:
     var choices := _holdable_items()

@@ -620,6 +620,9 @@ public final class GameSession implements AutoCloseable {
         if("weapon-buy-sport".equals(action)){
             var copy=town.copy();return apply(copy,2,WeaponLicenseLife.buySport(copy,state));
         }
+        if("weapon-refill".equals(action)){
+            var copy=town.copy();return apply(copy,2,WeaponLicenseLife.refill(copy,state));
+        }
         if("weapon-practice".equals(action)){
             var copy=town.copy();return apply(copy,2,WeaponLicenseLife.practice(copy,state));
         }

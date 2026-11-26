@@ -153,7 +153,7 @@ func _exercise() -> void:
             "shared foliage responds to seasons and snow"):
         return
     var sound = world._town_audio
-    if not _check(sound._streams.size()==15 and sound.water is AudioStreamPlayer3D
+    if not _check(sound._streams.has_all(["grass","stone","wood","asphalt","wind","water","traffic","voices","bird","bell","landing","door","bicycle","industry","crickets","shot"]) and sound.water is AudioStreamPlayer3D
             and sound.traffic is AudioStreamPlayer3D,
             "town has original sound streams and positional audio sources"):
         return
@@ -169,6 +169,9 @@ func _exercise() -> void:
     if not _check(sound.effects.stream==sound._streams["door"]
             and sound.industry is AudioStreamPlayer3D and sound.crickets is AudioStreamPlayer3D,
             "door latch and additional spatial sources exist"):
+        return
+    sound.play_effect("shot")
+    if not _check(sound.effects.stream==sound._streams["shot"],"shooting has a distinct sound"):
         return
     sound.set_enabled(false)
     if not _check(not sound.enabled and not sound.steps.playing and not sound.water.playing and not sound.effects.playing and not sound.bicycle.playing,
