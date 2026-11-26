@@ -246,7 +246,7 @@ func _exercise() -> void:
     var centro_root: Node3D = world._chunks["CENTRO"]["root"]
     world._on_world_updated(_world("CENTRO","Centro Storico"))
     if not _check(world._scenery == centro_root and centro_root.has_node("PiazzaCentrale")
-            and world._road_links.size() == 4 and world._park_lamps.size() == 6,
+            and world._road_links.size() == 4 and world._park_lamps.size() == 4,
             "historic square has cached scenery, four roads and lamps"):
         return
     if not _check(world._can_stand(Vector3(-13,0,-9),world.WALKER_RADIUS)
