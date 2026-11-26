@@ -126,8 +126,7 @@ lasts up to ten game minutes; hang up or invite the contact for coffee.
 Acceptance creates tomorrow's 18:00 cafe meeting in the existing scheduler.
 The latest outgoing call per contact is persisted separately from incoming
 calls. Outgoing calls are deterministic text interactions, not open-ended
-phone conversations. Inviting friends to the player's own home and choosing arbitrary meeting times
-are not yet implemented.
+phone conversations. Choosing arbitrary meeting times is not yet implemented.
 
 ## Visiting friends at home
 
@@ -147,8 +146,26 @@ Both participants' needs improve, affinity and trust increase, and the
 contact remembers the shared meal. This is a meal interaction, not
 a cooking minigame. A scheduled visit permits up to an hour inside while
 the host remains available. Existing household NPCs are visible according
-to the existing household rules. Hosting friends in the player's own
-home, introductions to family and birthdays remain separate future work.
+to the existing household rules. Introductions to family and birthdays remain separate future work.
+
+## Hosting friends and cooking together
+
+Purchase Casa del Glicine, exchange phone numbers with a trusted friend,
+call them in Contacts and select Invite to your home. Acceptance is recorded
+in the calendar for tomorrow at 18:00. The guest's schedule prefers the
+south residential district from 17:30 until 19:30, subject to work and
+essential needs. Arrive before 18:30. An NPC living in that same district
+cannot yet be invited, because private home units and guest routing within
+a district need finer-grained server support. The server tracks district
+presence, not exact indoor coordinates; Godot positions the arriving guest
+inside the house.
+
+Store two units each of pasta, vegetables and water in the cupboard.
+While the guest is present, open the kitchen actions and select Cook pasta
+together (25 minutes). The real ingredients are consumed, both people's
+needs improve, trust and affinity increase and a shared-meal milestone
+is saved. This is a timed shared cooking action, not a cooking animation
+or minigame. Only one meal per guest per game day is allowed.
 
 Manual check:
 ```sh
