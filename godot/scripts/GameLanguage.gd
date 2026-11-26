@@ -1,6 +1,12 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "Invite to your home": "Invita a casa tua",
+    "Cook pasta together · 25m": "Cucinate la pasta insieme · 25m",
+    "You cooked and ate together.": "Avete cucinato e mangiato insieme.",
+    "A guest and enough visit time are required.": "Serve un ospite e abbastanza tempo per la visita.",
+    "Two portions of pasta, vegetables and water are required.": "Servono due porzioni di pasta, verdure e acqua.",
+    "You already cooked together today.": "Avete già cucinato insieme oggi.",
     "Ask to visit at home": "Chiedi di andare a casa sua",
     "Accept invitation": "Accetta invito",
     "Visit with %s · day %s · %s": "Visita a %s · giorno %s · %s",
