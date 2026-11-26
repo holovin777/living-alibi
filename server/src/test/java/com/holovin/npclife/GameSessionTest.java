@@ -13,6 +13,31 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void constructionWorkerIsPaidFromReservedStageLabor() {
+        var state=new WorldState();var town=TownLife.create(state);
+        var worker=PopulationGenerator.add(town,1).getFirst();
+        worker.occupation=ConstructionLife.BUILDER;worker.employed=true;worker.age=30;
+        worker.workplace=TownLife.Place.NORTH_RESIDENCES;worker.place=worker.workplace;
+        worker.travelRemaining=0;worker.activity="WORKING";
+        ConstructionLife.set(town,ConstructionLife.OWNER,town.player.incarnation);
+        ConstructionLife.set(town,ConstructionLife.ENABLED,1);
+        ConstructionLife.set(town,ConstructionLife.STEEL,1);
+        ConstructionLife.set(town,ConstructionLife.RESERVE,10);
+        assertTrue(ConstructionLife.shift(town,2,780));
+        assertEquals("HAMMER",GameSession.workVisual(worker));
+        int wallet=worker.money,company=town.employerFunds.getOrDefault(ConstructionLife.CONTRACTOR,0);
+        ConstructionLife.tick(town,2,840);
+        ConstructionLife.tick(town,2,840);
+        assertEquals(1,ConstructionLife.get(town,ConstructionLife.STAGE));
+        assertEquals(0,ConstructionLife.get(town,ConstructionLife.RESERVE));
+        assertEquals(0,ConstructionLife.get(town,ConstructionLife.STEEL));
+        assertEquals(wallet+10,worker.money);
+        assertEquals(company,town.employerFunds.getOrDefault(ConstructionLife.CONTRACTOR,0));
+        assertFalse(ConstructionLife.shift(town,3,780));
+    }
+
+
+    @Test
     void municipalWorkChangesPublicUpkeepAndConservesPayroll() throws Exception {
         Path file=directory.resolve("street-care.db");
         try(var db=new WorldDatabase(file)){
