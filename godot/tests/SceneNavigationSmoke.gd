@@ -920,6 +920,31 @@ func _exercise() -> void:
     marco.remove_meta("wave_remaining")
     marco.remove_meta("wave_near")
     marco.remove_meta("wave_cooldown")
+    if not _check(not world._person_clear(Vector3(0,0,0),Vector3(0.4,0,0),0.3,Vector3(0.8,0,0),0.3)
+            and world._person_clear(Vector3(0.4,0,0),Vector3(0.3,0,0),0.3,Vector3(0.8,0,0),0.3),
+            "personal space blocks penetration but allows escape from overlap"):
+        return
+    var presence_old: Vector3=marco.position
+    var presence_yaw: float=marco.rotation.y
+    var presence_avatar: Vector3=world._avatar.position
+    marco.position=Vector3(0,0,0)
+    marco.rotation.y=0.0
+    world._avatar.position=Vector3(0.5,0,-2.0)
+    world._resident_attention(marco)
+    if not _check(marco.has_meta("attention_yaw") and float(marco.get_meta("attention_yaw"))<0.0,
+            "resident notices nearby visitor in front"):
+        return
+    world._avatar.position=Vector3(0,0,2)
+    world._resident_attention(marco)
+    if not _check(not marco.has_meta("attention_yaw"),"resident does not stare through the back of the head"):
+        return
+    world._animate_resident_posture(marco,1.0,1.0,PI/2.0,true,false)
+    if not _check(absf(marco.get_node("Shoulders").rotation.y)>0.04 and marco.position==Vector3.ZERO,
+            "walking posture rotates shoulders without moving collision body"):
+        return
+    marco.position=presence_old
+    marco.rotation.y=presence_yaw
+    world._avatar.position=presence_avatar
     var right_arm := marco.get_node("ArmRight") as Node3D
     var right_elbow := right_arm.get_node("Elbow") as Node3D
     var right_foot := marco.get_node("LegRight/Knee/Foot") as Node3D

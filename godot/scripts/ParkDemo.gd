@@ -276,8 +276,8 @@ func _process(delta: float) -> void:
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
         var before := _avatar.position
         var speed := _movement_speed()
-        _avatar.position = _move_on_ground(_avatar.position,
-                relative_motion * delta * speed, WALKER_RADIUS, _can_walk_roads())
+        _avatar.position = _move_among_people(_avatar.position,
+                relative_motion * delta * speed, WALKER_RADIUS, null, _can_walk_roads())
         moved = before.distance_to(_avatar.position)
         if speed == CYCLE_SPEED:
             _bike_wheel_angle += moved/0.35
@@ -1713,6 +1713,47 @@ func _move_on_ground(from: Vector3, displacement: Vector3, radius: float,
                 at = candidate
     if _stairwell_active and not _guest_active:
         at.y = _stairwell.ground_height(at)
+    return at
+
+# Dynamic local bodies are separate from static geometry and never affect
+# spawn/seat/path validation. A pre-existing overlap can be escaped, not deepened.
+func _person_clear(from: Vector3,at: Vector3,radius: float,other: Vector3,other_radius: float) -> bool:
+    if absf(at.y-other.y)>1.1:return true
+    var limit := radius+other_radius
+    var next := Vector2(at.x-other.x,at.z-other.z).length_squared()
+    if next>=limit*limit:return true
+    var before := Vector2(from.x-other.x,from.z-other.z).length_squared()
+    return next>before+0.000001
+
+func _people_clear(from: Vector3,at: Vector3,radius: float,ignore: Node3D) -> bool:
+    if ignore!=null and not _drive_active() and not _person_clear(from,at,radius,_avatar.position,WALKER_RADIUS):
+        return false
+    if _guest_active or _stairwell_active:return true
+    if not is_instance_valid(_residents_root):return true
+    for child in _residents_root.get_children():
+        var person := child as Node3D
+        if person==null or person==ignore:continue
+        var body_radius := clampf(0.32*person.scale.x,0.18,0.42)
+        if not _person_clear(from,at,radius,person.position,body_radius):return false
+    return true
+
+func _move_among_people(from: Vector3,motion: Vector3,radius: float,ignore: Node3D,allow_roads: bool=false) -> Vector3:
+    if _guest_active or _stairwell_active:
+        return _move_on_ground(from,motion,radius,allow_roads)
+    var count := maxi(1,ceili(Vector2(motion.x,motion.z).length()/COLLISION_STEP))
+    var step := Vector3(motion.x,0,motion.z)/float(count)
+    var at := from
+    for i in range(count):
+        var candidate := _move_on_ground(at,step,radius,allow_roads)
+        if _people_clear(at,candidate,radius,ignore):
+            at=candidate
+        else:
+            # Consistent right-side passing, with a left fallback; never cross a wall.
+            for angle in [PI/3.0,-PI/3.0,PI/2.0,-PI/2.0]:
+                var detour := _move_on_ground(at,step.rotated(Vector3.UP,angle),radius,allow_roads)
+                if detour.distance_squared_to(at)>0.000001 and _people_clear(at,detour,radius,ignore):
+                    at=detour
+                    break
     return at
 
 func _open_anchor(preferred: Vector3) -> Vector3:
@@ -3702,6 +3743,7 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var hair: Color = profile["hair"]
     var pants: Color = profile["pants"]
     var torso := _cylinder(person,0.23,0.57,jacket,Vector3(0,1.14,0))
+    torso.name="Torso"
     torso.scale=Vector3(float(profile["waist"]),1.0,0.72)
     var torso_mesh := torso.mesh as CylinderMesh
     torso_mesh.top_radius=0.245
@@ -3709,6 +3751,7 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var hips := _sphere(person,0.22,pants,Vector3(0,0.86,0))
     hips.scale=Vector3(1.0,0.46,0.72)
     var shoulders := _cylinder(person,0.255,0.14,jacket,Vector3(0,1.36,0))
+    shoulders.name="Shoulders"
     shoulders.scale=Vector3(float(profile["shoulders"]),1.0,0.68)
     var neck := _cylinder(person,0.087,0.17,skin,Vector3(0,1.49,0))
     var neck_mesh := neck.mesh as CylinderMesh
@@ -4034,6 +4077,8 @@ func _animate_resident_head(person: Node3D,delta: float,now: float,engaged: bool
         if mood=="TIRED":nod=0.10
     else:
         turn=0.08*sin(now*0.72+phase)
+    if not engaged and person.has_meta("attention_yaw"):
+        turn=lerpf(turn,float(person.get_meta("attention_yaw")),0.72)
     # Rotation is around the neck; existing facial meshes share one pivot.
     # Limit movement when headgear is anchored to a uniform or winter outfit.
     var winter := person.get_node_or_null("WinterClothes") as Node3D
@@ -4102,6 +4147,40 @@ func _assign_resident_seats() -> void:
             person.set_meta("seat_kind","")
 
 # Advance gait only by distance actually covered, not by the wall clock.
+func _resident_attention(person: Node3D) -> void:
+    person.remove_meta("attention_yaw")
+    var target := _avatar.position
+    var offset := target-person.position
+    offset.y=0.0
+    if offset.length_squared()>16.0 or offset.length_squared()<0.12:
+        return
+    var local := wrapf(atan2(-offset.x,-offset.z)-person.rotation.y,-PI,PI)
+    # Only notice someone in the forward field of view.
+    if absf(local)<1.0:
+        person.set_meta("attention_yaw",clampf(local,-0.38,0.38))
+
+func _animate_resident_posture(person: Node3D,delta: float,now: float,gait: float,walking: bool,seated: bool) -> void:
+    var torso := person.get_node_or_null("Torso") as Node3D
+    var shoulders := person.get_node_or_null("Shoulders") as Node3D
+    if torso==null or shoulders==null:return
+    var profile: Dictionary=person.get_meta("appearance",{})
+    var phase := float(person.get_meta("phase",0.0))
+    var breathing := 0.009*sin(now*2.1+phase)
+    var clothed := not str(person.get_meta("outfit_visual","")).is_empty()
+    var winter := person.get_node_or_null("WinterClothes") as Node3D
+    if clothed or (winter!=null and winter.visible):breathing*=0.25
+    var blend := minf(delta*5.0,1.0)
+    torso.scale.z=lerpf(torso.scale.z,0.72+breathing,blend)
+    var shift := 0.009*sin(now*0.75+phase) if not seated and not walking else 0.0
+    shoulders.position.x=lerpf(shoulders.position.x,shift,blend)
+    shoulders.rotation.y=lerpf(shoulders.rotation.y,0.055*sin(gait) if walking else 0.0,blend)
+    shoulders.rotation.z=lerpf(shoulders.rotation.z,shift*2.0,blend)
+    # Small asymmetric arm offsets; no ground position changes.
+    if not seated and not walking:
+        torso.scale.x=lerpf(torso.scale.x,float(profile.get("waist",1.0))+breathing*0.35,blend)
+    else:
+        torso.scale.x=lerpf(torso.scale.x,float(profile.get("waist",1.0)),blend)
+
 func _resident_gait(person: Node3D,distance: float) -> float:
     var phase := float(person.get_meta("gait_phase",person.get_meta("phase",0.0)))
     var step_length := maxf(0.27,0.68*person.scale.y)
@@ -4167,8 +4246,11 @@ func _animate_residents(delta: float) -> void:
                 person.rotation.y = atan2(-motion.x,-motion.z)
             var next := person.position.move_toward(target,delta*1.5*pace)
             var old := person.position
-            person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
+            person.position = _move_among_people(old,next-old,WALKER_RADIUS,person)
             walked=person.position.distance_to(old)
+            if walked>0.001:
+                var actual := person.position-old
+                person.rotation.y=atan2(-actual.x,-actual.z)
             walking = walked > 0.001
         var umbrella := _sync_resident_weather(person,talking,seated)
         var gait := _resident_gait(person,walked)
@@ -4178,7 +4260,9 @@ func _animate_residents(delta: float) -> void:
         person.set_meta("reply_remaining",reply_remaining)
         var joke := _current_place=="OFFICE" and str(person.get_meta("resident_id",""))==_office_joker_id and _office_joke_hold>0.0
         _animate_resident_face(person,delta,now,(talking and reply_remaining>0.0) or joke)
+        _resident_attention(person)
         _animate_resident_head(person,delta,now,talking,walking)
+        _animate_resident_posture(person,delta,now,gait,walking,seated)
         var casual := person.get_node_or_null("CasualDetails") as Node3D
         var winter := person.get_node_or_null("WinterClothes") as Node3D
         if casual!=null:
