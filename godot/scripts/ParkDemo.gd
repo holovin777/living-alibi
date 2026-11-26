@@ -80,6 +80,9 @@ var _host_activity := ""
 var _host_path: Array[Vector3] = []
 var _host_seated := false
 var _guest_sitting := false
+var _character_menu: PanelContainer
+var _character_resume_actions := false
+var _character_previous_mouse := Input.MOUSE_MODE_VISIBLE
 var _guest_stand_at := Vector3.ZERO
 var _guest_feedback := ""
 var _guest_feedback_time := 0.0
@@ -240,6 +243,7 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    if is_instance_valid(_character_menu) and _character_menu.visible:return
     if _phone_alert_remaining>0.0:
         _phone_alert_remaining = maxf(0.0,_phone_alert_remaining-delta)
         if _phone_alert_remaining<=0.0:
@@ -399,6 +403,7 @@ func _process(delta: float) -> void:
         _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
 
 func _unhandled_input(event: InputEvent) -> void:
+    if is_instance_valid(_character_menu) and _character_menu.visible:return
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         if _drive_active():
             _drive_look = clampf(_drive_look-event.relative.x*MOUSE_SENSITIVITY,-1.05,1.05)
@@ -413,6 +418,15 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        if is_instance_valid(_character_menu) and _character_menu.visible:
+            if event.keycode in [KEY_I,KEY_ESCAPE]:_close_character_menu()
+            get_viewport().set_input_as_handled()
+            return
+        if event.keycode==KEY_I and not _dialog_panel.visible:
+            _toggle_character_menu()
+            get_viewport().set_input_as_handled()
+            return
     if event is InputEventKey and event.pressed and not event.echo:
         if _guest_active:
             if event.keycode==KEY_G and not _guest_sitting and _guest.near_exit(_avatar.position):
@@ -3747,6 +3761,7 @@ func _create_interface() -> void:
     _status = Label.new()
     _status.text = "A visitor with 50 EUR and no assigned profession"
     column.add_child(_status)
+    column.add_child(_button("My character (I)",_toggle_character_menu))
     var guide_toggle := CheckButton.new()
     guide_toggle.text = "First steps / navigation"
     guide_toggle.button_pressed = true
@@ -3791,31 +3806,38 @@ func _create_interface() -> void:
     _message.custom_minimum_size = Vector2(420.0, 0.0)
     column.add_child(_message)
 
+    var details_toggle := CheckButton.new()
+    details_toggle.text=tr("More actions and settings")
+    column.add_child(details_toggle)
+    var details := VBoxContainer.new()
+    column.add_child(details)
+    details.hide()
+    details_toggle.toggled.connect(func(value):details.visible=value)
     var buttons := HBoxContainer.new()
-    column.add_child(buttons)
+    details.add_child(buttons)
     buttons.add_child(_button("Refresh", _refresh))
     buttons.add_child(_button("Jobs", _find_jobs))
     buttons.add_child(_button("Industry", _view_industry))
     buttons.add_child(_button("Business", _view_business))
     buttons.add_child(_button("Wait 60m", _wait_one_hour))
     _transport_button = _button("Transport: walking (B)",_toggle_transport)
-    column.add_child(_transport_button)
+    details.add_child(_transport_button)
     _transport_button.disabled = true
     _parking_button = _button("Bicycle rack (P)",_toggle_parking)
-    column.add_child(_parking_button)
+    details.add_child(_parking_button)
     _parking_button.disabled = true
     var map_button := Button.new()
     map_button.text = "Town map (M)"
     map_button.pressed.connect(_toggle_map)
-    column.add_child(map_button)
+    details.add_child(map_button)
     _language_selector = OptionButton.new()
     _language_selector.add_item("English",0)
     _language_selector.add_item("Italiano",1)
     _language_selector.select(1 if TranslationServer.get_locale()=="it" else 0)
     _language_selector.item_selected.connect(_on_language_selected)
-    column.add_child(_language_selector)
+    details.add_child(_language_selector)
     var clock_row := HBoxContainer.new()
-    column.add_child(clock_row)
+    details.add_child(clock_row)
     var clock_label := Label.new()
     clock_label.text = "World time:"
     clock_row.add_child(clock_label)
@@ -3827,7 +3849,7 @@ func _create_interface() -> void:
     _clock_selector.item_selected.connect(_on_clock_speed_selected)
     clock_row.add_child(_clock_selector)
     var graphics_row := HBoxContainer.new()
-    column.add_child(graphics_row)
+    details.add_child(graphics_row)
     var graphics_label := Label.new()
     graphics_label.text = "Graphics quality"
     graphics_row.add_child(graphics_label)
@@ -3838,7 +3860,7 @@ func _create_interface() -> void:
     quality.item_selected.connect(_set_graphics_quality)
     graphics_row.add_child(quality)
     var atmosphere_row := HBoxContainer.new()
-    column.add_child(atmosphere_row)
+    details.add_child(atmosphere_row)
     var effects_toggle := CheckButton.new()
     effects_toggle.text = "Weather FX"
     effects_toggle.button_pressed = true
@@ -3853,17 +3875,17 @@ func _create_interface() -> void:
     sound_toggle.text = "Town sound"
     sound_toggle.button_pressed = true
     sound_toggle.toggled.connect(_set_town_audio)
-    column.add_child(sound_toggle)
+    details.add_child(sound_toggle)
     var head_bob_toggle := CheckButton.new()
     head_bob_toggle.text = tr("Camera motion")
     head_bob_toggle.button_pressed = _head_bob_enabled
     head_bob_toggle.toggled.connect(_set_head_bob)
-    column.add_child(head_bob_toggle)
+    details.add_child(head_bob_toggle)
     var hands_toggle := CheckButton.new()
     hands_toggle.text = "First-person hands"
     hands_toggle.button_pressed = true
     hands_toggle.toggled.connect(_set_hands_enabled)
-    column.add_child(hands_toggle)
+    details.add_child(hands_toggle)
     _held_label = Label.new()
     column.add_child(_held_label)
     column.add_child(_button("Open phone (H)",_toggle_phone))
@@ -3872,6 +3894,9 @@ func _create_interface() -> void:
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
     column.add_child(_hint)
+    var character_hint := Label.new()
+    character_hint.text=tr("I: character · H: phone · M: map")
+    column.add_child(character_hint)
     _jobs = Label.new()
     _jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _jobs.text = ""
@@ -4018,12 +4043,36 @@ func _create_interface() -> void:
     intercom_col.add_child(_button("Ask to come inside",_intercom_action.bind("invite")))
     intercom_col.add_child(_button("Leave entrance",_close_intercom))
     _intercom.hide()
+    _character_menu=preload("res://scripts/CharacterMenu.gd").new()
+    canvas.add_child(_character_menu)
+    _character_menu.hide()
+    _character_menu.close_requested.connect(_close_character_menu)
+
+func _toggle_character_menu() -> void:
+    if _character_menu.visible:
+        _close_character_menu()
+        return
+    if not _connected or _drive_active() or _jump_elapsed>=0.0 or _guest_pending or _home_transition or not _road_pending.is_empty() or _dialog_panel.visible or _intercom.visible or _phone.visible or _map_panel.visible or _travel_panel.visible or _api.is_busy():return
+    _character_previous_mouse=Input.mouse_mode
+    _character_resume_actions=_action_panel.visible
+    _action_panel.hide()
+    _character_menu.refresh(_last_snapshot)
+    _character_menu.show()
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _close_character_menu() -> void:
+    if not is_instance_valid(_character_menu) or not _character_menu.visible:return
+    _character_menu.hide()
+    _action_panel.visible=_character_resume_actions
+    _character_resume_actions=false
+    Input.set_mouse_mode(_character_previous_mouse)
 
 func _on_language_selected(index: int) -> void:
     GameLanguage.select_locale("it" if index==1 else "en")
     _refresh_localized_hud()
     _refresh_held_item()
     _phone.refresh()
+    if is_instance_valid(_character_menu) and _character_menu.visible:_character_menu.refresh(_last_snapshot)
     if _software_menu:
         _render_actions()
 
@@ -6202,6 +6251,7 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
         _needs.text += tr(" · Town population: %s") % (int(demography.get("alive",0))+2)
 
 func _on_world_updated(snapshot: Dictionary) -> void:
+    if is_instance_valid(_character_menu) and _character_menu.visible:_close_character_menu()
     var clock_update := _clock_pending
     var walking_transition := _home_transition or not _road_pending.is_empty()
     _home_transition=false
