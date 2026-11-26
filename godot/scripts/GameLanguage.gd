@@ -2,6 +2,9 @@ extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
     "Camera motion": "Movimento visuale",
+    "Birthday: day %s · celebrations: %s": "Compleanno: giorno %s · feste: %s",
+    "Last celebration: day %s · gift: %s EUR · total gifts: %s EUR": "Ultima festa: giorno %s · regalo: %s EUR · regali totali: %s EUR",
+    "A family birthday celebration": "Una festa di compleanno in famiglia",
     "WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.": "WASD: cammina · Maiusc: corri · Ctrl: abbassati · Spazio: salta · Esc: cursore.",
     "Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch": "Viaggio E: %s · Servizi F: %s · Mappa M · Parla T · Spazio: salta · Maiusc: corri · Ctrl: abbassati.",
     "WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.": "WASD: cammina · Spazio: salta · clic: visuale · Esc: cursore.",
