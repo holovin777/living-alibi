@@ -432,6 +432,11 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if _dialog_panel.visible and event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode == KEY_ESCAPE:
+            _close_dialog()
+        get_viewport().set_input_as_handled()
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         if _guest_active:
             if event.keycode==KEY_G and not _guest_sitting and _guest.near_exit(_avatar.position):
@@ -483,11 +488,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
         if _foot_controls_available():
             _cycle_held_item()
             get_viewport().set_input_as_handled()
-        return
-    if _dialog_panel.visible and event is InputEventKey and event.pressed and not event.echo:
-        if event.keycode == KEY_ESCAPE:
-            _close_dialog()
-        get_viewport().set_input_as_handled()
         return
     if _rebirth_active():
         if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
@@ -5459,6 +5459,16 @@ func _travel_to(destination: String) -> void:
     _api.go_to(destination)
 
 func _toggle_actions() -> void:
+    if _rebirth_active():
+        if not _connected:
+            return
+        _close_dialog()
+        _travel_panel.visible = false
+        _action_panel.visible = not _action_panel.visible
+        if _action_panel.visible:
+            _render_actions()
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
+        return
     if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck()) or not _connected:
         _message.text = "Approach a local kiosk or your rented bed."
         return
