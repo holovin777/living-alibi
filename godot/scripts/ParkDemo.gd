@@ -297,6 +297,8 @@ func _process(delta: float) -> void:
             var household = visit.get("household",{})
             if household is Dictionary and int(household.get("members",0))>1:
                 hints += "\n"+tr("Household: %s · at home: %s") % [household.get("members",0),household.get("present",0)]
+            if household is Dictionary and bool(household.get("birthdayNow",false)):
+                hints+="\n"+tr("A family birthday celebration")
         if _guest_sitting:
             hints += "\n"+tr("E: stand up · R: relax")
         else:
@@ -4747,6 +4749,14 @@ func _render_actions() -> void:
                         personal.text += "\nGraduation recorded. Continue as the same person."
                         _action_choices.add_child(_button("Continue adult life",_garden_action.bind("rebirth-continue")))
                 _action_choices.add_child(personal)
+                var birthday = identity.get("birthday")
+                if birthday is Dictionary:
+                    var birthday_label := Label.new()
+                    birthday_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                    birthday_label.text=tr("Birthday: day %s · celebrations: %s") % [birthday.get("nextDay",0),birthday.get("celebrations",0)]
+                    if int(birthday.get("celebrations",0))>0:
+                        birthday_label.text+="\n"+(tr("Last celebration: day %s · gift: %s EUR · total gifts: %s EUR") % [birthday.get("lastDay",0),birthday.get("lastGift",0),birthday.get("totalGifts",0)])
+                    _action_choices.add_child(birthday_label)
                 var personality = identity.get("personality")
                 if personality is Dictionary:
                     var traits := Label.new()
