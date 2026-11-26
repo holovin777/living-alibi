@@ -13,6 +13,23 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void pharmacyDeskUsesOnlyActualWorkingMedicalResidents(){
+        var nurse=new TownLife.Citizen("nurse","Nurse","Nurse",TownLife.Place.CLINIC);
+        var pharmacist=new TownLife.Citizen("pharmacist","Pharmacist","Pharmacist",TownLife.Place.CLINIC);
+        nurse.employed=true;nurse.activity="WORKING";nurse.travelRemaining=0;
+        pharmacist.employed=true;pharmacist.activity="WORKING";pharmacist.travelRemaining=0;
+        assertEquals("nurse",GameSession.pharmacyAttendant(java.util.List.of(nurse)));
+        assertEquals("",GameSession.pharmacyAttendant(java.util.List.of(nurse,pharmacist)));
+        assertEquals("PHARMACY",GameSession.workVisual(pharmacist));
+        assertEquals("MEDICAL",GameSession.workVisual(nurse));
+        assertEquals("DOCTOR_COAT",GameSession.outfitVisual(pharmacist));
+        nurse.activity="RESTING";
+        assertEquals("",GameSession.pharmacyAttendant(java.util.List.of(nurse)));
+        nurse.activity="WORKING";nurse.travelRemaining=1;
+        assertEquals("",GameSession.pharmacyAttendant(java.util.List.of(nurse)));
+    }
+
+    @Test
     void barberServicePersistsStyleAndConservesMoney() throws Exception {
         Path file=directory.resolve("barber.db");
         try(var db=new WorldDatabase(file)){
