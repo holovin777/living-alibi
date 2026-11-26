@@ -303,7 +303,12 @@ func _exercise() -> void:
     world._open_guest({"unit":1,"level":2,"style":"rosa","name":"Marco","activity":"COOKING","cleanliness":65})
     if not _check(world._host_activity=="COOKING" and not world._host_path.is_empty() and world._guest.get_node("Clutter").visible,"server home routine generates a route and cleanliness decor"):
         return
-    world._sync_host_routine({"activity":"READING","cleanliness":95})
+    world._sync_host_routine({"activity":"FAMILY_DINNER","cleanliness":95,"household":{"members":3,"present":3,"dinnerNow":true}})
+    if not _check(world._host_activity=="FAMILY_DINNER" and world._guest.get_node("FamilyDinner").visible and not world._guest.get_node("FamilyDinner").get_child(3).visible,"family dinner places match present household"):
+        return
+    world._sync_host_routine({"activity":"READING","cleanliness":95,"household":{"members":3,"present":1,"dinnerNow":false}})
+    if not _check(not world._guest.get_node("FamilyDinner").visible,"finished dinner clears table preview"):
+        return
     if not _check(world._host_activity=="READING" and not world._host_path.is_empty() and not world._guest.get_node("Clutter").visible,"host changes routine and home cleanliness updates"):
         return
     if not _check(world._guest_active and world._guest.has_node("CoffeeMachine")
