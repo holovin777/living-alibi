@@ -475,6 +475,7 @@ public final class GameSession implements AutoCloseable {
         }
         if(understood){
             var contact=copy.player.contacts.computeIfAbsent(resident.id,PlayerLife.Contact::new);
+            contact.lastDay=state.day;contact.lastMinute=state.minute;
             ConversationMemory.remember(contact,state.day,state.minute,language,message.strip(),reply);
             ConversationMemory.captureMilestones(town,copy,prior,contact,contact.dialogue.getLast());
         }
