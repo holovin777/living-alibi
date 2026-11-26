@@ -1285,7 +1285,10 @@ func _build_road_links(place_id: String) -> void:
                 direction * 16.5 + Vector3(0,0.025,0),"asphalt" if motor else "paving")
         if motor:
             _mark_motor_road(roads,direction)
-        _sign(roads, str(TownLayout.LABELS.get(id,str(id).capitalize())), direction * 19.0 + Vector3(0,2.8,0))
+        var roadside := direction*19.0+Vector3(-direction.z,0,direction.x)*(width/2.0+0.65)
+        var yaw := atan2(-direction.x,-direction.z)
+        _box(roads,Vector3(0.09,2.0,0.09),Color("#686e70"),roadside+Vector3(0,1,0))
+        _physical_sign(roads,_district_sign_name(str(id)),roadside+Vector3(0,2.05,0),yaw,2.5)
 
 func _mark_motor_road(parent: Node3D,direction: Vector3) -> void:
     var lane := Node3D.new()
@@ -2511,7 +2514,7 @@ func _build_cafe() -> void:
     _box(cafe,Vector3(9.35,0.3,8.35),Color("#91563e"),Vector3(-8.5,6.35,7))
     _box(cafe,Vector3(0.22,0.50,2.1),wood,Vector3(-4,2.75,7))
     _box(cafe,Vector3(1.45,0.14,2.4),Color("#537569"),Vector3(-3.4,3.0,7))
-    _sign(cafe,"Bar Centrale",Vector3(-3.0,3.4,7))
+    _physical_sign(cafe,"Bar Centrale",Vector3(-3.8,3.4,7),PI/2.0,2.6)
     for z in [4.5,9.5]:
         _box(cafe,Vector3(0.12,1.55,1.85),Color("#536e75"),Vector3(-3.82,1.45,z))
         _box(cafe,Vector3(0.16,1.3,1.1),Color("#4e6352"),Vector3(-3.84,4.6,z))
@@ -2566,7 +2569,7 @@ func _build_bakery() -> void:
         _box(bakery,Vector3(0.12,1.25,1.15),Color("#5b7278"),Vector3(-3.82,1.55,z))
         _box(bakery,Vector3(0.24,0.12,1.4),stone,Vector3(-3.72,0.88,z))
         _box(bakery,Vector3(0.16,1.25,1.10),Color("#526554"),Vector3(-3.85,4.55,z))
-    _sign(bakery,"Panetteria del Borgo",Vector3(-3.1,3.36,7))
+    _physical_sign(bakery,"Panetteria del Borgo",Vector3(-3.1,3.36,7),PI/2.0,3.0)
     _box(bakery,Vector3(2.1,0.07,4.0),stone,Vector3(-2.95,0.045,7))
     var counter := Node3D.new()
     counter.name="BakeryCounter"
@@ -2612,7 +2615,8 @@ func _build_portici() -> void:
     _portici_grocery(street)
     for at in [Vector3(-3,0,-8),Vector3(3,0,-4),Vector3(-3,0,9),Vector3(3,0,12)]:
         _lamp(street,at)
-    _sign(street,"Via dei Portici",Vector3(0,3.6,-8))
+    _box(street,Vector3(0.10,2.0,0.10),Color("#6a6c67"),Vector3(4,1,-8))
+    _physical_sign(street,"Via dei Portici",Vector3(4,2.05,-8),0,2.4)
     _sign(street,"Piazza Centrale",Vector3(0,3.4,-16))
 
 func _portici_house(parent: Node3D,side: float,z: float,length: float,height: float,
@@ -2720,7 +2724,8 @@ func _build_centro() -> void:
         _cylinder(piazza,0.035,1.2,Color(0.35,0.27,0.2),at+Vector3(0,1.55,0))
     _sign(piazza,"Caffè Ducale",Vector3(-11,3.55,-9))
     _sign(piazza,"Botteghe",Vector3(11,3.55,-9))
-    _sign(piazza,"Piazza Centrale",Vector3(0,3.9,-12))
+    _box(piazza,Vector3(0.10,2.0,0.10),Color("#6a6c67"),Vector3(4,1,-12))
+    _physical_sign(piazza,"Piazza Centrale",Vector3(4,2.05,-12),0,2.5)
     _sign(piazza,"Bacheca lavoro · F",KIOSK_POSITION+Vector3(0,2.4,0))
 
 func _centro_paving(parent: Node3D) -> void:
@@ -2993,6 +2998,26 @@ func _lamp(parent: Node3D, at: Vector3) -> void:
     parent.add_child(lamp)
     _park_lamps.append(lamp)
 
+func _district_sign_name(id: String) -> String:
+    return str({"PARK":"Parco","MARKET":"Mercato","CAFE":"Bar Centrale","BAKERY":"Panetteria","LIBRARY":"Biblioteca","OFFICE":"Uffici","CLINIC":"Ambulatorio","SCHOOL":"Scuola","WORKSHOP":"Officina","NORTH_RESIDENCES":"Quartiere Nord","SOUTH_RESIDENCES":"Quartiere Sud","RIVER":"Fiume","WOODS":"Bosco","QUARRY":"Cava","FACTORY":"Fabbrica","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Cascina","FUEL_STATION":"Stazione di servizio","LOGISTICS_DEPOT":"Deposito logistico"}.get(id,id))
+
+func _physical_sign(parent: Node3D, caption: String, at: Vector3, yaw: float, width: float) -> void:
+    var board := Node3D.new()
+    board.name = "PhysicalSign"
+    parent.add_child(board)
+    board.position = at
+    board.rotation.y = yaw
+    _box(board,Vector3(width,0.46,0.075),Color("#e4daca"),Vector3.ZERO)
+    var tag := Label3D.new()
+    tag.text = caption
+    tag.position = Vector3(0,0,0.045)
+    tag.billboard = BaseMaterial3D.BILLBOARD_DISABLED
+    tag.font_size = 32
+    tag.pixel_size = 0.005
+    tag.modulate = Color("#233d49")
+    tag.outline_size = 0
+    board.add_child(tag)
+
 func _sign(parent: Node3D, caption: String, at: Vector3) -> void:
     var tag := Label3D.new()
     tag.text = caption
@@ -3041,7 +3066,9 @@ func _render_residents() -> void:
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
         _sync_office_employee(person,id)
         _sync_dojo_member(person,id)
-        person.set_meta("display_name",str(resident.get("name","Resident")))
+        person.set_meta("display_name",str(resident.get("name","Unknown resident")))
+        person.get_node("ResidentName").text = tr(str(person.get_meta("display_name")))
+        person.get_node("ResidentName").hide()
         person.set_meta("known_name",str(resident.get("knownName","")) if resident.get("knownName") != null else "")
         person.set_meta("conversations",int(resident.get("conversations",0)))
         person.set_meta("relationship",str(resident.get("relationship","STRANGER")))
@@ -3244,7 +3271,12 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var cup := _cylinder(hand,0.055,0.095,Color("#eee6d5"),Vector3(0,-0.49,-0.07))
     cup.name = "CoffeeCup"
     cup.hide()
-    _sign(person,display_name,Vector3(0,2.1,0))
+    var name_label := Label3D.new()
+    name_label.name = "ResidentName"
+    name_label.text = display_name
+    name_label.position = Vector3(0,2.1,0)
+    name_label.hide()
+    person.add_child(name_label)
     var activity_label := Label3D.new()
     activity_label.name="ActivityLabel"
     activity_label.position=Vector3(0,1.94,0)
@@ -3252,6 +3284,7 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     activity_label.font_size=24
     activity_label.pixel_size=0.006
     activity_label.modulate=Color("#f4db9e")
+    activity_label.hide()
     person.add_child(activity_label)
     return person
 
@@ -3364,7 +3397,8 @@ func _building(_title: String, wall_color: Color) -> void:
             Vector3(-7.0, 4.85, 7.5))
     _box(_scenery, Vector3(2.1, 3.0, 0.1), Color(0.20, 0.28, 0.32),
             Vector3(-7.0, 1.5, 3.95))
-    _sign(_scenery,_title,Vector3(-7,3.9,3.82))
+    var title := str({"Market stalls":"Mercato","Public library":"Biblioteca comunale","Mechanical workshop":"Officina meccanica","Parts factory":"Fabbrica","Neighborhood":"Quartiere"}.get(_title,_title))
+    _physical_sign(_scenery,title,Vector3(-7,3.9,3.81),PI,3.5)
     var trim := wall_color.lightened(0.25)
     for x in [-10.7,-3.3]:
         for y in [1.5,3.25]:
@@ -3658,6 +3692,7 @@ func _create_interface() -> void:
     _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_reply)
     dialog_col.add_child(_button("Say hello",_send_dialog.bind("Hello")))
+    dialog_col.add_child(_button("Ask their name",_send_dialog.bind("What is your name?")))
     dialog_col.add_child(_button("How are you?",_send_dialog.bind("How are you?")))
     dialog_col.add_child(_button("Offer support",_send_dialog.bind("I'm here for you.")))
     dialog_col.add_child(_button("Ask about shared memories",_send_dialog.bind("What do you remember about me?")))
@@ -3764,6 +3799,12 @@ func _nearest_resident() -> String:
             nearest = str(person.get_meta("resident_id",""))
     return nearest
 
+func _resident_caption(person: Node3D) -> String:
+    var label := str(person.get_meta("display_name","Unknown resident"))
+    if label=="Unknown resident" and int(person.get_meta("conversations",0))>0:
+        return tr("Familiar face")
+    return tr(label)
+
 func _open_dialog() -> void:
     if not _connected or _api.is_busy() or _dialog_pending:
         return
@@ -3776,7 +3817,7 @@ func _open_dialog() -> void:
     _travel_panel.visible = false
     _action_panel.visible = false
     _map_panel.visible = false
-    _dialog_title.text = str(person.get_meta("display_name","Resident"))
+    _dialog_title.text = _resident_caption(person)
     _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
     _render_dialog_mood(person)
     var known := str(person.get_meta("known_name",""))
@@ -3799,9 +3840,12 @@ func _render_dialog_mood(person: Node3D) -> void:
 func _localized_resident_reply(message: String) -> String:
     var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
     if person==null:return message
-    var prefix := str(person.get_meta("display_name",""))+": "
-    if not message.begins_with(prefix):return message
-    return prefix+tr(message.substr(prefix.length()))
+    var separator := message.find(": ")
+    if separator<0:return tr(message)
+    var spoken := message.substr(separator+2)
+    if spoken.begins_with("My name is ") and spoken.ends_with("."):
+        return tr("My name is %s.") % spoken.substr(11,spoken.length()-12)
+    return tr(spoken)
 
 func _close_dialog() -> void:
     _dialog_panel.visible = false
@@ -5639,6 +5683,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         if person == null:
             _close_dialog()
         else:
+            _dialog_title.text = _resident_caption(person)
             _dialog_attitude.text = tr("Attitude: %s") % tr(str(person.get_meta("relationship","STRANGER")).capitalize())
             _render_dialog_mood(person)
     _apply_weather()
