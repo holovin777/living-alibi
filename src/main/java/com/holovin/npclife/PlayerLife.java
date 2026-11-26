@@ -356,6 +356,22 @@ final class PlayerLife {
             if(spoken.equalsIgnoreCase("Ask for a 10 EUR loan"))return PersonalLoanLife.borrow(town,resident,contact,day);
             return PersonalLoanLife.repay(town,resident,contact,day);
         }
+        if(spoken.regionMatches(true,0,"Give gift: ",0,11)){
+            String item=spoken.substring(11).strip().toLowerCase(java.util.Locale.ROOT);
+            if(RebirthLife.active(town)||!RetailLife.gift(item)||FoodLife.quantity(town.player,item,false)<1)
+                throw new IllegalArgumentException("You do not have this gift.");
+            if(resident.age<18||contact.trust<55||contact.affinity<0||contact.conversations<2)
+                return "I would rather not accept a gift.";
+            String last="gift:visitor:"+town.player.incarnation+":"+id+":day";
+            if(town.industryStocks.getOrDefault(last,0)==day)return "One gift is enough for today.";
+            String owned="gift:resident:"+id+":"+item;
+            int next=Math.addExact(town.industryStocks.getOrDefault(owned,0),1);
+            FoodLife.change(town.player,item,false,-1);
+            town.industryStocks.put(owned,next);
+            town.industryStocks.put(last,day);
+            adjust(contact,2,4);
+            return "Thank you for the gift!";
+        }
         boolean giveBread=spoken.equalsIgnoreCase("Offer bread");
         boolean giveWater=spoken.equalsIgnoreCase("Offer water");
         boolean askBread=spoken.equalsIgnoreCase("Ask for bread");
