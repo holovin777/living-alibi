@@ -53,6 +53,9 @@ final class ConversationAvailability {
         return get(t,c,"turns")>=turns(t,c,day,minute)||
                 now-get(t,c,"start")+1>=minutes(t,c,day,minute);
     }
+    static String reason(TownLife.Citizen c,int day,int minute){
+        return urgent(c)?"NEEDS":PoliceLife.scheduled(c,day,minute)?"SHIFT":duty(c,day,minute)?"DUTY":"PERSONAL";
+    }
     static String farewell(TownLife.Citizen c,int day,int minute,String language){
         boolean it="it".equals(language);
         if(urgent(c))return it?"Scusami, devo occuparmi di me. Ci sentiamo più tardi.":"Sorry, I need to take care of myself. Talk later.";
