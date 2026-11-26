@@ -48,6 +48,11 @@ final class FamilyBudgetLife {
             default -> throw new IllegalArgumentException("Unknown family budget action.");
         }
     }
+    /** Autonomous partners earmark existing cash, never create money. */
+    static void autonomousDeposit(TownLife.Town t,TownLife.Citizen c){
+        if(c.money<RESERVE+STEP||RebirthLife.linkedAdult(t,c))return;
+        c.money-=STEP;set(t,c,Math.addExact(savings(t,c),STEP));
+    }
     static void releaseEstate(TownLife.Town t,TownLife.Citizen c){
         int saved=savings(t,c);
         if(saved>0){c.money=Math.addExact(c.money,saved);set(t,c,0);}
