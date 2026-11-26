@@ -76,7 +76,7 @@ final class HouseholdLife {
         return awake(c)&&get(t,c.homeUnit,"meal-day")==day&&minute>=start&&minute<start+20;
     }
     record ResidentView(String id,int age,String activity){}
-    record View(int members,int children,int present,int dinners,boolean dinnerNow,List<ResidentView> visibleResidents){}
+    record View(int members,int children,int present,int dinners,boolean dinnerNow,List<ResidentView> visibleResidents,boolean birthdayNow){}
     static View view(TownLife.Town t,TownLife.Citizen host,int day,int minute){
         return view(t,host,day,minute,false);
     }
