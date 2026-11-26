@@ -3198,6 +3198,7 @@ func _render_residents() -> void:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
+        _sync_work_prop(person,str(resident.get("workVisual","")))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
         _sync_office_employee(person,id)
@@ -3217,7 +3218,90 @@ func _render_residents() -> void:
             child.queue_free()
 
     _assign_resident_seats()
+    _assign_work_stations()
     _sync_office_joker()
+
+# Presentation follows the server's current visible work equipment, never a guessed identity.
+func _sync_work_prop(person: Node3D, kind: String) -> void:
+    var hand := person.get_node("ArmRight") as Node3D
+    var old := hand.get_node_or_null("WorkProp") as Node3D
+    if old!=null and str(old.get_meta("kind",""))==kind:return
+    if old!=null:
+        hand.remove_child(old)
+        old.queue_free()
+    person.set_meta("work_visual",kind)
+    if kind.is_empty():return
+    var prop := Node3D.new()
+    prop.name="WorkProp"
+    prop.set_meta("kind",kind)
+    prop.position=Vector3(0,-0.48,-0.12)
+    hand.add_child(prop)
+    match kind:
+        "PICK":
+            _box(prop,Vector3(0.045,0.70,0.045),Color("#95704d"),Vector3(0,-0.12,0))
+            _box(prop,Vector3(0.37,0.07,0.07),Color("#686e70"),Vector3(0,-0.45,0))
+        "WRENCH":
+            _box(prop,Vector3(0.055,0.24,0.035),Color("#aeb6ba"),Vector3(0,-0.08,0))
+            for side in [-1,1]:
+                _box(prop,Vector3(0.035,0.08,0.035),Color("#aeb6ba"),Vector3(side*0.045,-0.22,0))
+            _box(prop,Vector3(0.12,0.045,0.035),Color("#aeb6ba"),Vector3(0,-0.17,0))
+        "BREAD":
+            var loaf := _sphere(prop,0.12,Color("#c38c47"),Vector3.ZERO)
+            loaf.scale=Vector3(1.6,0.65,0.8)
+        "COFFEE":
+            _cylinder(prop,0.075,0.10,Color("#f4ebdb"),Vector3.ZERO)
+        "CRATE":
+            _box(prop,Vector3(0.29,0.17,0.23),Color("#99724a"),Vector3.ZERO)
+            for x in [-0.08,0.08]:
+                _sphere(prop,0.055,Color("#b94c38"),Vector3(x,0.10,0))
+        "PAPERS":
+            _box(prop,Vector3(0.22,0.035,0.30),Color("#a17e53"),Vector3.ZERO)
+            _box(prop,Vector3(0.19,0.012,0.26),Color("#f1eee4"),Vector3(0,0.025,0))
+    prop.show()
+
+func _assign_work_stations() -> void:
+    if _apartment_active:return
+    var stations: Array[Vector3] = []
+    var yaw := 0.0
+    match _current_place:
+        "BAKERY":
+            stations=[Vector3(-9.1,0,6.6),Vector3(-9.1,0,7.8),Vector3(-9.1,0,8.8)]
+            yaw=-PI/2.0
+        "CAFE":
+            stations=[Vector3(-9.65,0,4.4),Vector3(-9.65,0,5.6),Vector3(-9.65,0,6.8)]
+            yaw=-PI/2.0
+        "QUARRY":
+            stations=[Vector3(-11,0,4.7),Vector3(-8,0,4.7),Vector3(-5,0,4.7)]
+        "FACTORY":
+            stations=[Vector3(-8,0,0.8),Vector3(-5,0,0.8),Vector3(-2,0,0.8)]
+            yaw=PI
+        "MARKET":
+            stations=[Vector3(-9,0,2.3),Vector3(-7,0,2.3),Vector3(-5,0,2.3)]
+            yaw=PI
+        _:
+            return
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b): return str(a.get_meta("resident_id","")) < str(b.get_meta("resident_id","")))
+    for child in people:
+        var person := child as Node3D
+        var kind := str(person.get_meta("work_visual",""))
+        var eligible := str(person.get_meta("activity",""))=="WORKING" and not kind.is_empty()
+        if eligible:
+            while not stations.is_empty():
+                var at: Vector3 = stations.pop_front()
+                if not _can_stand(at,WALKER_RADIUS):continue
+                if not person.has_meta("pre_work_anchor"):
+                    person.set_meta("pre_work_anchor",person.get_meta("anchor",person.position))
+                person.position=at
+                person.set_meta("anchor",at)
+                person.rotation.y=yaw
+                break
+        elif person.has_meta("pre_work_anchor"):
+            var at: Vector3 = person.get_meta("pre_work_anchor")
+            person.set_meta("anchor",at)
+            if int(person.get_meta("seat_index",-1))<0:
+                person.position=_open_anchor(at)
+            person.remove_meta("pre_work_anchor")
 
 func _sync_office_joker() -> void:
     if _current_place!="OFFICE" or _apartment_active:return
@@ -3499,6 +3583,8 @@ func _animate_residents(delta: float) -> void:
         var phone := not seated and not talking and not walking and activity in ["RELAXING","RESTING","FREE_TIME"] and sin(gesture_time*0.45)>0.45
         person.get_node("ArmRight/Phone").visible = phone
         person.get_node("ArmRight/CoffeeCup").visible = coffee
+        var work_prop := person.get_node_or_null("ArmRight/WorkProp") as Node3D
+        if work_prop!=null:work_prop.visible=activity=="WORKING" and not talking and not walking
         for limb in ["LegLeft","ArmRight","LegRight","ArmLeft"]:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
@@ -3515,6 +3601,14 @@ func _animate_residents(delta: float) -> void:
                 angle=1.02
             elif activity=="KUMITE" and limb in ["ArmLeft","ArmRight"]:
                 angle=-0.7
+            elif not talking and not walking and activity=="WORKING" and limb in ["ArmRight","ArmLeft"] and work_prop!=null:
+                var kind := str(person.get_meta("work_visual",""))
+                if kind=="PICK":
+                    angle=0.9+sin(gesture_time*3.0)*0.8 if limb=="ArmRight" else 0.55
+                elif kind=="WRENCH":
+                    angle=0.65+sin(gesture_time*4.0)*0.25 if limb=="ArmRight" else 0.35
+                else:
+                    angle=0.8+sin(gesture_time*1.7)*0.18 if limb=="ArmRight" else 0.25
             elif not walking and activity in ["WORKING","STUDYING"] and limb in ["ArmRight","ArmLeft"]:
                 angle=-0.22+sin(float(Time.get_ticks_msec())*0.003+phase)*0.12
             elif not walking and activity!="SLEEPING" and limb=="ArmRight":
