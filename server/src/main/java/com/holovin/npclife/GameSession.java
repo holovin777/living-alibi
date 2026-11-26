@@ -90,7 +90,7 @@ public final class GameSession implements AutoCloseable {
         return switch(c.place){
             case NORTH_RESIDENCES -> ConstructionLife.BUILDER.equals(role)?"HAMMER":"";
             case CENTRO -> StreetCareLife.CLEANER.equals(role)?"BROOM":"";
-            case PARK -> StreetCareLife.GARDENER.equals(role)?"WATERING_CAN":"";
+            case PARK -> ElectricianLife.JOB.equals(role)?"ELECTRIC_TOOL":StreetCareLife.GARDENER.equals(role)?"WATERING_CAN":"";
             case BAKERY -> role.equals("Baker")?"BREAD":"";
             case CAFE -> role.equals("Barista")?"COFFEE":"";
             case MARKET -> role.contains("vendor")||role.contains("seller")||role.equals("Shopkeeper")?"CRATE":"";
