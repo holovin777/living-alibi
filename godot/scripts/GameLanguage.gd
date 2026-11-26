@@ -1,6 +1,18 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "Toy ball": "Palla giocattolo",
+    "Teddy bear": "Orsacchiotto",
+    "Storybook": "Libro di fiabe",
+    "Gift box": "Pacco regalo",
+    "Scarf": "Sciarpa",
+    "Give %s": "Regala: %s",
+    "Toys and gifts": "Giochi e regali",
+    "Buy %s · %s EUR (%s left)": "Compra %s · %s EUR (%s disponibili)",
+    "Buy outfit: %s · %s EUR (%s left)": "Compra abito: %s · %s EUR (%s disponibili)",
+    "Thank you for the gift!": "Grazie per il regalo!",
+    "I would rather not accept a gift.": "Preferirei non accettare un regalo.",
+    "One gift is enough for today.": "Un regalo basta per oggi.",
     "Camera motion": "Movimento visuale",
     "WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.": "WASD: cammina · Maiusc: corri · Ctrl: abbassati · Spazio: salta · Esc: cursore.",
     "Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch": "Viaggio E: %s · Servizi F: %s · Mappa M · Parla T · Spazio: salta · Maiusc: corri · Ctrl: abbassati.",

@@ -80,6 +80,8 @@ var _host_activity := ""
 var _host_path: Array[Vector3] = []
 var _host_seated := false
 var _guest_sitting := false
+const LEISURE_ITEMS := {"toy-ball":"Toy ball","teddy-bear":"Teddy bear","storybook":"Storybook","gift-box":"Gift box","scarf":"Scarf"}
+var _gift_buttons := {}
 var _guest_stand_at := Vector3.ZERO
 var _guest_feedback := ""
 var _guest_feedback_time := 0.0
@@ -2793,6 +2795,9 @@ func _portici_grocery(parent: Node3D) -> void:
     _box(shop,Vector3(6.65,0.3,6.25),Color("#794b36"),Vector3(7.45,7.35,5))
     _box(shop,Vector3(0.24,0.45,2.3),Color("#6f4931"),Vector3(4.4,2.85,5.3))
     _sign(shop,"Alimentari · F",Vector3(4.05,3.1,5.3))
+    _physical_sign(shop,"Giochi e regali",Vector3(4.20,2.35,6.95),-PI/2.0,1.6)
+    for i in range(3):
+        _box(shop,Vector3(0.28,0.25,0.26),[Color("#bb7962"),Color("#5e94a1"),Color("#d7bb72")][i],Vector3(9.35,1.55,6.45+i*0.3))
     for z in [4.5,6.8]:
         var shelf := Vector3(9.8,0,z)
         _add_obstacle(shelf,Vector2(0.6,1.3))
@@ -3933,6 +3938,11 @@ func _create_interface() -> void:
     dialog_col.add_child(_button("Ask about shared memories",_send_dialog.bind("What do you remember about me?")))
     dialog_col.add_child(_button("Offer bread",_send_dialog.bind("Offer bread")))
     dialog_col.add_child(_button("Offer water",_send_dialog.bind("Offer water")))
+    for id in LEISURE_ITEMS:
+        var gift := _button(tr("Give %s") % tr(LEISURE_ITEMS[id]),_send_dialog.bind("Give gift: "+id))
+        dialog_col.add_child(gift)
+        gift.hide()
+        _gift_buttons[id]=gift
     dialog_col.add_child(_button("Ask for bread",_send_dialog.bind("Ask for bread")))
     dialog_col.add_child(_button("Ask for water",_send_dialog.bind("Ask for water")))
     dialog_col.add_child(_button("Ask for a 10 EUR loan",_send_dialog.bind("Ask for a 10 EUR loan")))
@@ -4086,6 +4096,7 @@ func _open_dialog() -> void:
     _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     _dialog_input.clear()
+    _refresh_gift_buttons()
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
@@ -4917,7 +4928,7 @@ func _render_actions() -> void:
                             condition_label.text=tr("%s · condition %s/100") % [outfit_name,outfit.get("condition",100)]
                             _action_choices.add_child(condition_label)
                         if outfit.get("canBuy",false):
-                            _action_choices.add_child(_button(tr("Buy outfit: %s · %s EUR") % [outfit_name,outfit.get("price",0)],_garden_action.bind("rebirth-wardrobe-buy-"+outfit_id)))
+                            _action_choices.add_child(_button(tr("Buy outfit: %s · %s EUR (%s left)") % [outfit_name,outfit.get("price",0),outfit.get("stock",0)],_garden_action.bind("rebirth-wardrobe-buy-"+outfit_id)))
                         if outfit.get("canWear",false):
                             _action_choices.add_child(_button(tr("Wear %s") % outfit_name,_garden_action.bind("rebirth-wardrobe-wear-"+outfit_id)))
                 var furnishing_names := {"kitchen":"Kitchen furnishings","bedroom":"Bedroom furnishings","children":"Children’s furnishings","laundry":"Washing machine"}
@@ -5170,11 +5181,17 @@ func _render_actions() -> void:
         "MARKET", "PORTICI", "FUEL_STATION":
             if _current_place=="MARKET" and employed!="shop-assistant":
                 _action_choices.add_child(_button("Apply: market assistant",_apply_job.bind("shop-assistant")))
+            var gifts_heading := false
             for item in _last_snapshot.get("shop",[]):
                 var id := str(item.get("id",""))
+                if LEISURE_ITEMS.has(id) and not gifts_heading:
+                    var heading := Label.new()
+                    heading.text=tr("Toys and gifts")
+                    _action_choices.add_child(heading)
+                    gifts_heading=true
                 var stock := int(item.get("stock",0))
-                var choice := _button("Buy %s · %s EUR (%s left)" % [
-                    str(item.get("label",id)),str(item.get("price",0)),stock],_buy_product.bind(id))
+                var choice := _button(tr("Buy %s · %s EUR (%s left)") % [
+                    tr(str(item.get("label",id))),str(item.get("price",0)),stock],_buy_product.bind(id))
                 choice.disabled = stock <= 0
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
@@ -5656,7 +5673,15 @@ func _render_aid_notices() -> void:
     _aid_label.text = "\n".join(lines)
     _aid_label.visible = not lines.is_empty()
 
+func _refresh_gift_buttons() -> void:
+    var bag: Dictionary = _last_snapshot.get("player",{}).get("bag",{})
+    for id in _gift_buttons:
+        var gift: Button = _gift_buttons[id]
+        gift.visible=not _rebirth_active() and int(bag.get(id,0))>0
+        gift.text=tr("Give %s") % tr(LEISURE_ITEMS[id])
+
 func _update_bag() -> void:
+    _refresh_gift_buttons()
     _render_aid_notices()
     var player: Dictionary = _last_snapshot.get("player",{})
     var bread := int(player.get("bread",0))

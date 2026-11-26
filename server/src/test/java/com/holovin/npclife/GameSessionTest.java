@@ -13,6 +13,47 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void leisurePurchasesAndGiftsConserveStockAndCash() throws Exception {
+        Path file=directory.resolve("leisure-shop.db");
+        String recipientId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=PopulationGenerator.add(town,1).getFirst();
+            recipientId=resident.id;
+            resident.age=30;resident.alive=true;resident.home=TownLife.Place.NORTH_RESIDENCES;
+            resident.place=TownLife.Place.PORTICI;resident.destination=resident.place;
+            resident.travelRemaining=0;resident.activity="FREE_TIME";
+            town.player.place=TownLife.Place.MARKET;town.player.travelRemaining=0;town.player.money=50;
+            RetailLife.ensure(town);
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"teddy-bear",600));
+            town.player.place=TownLife.Place.PORTICI;
+            assertThrows(IllegalArgumentException.class,()->RetailLife.buy(town,"teddy-bear",300));
+            int stock=town.retailStock.get("teddy-bear");
+            int cash=town.employerFunds.getOrDefault("shop-assistant",0);
+            RetailLife.buy(town,"teddy-bear",600);
+            assertEquals(38,town.player.money);
+            assertEquals(cash+12,town.employerFunds.get("shop-assistant"));
+            assertEquals(stock-1,town.retailStock.get("teddy-bear"));
+            assertEquals(1,FoodLife.quantity(town.player,"teddy-bear",false));
+            assertEquals("I would rather not accept a gift.",PlayerLife.speak(town,recipientId,"Give gift: teddy-bear",1,600));
+            var contact=town.player.contacts.get(recipientId);
+            contact.trust=70;contact.conversations=3;
+            assertEquals("Thank you for the gift!",PlayerLife.speak(town,recipientId,"Give gift: teddy-bear",1,600));
+            assertEquals(0,FoodLife.quantity(town.player,"teddy-bear",false));
+            assertEquals(1,town.industryStocks.get("gift:resident:"+recipientId+":teddy-bear"));
+            RetailLife.buy(town,"toy-ball",600);
+            assertEquals("One gift is enough for today.",PlayerLife.speak(town,recipientId,"Give gift: toy-ball",1,600));
+            assertEquals(1,FoodLife.quantity(town.player,"toy-ball",false));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(1,town.industryStocks.get("gift:resident:"+recipientId+":teddy-bear"));
+            assertEquals(1,FoodLife.quantity(town.player,"toy-ball",false));
+        }
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";

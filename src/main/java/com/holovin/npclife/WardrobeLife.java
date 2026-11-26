@@ -14,7 +14,9 @@ final class WardrobeLife {
     static boolean owns(TownLife.Town t,TownLife.Citizen c,Outfit o){return o.code()==0||get(t,c,o.id()+"-owned")>0;}
     static int condition(TownLife.Town t,TownLife.Citizen c,Outfit o){return 100-Math.min(100,get(t,c,o.id()+"-wear"));}
     static boolean shop(TownLife.Citizen c,int minute){return RebirthLife.awakePresent(c)&&!RebirthLife.atHome(c)&&c.place==TownLife.Place.PORTICI&&minute>=480&&minute<1200;}
-    record Item(String id,int price,int condition,boolean owned,boolean worn,boolean canBuy,boolean canWear){}
+    static final int SHOP_CAPACITY=5;
+    static int stock(TownLife.Town t,Outfit o){return t.industryStocks.getOrDefault("clothes:stock:"+o.id(),SHOP_CAPACITY);}
+    record Item(String id,int price,int condition,boolean owned,boolean worn,boolean canBuy,boolean canWear,int stock){}
     record View(String worn,int comfort,List<Item> items){}
     static int comfort(TownLife.Town t,TownLife.Citizen c,int temperature){
         var o=worn(t,c);int warmth=condition(t,c,o)<25?Math.max(0,o.warmth()-1):o.warmth();
@@ -24,8 +26,8 @@ final class WardrobeLife {
     static View view(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         var worn=worn(t,c);
         var items=OUTFITS.stream().map(o->new Item(o.id(),o.price(),condition(t,c,o),owns(t,c,o),o==worn,
-            shop(c,minute)&&c.money>=o.price()+20&&(!owns(t,c,o)||condition(t,c,o)<100),
-            RebirthLife.atHome(c)&&owns(t,c,o)&&o!=worn)).toList();
+            shop(c,minute)&&stock(t,o)>0&&c.money>=o.price()+20&&(!owns(t,c,o)||condition(t,c,o)<100),
+            RebirthLife.atHome(c)&&owns(t,c,o)&&o!=worn,stock(t,o))).toList();
         return new View(worn.id(),minute<0?100:comfort(t,c,WeatherLife.at(day,minute).temperatureC()),items);
     }
     static String act(TownLife.Town t,String action,int day,int minute){
@@ -37,6 +39,7 @@ final class WardrobeLife {
             if(!item.canBuy())throw new IllegalArgumentException("Visit the open clothing shop and keep 20 EUR in reserve.");
             int next=Math.addExact(t.employerFunds.getOrDefault("shop-assistant",0),o.price());
             c.money-=o.price();t.employerFunds.put("shop-assistant",next);
+            t.industryStocks.put("clothes:stock:"+o.id(),stock(t,o)-1);
             set(t,c,o.id()+"-owned",1);set(t,c,o.id()+"-wear",0);
             return "Purchased an outfit.";
         }
@@ -45,6 +48,10 @@ final class WardrobeLife {
         return "Changed outfit.";
     }
     static void tick(TownLife.Town t,WorldState clock){
+        if(clock.minute==360&&t.industryStocks.getOrDefault("clothes:delivery-day",0)<clock.day){
+            for(var o:OUTFITS)t.industryStocks.put("clothes:stock:"+o.id(),Math.min(SHOP_CAPACITY,stock(t,o)+1));
+            t.industryStocks.put("clothes:delivery-day",clock.day);
+        }
         var c=RebirthLife.child(t);
         if(!RebirthLife.linkedAdult(t,c))return;
         if(clock.minute==360&&get(t,c,"last-day")<clock.day){

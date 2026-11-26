@@ -21,7 +21,12 @@ final class RetailLife {
             new Product("grapes","Grapes",3,12,0),
             new Product("honey","Honey",5,8,0),
             new Product("grape-juice","Grape juice",7,8,0),
-            new Product("wine","Wine",10,8,0));
+            new Product("wine","Wine",10,8,0),
+            new Product("toy-ball","Toy ball",6,8,2),
+            new Product("teddy-bear","Teddy bear",12,6,1),
+            new Product("storybook","Storybook",8,8,2),
+            new Product("gift-box","Gift box",15,6,1),
+            new Product("scarf","Scarf",18,6,1));
     static void ensure(TownLife.Town t) {
         for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),(OrchardLife.isFruit(p.id())||p.id().equals("honey")||p.id().equals("grape-juice")||p.id().equals("wine"))?0:p.capacity());
     }
@@ -37,7 +42,9 @@ final class RetailLife {
     static boolean hasCounter(TownLife.Place place) {
         return place==TownLife.Place.MARKET || place==TownLife.Place.PORTICI || place==TownLife.Place.FUEL_STATION;
     }
+    static boolean gift(String id){return java.util.Set.of("toy-ball","teddy-bear","storybook","gift-box","scarf").contains(id);}
     static boolean availableAt(TownLife.Place place,Product product) {
+        if(gift(product.id()))return place==TownLife.Place.PORTICI;
         return hasCounter(place) && (place!=TownLife.Place.FUEL_STATION || product.id().equals("bread") || product.id().equals("water"));
     }
     static String buy(TownLife.Town t,String id,int minute) {
