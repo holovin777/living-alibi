@@ -116,11 +116,17 @@ func update_data(snapshot: Dictionary,jobs: Array,locations: Array) -> void:
         _sms_initialized = false
         alarm_at = -1
         _last_world_minute = -1
+    if snapshot.get("contacts") is Array:
+        _contacts.clear()
+        for contact in snapshot["contacts"]:
+            if contact is Dictionary and not str(contact.get("residentId","")).is_empty():
+                _contacts[str(contact["residentId"])] = {"name":str(contact.get("name","")),"address":str(contact.get("address",""))}
     for resident in snapshot.get("residents",[]):
         if resident is Dictionary and int(resident.get("conversations",0))>0 and str(resident.get("name","Unknown resident"))!="Unknown resident":
             var id := str(resident.get("id",""))
             if not id.is_empty():
-                _contacts[id] = str(resident.get("name",""))
+                if not _contacts.has(id):
+                    _contacts[id] = {"name":str(resident.get("name","")),"address":""}
     var phone = snapshot.get("phone")
     if phone is Dictionary:
         for sms in phone.get("messages",[]):
@@ -224,7 +230,10 @@ func refresh() -> void:
             if _contacts.is_empty():
                 lines.append(tr("Talk to residents to add known contacts."))
             for id in _contacts:
-                lines.append(str(_contacts[id]))
+                var contact: Dictionary = _contacts[id]
+                lines.append(str(contact.get("name","")))
+                if not str(contact.get("address","")).is_empty():
+                    lines.append("  "+str(contact["address"]))
             lines.append("\n"+tr("Calls are not available yet. Open SMS for messages."))
         "bank":
             var bank = _snapshot.get("bank")

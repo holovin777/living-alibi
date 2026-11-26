@@ -392,6 +392,7 @@ final class PlayerLife {
         contact.conversations++;
         contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard=spoken;
         String greeting=contact.knownName==null?"stranger":contact.knownName;
+        if(spoken.equalsIgnoreCase("Where do you live?")||spoken.equalsIgnoreCase("Dove abiti?"))return AddressLife.ask(town,resident,contact);
         if(askingName){
             if(knowsResident(town,id))return "My name is "+resident.name+".";
             var mood=EmotionLife.mood(town,resident,day,minute);

@@ -13,6 +13,30 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void addressRequiresConsentAndSurvivesReload() throws Exception {
+        Path file=directory.resolve("addresses.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=town.get("marco");
+            resident.place=TownLife.Place.PARK;resident.destination=resident.place;resident.travelRemaining=0;
+            resident.activity="FREE_TIME";town.player.place=TownLife.Place.PARK;
+            assertEquals("I prefer to keep my address private.",PlayerLife.speak(town,"marco","Where do you live?",1,600));
+            assertTrue(AddressLife.contacts(town).isEmpty());
+            var contact=town.player.contacts.get("marco");
+            PlayerLife.learnResident(town,"marco");contact.knownName="Visitor";contact.trust=80;contact.affinity=30;
+            assertEquals("I live at Via delle Magnolie 12.",PlayerLife.speak(town,"marco","Where do you live?",1,601));
+            assertEquals("NORTH_RESIDENCES",AddressLife.contacts(town).get(0).district());
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals("Via delle Magnolie 12",AddressLife.contacts(town).get(0).address());
+            town.player.incarnation++;
+            assertTrue(AddressLife.contacts(town).isEmpty());
+        }
+    }
+
+    @Test
     void namesRequireIntroductionAndSurviveReload() throws Exception {
         Path file=directory.resolve("introductions.db");
         try(var db=new WorldDatabase(file)){
