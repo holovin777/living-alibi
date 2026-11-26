@@ -88,6 +88,7 @@ public final class GameSession implements AutoCloseable {
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
         String role=c.occupation==null?"":c.occupation;
         return switch(c.place){
+            case NORTH_RESIDENCES -> ConstructionLife.BUILDER.equals(role)?"HAMMER":"";
             case CENTRO -> StreetCareLife.CLEANER.equals(role)?"BROOM":"";
             case PARK -> StreetCareLife.GARDENER.equals(role)?"WATERING_CAN":"";
             case BAKERY -> role.equals("Baker")?"BREAD":"";
