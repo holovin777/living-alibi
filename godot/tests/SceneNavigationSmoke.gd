@@ -316,6 +316,21 @@ func _exercise() -> void:
     if not _check(world._host_seated and world._guest_host.position.is_equal_approx(world._guest.routine_seat("FAMILY_DINNER")+Vector3(0,-0.34,0)),"host sits at dinner table"):
         return
     var child := family.get_node("Resident_guest-child") as Node3D
+    var original_locale := TranslationServer.get_locale()
+    var original_position: Vector3 = world._avatar.position
+    var spoken := {"dinnerNow":true,"speech":{"speakerId":"guest-child","english":"Homework later?","italian":"Compiti dopo?"}}
+    world._avatar.position=child.position
+    TranslationServer.set_locale("en")
+    if not _check(world._guest_family_subtitle(spoken)=="— Homework later?","nearby family speech appears anonymously"):
+        return
+    TranslationServer.set_locale("it")
+    if not _check(world._guest_family_subtitle(spoken)=="— Compiti dopo?","family speech follows language selection"):
+        return
+    TranslationServer.set_locale(original_locale)
+    world._avatar.position=child.position+Vector3(8,0,0)
+    if not _check(world._guest_family_subtitle(spoken).is_empty(),"distant speech is hidden"):
+        return
+    world._avatar.position=original_position
     var before_play := child.position
     var playing := {"activity":"FAMILY_DINNER","cleanliness":95,"household":{"members":3,"present":3,"dinnerNow":true,"visibleResidents":[{"id":"guest-child","age":8,"activity":"PLAYING"},{"id":"guest-adult","age":35,"activity":"FAMILY_DINNER"}]}}
     world._sync_host_routine(playing)
