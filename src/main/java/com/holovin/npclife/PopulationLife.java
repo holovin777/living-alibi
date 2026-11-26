@@ -53,6 +53,8 @@ final class PopulationLife {
         boolean publicWater=needWater && UtilityLife.status(town).fountainWorking()
                 && town.cleanWater>0;
         TownLife.Place desired;
+        var hobby=HobbyLife.scheduled(town,c,clock.day,minute);
+        boolean hobbyChosen=false;
         TownLife.Place manual=child?RebirthLife.childOuting(town,c,clock.day,minute):RebirthLife.manualDestination(town,c);
         if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
             RebirthLife.resumeRoutine(town);manual=null;
@@ -73,6 +75,7 @@ final class PopulationLife {
         else if(working)desired=c.workplace;
         else if(PhoneLife.meetingWindow(town,c,clock))desired=TownLife.Place.CAFE;
         else if(DojoCommunityLife.scheduled(town,c,clock.day,minute))desired=TownLife.Place.SCHOOL;
+        else if(hobby!=null){desired=hobby.place();hobbyChosen=true;}
         else if(minute>=960 && minute<1200) {
             // The same resident favors a location consistently for a given day.
             // Unlit parks lose visitors at dusk; they choose a covered cafe.
@@ -144,6 +147,7 @@ final class PopulationLife {
                 }
             }
         } else c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"FREE_TIME";
+        if(hobbyChosen&&c.place==hobby.place()&&c.travelRemaining==0)c.activity=HobbyLife.marker(hobby);
         if(minute%60==0 && (c.hunger>93||c.thirst>93))c.health=clamp(c.health-2);
         if(minute%180==0 && c.hunger<65 && c.thirst<60 && c.fatigue<85)c.health=clamp(c.health+1);
         if(c.health==0){
