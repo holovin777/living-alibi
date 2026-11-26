@@ -92,7 +92,8 @@ final class HouseholdLife {
         int topic=get(t,host.homeUnit,"meal-topic");
         if(topic<1||topic>4)return null;
         var other=visible.stream().filter(c->c.age()>=6)
-            .filter(c->topic!=2||c.age()<18||host.age<18)
+            .filter(c->related(t,host,t.get(c.id())))
+            .filter(c->topic!=2||((c.age()<18)!=(host.age<18)))
             .findFirst().orElse(null);
         if(other==null)return null;
         boolean reply=minute-get(t,host.homeUnit,"meal-minute")>=10;
@@ -102,7 +103,8 @@ final class HouseholdLife {
                 new Speech(speaker,"It's been a tiring day. We need to talk.","È stata una giornata faticosa. Dobbiamo parlare.");
             case 2 -> {
                 boolean childSpeaker=(reply?other.age():host.age)<18;
-                yield childSpeaker?new Speech(speaker,"Can I finish my homework after dinner?","Posso finire i compiti dopo cena?"):
+                if(childSpeaker)yield new Speech(speaker,"Can I finish my homework after dinner?","Posso finire i compiti dopo cena?");
+                yield reply?new Speech(speaker,"Of course, I can help you if you need it.","Certo, se vuoi ti do una mano."):
                     new Speech(speaker,"Have you got any homework left?","Hai ancora dei compiti da fare?");
             }
             case 3 -> reply?new Speech(speaker,"Then you'd better do the dishes too!","Allora ti tocca anche lavare i piatti!"):
