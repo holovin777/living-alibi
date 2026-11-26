@@ -43,6 +43,8 @@ final class CareerLife {
     static void ensureEmployers(TownLife.Town town) {
         for(var offer:OFFERS)
             town.employerFunds.putIfAbsent(offer.id,offer.startingPayroll);
+        town.employerFunds.putIfAbsent("pizzeria",1200);
+        town.employerFunds.putIfAbsent("gelateria",1200);
         town.employerFunds.putIfAbsent("school",200);
         town.employerFunds.putIfAbsent("library",200);
         // Enterprise workers share real company funds with player industrial wages.
