@@ -98,7 +98,8 @@ public final class GameSession implements AutoCloseable {
             case QUARRY -> role.equals("Miner")?"PICK":"";
             case WORKSHOP -> role.equals("Mechanic")||role.equals("Engineer")||role.equals("Independent fabricator")?"WRENCH":"";
             case FACTORY -> role.equals("Factory machinist")?"WRENCH":"";
-            case OFFICE, LIBRARY, SCHOOL, CLINIC -> "PAPERS";
+            case CLINIC -> role.equals("Pharmacist")?"PHARMACY":role.equals("Doctor")||role.equals("Nurse")?"MEDICAL":"PAPERS";
+            case OFFICE, LIBRARY, SCHOOL -> "PAPERS";
             default -> "";
         };
     }
@@ -121,7 +122,7 @@ public final class GameSession implements AutoCloseable {
             case CENTRO -> role.equals("Pizzaiolo")?"BAKER_APRON":role.equals("Gelataio")?"CAFE_APRON":"";
             case BAKERY -> role.equals("Baker")?"BAKER_APRON":"";
             case CAFE -> role.equals("Barista")?"CAFE_APRON":"";
-            case CLINIC -> role.equals("Doctor")?"DOCTOR_COAT":role.equals("Nurse")?"SCRUBS":"";
+            case CLINIC -> role.equals("Pharmacist")||role.equals("Doctor")?"DOCTOR_COAT":role.equals("Nurse")?"SCRUBS":"";
             case QUARRY -> role.equals("Miner")?"HIGH_VIS":"";
             case FACTORY -> role.equals("Factory machinist")?"HIGH_VIS":"";
             case WORKSHOP -> switch(role){
@@ -132,6 +133,13 @@ public final class GameSession implements AutoCloseable {
             case LOGISTICS_DEPOT -> role.equals("Transport driver")?"HIGH_VIS":"";
             default -> "";
         };
+    }
+    // An existing nurse may cover basic first-aid desk duty when no pharmacist is on site.
+    // This does not change their occupation or create a resident.
+    static String pharmacyAttendant(List<TownLife.Citizen> visible){
+        var medical=visible.stream().filter(c->c.alive&&c.employed&&c.place==TownLife.Place.CLINIC&&c.travelRemaining==0&&"WORKING".equals(c.activity)).toList();
+        if(medical.stream().anyMatch(c->"Pharmacist".equals(c.occupation)))return "";
+        return medical.stream().filter(c->"Nurse".equals(c.occupation)).map(c->c.id).sorted().findFirst().orElse("");
     }
     public record SourceView(String id,String label,String kind,int stock,int capacity) { }
     public record WeatherView(String sky,int temperatureC,boolean raining,boolean snowing) { }
@@ -272,12 +280,13 @@ public final class GameSession implements AutoCloseable {
                 p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
         var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
         var companions=walkingCompanions(town,visible,state.minute);
+        var pharmacyAttendant=pharmacyAttendant(visible);
         var residents=visible.stream()
                 .map(c->{
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
                             contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""));
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),c.id.equals(pharmacyAttendant)?"PHARMACY":workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
