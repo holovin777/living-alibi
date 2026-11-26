@@ -13,6 +13,105 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void electricianRepairsRecurringFaultWithRealMaterialsAndPay() {
+        var state=new WorldState();var town=TownLife.create(state);
+        var worker=PopulationGenerator.add(town,1).getFirst();
+        worker.occupation=ElectricianLife.JOB;worker.age=30;worker.employed=true;
+        worker.workplace=TownLife.Place.PARK;worker.place=worker.workplace;
+        worker.activity="WORKING";worker.travelRemaining=0;
+        var order=town.technicalOrders.get("street-lights");
+        town.employerFunds.put(StreetCareLife.ACCOUNT,ElectricianLife.WAGE);
+        assertFalse(ElectricianLife.ready(town),"initial player order is reserved");
+        order.completedDay=1;order.condition=55;
+        state.day=2;state.minute=660;
+        assertFalse(UtilityLife.status(town).lightsWorking());
+        int cash=worker.money,steel=town.technicalMaterials.get("steel"),copper=town.technicalMaterials.get("copper");
+        var events=new java.util.ArrayList<TownLife.Event>();
+        var observations=new java.util.ArrayList<TownLife.Observation>();
+        worker.travelRemaining=1;
+        ElectricianLife.tick(town,state,events,observations);
+        assertEquals(55,order.condition);
+        worker.travelRemaining=0;
+        assertEquals("ELECTRIC_TOOL",GameSession.workVisual(worker));
+        ElectricianLife.tick(town,state,events,observations);
+        ElectricianLife.tick(town,state,events,observations);
+        assertTrue(UtilityLife.status(town).lightsWorking());
+        assertEquals(95,order.condition);
+        assertEquals(steel-1,town.technicalMaterials.get("steel"));
+        assertEquals(copper-1,town.technicalMaterials.get("copper"));
+        assertEquals(cash+ElectricianLife.WAGE,worker.money);
+        assertEquals(0,town.employerFunds.get(StreetCareLife.ACCOUNT));
+        assertFalse(ElectricianLife.ready(town));
+    }
+
+
+    @Test
+    void constructionWorkerIsPaidFromReservedStageLabor() {
+        var state=new WorldState();var town=TownLife.create(state);
+        var worker=PopulationGenerator.add(town,1).getFirst();
+        worker.occupation=ConstructionLife.BUILDER;worker.employed=true;worker.age=30;
+        worker.workplace=TownLife.Place.NORTH_RESIDENCES;worker.place=worker.workplace;
+        worker.travelRemaining=0;worker.activity="WORKING";
+        ConstructionLife.set(town,ConstructionLife.OWNER,town.player.incarnation);
+        ConstructionLife.set(town,ConstructionLife.ENABLED,1);
+        ConstructionLife.set(town,ConstructionLife.STEEL,1);
+        ConstructionLife.set(town,ConstructionLife.RESERVE,10);
+        assertTrue(ConstructionLife.shift(town,2,780));
+        assertEquals("HAMMER",GameSession.workVisual(worker));
+        int wallet=worker.money,company=town.employerFunds.getOrDefault(ConstructionLife.CONTRACTOR,0);
+        ConstructionLife.tick(town,2,840);
+        ConstructionLife.tick(town,2,840);
+        assertEquals(1,ConstructionLife.get(town,ConstructionLife.STAGE));
+        assertEquals(0,ConstructionLife.get(town,ConstructionLife.RESERVE));
+        assertEquals(0,ConstructionLife.get(town,ConstructionLife.STEEL));
+        assertEquals(wallet+10,worker.money);
+        assertEquals(company,town.employerFunds.getOrDefault(ConstructionLife.CONTRACTOR,0));
+        assertFalse(ConstructionLife.shift(town,3,780));
+    }
+
+
+    @Test
+    void municipalWorkChangesPublicUpkeepAndConservesPayroll() throws Exception {
+        Path file=directory.resolve("street-care.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var crew=PopulationGenerator.add(town,2);
+            var cleaner=crew.get(0);var gardener=crew.get(1);
+            cleaner.occupation=StreetCareLife.CLEANER;gardener.occupation=StreetCareLife.GARDENER;
+            for(var c:crew){
+                c.age=30;c.employed=true;c.alive=true;c.travelRemaining=0;
+                c.workplace=StreetCareLife.station(c);c.place=c.workplace;c.activity="WORKING";
+            }
+            state.day=2;state.minute=360;
+            StreetCareLife.tick(town,state);StreetCareLife.tick(town,state);
+            assertEquals(36,StreetCareLife.view(town).litter());
+            assertEquals(32,StreetCareLife.view(town).gardenNeglect());
+            state.minute=480;town.employerFunds.put(StreetCareLife.ACCOUNT,8);
+            int core=town.employerFunds.getOrDefault(MunicipalLife.CITY,0);
+            int money=cleaner.money;
+            var events=new java.util.ArrayList<TownLife.Event>();
+            var observations=new java.util.ArrayList<TownLife.Observation>();
+            assertTrue(StreetCareLife.payHourly(town,cleaner,state,events,observations));
+            StreetCareLife.payHourly(town,cleaner,state,events,observations);
+            StreetCareLife.payHourly(town,gardener,state,events,observations);
+            assertEquals(money+8,cleaner.money);
+            assertEquals(0,town.employerFunds.get(StreetCareLife.ACCOUNT));
+            assertEquals(core,town.employerFunds.getOrDefault(MunicipalLife.CITY,0));
+            assertEquals(26,StreetCareLife.view(town).litter());
+            assertEquals(32,StreetCareLife.view(town).gardenNeglect());
+            assertEquals("BROOM",GameSession.workVisual(cleaner));
+            assertEquals("WATERING_CAN",GameSession.workVisual(gardener));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(26,StreetCareLife.view(town).litter());
+            assertEquals(32,StreetCareLife.view(town).gardenNeglect());
+        }
+    }
+
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";

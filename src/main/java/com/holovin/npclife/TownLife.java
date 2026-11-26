@@ -298,7 +298,9 @@ final class TownLife {
         if(e.alive)move(town,e,PhoneLife.meetingWindow(town,e,marco)&&"FREE_TIME".equals(e.activity)?Place.CAFE:desiredElena(marco.day,marco.minute,e,town),marco,truth,observations);
         DemographyLife.tick(town,marco,truth,observations);
         EmploymentLife.tick(town,marco,truth,observations);
+        StreetCareLife.tick(town,marco);
         PopulationLife.tick(town,marco,truth,observations);
+        ElectricianLife.tick(town,marco,truth,observations);
         DojoCommunityLife.tick(town,marco);
         DomesticLife.tick(town,marco);
         HouseholdLife.tick(town,marco);
