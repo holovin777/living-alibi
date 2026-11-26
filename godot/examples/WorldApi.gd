@@ -16,10 +16,14 @@ signal request_failed(message: String)
 
 const BASE_URL := "http://127.0.0.1:8080/api/v1"
 var http_request: HTTPRequest
+var _base_url := BASE_URL
 var _busy := false
 var _pending_route := ""
 
 func _ready() -> void:
+    var port := OS.get_environment("LIVING_ALIBI_LOCAL_PORT")
+    if port.is_valid_int() and int(port)>=1024 and int(port)<=65535:
+        _base_url="http://127.0.0.1:%s/api/v1" % port
     http_request = HTTPRequest.new()
     add_child(http_request)
     http_request.request_completed.connect(_on_request_completed)
@@ -153,7 +157,7 @@ func _send(route: String, method: int, payload: Dictionary) -> void:
     request_started.emit(route)
     var body := "" if method == HTTPClient.METHOD_GET else JSON.stringify(payload)
     var headers := PackedStringArray(["Content-Type: application/json"])
-    var error := http_request.request(BASE_URL + route, headers, method, body)
+    var error := http_request.request(_base_url + route, headers, method, body)
     if error != OK:
         _busy = false
         _pending_route = ""
