@@ -894,6 +894,25 @@ func _exercise() -> void:
             and is_zero_approx(marco.get_node("LegLeft/Knee").rotation.x),
             "walking releases the seat and restores standing pose"):
         return
+    populated_park["residents"][0]["activity"]="FREE_TIME"
+    populated_park["residents"][0]["walkingCompanion"]="elena"
+    populated_park["residents"][1]["walkingCompanion"]="marco"
+    world._on_world_updated(populated_park)
+    if not _check(world._walking_partner(marco)==elena and world._walking_partner(elena)==marco
+            and int(marco.get_meta("seat_index",-1))==-1 and int(elena.get_meta("seat_index",-1))==-1,
+            "mutual companions walk instead of taking benches"):
+        return
+    marco.position=Vector3(0,0,0)
+    elena.position=Vector3(0.85,0,0.25)
+    marco.set_meta("anchor",Vector3.ZERO)
+    for i in range(40):
+        world._animate_residents(0.05)
+    if not _check(marco.position.distance_to(elena.position)<2.5,"walking companions remain near each other"):
+        return
+    populated_park["residents"][1]["walkingCompanion"]=""
+    world._on_world_updated(populated_park)
+    if not _check(world._walking_partner(marco)==null,"unilateral companion metadata does not fabricate a pair"):
+        return
     var rainy := _world("PARK", "Park")
     rainy["weather"] = {"sky":"RAIN","raining":true,"snowing":false}
     world._on_world_updated(rainy)
