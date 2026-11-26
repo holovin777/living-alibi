@@ -5582,7 +5582,15 @@ func _speak_resident_reply(reply: String) -> void:
     var language: String = _api.dialogue_language
     if language not in ["it","en"]:
         language = "it" if TranslationServer.get_locale().begins_with("it") else "en"
-    var voices := DisplayServer.tts_get_voices_for_language(language)
+    var locale: String = _api.dialogue_locale
+    var voices := PackedStringArray()
+    if not locale.is_empty() and locale != "<null>":
+        # Prefer the actual region when the platform has a matching voice.
+        for voice in DisplayServer.tts_get_voices():
+            if str(voice.get("language","")).replace("_","-").to_lower()==locale.to_lower():
+                voices.append(str(voice.get("id","")))
+    if voices.is_empty():
+        voices = DisplayServer.tts_get_voices_for_language(language)
     if voices.is_empty():
         _message.text = tr("No system speech voice is available. Text chat still works.")
         return
