@@ -89,6 +89,23 @@ final class IntercomLife {
         }
         return null;
     }
+    static TownLife.Citizen visitingResident(TownLife.Town t,String id,int day,int minute){
+        var visit=apartment(t,day,minute);
+        if(visit==null||!"VISITING".equals(visit.status()))return null;
+        var host=t.people.get(visit.residentId());
+        var member=t.people.get(id);
+        return HouseholdLife.availableMember(host,member)?member:null;
+    }
+    static boolean insideVisit(TownLife.Town t,int day,int minute){
+        var visit=apartment(t,day,minute);
+        return visit!=null&&"VISITING".equals(visit.status());
+    }
+    static String introduceFamily(TownLife.Town t,String id,int day,int minute,String language){
+        var visit=apartment(t,day,minute);
+        if(visit==null||!"VISITING".equals(visit.status())||!visit.residentId().equals(id))
+            return "it".equals(language)?"Possiamo parlarne quando sarai a casa mia.":"We can talk about that when you visit my home.";
+        return HouseholdLife.introduce(t,t.get(id),day,minute,language);
+    }
     static String enter(TownLife.Town t,String id,int building,int day,int minute){
         validate(t,id,building);
         var invitation=apartment(t,day,minute);
