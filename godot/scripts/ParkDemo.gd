@@ -3703,14 +3703,24 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var pants: Color = profile["pants"]
     var torso := _cylinder(person,0.23,0.57,jacket,Vector3(0,1.14,0))
     torso.scale=Vector3(float(profile["waist"]),1.0,0.72)
+    var torso_mesh := torso.mesh as CylinderMesh
+    torso_mesh.top_radius=0.245
+    torso_mesh.bottom_radius=0.205
+    var hips := _sphere(person,0.22,pants,Vector3(0,0.86,0))
+    hips.scale=Vector3(1.0,0.46,0.72)
     var shoulders := _cylinder(person,0.255,0.14,jacket,Vector3(0,1.36,0))
     shoulders.scale=Vector3(float(profile["shoulders"]),1.0,0.68)
-    _cylinder(person,0.10,0.15,skin,Vector3(0,1.48,0))
+    var neck := _cylinder(person,0.087,0.17,skin,Vector3(0,1.49,0))
+    var neck_mesh := neck.mesh as CylinderMesh
+    neck_mesh.top_radius=0.072
+    neck_mesh.bottom_radius=0.097
     var head := Node3D.new()
     head.name="Head"
     person.add_child(head)
     var face := _sphere(head,0.20,skin,Vector3(0,1.66,0))
-    face.scale.x=float(profile["face_width"])
+    face.scale=Vector3(float(profile["face_width"]),1.06,0.94)
+    var jaw := _sphere(head,0.132,skin,Vector3(0,1.565,-0.025))
+    jaw.scale=Vector3(float(profile["face_width"]),0.62,0.88)
     var hair_root := Node3D.new()
     hair_root.name="Hair"
     head.add_child(hair_root)
@@ -3750,7 +3760,10 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
                 var sideburn := _sphere(hair_root,0.045,hair,Vector3(x,1.65,0.02))
                 sideburn.scale.y=1.45
     for side in [-1.0,1.0]:
-        _sphere(head,0.045,skin,Vector3(side*0.18,1.64,0))
+        var ear := _sphere(head,0.045,skin,Vector3(side*0.18,1.64,0))
+        ear.scale=Vector3(0.64,1.25,0.78)
+        var inner_ear := _sphere(head,0.021,skin.darkened(0.16),Vector3(side*0.195,1.64,-0.012))
+        inner_ear.scale=Vector3(0.45,1.2,0.8)
         var eye := Node3D.new()
         eye.name="EyeLeft" if side<0 else "EyeRight"
         head.add_child(eye)
@@ -3825,20 +3838,61 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
         person.add_child(leg)
         var trouser := _cylinder(leg,0.105,0.36,pants,Vector3(0,-0.18,0))
         trouser.scale.z = 1.08
+        var thigh_mesh := trouser.mesh as CylinderMesh
+        thigh_mesh.top_radius=0.116
+        thigh_mesh.bottom_radius=0.090
         var knee := Node3D.new()
         knee.name = "Knee"
         knee.position = Vector3(0,-0.35,0)
         leg.add_child(knee)
-        _cylinder(knee,0.10,0.35,pants,Vector3(0,-0.175,0))
-        _box(knee,Vector3(0.22,0.13,0.34),profile["shoe_color"],Vector3(0,-0.42,-0.06))
-        _box(knee,Vector3(0.23,0.035,0.35),Color("#665f55"),Vector3(0,-0.475,-0.06))
+        _sphere(knee,0.092,pants,Vector3.ZERO)
+        var calf := _cylinder(knee,0.09,0.35,pants,Vector3(0,-0.175,0))
+        var calf_mesh := calf.mesh as CylinderMesh
+        calf_mesh.top_radius=0.093
+        calf_mesh.bottom_radius=0.060
+        var foot := Node3D.new()
+        foot.name="Foot"
+        knee.add_child(foot)
+        foot.position=Vector3(0,-0.35,0)
+        var shoe := _sphere(foot,0.15,profile["shoe_color"],Vector3(0,-0.065,-0.055))
+        shoe.scale=Vector3(0.72,0.48,1.12)
+        _box(foot,Vector3(0.20,0.035,0.31),Color("#665f55"),Vector3(0,-0.122,-0.055))
+        for z in [-0.05,-0.09]:
+            _box(foot,Vector3(0.10,0.012,0.018),profile["shoe_color"].lightened(0.32),Vector3(0,-0.012,z))
         var arm := Node3D.new()
         arm.name = "ArmLeft" if side < 0 else "ArmRight"
         arm.position = Vector3(side*0.29*float(profile["shoulders"]),1.37,0)
         person.add_child(arm)
-        _cylinder(arm,0.083,0.43,jacket,Vector3(0,-0.22,0))
-        _cylinder(arm,0.085,0.065,jacket.darkened(0.18),Vector3(0,-0.425,0))
-        _sphere(arm,0.075,skin,Vector3(0,-0.48,0))
+        var shoulder_cap := _sphere(arm,0.091,jacket,Vector3(0,-0.035,0))
+        shoulder_cap.scale=Vector3(0.95,1.15,0.93)
+        var upper := _cylinder(arm,0.080,0.23,jacket,Vector3(0,-0.115,0))
+        var upper_mesh := upper.mesh as CylinderMesh
+        upper_mesh.top_radius=0.083
+        upper_mesh.bottom_radius=0.064
+        var elbow := Node3D.new()
+        elbow.name="Elbow"
+        arm.add_child(elbow)
+        elbow.position=Vector3(0,-0.23,0)
+        _sphere(elbow,0.067,jacket,Vector3.ZERO)
+        var forearm := _cylinder(elbow,0.063,0.20,jacket,Vector3(0,-0.10,0))
+        var forearm_mesh := forearm.mesh as CylinderMesh
+        forearm_mesh.top_radius=0.067
+        forearm_mesh.bottom_radius=0.048
+        _cylinder(elbow,0.053,0.040,jacket.darkened(0.18),Vector3(0,-0.205,0))
+        var palm := _sphere(elbow,0.062,skin,Vector3(0,-0.256,0))
+        palm.name="Palm"
+        palm.scale=Vector3(0.72,1.05,0.62)
+        var fingers := Node3D.new()
+        fingers.name="Fingers"
+        elbow.add_child(fingers)
+        fingers.position=Vector3(0,-0.29,0)
+        for n in range(4):
+            var length: float = [0.046,0.057,0.053,0.042][n]
+            var digit := _sphere(fingers,0.014,skin,Vector3((float(n)-1.5)*0.022,-length*0.45,-0.002))
+            digit.scale.y=length/0.028
+        var thumb := _sphere(fingers,0.017,skin,Vector3(-float(side)*0.041,0.025,-0.019))
+        thumb.scale.y=1.65
+        thumb.rotation.z=float(side)*0.45
     var hand := person.get_node("ArmRight") as Node3D
     var phone := Node3D.new()
     phone.name = "Phone"
@@ -4047,6 +4101,37 @@ func _assign_resident_seats() -> void:
             person.position = _open_anchor(anchor)
             person.set_meta("seat_kind","")
 
+# Advance gait only by distance actually covered, not by the wall clock.
+func _resident_gait(person: Node3D,distance: float) -> float:
+    var phase := float(person.get_meta("gait_phase",person.get_meta("phase",0.0)))
+    var step_length := maxf(0.27,0.68*person.scale.y)
+    phase=fposmod(phase+maxf(distance,0.0)*PI/step_length,TAU)
+    person.set_meta("gait_phase",phase)
+    return phase
+
+func _animate_resident_leg(leg: Node3D,delta: float,phase: float,walking: bool,seated: bool) -> void:
+    var knee := leg.get_node("Knee") as Node3D
+    var foot := knee.get_node("Foot") as Node3D
+    var flex := -0.58*maxf(0.0,sin(phase-0.65)) if walking else 0.0
+    if seated:flex=-PI/2.0
+    knee.rotation.x=lerpf(knee.rotation.x,flex,minf(delta*10.0,1.0))
+    var ankle := 0.13*sin(phase+0.5) if walking else 0.0
+    foot.rotation.x=lerpf(foot.rotation.x,ankle,minf(delta*10.0,1.0))
+
+# Preserve existing prop paths while making held props follow the elbow joint.
+func _animate_resident_elbow(arm: Node3D,delta: float,bend: float,grip: bool) -> void:
+    var elbow := arm.get_node("Elbow") as Node3D
+    elbow.rotation.x=lerpf(elbow.rotation.x,bend,minf(delta*12.0,1.0))
+    var fingers := elbow.get_node("Fingers") as Node3D
+    fingers.rotation.x=lerpf(fingers.rotation.x,-0.45 if grip else 0.0,minf(delta*12.0,1.0))
+    for child in arm.get_children():
+        if not child is Node3D or child==elbow or str(child.name) not in ["Phone","CoffeeCup","WorkProp","ReadingBook","FamilyBook","FamilyToy"]:continue
+        if not child.has_meta("rest_transform"):
+            child.set_meta("rest_transform",child.transform)
+        var rest: Transform3D=child.get_meta("rest_transform")
+        var pivot := elbow.position
+        child.transform=Transform3D(elbow.basis*rest.basis,pivot+elbow.basis*(rest.origin-pivot))
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
@@ -4071,6 +4156,7 @@ func _animate_residents(delta: float) -> void:
             var toward := _avatar.position-person.position
             if toward.length_squared()>0.001:
                 person.rotation.y = lerp_angle(person.rotation.y,atan2(-toward.x,-toward.z),minf(delta*6.0,1.0))
+        var walked := 0.0
         if walking:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
@@ -4082,9 +4168,11 @@ func _animate_residents(delta: float) -> void:
             var next := person.position.move_toward(target,delta*1.5*pace)
             var old := person.position
             person.position = _move_on_ground(old, next - old, WALKER_RADIUS)
-            walking = person.position.distance_squared_to(old) > 0.000001
+            walked=person.position.distance_to(old)
+            walking = walked > 0.001
         var umbrella := _sync_resident_weather(person,talking,seated)
-        var swing := sin(phase*12.0)*stride if walking else 0.0
+        var gait := _resident_gait(person,walked)
+        var swing := sin(gait)*stride if walking else 0.0
         var now := float(Time.get_ticks_msec())*0.001
         var reply_remaining := maxf(0.0,float(person.get_meta("reply_remaining",0.0))-delta)
         person.set_meta("reply_remaining",reply_remaining)
@@ -4114,8 +4202,7 @@ func _animate_residents(delta: float) -> void:
             var part := person.get_node(limb) as Node3D
             var angle := swing if limb in ["LegLeft","ArmRight"] else -swing
             if limb in ["LegLeft","LegRight"]:
-                var knee := part.get_node("Knee") as Node3D
-                knee.rotation.x = lerpf(knee.rotation.x,-PI/2.0 if seated else 0.0,minf(delta*10.0,1.0))
+                _animate_resident_leg(part,delta,gait+(0.0 if limb=="LegLeft" else PI),walking,seated)
                 if seated:
                     angle = PI/2.0
             if wave and limb=="ArmRight":
@@ -4151,7 +4238,14 @@ func _animate_residents(delta: float) -> void:
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
             if limb in ["ArmLeft","ArmRight"]:
                 var roll := (-0.42 if limb=="ArmRight" else 0.42) if guarded else (0.30 if wave and limb=="ArmRight" else 0.0)
-                part.rotation.z=lerpf(part.rotation.z,roll,minf(delta*8.0,1.0))
+                var shoulder_sway := 0.035*sin(gait+(0.0 if limb=="ArmLeft" else PI)) if walking else 0.0
+                part.rotation.z=lerpf(part.rotation.z,roll+shoulder_sway,minf(delta*8.0,1.0))
+                var grip: bool = limb=="ArmRight" and (phone or coffee or (work_prop!=null and work_prop.visible))
+                var elbow_bend := -0.12-0.18*maxf(0.0,sin(gait+(PI if limb=="ArmLeft" else 0.0))) if walking else 0.0
+                if grip:elbow_bend=-0.20
+                elif wave and limb=="ArmRight":elbow_bend=-0.36
+                elif guarded:elbow_bend=-0.55
+                _animate_resident_elbow(part,delta,elbow_bend,grip)
 
 func _building(_title: String, wall_color: Color) -> void:
     _add_obstacle(Vector3(-7.0, 0.0, 7.5), Vector2(11.0, 7.0))
