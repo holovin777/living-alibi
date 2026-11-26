@@ -32,6 +32,30 @@ class GameSessionTest {
     }
 
     @Test
+    void walkingCompanionsPrioritizeVisibleParentAndChild() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("walking-family.db"))){
+            var town=db.loadTown(db.load());
+            var parent=new TownLife.Citizen("parent","Parent","Worker",TownLife.Place.PARK);
+            var child=new TownLife.Citizen("child","Child","Child",TownLife.Place.PARK);
+            parent.generationIndex=501;child.generationIndex=502;
+            parent.age=35;child.age=7;
+            parent.home=TownLife.Place.CAFE;child.home=TownLife.Place.CAFE;
+            parent.activity="FREE_TIME";child.activity="FREE_TIME";
+            town.people.put(parent.id,parent);town.people.put(child.id,child);
+            DemographyLife.set(town,child,"parent-a",parent.generationIndex);
+            var visible=java.util.List.of(parent,child);
+            var pairs=GameSession.walkingCompanions(town,visible,600);
+            assertEquals(parent.id,pairs.get(child.id));
+            assertEquals(child.id,pairs.get(parent.id));
+            assertTrue(GameSession.walkingCompanions(town,visible,300).isEmpty());
+            child.activity="STUDYING";
+            assertTrue(GameSession.walkingCompanions(town,visible,600).isEmpty());
+            child.activity="FREE_TIME";child.age=1;
+            assertTrue(GameSession.walkingCompanions(town,visible,600).isEmpty());
+        }
+    }
+
+    @Test
     void peerEncountersRequireRecentConversationAndSharedVisibleSpace() throws Exception {
         try(var db=new WorldDatabase(directory.resolve("peer-visual.db"))){
             var town=db.loadTown(db.load());
