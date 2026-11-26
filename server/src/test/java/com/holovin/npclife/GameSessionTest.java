@@ -29,7 +29,7 @@ class GameSessionTest {
             town.player.contacts.put(id,contact);
             PhoneLife.tick(town,state);
             assertEquals(1,PhoneLife.report(town).messages().size());
-            assertTrue(PhoneLife.report(town).messages().get(0).text().contains("coffee"));
+            assertEquals("Coffee tomorrow at 18:00? Let me know.",PhoneLife.report(town).messages().get(0).text());
             state.minute=600;
             PhoneLife.tick(town,state);
             assertEquals(540,PhoneLife.report(town).messages().get(0).minute());
