@@ -1077,6 +1077,30 @@ func _exercise() -> void:
             "office offers engineering task rather than magically paying salary"):
         return
 
+    var building_site := _world("NORTH_RESIDENCES","North residences")
+    building_site["construction"]={"stage":1,"steel":2,"parts":1}
+    building_site["residents"]=[{"id":"builder-test","activity":"WORKING","workVisual":"HAMMER"}]
+    world._on_world_updated(building_site)
+    var site := world._scenery.get_node("CantiereVerdi") as Node3D
+    var builder_model := world._residents_root.get_node("Resident_builder-test") as Node3D
+    if not _check(site.get_node("Foundation").visible and not site.get_node("Walls").visible and site.get_node("ReservedMaterials").get_child(1).visible and not site.get_node("ReservedMaterials").get_child(2).visible and builder_model.has_node("ArmRight/WorkProp"),"construction presents the committed stage, materials and builder tool"):
+        return
+    building_site["construction"]={"stage":2,"steel":1,"parts":0}
+    world._on_world_updated(building_site)
+    if not _check(site.get_node("Walls").visible and not site.get_node("ReservedMaterials").get_child(1).visible and not site.get_node("ReservedParts").get_child(0).visible,"new construction stage consumes visible supplies"):
+        return
+    var dirty_square := _world("CENTRO","Centro")
+    dirty_square["streetCare"]={"litter":80,"gardenNeglect":30}
+    dirty_square["residents"]=[{"id":"cleaner","activity":"WORKING","workVisual":"BROOM"}]
+    world._on_world_updated(dirty_square)
+    var street_decor := world._scenery.get_node("StreetCareDecor") as Node3D
+    var street_worker := world._residents_root.get_node("Resident_cleaner") as Node3D
+    if not _check(street_decor.get_child(7).visible and not street_decor.get_child(8).visible and street_worker.has_node("ArmRight/WorkProp"),"dirty square shows litter and a working cleaner"):
+        return
+    dirty_square["streetCare"]["litter"]=10
+    world._on_world_updated(dirty_square)
+    if not _check(street_decor.get_child(0).visible and not street_decor.get_child(1).visible,"committed cleanup reduces visible litter"):
+        return
     world._on_world_updated(_world("QUARRY", "Quarry"))
     if not _check(world._scenery.name == "PublicScene_QUARRY",
             "quarry has its own physical district"):

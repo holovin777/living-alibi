@@ -7,7 +7,7 @@ final class ConstructionLife {
     private ConstructionLife(){}
     static final String OWNER="build:owner", STAGE="build:stage", STEEL="build:steel", PARTS="build:parts",
             RESERVE="build:reserve", LAST="build:last-day", ENABLED="build:enabled";
-    static final String CONTRACTOR="construction-contractors";
+    static final String CONTRACTOR="construction-contractors", BUILDER="Construction worker";
     static final int LAND=60, SALE=150, LABOR=10, STEEL_PRICE=4, PART_PRICE=5, STAGES=3;
     static final List<String> KEYS=List.of(OWNER,STAGE,STEEL,PARTS,RESERVE,LAST,ENABLED);
     static int get(TownLife.Town t,String key){return t.industryStocks.getOrDefault(key,0);}
@@ -65,14 +65,26 @@ final class ConstructionLife {
             default -> throw new IllegalArgumentException("Unknown construction action.");
         };
     }
+    static boolean ready(TownLife.Town t){
+        int stage=get(t,STAGE);
+        return t.player.alive&&yours(t)&&get(t,ENABLED)>0&&stage<STAGES&&
+                get(t,STEEL)>=1&&get(t,PARTS)>=(stage==0?0:1)&&get(t,RESERVE)>=LABOR;
+    }
+    static boolean shift(TownLife.Town t,int day,int minute){
+        return ready(t)&&get(t,LAST)<day&&minute>=720&&minute<=840;
+    }
     static void tick(TownLife.Town t,int day,int minute){
         if(minute!=840||get(t,LAST)>=day||!t.player.alive||!yours(t)||get(t,ENABLED)==0)return;
         set(t,LAST,day);
         int stage=get(t,STAGE),parts=stage==0?0:1;
         if(stage>=STAGES||get(t,STEEL)<1||get(t,PARTS)<parts||get(t,RESERVE)<LABOR)return;
-        int paid=Math.addExact(t.employerFunds.getOrDefault(CONTRACTOR,0),LABOR);
+        var worker=t.people.values().stream().filter(c->c.alive&&c.employed&&BUILDER.equals(c.occupation)
+                &&c.presentAt(TownLife.Place.NORTH_RESIDENCES)&&"WORKING".equals(c.activity)
+                &&!EmploymentLife.sick(c,day)).findFirst().orElse(null);
+        int paid=Math.addExact(worker==null?t.employerFunds.getOrDefault(CONTRACTOR,0):worker.money,LABOR);
         set(t,STEEL,get(t,STEEL)-1);set(t,PARTS,get(t,PARTS)-parts);
-        set(t,RESERVE,get(t,RESERVE)-LABOR);t.employerFunds.put(CONTRACTOR,paid);
+        set(t,RESERVE,get(t,RESERVE)-LABOR);
+        if(worker==null)t.employerFunds.put(CONTRACTOR,paid);else worker.money=paid;
         set(t,STAGE,stage+1);
         ArchiveLife.record(t,"construction-stage:"+(stage+1),day,minute,"Construction",switch(stage+1){case 1 -> "Via Verdi foundation completed.";case 2 -> "Via Verdi walls completed.";default -> "Via Verdi house completed.";});
         if(stage+1==STAGES)set(t,ENABLED,0);

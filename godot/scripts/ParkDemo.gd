@@ -2043,6 +2043,18 @@ func _build_construction_site() -> void:
     _box(roof,Vector3(1.0,2.0,0.08),Color("#72523e"),Vector3(0,1.2,-2.53))
     for x in [-1.5,1.5]:
         _box(roof,Vector3(0.85,0.9,0.08),Color("#7199aa"),Vector3(x,1.9,-2.53))
+    var stock := Node3D.new()
+    stock.name="ReservedMaterials"
+    site.add_child(stock)
+    for n in range(3):
+        _box(stock,Vector3(0.8,0.12,0.25),Color("#787f83"),Vector3(-2.0,0.11+0.13*n,-2.0))
+    var parts := Node3D.new()
+    parts.name="ReservedParts"
+    site.add_child(parts)
+    for n in range(2):
+        _box(parts,Vector3(0.42,0.35,0.42),Color("#aa8153"),Vector3(2.1,0.20+0.36*n,-2.0))
+    stock.hide()
+    parts.hide()
     foundation.visible = false
     walls.visible = false
     roof.visible = false
@@ -2058,6 +2070,13 @@ func _sync_construction_site() -> void:
     site.get_node("Foundation").visible = stage>=1
     site.get_node("Walls").visible = stage>=2
     site.get_node("Roof").visible = stage>=3
+    var construction: Dictionary = _last_snapshot.get("construction",{})
+    for key in ["ReservedMaterials","ReservedParts"]:
+        var stack := site.get_node(key) as Node3D
+        stack.show()
+        var count := int(construction.get("steel" if key=="ReservedMaterials" else "parts",0))
+        for n in range(stack.get_child_count()):
+            stack.get_child(n).visible=n<count
 
 # Fictional Lombard residential block, with a real street-facing home entrance.
 # Keep the established guesthouse, rental room, construction site and road lanes intact.
@@ -3222,6 +3241,26 @@ func _render_residents() -> void:
     _sync_office_joker()
 
 # Presentation follows the server's current visible work equipment, never a guessed identity.
+func _sync_street_care() -> void:
+    if _current_place not in ["CENTRO","PARK"] or not is_instance_valid(_scenery):return
+    var care = _last_snapshot.get("streetCare",{})
+    if not care is Dictionary:return
+    var root := _scenery.get_node_or_null("StreetCareDecor") as Node3D
+    if root==null:
+        root=Node3D.new()
+        root.name="StreetCareDecor"
+        _scenery.add_child(root)
+        for n in range(10):
+            var x := -2.1+float(n%5)*1.05
+            var z := -6.0+float(n/5)*12.0
+            if _current_place=="CENTRO":
+                _box(root,Vector3(0.18,0.018,0.23),Color("#ddd5bb") if n%2==0 else Color("#9caaaf"),Vector3(x,0.09,z+float(n%3)*0.42))
+            else:
+                _box(root,Vector3(0.06,0.22,0.06),Color("#a69b51"),Vector3(-6.9+float(n%5)*0.25,0.11,-4.9+float(n/5)*0.3))
+    var amount := clampi(int(care.get("litter" if _current_place=="CENTRO" else "gardenNeglect",0)),0,100)
+    for n in range(root.get_child_count()):
+        root.get_child(n).visible=n<int(ceil(float(amount)/10.0))
+
 func _sync_work_prop(person: Node3D, kind: String) -> void:
     var hand := person.get_node("ArmRight") as Node3D
     var old := hand.get_node_or_null("WorkProp") as Node3D
@@ -3237,6 +3276,16 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
     prop.position=Vector3(0,-0.48,-0.12)
     hand.add_child(prop)
     match kind:
+        "HAMMER":
+            _box(prop,Vector3(0.045,0.34,0.045),Color("#a78155"),Vector3(0,-0.13,0))
+            _box(prop,Vector3(0.23,0.09,0.08),Color("#676d70"),Vector3(0,-0.31,0))
+        "BROOM":
+            _box(prop,Vector3(0.035,0.92,0.035),Color("#a47c4c"),Vector3(0,-0.38,0))
+            _box(prop,Vector3(0.30,0.14,0.12),Color("#ab9359"),Vector3(0,-0.88,0))
+        "WATERING_CAN":
+            _box(prop,Vector3(0.20,0.18,0.26),Color("#547e62"),Vector3(0,-0.04,0))
+            _box(prop,Vector3(0.055,0.06,0.25),Color("#547e62"),Vector3(0,0,-0.22))
+            _box(prop,Vector3(0.10,0.09,0.04),Color("#8ca59b"),Vector3(0,0,-0.36))
         "PICK":
             _box(prop,Vector3(0.045,0.70,0.045),Color("#95704d"),Vector3(0,-0.12,0))
             _box(prop,Vector3(0.37,0.07,0.07),Color("#686e70"),Vector3(0,-0.45,0))
@@ -3265,6 +3314,14 @@ func _assign_work_stations() -> void:
     var stations: Array[Vector3] = []
     var yaw := 0.0
     match _current_place:
+        "NORTH_RESIDENCES":
+            stations=[Vector3(11,0,8.3),Vector3(13,0,8.3)]
+            yaw=PI
+        "CENTRO":
+            stations=[Vector3(-2,0,-5),Vector3(2,0,5),Vector3(-2,0,9)]
+        "PARK":
+            stations=[Vector3(-6.5,0,-5),Vector3(8.5,0,11),Vector3(-13.5,0,9)]
+            yaw=PI/2.0
         "BAKERY":
             stations=[Vector3(-9.1,0,6.6),Vector3(-9.1,0,7.8),Vector3(-9.1,0,8.8)]
             yaw=-PI/2.0
@@ -3609,6 +3666,13 @@ func _animate_residents(delta: float) -> void:
                 var kind := str(person.get_meta("work_visual",""))
                 if kind=="PICK":
                     angle=0.9+sin(gesture_time*3.0)*0.8 if limb=="ArmRight" else 0.55
+                elif kind=="HAMMER":
+                    angle=0.8+sin(gesture_time*3.5)*0.65 if limb=="ArmRight" else 0.35
+                elif kind=="BROOM":
+                    angle=0.18+sin(gesture_time*4.0)*0.32 if limb=="ArmRight" else 0.2
+                    if limb=="ArmRight":part.rotation.z=sin(gesture_time*4.0)*0.28
+                elif kind=="WATERING_CAN":
+                    angle=0.55+sin(gesture_time*1.8)*0.24 if limb=="ArmRight" else 0.15
                 elif kind=="WRENCH":
                     angle=0.65+sin(gesture_time*4.0)*0.25 if limb=="ArmRight" else 0.35
                 else:
@@ -3621,6 +3685,8 @@ func _animate_residents(delta: float) -> void:
                     angle=sin(float(Time.get_ticks_msec())*0.003+phase)*0.16
                 elif style=="relaxed":
                     angle=-0.10
+            if limb=="ArmRight" and not (activity=="WORKING" and not talking and str(person.get_meta("work_visual",""))=="BROOM"):
+                part.rotation.z=lerpf(part.rotation.z,0.0,minf(delta*10.0,1.0))
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
@@ -6287,6 +6353,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _refresh_held_item()
     _town_map.update_world(_current_place, _locations)
     _render_residents()
+    if not _apartment_active:_sync_street_care()
     if _dialog_panel.visible:
         var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
         if person == null:
