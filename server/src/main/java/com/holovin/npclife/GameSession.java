@@ -360,10 +360,14 @@ public final class GameSession implements AutoCloseable {
     public synchronized ActionView gardenAction(String action) throws SQLException {
         if(action!=null&&action.startsWith("intercom:")){
             String[] parts=action.split(":",4);
-            if(parts.length!=4||!java.util.Set.of("ring","visit","invite","enter","leave").contains(parts[1])||!java.util.Set.of("1","2","3").contains(parts[2]))
+            if(parts.length!=4||!java.util.Set.of("ring","visit","invite","enter","leave","talk","coffee","snack","rest").contains(parts[1])||!java.util.Set.of("1","2","3").contains(parts[2]))
                 throw new IllegalArgumentException("Choose a known door and contact.");
             var copy=town.copy();
             int building=Integer.parseInt(parts[2]);
+            if(java.util.Set.of("talk","coffee","snack","rest").contains(parts[1])){
+                var result=IntercomLife.socialize(copy,parts[3],building,parts[1],state.day,state.minute);
+                return apply(copy,result.minutes(),result.message());
+            }
             boolean visit=parts[1].equals("visit");
             String reply=switch(parts[1]){
                 case "visit" -> IntercomLife.visit(copy,parts[3],building,state.day,state.minute);
