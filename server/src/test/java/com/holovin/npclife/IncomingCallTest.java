@@ -72,6 +72,33 @@ class IncomingCallTest {
     }
 
     @Test
+    void homeVisitRequiresSharedAddressAndDinnerConsumesSupplies(){
+        var clock=new WorldState();var town=TownLife.create(clock);
+        friendly(town,"marco");
+        var host=town.get("marco");host.travelRemaining=0;
+        assertTrue(PhoneLife.shareNumber(town,host));
+        PhoneLife.outgoing(town,"marco","dial",5,600);
+        assertTrue(PhoneLife.outgoing(town,"marco","ask-home-visit",5,601).contains("Mi dispiace"));
+        assertTrue(AddressLife.ask(town,host,town.player.contacts.get("marco")).contains("Magnolie"));
+        PhoneLife.outgoing(town,"marco","dial",5,630);
+        assertTrue(PhoneLife.outgoing(town,"marco","ask-home-visit",5,631).contains("Volentieri"));
+        assertEquals("HOME",PhoneLife.report(town).meetings().getFirst().place());
+        clock.day=6;clock.minute=1080;
+        assertTrue(PhoneLife.homeVisitWindow(town,host,clock));
+        assertFalse(PhoneLife.meetingWindow(town,host,clock));
+        town.player.place=TownLife.Place.NORTH_RESIDENCES;
+        host.place=host.home;host.activity="FREE_TIME";host.food=5;host.water=5;
+        IntercomLife.ring(town,"marco",1,6,1080);
+        assertTrue(IntercomLife.invite(town,"marco",1,6,1081).contains("Come in"));
+        IntercomLife.enter(town,"marco",1,6,1082);
+        assertEquals("MET",PhoneLife.report(town).meetings().getFirst().status());
+        assertEquals("You shared dinner.",IntercomLife.socialize(town,"marco",1,"dinner",6,1083).message());
+        assertEquals(3,host.food);assertEquals(3,host.water);
+        assertTrue(town.player.contacts.get("marco").important.containsKey(ConversationMemory.Milestone.SHARED_MEAL));
+        assertThrows(IllegalArgumentException.class,()->IntercomLife.socialize(town,"marco",1,"dinner",6,1098));
+    }
+
+    @Test
     void missedCallsExpireAndCooldownPreventsRepeatedRinging(){
         var clock=new WorldState();var town=TownLife.create(clock);
         friendly(town,"marco");assertTrue(PhoneLife.shareNumber(town,town.get("marco")));
