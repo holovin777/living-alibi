@@ -61,8 +61,9 @@ final class CombatLife {
             SocialMemoryLife.remember(t,witness.id,SocialMemoryLife.Kind.BROKEN_TRUST,clock.day);
             if(PoliceLife.scheduled(witness,clock.day,clock.minute))officer=true;
         }
+        t.industryStocks.merge(key(t,"police-reports"),1,Math::addExact);
+        JusticeLife.report(t,clock,officer,"baton".equals(weapon),truth,observations);
         if(officer){
-            t.industryStocks.merge(key(t,"police-reports"),1,Math::addExact);
             if("baton".equals(weapon))t.industryStocks.put(key(t,"baton"),0);
             return new Result("Police intervened and recorded the assault.",30);
         }
