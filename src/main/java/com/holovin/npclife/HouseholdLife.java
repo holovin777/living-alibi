@@ -90,7 +90,7 @@ final class HouseholdLife {
             PlayerLife.learnResident(t,member.id);
             var contact=t.player.contacts.computeIfAbsent(member.id,PlayerLife.Contact::new);
             if(contact.dialogue.isEmpty()&&!contact.important.containsKey(ConversationMemory.Milestone.FIRST_MEETING)){
-                var event=new ConversationMemory.Turn(day,minute,"und","Introduced by "+host.name,"Met "+member.name+".");
+                var event=new ConversationMemory.Turn(day,minute,"und","","Introduced by "+host.name);
                 ConversationMemory.mark(contact,ConversationMemory.Milestone.FIRST_MEETING,event);
             }
             contact.lastDay=day;contact.lastMinute=minute;
