@@ -1,6 +1,19 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "Phone calls": "Chiamate",
+    "Decline call": "Rifiuta chiamata",
+    "Answer call": "Rispondi",
+    "Accept coffee invitation": "Accetta invito per un caffè",
+    "Incoming call from %s · H": "Chiamata da %s · H",
+    "Share your number in person to receive calls.": "Scambia il numero di persona per ricevere chiamate.",
+    "Calls are unavailable in this life stage.": "Chiamate non disponibili in questa fase della vita.",
+    "No calls yet. Share your number with a friend.": "Nessuna chiamata. Scambia il numero con un amico.",
+    "RINGING": "IN ARRIVO",
+    "ANSWERED": "RISPOSTA",
+    "DECLINED": "RIFIUTATA",
+    "ACCEPTED": "INVITO ACCETTATO",
+    "Call declined.": "Chiamata rifiutata.",
     "I remember we had a disagreement, but it was a while ago.": "Ricordo che abbiamo avuto un disaccordo, ma è passato del tempo.",
     "Closed · %s": "Chiuso · %s",
     "Walk through the open entrance: %s": "Entra a piedi dalla porta aperta: %s",
