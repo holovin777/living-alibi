@@ -307,6 +307,9 @@ func _process(delta: float) -> void:
             hints += "\n"+tr("T: talk to host")
         _guest_feedback_time = maxf(0.0,_guest_feedback_time-delta)
         if _guest_feedback_time>0.0:hints += "\n"+_guest_feedback
+        elif visit is Dictionary:
+            var subtitle := _guest_family_subtitle(visit.get("household",{}))
+            if not subtitle.is_empty():hints += "\n\n"+subtitle
         _stairwell_hint.text = hints
         _tick_live_clock(delta)
         return
@@ -5918,6 +5921,25 @@ func _toggle_guest_seat() -> void:
         _avatar.position = _guest.sofa_anchor()
     _reset_locomotion()
     _follow_player()
+
+# Speech is visible only when its actual speaker has a local model nearby.
+# Do not reveal a relative's unknown identity through the subtitle.
+func _guest_family_subtitle(household) -> String:
+    if not _guest_active or not household is Dictionary:return ""
+    var speech = household.get("speech")
+    if not speech is Dictionary or not bool(household.get("dinnerNow",false)):return ""
+    var id := str(speech.get("speakerId",""))
+    if id.is_empty():return ""
+    var speaker: Node3D
+    if is_instance_valid(_guest_host) and str(_guest_host.get_meta("resident_id",""))==id:
+        speaker = _guest_host
+    else:
+        speaker = _guest.get_node_or_null("GuestFamily/Resident_"+id) as Node3D
+    if not is_instance_valid(speaker) or speaker.position.distance_to(_avatar.position)>4.5:return ""
+    var italian := TranslationServer.get_locale().begins_with("it")
+    var line := str(speech.get("italian" if italian else "english",""))
+    if line.is_empty():return ""
+    return "— "+line
 
 func _sync_host_routine(invitation: Dictionary) -> void:
     if not is_instance_valid(_guest_host):return
