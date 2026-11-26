@@ -3222,6 +3222,26 @@ func _render_residents() -> void:
     _sync_office_joker()
 
 # Presentation follows the server's current visible work equipment, never a guessed identity.
+func _sync_street_care() -> void:
+    if _current_place not in ["CENTRO","PARK"] or not is_instance_valid(_scenery):return
+    var care = _last_snapshot.get("streetCare",{})
+    if not care is Dictionary:return
+    var root := _scenery.get_node_or_null("StreetCareDecor") as Node3D
+    if root==null:
+        root=Node3D.new()
+        root.name="StreetCareDecor"
+        _scenery.add_child(root)
+        for n in range(10):
+            var x := -2.1+float(n%5)*1.05
+            var z := -6.0+float(n/5)*12.0
+            if _current_place=="CENTRO":
+                _box(root,Vector3(0.18,0.018,0.23),Color("#ddd5bb") if n%2==0 else Color("#9caaaf"),Vector3(x,0.09,z+float(n%3)*0.42))
+            else:
+                _box(root,Vector3(0.06,0.22,0.06),Color("#a69b51"),Vector3(-6.9+float(n%5)*0.25,0.11,-4.9+float(n/5)*0.3))
+    var amount := clampi(int(care.get("litter" if _current_place=="CENTRO" else "gardenNeglect",0)),0,100)
+    for n in range(root.get_child_count()):
+        root.get_child(n).visible=n<int(ceil(float(amount)/10.0))
+
 func _sync_work_prop(person: Node3D, kind: String) -> void:
     var hand := person.get_node("ArmRight") as Node3D
     var old := hand.get_node_or_null("WorkProp") as Node3D
@@ -3237,6 +3257,13 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
     prop.position=Vector3(0,-0.48,-0.12)
     hand.add_child(prop)
     match kind:
+        "BROOM":
+            _box(prop,Vector3(0.035,0.92,0.035),Color("#a47c4c"),Vector3(0,-0.38,0))
+            _box(prop,Vector3(0.30,0.14,0.12),Color("#ab9359"),Vector3(0,-0.88,0))
+        "WATERING_CAN":
+            _box(prop,Vector3(0.20,0.18,0.26),Color("#547e62"),Vector3(0,-0.04,0))
+            _box(prop,Vector3(0.055,0.06,0.25),Color("#547e62"),Vector3(0,0,-0.22))
+            _box(prop,Vector3(0.10,0.09,0.04),Color("#8ca59b"),Vector3(0,0,-0.36))
         "PICK":
             _box(prop,Vector3(0.045,0.70,0.045),Color("#95704d"),Vector3(0,-0.12,0))
             _box(prop,Vector3(0.37,0.07,0.07),Color("#686e70"),Vector3(0,-0.45,0))
@@ -3265,6 +3292,11 @@ func _assign_work_stations() -> void:
     var stations: Array[Vector3] = []
     var yaw := 0.0
     match _current_place:
+        "CENTRO":
+            stations=[Vector3(-2,0,-5),Vector3(2,0,5),Vector3(-2,0,9)]
+        "PARK":
+            stations=[Vector3(-6.5,0,-5),Vector3(8.5,0,11),Vector3(-13.5,0,9)]
+            yaw=PI/2.0
         "BAKERY":
             stations=[Vector3(-9.1,0,6.6),Vector3(-9.1,0,7.8),Vector3(-9.1,0,8.8)]
             yaw=-PI/2.0
@@ -3609,6 +3641,11 @@ func _animate_residents(delta: float) -> void:
                 var kind := str(person.get_meta("work_visual",""))
                 if kind=="PICK":
                     angle=0.9+sin(gesture_time*3.0)*0.8 if limb=="ArmRight" else 0.55
+                elif kind=="BROOM":
+                    angle=0.18+sin(gesture_time*4.0)*0.32 if limb=="ArmRight" else 0.2
+                    if limb=="ArmRight":part.rotation.z=sin(gesture_time*4.0)*0.28
+                elif kind=="WATERING_CAN":
+                    angle=0.55+sin(gesture_time*1.8)*0.24 if limb=="ArmRight" else 0.15
                 elif kind=="WRENCH":
                     angle=0.65+sin(gesture_time*4.0)*0.25 if limb=="ArmRight" else 0.35
                 else:
@@ -3621,6 +3658,8 @@ func _animate_residents(delta: float) -> void:
                     angle=sin(float(Time.get_ticks_msec())*0.003+phase)*0.16
                 elif style=="relaxed":
                     angle=-0.10
+            if limb=="ArmRight" and not (activity=="WORKING" and not talking and str(person.get_meta("work_visual",""))=="BROOM"):
+                part.rotation.z=lerpf(part.rotation.z,0.0,minf(delta*10.0,1.0))
             part.rotation.x = lerpf(part.rotation.x,angle,minf(delta*10.0,1.0))
 
 func _building(_title: String, wall_color: Color) -> void:
@@ -6287,6 +6326,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _refresh_held_item()
     _town_map.update_world(_current_place, _locations)
     _render_residents()
+    if not _apartment_active:_sync_street_care()
     if _dialog_panel.visible:
         var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
         if person == null:
