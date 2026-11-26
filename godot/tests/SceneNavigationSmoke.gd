@@ -921,6 +921,14 @@ func _exercise() -> void:
             and world._residents_root.get_child(0).name == "Resident_marco",
             "only actually co-present residents appear in the park"):
         return
+    world._append_dialog_line("marco","You","Ciao!")
+    world._append_dialog_line("marco","Resident","Hello.")
+    if not _check(world._dialog_history_text("marco")=="You: Ciao!\n\nResident: Hello."
+            and world._dialog_history_text("elena").is_empty()
+            and world._dialog_input.max_length==1000,
+            "typed conversation transcript is isolated per resident"):
+        return
+    world._dialog_transcripts.clear()
     var marco = world._residents_root.get_node("Resident_marco")
     var appearance: Dictionary = marco.get_meta("appearance")
     var elena = world._residents_root.get_node("Resident_elena")
