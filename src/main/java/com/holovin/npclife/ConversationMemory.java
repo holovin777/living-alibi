@@ -50,6 +50,10 @@ final class ConversationMemory {
         boolean it="it".equals(language);
         Turn turn=contact==null?null:contact.important.get(Milestone.FIRST_MEETING);
         if(turn==null)return it?"Non ricordo il nostro primo incontro.":"I don't remember our first meeting.";
+        if(turn.player().isEmpty()&&turn.reply().startsWith("Introduced by ")){
+            String host=turn.reply().substring("Introduced by ".length());
+            return it?"Ci ha presentati "+host+", il giorno "+turn.day()+".":host+" introduced us on day "+turn.day()+".";
+        }
         return (it?"Ricordo il nostro primo incontro, il giorno ":"I remember our first meeting, on day ")
                 +turn.day()+(it?". Mi hai detto: «":". You said: “")+clip(turn.player(),300)+(it?"».":"”.");
     }
