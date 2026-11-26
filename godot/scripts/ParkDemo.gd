@@ -59,6 +59,7 @@ var _shop_glass: StandardMaterial3D
 var _graphics_details: Array[Node3D] = []
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
 const PublicStairwell = preload("res://scripts/PublicStairwell.gd")
+const GuestApartment = preload("res://scripts/GuestApartment.gd")
 const GameLanguage = preload("res://scripts/GameLanguage.gd")
 const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
 const ResidentAppearance = preload("res://scripts/ResidentAppearance.gd")
@@ -70,6 +71,10 @@ var _stairwell: Node3D
 var _stairwell_active := false
 var _stairwell_return := Vector3.ZERO
 var _stairwell_hint: Label
+var _guest: Node3D
+var _guest_active := false
+var _guest_return := Vector3.ZERO
+var _guest_pending := false
 var _home_entrance: Node3D
 var _home_transition := false
 var _grocery_menu := false
@@ -272,10 +277,23 @@ func _process(delta: float) -> void:
     _follow_player()
     _update_town_audio(delta,moved)
     _hands.update_pose(delta,_step_bob,not _cycling() and (not _rebirth_active() or _child_can_walk()))
+    if _guest_active:
+        _weather_fx.follow(_avatar.position)
+        _weather_fx.set_sheltered(true,_environment)
+        _stairwell_hint.text = tr("G: leave apartment") if _guest.near_exit(_avatar.position) else tr("Visiting %s") % _guest.resident_name
+        _tick_live_clock(delta)
+        return
     if _stairwell_active:
         _weather_fx.follow(_avatar.position)
         _weather_fx.set_sheltered(true,_environment)
-        _stairwell_hint.text = tr("G: leave stairwell") if _stairwell.near_exit(_avatar.position) else tr("Stairwell · floor %s · apartment doors locked") % _stairwell.floor_number(_avatar.position)
+        var unit: int = _stairwell.near_unit(_avatar.position)
+        var invitation = _last_snapshot.get("apartmentVisit")
+        if unit>0 and invitation is Dictionary and int(invitation.get("unit",0))==unit:
+            _stairwell_hint.text=tr("E: enter apartment %s") % unit
+        elif unit>0:
+            _stairwell_hint.text=tr("Apartment %s · locked") % unit
+        else:
+            _stairwell_hint.text = tr("G: leave stairwell") if _stairwell.near_exit(_avatar.position) else tr("Stairwell · floor %s · apartment doors locked") % _stairwell.floor_number(_avatar.position)
         _tick_live_clock(delta)
         return
 
@@ -369,7 +387,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
+        if _guest_active:
+            if event.keycode==KEY_G and _guest.near_exit(_avatar.position):
+                _guest_action("leave")
+            get_viewport().set_input_as_handled()
+            return
         if _stairwell_active:
+            if event.keycode==KEY_E:
+                _guest_action("enter")
             if event.keycode==KEY_G and _stairwell.near_exit(_avatar.position):
                 _set_stairwell(false)
             get_viewport().set_input_as_handled()
@@ -1546,6 +1571,8 @@ func _add_obstacle(center: Vector3, size: Vector2) -> void:
     _obstacles.append(Rect2(Vector2(center.x, center.z) - size * 0.5, size))
 
 func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
+    if _guest_active:
+        return _guest.can_stand(at,radius)
     if _stairwell_active:
         return _stairwell.can_stand(at,radius)
     if _apartment_active:
@@ -1610,7 +1637,7 @@ func _move_on_ground(from: Vector3, displacement: Vector3, radius: float,
             candidate = at + Vector3(0.0, 0.0, step.z)
             if _can_stand(candidate, radius, allow_roads):
                 at = candidate
-    if _stairwell_active:
+    if _stairwell_active and not _guest_active:
         at.y = _stairwell.ground_height(at)
     return at
 
@@ -3853,6 +3880,7 @@ func _create_interface() -> void:
     intercom_col.add_child(_intercom_reply)
     intercom_col.add_child(_button("Ring bell",_intercom_action.bind("ring")))
     intercom_col.add_child(_button("Chat at entrance",_intercom_action.bind("visit")))
+    intercom_col.add_child(_button("Ask to come inside",_intercom_action.bind("invite")))
     intercom_col.add_child(_button("Leave entrance",_close_intercom))
     _intercom.hide()
 
@@ -5676,6 +5704,44 @@ func _apartment_action() -> String:
     var home = _last_snapshot.get("rebirth",{}).get("homeOptions")
     return _apartment.nearby_action(_avatar.position,home.get("actions",[])) if home is Dictionary else ""
 
+func _guest_action(action: String) -> void:
+    if not _connected or _api.is_busy() or _guest_pending:return
+    var invitation = _last_snapshot.get("apartmentVisit")
+    if not invitation is Dictionary:return
+    if action=="enter" and (_guest_active or not _stairwell_active or _stairwell.near_unit(_avatar.position)!=int(invitation.get("unit",0))):return
+    if action=="leave" and (not _guest_active or not _guest.near_exit(_avatar.position)):return
+    _guest_pending = true
+    _api.garden_action("intercom:%s:1:%s" % [action,invitation.get("residentId","")])
+
+func _open_guest(invitation: Dictionary) -> void:
+    if _guest_active or not _stairwell_active:return
+    _guest_return = _avatar.position
+    _guest = GuestApartment.new()
+    _guest.unit = int(invitation.get("unit",1))
+    _guest.level = int(invitation.get("level",0))
+    _guest.style = str(invitation.get("style","olmo"))
+    _guest.resident_name = str(invitation.get("name",""))
+    add_child(_guest)
+    _guest_active = true
+    _stairwell.hide()
+    _avatar.position = GuestApartment.SPAWN
+    _view_yaw = 0.0
+    _view_pitch = 0.0
+    _reset_locomotion()
+    _town_audio.play_effect("door")
+    _follow_player()
+
+func _close_guest() -> void:
+    if not _guest_active:return
+    _guest_active = false
+    _guest.queue_free()
+    _guest = null
+    _stairwell.show()
+    _avatar.position = _guest_return
+    _reset_locomotion()
+    _town_audio.play_effect("door")
+    _follow_player()
+
 func _near_stairwell() -> bool:
     if _stairwell_active or _rebirth_active() or _drive_active() or _cycling() or _apartment_active or _current_place!="NORTH_RESIDENCES":
         return false
@@ -5684,6 +5750,7 @@ func _near_stairwell() -> bool:
 
 func _set_stairwell(active: bool) -> void:
     if active==_stairwell_active:return
+    if not active and _guest_active:_close_guest()
     if active and not _near_stairwell():return
     _reset_jump()
     _reset_locomotion()
@@ -5805,6 +5872,13 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if not _road_pending.is_empty():
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
+    var invitation = snapshot.get("apartmentVisit")
+    if _guest_active and (not invitation is Dictionary or str(invitation.get("status",""))!="VISITING" or new_place!=_current_place or _rebirth_active()):
+        _close_guest()
+    if _guest_pending:
+        _guest_pending = false
+        if not _guest_active and _stairwell_active and invitation is Dictionary and str(invitation.get("status",""))=="VISITING" and _stairwell.near_unit(_avatar.position)==int(invitation.get("unit",0)):
+            _open_guest(invitation)
     if _stairwell_active and (new_place!=_current_place or _rebirth_active()):
         _set_stairwell(false)
     if new_place != _current_place:
@@ -6140,6 +6214,9 @@ func _set_request_busy(busy: bool) -> void:
         _update_bag()
 
 func _on_request_failed(message: String) -> void:
+    if _guest_pending:
+        _guest_pending = false
+        _stairwell_hint.text = tr(message)
     if _intercom_pending:
         _intercom_pending = false
         if _intercom.visible:

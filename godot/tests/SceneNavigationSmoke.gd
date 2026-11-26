@@ -297,6 +297,18 @@ func _exercise() -> void:
     if not _check(world._near_stairwell(),"public stairwell is accessed from Magnolia entrance"):
         return
     world._set_stairwell(true)
+    world._avatar.position=Vector3(-0.9,0,1)
+    if not _check(world._stairwell.near_unit(world._avatar.position)==1,"numbered doorway proximity"):
+        return
+    world._open_guest({"unit":1,"level":2,"style":"rosa","name":"Marco"})
+    if not _check(world._guest_active and world._guest.has_node("CoffeeMachine")
+            and not world._guest.can_stand(Vector3(-3.1,0,-2.6),world.WALKER_RADIUS)
+            and world._guest.can_stand(world._avatar.position,world.WALKER_RADIUS),"furnished guest room has walkable space and solid furniture"):
+        return
+    world._close_guest()
+    if not _check(not world._guest_active and world._avatar.position.is_equal_approx(Vector3(-0.9,0,1)),"guest exit returns to apartment door"):
+        return
+    world._avatar.position=world.PublicStairwell.SPAWN
     var climb: Vector3 = world._move_on_ground(world._avatar.position,Vector3(0,0,-14.8),world.WALKER_RADIUS)
     if not _check(world._stairwell_active and absf(climb.y-6.2)<0.01 and world._stairwell.floor_number(climb)==2
             and not world._can_stand(Vector3(1.5,climb.y,climb.z),world.WALKER_RADIUS)
