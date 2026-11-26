@@ -60,6 +60,22 @@ func _ready() -> void:
         _box("Art",Vector3(1.35,0.8,0.07),fabric,Vector3(-2.4*side,1.9,3.85))
         _box("CoffeeMachine",Vector3(0.35,0.40,0.35),Color("#414b4f"),Vector3(-3.5*side,1.25,-3.35))
         _furniture("Sideboard",Vector3(-3.6*side,0,0.7),Vector3(0.65,0.95,1.0),wood)
+    _box("Television",Vector3(1.0,0.63,0.08),Color("#292d32"),Vector3(-2.2*side,1.6,3.86))
+    _box("Screen",Vector3(0.91,0.53,0.02),Color("#536d7c"),Vector3(-2.2*side,1.6,3.81))
+    _furniture("HostChair",Vector3(-2.0*side,0,2.8),Vector3(0.62,0.48,0.60),wood)
+    _box("ChairBack",Vector3(0.62,0.65,0.10),wood,Vector3(-2.0*side,0.72,2.53))
+    var clutter := Node3D.new()
+    clutter.name="Clutter"
+    add_child(clutter)
+    for n in range(3):
+        var paper := MeshInstance3D.new()
+        var mesh := BoxMesh.new()
+        mesh.size=Vector3(0.18,0.012,0.23)
+        paper.mesh=mesh
+        paper.position=Vector3(float(n-1)*0.24,0.02,0.8)
+        paper.rotation.y=float(n)*0.5
+        clutter.add_child(paper)
+    clutter.hide()
     for at in [Vector3(0,2.5,1.7),Vector3(0,2.5,-2.3)]:
         var lamp := OmniLight3D.new()
         lamp.position=at
@@ -110,3 +126,37 @@ func near_table(at: Vector3) -> bool:
 
 func show_coffee() -> void:
     get_node("CoffeeTray").show()
+
+func routine_anchor(activity: String) -> Vector3:
+    var side := -1.0 if unit%2==1 else 1.0
+    match activity:
+        "COOKING","DRINKING":return Vector3(-2.7*side,0,-2.25)
+        "READING","WATCHING_TV","RESTING":return Vector3(-1.15*side,0,2.8)
+        "CLEANING":return Vector3(0,0,-1.25)
+    return host_anchor()
+
+func routine_seat() -> Vector3:
+    return Vector3(2.0 if unit%2==1 else -2.0,0,2.8)
+
+func update_cleanliness(value: int) -> void:
+    get_node("Clutter").visible = value<75
+
+func host_path(from: Vector3,to: Vector3) -> Array[Vector3]:
+    var grid := AStarGrid2D.new()
+    grid.region=Rect2i(-16,-14,33,29)
+    grid.cell_size=Vector2(0.25,0.25)
+    grid.diagonal_mode=AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+    grid.update()
+    for x in range(-16,17):
+        for z in range(-14,15):
+            if not can_stand(Vector3(x*0.25,0,z*0.25),0.25):
+                grid.set_point_solid(Vector2i(x,z))
+    var start := Vector2i(roundi(from.x*4),roundi(from.z*4))
+    var finish := Vector2i(roundi(to.x*4),roundi(to.z*4))
+    var result: Array[Vector3] = []
+    if not grid.region.has_point(start) or not grid.region.has_point(finish):return result
+    if grid.is_point_solid(start) or grid.is_point_solid(finish):return result
+    for id in grid.get_id_path(start,finish):
+        result.append(Vector3(id.x*0.25,0,id.y*0.25))
+    if not result.is_empty():result.append(to)
+    return result
