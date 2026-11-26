@@ -362,7 +362,7 @@ public final class GameSession implements AutoCloseable {
             String[] parts=action.split(":",3);
             if(parts.length!=3||!java.util.Set.of("1","2").contains(parts[1]))throw new IllegalArgumentException("Choose a message reply.");
             var copy=town.copy();
-            return apply(copy,1,PhoneLife.reply(copy,parts[2],Integer.parseInt(parts[1])));
+            return apply(copy,1,PhoneLife.reply(copy,parts[2],Integer.parseInt(parts[1]),state.day));
         }
         if(action!=null&&action.startsWith("rebirth-")){
             var copy=town.copy();
