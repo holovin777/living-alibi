@@ -15,9 +15,9 @@ final class LocalDialogue {
     private static final String MODEL=System.getenv().getOrDefault("LIVING_ALIBI_OLLAMA_MODEL","qwen2.5:3b");
     private LocalDialogue(){}
     static String smallTalk(TownLife.Citizen resident,PlayerLife.Contact contact,String previous,
-                            String message,String language) {
-        String instructions="You are a fictional resident of an Italian town. Respond only in "
-                +(language.equals("it")?"Italian":"English")
+                            String message,WorldSpeechRegion region,String language) {
+        String instructions="You are a fictional resident of a town in country "+region.countryCode+". Respond only in "
+                +region.speechNameFor(language)+" at the language level "+ResidentLanguages.level(region,resident.id,language)
                 +", in one or two short natural sentences. Never act as an AI assistant. "
                 +"Do not invent personal history, names, addresses, other people's actions, world events, or promises. "
                 +"Do not reveal your name or private information. You cannot perform transactions, transfer objects or change the simulation. "
