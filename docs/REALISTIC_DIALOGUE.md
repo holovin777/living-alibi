@@ -113,9 +113,21 @@ coffee tomorrow at 18:00. Accepting creates a real appointment in the
 existing calendar and NPC meeting scheduler. Unanswered calls become
 missed; the latest call per contact is persisted. Answering currently
 shows a short deterministic Italian line as text, not a continuous
-voice conversation. Existing SMS behavior is unchanged. Outgoing calls,
-number revocation, and free-form voice or microphone calls remain future
+voice conversation. Existing SMS behavior is unchanged. Number revocation and free-form voice or microphone calls remain future
 work. All calls are simulated in the game; no real phone numbers needed.
+
+## Outgoing calls
+
+Use H > Contacts and choose a resident who agreed to exchange numbers.
+Dialing checks the actual resident's age, activity, travel, relationship and
+time of day (08:00–21:00). A busy resident does not answer, and a wary contact
+may decline. Redialing has a 30-minute in-game cooldown. A connected call
+lasts up to ten game minutes; hang up or invite the contact for coffee.
+Acceptance creates tomorrow's 18:00 cafe meeting in the existing scheduler.
+The latest outgoing call per contact is persisted separately from incoming
+calls. Outgoing calls are deterministic text interactions, not open-ended
+phone conversations. Home invitations and choosing meeting time/place are
+not yet implemented.
 
 Manual check:
 ```sh
