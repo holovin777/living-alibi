@@ -60,7 +60,10 @@ final class PopulationGenerator {
                 // candidate rather than relying on a random lucky job draw.
                 c.occupation="Mechanic";c.workplace=TownLife.Place.WORKSHOP;
             }
+            // Reserve two food-shop jobs in larger worlds without changing earlier identities.
+            if(index==29||index==30){c.occupation=index==29?"Pizzaiolo":"Gelataio";c.workplace=TownLife.Place.CENTRO;}
             c.age=rng.nextInt(19,71);
+            if(index==29||index==30)c.age=Math.min(c.age,64);
             c.sociability=rng.nextInt(15,91);
             c.carefulness=rng.nextInt(15,91);
             c.curiosity=rng.nextInt(15,91);
