@@ -328,6 +328,7 @@ final class TownLife {
         town.together=nowTogether;
         int before=interactions.size();
         SocialLife.tick(town,marco,truth,observations,interactions);
+        ChildhoodLife.tick(town,marco);
         SocialNetwork.tick(town,marco,truth,observations,interactions);
         MutualAidLife.tick(town,marco);
         PersonalLoanLife.tick(town,marco);
