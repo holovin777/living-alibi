@@ -259,6 +259,10 @@ func refresh() -> void:
                 for meeting in phone.get("meetings",[]):
                     lines.append("\n"+tr("Coffee with %s · day %s · %s") % [meeting.get("name",""),meeting.get("day",0),format_time(int(meeting.get("minute",1080)))])
                     lines.append(tr("Cafe") + " · " + tr(str(meeting.get("status","SCHEDULED"))))
+            lines.append("\n"+tr("Community events"))
+            for club in _snapshot.get("hobbyEvents",[]):
+                lines.append(tr("%s · day %s · %s") % [tr(str(club.get("name",""))),club.get("day",0),format_time(int(club.get("minute",0)))])
+                lines.append(tr(str(club.get("district",""))) + (" · "+tr("Weather cancellation") if club.get("cancelled",false) else (" · "+tr("%s attending") % club.get("present",0) if int(club.get("present",0))>0 else "")))
             if alarm_at>=0:
                 lines.append(tr("Alarm: day %s, %s") % [alarm_at/1440+1,format_time(alarm_at%1440)])
         "weather":
