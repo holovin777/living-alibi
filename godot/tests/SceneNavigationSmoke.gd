@@ -17,6 +17,24 @@ func _exercise() -> void:
     await process_frame
     world.GameLanguage.select_locale("en",false)
 
+    var menu = world._character_menu
+    var menu_snapshot := {"player":{"privateName":"Test visitor","money":50,"hunger":80,"thirst":30,"fatigue":10,"health":90,"hygiene":60,"bag":{"bread":2}}}
+    menu.refresh(menu_snapshot)
+    var bars: Array[ProgressBar]=[]
+    for item in menu.pages[0].get_children():
+        if item is ProgressBar:bars.append(item)
+    if not _check(menu.tabs.get_tab_count()==4 and bars.size()==5 and bars[0].value==20 and bars[1].value==70 and bars[3].value==90,"character menu groups information and uses consistent wellbeing direction"):
+        return
+    menu_snapshot["rebirth"]={"phase":"CHILDHOOD","childName":"Test child","age":8}
+    menu_snapshot["characterNeeds"]={"hunger":10,"thirst":20,"fatigue":30,"health":80,"hygiene":90}
+    menu.refresh(menu_snapshot)
+    bars.clear()
+    for item in menu.pages[0].get_children():
+        if item is ProgressBar:bars.append(item)
+    if not _check(bars.size()==5 and bars[0].value==90 and bars[3].value==80,"linked childhood uses the real character rather than the old visitor needs"):
+        return
+    menu.refresh({})
+
     var clock = preload("res://scripts/LiveClock.gd").new()
     for i in range(5):
         if not _check(not clock.advance(1.0,true), "1:10 waits six real seconds"):
