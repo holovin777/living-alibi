@@ -3353,6 +3353,7 @@ func _render_residents() -> void:
         person.set_meta("mood",str(resident.get("mood","CALM")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
         _sync_resident_uniform(person,str(resident.get("outfitVisual","")))
+        _sync_resident_appearance(person,str(resident.get("appearanceStage","ADULT")))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
         _sync_office_employee(person,id)
@@ -3705,25 +3706,50 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var shoulders := _cylinder(person,0.255,0.14,jacket,Vector3(0,1.36,0))
     shoulders.scale.z = 0.68
     _cylinder(person,0.10,0.15,skin,Vector3(0,1.48,0))
-    _sphere(person,0.20,skin,Vector3(0,1.66,0))
+    var face := _sphere(person,0.20,skin,Vector3(0,1.66,0))
+    face.scale.x=float(profile["face_width"])
+    var hair_root := Node3D.new()
+    hair_root.name="Hair"
+    person.add_child(hair_root)
     var style: int = profile["style"]
     if style == 0:
-        _sphere(person,0.195,hair,Vector3(0,1.75,0.04))
+        _sphere(hair_root,0.195,hair,Vector3(0,1.75,0.04))
     elif style == 1:
-        _sphere(person,0.21,hair,Vector3(0,1.76,0.055))
-        _sphere(person,0.12,hair,Vector3(0,1.60,0.17))
+        _sphere(hair_root,0.21,hair,Vector3(0,1.76,0.055))
+        _sphere(hair_root,0.12,hair,Vector3(0,1.60,0.17))
     elif style == 2:
-        _sphere(person,0.17,hair,Vector3(0,1.78,0.025))
+        _sphere(hair_root,0.17,hair,Vector3(0,1.78,0.025))
     else:
-        _sphere(person,0.20,hair,Vector3(0,1.77,0.05))
-        _sphere(person,0.12,hair,Vector3(0.11,1.79,0.02))
+        _sphere(hair_root,0.20,hair,Vector3(0,1.77,0.05))
+        _sphere(hair_root,0.12,hair,Vector3(0.11,1.79,0.02))
+    match int(profile["hair_detail"]):
+        0:
+            var fringe := _sphere(hair_root,0.105,hair,Vector3(-0.08,1.77,-0.125))
+            fringe.scale=Vector3(1.2,0.42,0.62)
+        1:
+            for x in [-0.13,0.13]:
+                var lock := _sphere(hair_root,0.075,hair,Vector3(x,1.57,0.08))
+                lock.scale.y=1.7
+        2:
+            _sphere(hair_root,0.085,hair,Vector3(0,1.88,0.10))
     for side in [-1.0,1.0]:
         _sphere(person,0.045,skin,Vector3(side*0.18,1.64,0))
         _sphere(person,0.025,Color("#e9e3d8"),Vector3(side*0.072,1.69,-0.177))
-        _sphere(person,0.012,Color("#333530"),Vector3(side*0.072,1.69,-0.199))
-    _sphere(person,0.035,skin,Vector3(0,1.635,-0.193))
+        _sphere(person,0.013,profile["eye"],Vector3(side*0.072,1.69,-0.199))
+        _sphere(person,0.006,Color("#202225"),Vector3(side*0.072,1.69,-0.211))
+        _box(hair_root,Vector3(0.071,0.014,0.014),hair,Vector3(side*0.072,1.735,-0.187))
+    _sphere(person,float(profile["nose"]),skin,Vector3(0,1.635,-0.193))
     _box(person,Vector3(0.075,0.012,0.012),skin.darkened(0.32),Vector3(0,1.57,-0.178))
     _box(person,Vector3(0.05,0.46,0.027),jacket.darkened(0.24),Vector3(0,1.16,-0.175))
+    var beard := Node3D.new()
+    beard.name="FacialHair"
+    person.add_child(beard)
+    if int(profile["beard"])==0:
+        var chin := _sphere(beard,0.115,hair,Vector3(0,1.535,-0.128))
+        chin.scale=Vector3(1.03,0.61,0.55)
+    elif int(profile["beard"])==1:
+        _box(beard,Vector3(0.11,0.022,0.024),hair,Vector3(0,1.602,-0.186))
+    beard.hide()
     var accessory: int = profile["accessory"]
     if accessory == 0:
         for side in [-1.0,1.0]:
@@ -3785,6 +3811,22 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     person.add_child(activity_label)
     return person
 
+# Updates the existing model when a birthday crosses a visible life stage.
+func _sync_resident_appearance(person: Node3D,stage: String) -> void:
+    if str(person.get_meta("appearance_stage",""))==stage:return
+    person.set_meta("appearance_stage",stage)
+    var profile: Dictionary=person.get_meta("appearance",{})
+    person.scale=ResidentAppearance.body_scale(profile,stage)
+    var tint := ResidentAppearance.hair_color(profile.get("hair",Color("#594437")),stage)
+    for group in ["Hair","FacialHair"]:
+        var root := person.get_node_or_null(group) as Node3D
+        if root==null:continue
+        for child in root.get_children():
+            if child is MeshInstance3D and child.material_override is StandardMaterial3D:
+                child.material_override.albedo_color=tint
+        if group=="FacialHair":
+            root.visible=stage in ["ADULT","MATURE","SENIOR"]
+
 func _register_resident_seat(at: Vector3, yaw: float, kind: String) -> void:
     var seats: Array = _scenery.get_meta("resident_seats",[])
     seats.append({"at":at,"yaw":yaw,"kind":kind})
@@ -3832,7 +3874,7 @@ func _animate_residents(delta: float) -> void:
         var walking := activity in ["WALKING", "WANDERING", "STROLLING", "FREE_TIME", "SHOPPING", "JOB_SEARCH"]
         var phase := float(person.get_meta("phase", 0.0))
         var appearance: Dictionary = person.get_meta("appearance",{})
-        var pace := float(appearance.get("pace",1.0))
+        var pace := float(appearance.get("pace",1.0))*ResidentAppearance.pace_factor(str(person.get_meta("appearance_stage","ADULT")))
         var stride := float(appearance.get("stride",0.42))
         var seated := int(person.get_meta("seat_index",-1)) >= 0
         var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
@@ -6275,9 +6317,6 @@ func _sync_guest_family(household: Dictionary) -> void:
             _residents_root = root
             person = _make_resident(id,0,"")
             _residents_root = old_root
-            var age := int(entry.get("age",18))
-            var size := 0.56 if age<6 else 0.72 if age<12 else 0.90 if age<18 else 1.0
-            person.scale *= size
             person.position = goal
             var hand := person.get_node("ArmRight") as Node3D
             _box(hand,Vector3(0.18,0.025,0.15),Color("#9d6744"),Vector3(0,-0.48,-0.10))
@@ -6288,6 +6327,7 @@ func _sync_guest_family(household: Dictionary) -> void:
             var toy := hand.get_child(hand.get_child_count()-1) as Node3D
             toy.name="FamilyToy"
             toy.hide()
+        _sync_resident_appearance(person,ResidentAppearance.stage_for_age(int(entry.get("age",18))))
         if not person.has_meta("family_goal") or person.get_meta("family_goal")!=goal:
             var path: Array[Vector3] = _guest.host_path(person.position,goal)
             # Keep a resident in place if there is no safe route.

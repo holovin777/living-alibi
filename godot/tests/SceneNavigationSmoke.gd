@@ -898,6 +898,28 @@ func _exercise() -> void:
             and marco.has_node("LegLeft") and marco.has_node("ArmRight"),
             "residents have stable distinct visual profiles and articulated limbs"):
         return
+    var adult_scale: Vector3=marco.scale
+    var original_appearance: Dictionary=marco.get_meta("appearance").duplicate()
+    populated_park["residents"][0]["appearanceStage"]="CHILD"
+    world._on_world_updated(populated_park)
+    if not _check(world._residents_root.get_node("Resident_marco")==marco
+            and marco.scale.y<adult_scale.y*0.8
+            and marco.scale.x<adult_scale.x
+            and not marco.get_node("FacialHair").visible,
+            "children have smaller bodies, no facial hair and retain the same resident model"):
+        return
+    populated_park["residents"][0]["appearanceStage"]="SENIOR"
+    world._on_world_updated(populated_park)
+    var hair_mesh := marco.get_node("Hair").get_child(0) as MeshInstance3D
+    if not _check(hair_mesh.material_override.albedo_color.is_equal_approx(world.ResidentAppearance.hair_color(original_appearance["hair"],"SENIOR"))
+            and marco.get_meta("appearance")==original_appearance
+            and marco.scale.y>adult_scale.y*0.9,
+            "older residents gain gray hair without losing their stable identity"):
+        return
+    populated_park["residents"][0]["appearanceStage"]="ADULT"
+    world._on_world_updated(populated_park)
+    if not _check(marco.scale.is_equal_approx(adult_scale),"adult body scale is restored without compounding"):
+        return
     world._sync_resident_uniform(marco,"BAKER_APRON")
     if not _check(marco.has_node("Uniform") and marco.get_node("Uniform").get_child_count()>2,
             "visible work outfit has apron geometry"):

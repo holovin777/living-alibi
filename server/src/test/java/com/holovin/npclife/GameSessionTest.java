@@ -32,6 +32,17 @@ class GameSessionTest {
     }
 
     @Test
+    void visibleLifeStageTracksAgeWithoutRevealingExactBirthday() {
+        var resident=new TownLife.Citizen("appearance","Resident","Child",TownLife.Place.PARK);
+        int[] ages={0,5,6,11,12,17,18,44,45,66,67,90};
+        String[] expected={"PRESCHOOL","PRESCHOOL","CHILD","CHILD","TEEN","TEEN","ADULT","ADULT","MATURE","MATURE","SENIOR","SENIOR"};
+        for(int i=0;i<ages.length;i++){
+            resident.age=ages[i];
+            assertEquals(expected[i],GameSession.appearanceStage(resident));
+        }
+    }
+
+    @Test
     void observableOutfitsRequireActualWorkOrSchoolAttendance() {
         var resident=new TownLife.Citizen("outfit","Resident","Baker",TownLife.Place.BAKERY);
         resident.activity="WORKING";

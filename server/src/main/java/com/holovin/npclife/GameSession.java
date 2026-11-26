@@ -82,7 +82,7 @@ public final class GameSession implements AutoCloseable {
                                 String phase,int condition,int completedDay,
                                 String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
-    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual,String appearanceStage) { }
     // Observable equipment, not a disclosure of a stranger's name or private employment record.
     static String workVisual(TownLife.Citizen c){
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
@@ -97,6 +97,15 @@ public final class GameSession implements AutoCloseable {
             case OFFICE, LIBRARY, SCHOOL, CLINIC -> "PAPERS";
             default -> "";
         };
+    }
+    // Coarse visible age group, not a private birth date or exact age.
+    static String appearanceStage(TownLife.Citizen c){
+        if(c.age<6)return "PRESCHOOL";
+        if(c.age<12)return "CHILD";
+        if(c.age<18)return "TEEN";
+        if(c.age<45)return "ADULT";
+        if(c.age<67)return "MATURE";
+        return "SENIOR";
     }
     // Visible clothing only; do not expose a stranger's age or occupation string.
     static String outfitVisual(TownLife.Citizen c){
@@ -160,7 +169,7 @@ public final class GameSession implements AutoCloseable {
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
                             contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c));
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
