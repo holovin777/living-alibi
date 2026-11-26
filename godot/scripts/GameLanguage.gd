@@ -2,6 +2,10 @@ extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
     "Camera motion": "Movimento visuale",
+    "Excuse me, could you spare some water?": "Scusa, avresti dell'acqua da darmi?",
+    "Excuse me, do you have some bread?": "Scusa, hai un po' di pane?",
+    "Hey! Good to see you again.": "Ciao! Che piacere rivederti.",
+    "T: respond · R: ignore": "T: rispondi · R: ignora",
     "WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.": "WASD: cammina · Maiusc: corri · Ctrl: abbassati · Spazio: salta · Esc: cursore.",
     "Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch": "Viaggio E: %s · Servizi F: %s · Mappa M · Parla T · Spazio: salta · Maiusc: corri · Ctrl: abbassati.",
     "WASD: walk · Space: jump · click scene: mouse look · Esc: cursor.": "WASD: cammina · Spazio: salta · clic: visuale · Esc: cursore.",

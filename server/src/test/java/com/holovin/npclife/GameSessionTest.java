@@ -13,6 +13,37 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void residentInitiativeReflectsActualNeedsAndFamiliarity() throws Exception {
+        try(var db=new WorldDatabase(directory.resolve("initiative.db"))){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=town.get("marco");
+            town.player.place=TownLife.Place.PARK;
+            town.player.travelRemaining=0;
+            resident.place=TownLife.Place.PARK;resident.destination=resident.place;resident.travelRemaining=0;
+            resident.activity="WALKING";resident.age=30;resident.sociability=80;
+            resident.thirst=80;resident.water=0;resident.hunger=30;resident.food=2;
+            assertEquals("ASK_WATER",GameSession.initiative(town,resident,1,600));
+            resident.water=1;
+            assertEquals("",GameSession.initiative(town,resident,1,600));
+            resident.food=0;resident.hunger=80;
+            assertEquals("ASK_BREAD",GameSession.initiative(town,resident,1,600));
+            resident.food=2;resident.hunger=20;
+            var contact=new PlayerLife.Contact(resident.id);
+            contact.trust=75;contact.affinity=35;contact.conversations=3;
+            town.player.contacts.put(resident.id,contact);
+            resident.thirst=20;
+            resident.fatigue=10;
+            assertEquals("GREET",GameSession.initiative(town,resident,1,600));
+            assertEquals("",GameSession.initiative(town,resident,1,60));
+            resident.activity="WORKING";
+            assertEquals("",GameSession.initiative(town,resident,1,600));
+            resident.activity="WALKING";resident.travelRemaining=1;
+            assertEquals("",GameSession.initiative(town,resident,1,600));
+            assertEquals(3,contact.conversations);
+        }
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";

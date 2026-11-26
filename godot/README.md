@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Resident-initiated encounters
+
+Daytime, awake sociable adults in the visitor's actual public district may initiate an encounter: severe thirst without water, severe hunger without food, or a greeting based on positive established familiarity. Java exposes only an eligible opening intent, without changing inventory or relationships. Godot selects a nearby standing resident, approaches using existing collision-aware movement, stops at conversational distance, and displays a localized opening line. T opens that resident's normal conversation, where the player can voluntarily offer bread/water or reply; R ignores the encounter. A 12-second approach window and 20-second cooldown limit interruptions, with at most one attempt per resident per game day within the client session. No forced donations, identity disclosure or new social effects occur. Cooldowns are session-only; pathfinding around complex obstructions, voice playback integration and linked-life encounters remain future work.

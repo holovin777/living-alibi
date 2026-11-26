@@ -82,7 +82,21 @@ public final class GameSession implements AutoCloseable {
                                 String phase,int condition,int completedDay,
                                 String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
-    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String initiative) { }
+    // A public, voluntary opening line, not a new transfer or conversation.
+    static String initiative(TownLife.Town town,TownLife.Citizen c,int day,int minute){
+        if(RebirthLife.active(town)||!town.player.alive||town.player.travelRemaining>0||
+            !c.alive||c.travelRemaining>0||c.age<18||c.sociability<55||minute<420||minute>=1260||
+            !c.currentSpace().equals(TownLife.publicSpace(town.player.place))||
+            !java.util.Set.of("WALKING","WANDERING","STROLLING","FREE_TIME","RELAXING","RESTING","SHOPPING","JOB_SEARCH").contains(c.activity))return "";
+        var contact=town.player.contacts.get(c.id);
+        if(contact!=null&&(contact.trust<30||contact.affinity<=-20))return "";
+        if(c.thirst>=75&&c.water==0)return "ASK_WATER";
+        if(c.hunger>=75&&c.food==0)return "ASK_BREAD";
+        if(contact!=null&&contact.conversations>=2&&contact.trust>=55&&contact.affinity>=12&&
+            EmotionLife.mood(town,c,day,minute)!=EmotionLife.Mood.IRRITATED)return "GREET";
+        return "";
+    }
     // Observable equipment, not a disclosure of a stranger's name or private employment record.
     static String workVisual(TownLife.Citizen c){
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
@@ -139,7 +153,7 @@ public final class GameSession implements AutoCloseable {
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
                             contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c));
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),initiative(town,c,state.day,state.minute));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();

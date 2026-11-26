@@ -80,6 +80,12 @@ var _host_activity := ""
 var _host_path: Array[Vector3] = []
 var _host_seated := false
 var _guest_sitting := false
+var _initiative_id := ""
+var _initiative_kind := ""
+var _initiative_remaining := 0.0
+var _initiative_wait := 8.0
+var _initiative_seen := {}
+var _initiative_life := -1
 var _guest_stand_at := Vector3.ZERO
 var _guest_feedback := ""
 var _guest_feedback_time := 0.0
@@ -334,6 +340,7 @@ func _process(delta: float) -> void:
         return
     _sync_bicycle()
     _advance_traffic(delta)
+    _tick_resident_initiative(delta)
     _animate_residents(delta)
     _tick_office_joker(delta)
     _weather_fx.follow(_avatar.position)
@@ -397,6 +404,10 @@ func _process(delta: float) -> void:
         _hint.text = "T: talk to nearby resident · Esc: cursor."
     else:
         _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
+    if not _initiative_id.is_empty():
+        var person := _residents_root.get_node_or_null("Resident_"+_initiative_id) as Node3D
+        if person!=null and person.position.distance_to(_avatar.position)<2.5:
+            _hint.text+="\n— "+_initiative_line(_initiative_kind)+"\n"+tr("T: respond · R: ignore")
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -557,6 +568,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
             _action_panel.visible = false
             _map_panel.visible = false
             _close_dialog()
+            get_viewport().set_input_as_handled()
+        elif event.keycode == KEY_R and not _initiative_id.is_empty():
+            _clear_initiative()
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_T and not _dialog_panel.visible:
             _open_dialog()
@@ -3198,6 +3212,7 @@ func _render_residents() -> void:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
+        person.set_meta("initiative",str(resident.get("initiative","")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
         person.set_meta("personal_debt",int(resident.get("personalDebt",0)))
         person.set_meta("personal_debt_due",int(resident.get("personalDebtDueDay",0)))
@@ -3550,6 +3565,57 @@ func _assign_resident_seats() -> void:
             person.position = _open_anchor(anchor)
             person.set_meta("seat_kind","")
 
+func _initiative_line(kind: String) -> String:
+    match kind:
+        "ASK_WATER":return tr("Excuse me, could you spare some water?")
+        "ASK_BREAD":return tr("Excuse me, do you have some bread?")
+        "GREET":return tr("Hey! Good to see you again.")
+    return ""
+
+func _clear_initiative() -> void:
+    _initiative_id=""
+    _initiative_kind=""
+    _initiative_remaining=0.0
+    _initiative_wait=20.0
+
+func _initiative_candidate(person: Node3D) -> bool:
+    return not _initiative_line(str(person.get_meta("initiative",""))).is_empty() and int(person.get_meta("seat_index",-1))<0
+
+func _tick_resident_initiative(delta: float) -> void:
+    if not _connected or _rebirth_active() or _guest_active or _stairwell_active or _apartment_active or _inside_guest_room() or not _foot_controls_available() or _jump_elapsed>=0.0:
+        if not _initiative_id.is_empty():_clear_initiative()
+        return
+    var life := int(_last_snapshot.get("player",{}).get("incarnation",1))
+    if life!=_initiative_life:
+        _initiative_life=life
+        _initiative_seen.clear()
+        _clear_initiative()
+    var day := int(_last_snapshot.get("day",1))
+    if not _initiative_id.is_empty():
+        var person := _residents_root.get_node_or_null("Resident_"+_initiative_id) as Node3D
+        _initiative_remaining-=delta
+        if person==null or not _initiative_candidate(person) or str(person.get_meta("initiative"))!=_initiative_kind or person.position.distance_to(_avatar.position)>6.0 or _initiative_remaining<=0.0:
+            _clear_initiative()
+        return
+    _initiative_wait=maxf(0.0,_initiative_wait-delta)
+    if _initiative_wait>0.0:return
+    var best := 5.0
+    var chosen: Node3D
+    for child in _residents_root.get_children():
+        var person := child as Node3D
+        if person==null or not _initiative_candidate(person):continue
+        var id := str(person.get_meta("resident_id",""))
+        if id.is_empty() or int(_initiative_seen.get(id,-1))==day:continue
+        var distance := person.position.distance_to(_avatar.position)
+        if distance<best:
+            best=distance
+            chosen=person
+    if chosen==null:return
+    _initiative_id=str(chosen.get_meta("resident_id"))
+    _initiative_kind=str(chosen.get_meta("initiative"))
+    _initiative_seen[_initiative_id]=day
+    _initiative_remaining=12.0
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
@@ -3563,13 +3629,26 @@ func _animate_residents(delta: float) -> void:
         var stride := float(appearance.get("stride",0.42))
         var seated := int(person.get_meta("seat_index",-1)) >= 0
         var talking := _dialog_panel.visible and str(person.get_meta("resident_id","")) == _dialog_target
-        if talking or seated:
+        var approaching := not seated and not _initiative_id.is_empty() and str(person.get_meta("resident_id",""))==_initiative_id
+        if talking or seated or approaching:
             walking = false
         if talking and not seated:
             var toward := _avatar.position-person.position
             if toward.length_squared()>0.001:
                 person.rotation.y = lerp_angle(person.rotation.y,atan2(-toward.x,-toward.z),minf(delta*6.0,1.0))
-        if walking:
+        if approaching:
+            var toward := _avatar.position-person.position
+            toward.y=0.0
+            if toward.length_squared()>0.001:
+                person.rotation.y=lerp_angle(person.rotation.y,atan2(-toward.x,-toward.z),minf(delta*6.0,1.0))
+            if toward.length()>1.8:
+                var old := person.position
+                person.position=_move_on_ground(old,toward.normalized()*minf(delta*1.3,toward.length()-1.8),WALKER_RADIUS)
+                walking=person.position.distance_squared_to(old)>0.000001
+                phase+=delta*0.65*pace
+                person.set_meta("phase",phase)
+                person.set_meta("anchor",person.position)
+        elif walking:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
@@ -4071,6 +4150,13 @@ func _open_dialog() -> void:
     if not _connected or _api.is_busy() or _dialog_pending:
         return
     var id := _nearest_resident()
+    var opening := ""
+    if not _initiative_id.is_empty():
+        var initiator := _residents_root.get_node_or_null("Resident_"+_initiative_id) as Node3D
+        if initiator!=null and initiator.position.distance_to(_avatar.position)<2.5:
+            id=_initiative_id
+            opening=_initiative_line(_initiative_kind)
+            _clear_initiative()
     if id.is_empty():
         _message.text = "Approach a resident to talk."
         return
@@ -4085,6 +4171,7 @@ func _open_dialog() -> void:
     var known := str(person.get_meta("known_name",""))
     _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
+    if not opening.is_empty():_dialog_reply.text=opening
     _dialog_input.clear()
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -6232,6 +6319,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if _stairwell_active and (new_place!=_current_place or _rebirth_active()):
         _set_stairwell(false)
     if new_place != _current_place:
+        _clear_initiative()
         _reset_jump()
         _reset_locomotion()
         _office_app="work"
