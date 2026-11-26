@@ -319,7 +319,7 @@ func _process(delta: float) -> void:
         else:
             if _guest.near_exit(_avatar.position):hints += "\n"+tr("G: leave apartment")
             if _guest.near_sofa(_avatar.position):hints += "\n"+tr("E: sit on sofa")
-            if _guest.near_table(_avatar.position):hints += "\n"+tr("C: coffee · F: snack")
+            if _guest.near_table(_avatar.position):hints += "\n"+tr("C: coffee · F: snack · V: dinner")
         if is_instance_valid(_guest_host) and _avatar.position.distance_to(_guest_host.position)<2.5:
             hints += "\n"+tr("T: talk to host")
         _guest_feedback_time = maxf(0.0,_guest_feedback_time-delta)
@@ -457,6 +457,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 _guest_action("coffee")
             elif event.keycode==KEY_F:
                 _guest_action("snack")
+            elif event.keycode==KEY_V:
+                _guest_action("dinner")
             elif event.keycode==KEY_R:
                 _guest_action("rest")
             get_viewport().set_input_as_handled()
@@ -7311,7 +7313,7 @@ func _on_phone_alarm(message: String) -> void:
 
 func _reply_phone_call(resident_id: String,action: String) -> void:
     if _phone.visible and _phone_allowed() and _connected and not _api.is_busy():
-        var route := "phone-out" if action in ["dial","hangup","invite-coffee"] else "phone-call"
+        var route := "phone-out" if action in ["dial","hangup","invite-coffee","ask-home-visit"] else "phone-call"
         _api.garden_action("%s:%s:%s" % [route,action,resident_id])
 
 func _reply_phone_sms(resident_id: String,choice: int) -> void:
@@ -7400,7 +7402,7 @@ func _guest_action(action: String) -> void:
     if action=="leave" and (not _guest_active or not _guest.near_exit(_avatar.position)):return
     if action in ["talk","coffee","snack","rest"] and not _guest_active:return
     if action=="talk" and (not is_instance_valid(_guest_host) or _avatar.position.distance_to(_guest_host.position)>=2.5):return
-    if action in ["coffee","snack"] and not _guest.near_table(_avatar.position):return
+    if action in ["coffee","snack","dinner"] and not _guest.near_table(_avatar.position):return
     if action=="rest" and not _guest_sitting:return
     _guest_requested_action = action
     _guest_pending = true
