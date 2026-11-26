@@ -5847,12 +5847,12 @@ func _animate_guest_host(delta: float) -> void:
             walking = true
         else:
             _host_path.pop_front()
-    if not talking and not walking and _host_path.is_empty() and not _host_seated and _host_activity in ["READING","WATCHING_TV","RESTING"]:
+    if not talking and not walking and _host_path.is_empty() and not _host_seated and _host_activity in ["READING","WATCHING_TV","RESTING","FAMILY_DINNER"]:
         var anchor: Vector3 = _guest.routine_anchor(_host_activity)
         if _guest_host.position.distance_to(anchor)<0.1:
             _host_seated = true
-            _guest_host.position = _guest.routine_seat()+Vector3(0,-0.34,0)
-            _guest_host.rotation.y = PI
+            _guest_host.position = _guest.routine_seat(_host_activity)+Vector3(0,-0.34,0)
+            _guest_host.rotation.y = _guest.routine_seat_yaw(_host_activity)
     if talking:
         var toward := _avatar.position-_guest_host.position
         if toward.length_squared()>0.001:
@@ -5868,6 +5868,9 @@ func _animate_guest_host(delta: float) -> void:
     var gesture := 0.0
     if talking:gesture=0.25+sin(phase*3.0)*0.18
     elif walking:gesture=-swing
+    elif _host_activity=="FAMILY_DINNER" and _host_seated:
+        _guest_host.rotation.y = lerp_angle(_guest_host.rotation.y,_guest.routine_seat_yaw(_host_activity),minf(delta*4.0,1.0))
+        gesture=0.75+sin(phase*2.0)*0.45
     elif _host_activity in ["COOKING","CLEANING","DRINKING","READING"]:
         gesture=0.7+sin(phase*3.0)*0.2
     arm.rotation.x = lerpf(arm.rotation.x,gesture,minf(delta*6,1.0))
