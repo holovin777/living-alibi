@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Visible household activities
+
+Present relatives now hold a cup while drinking, a cloth while cleaning, a wooden spoon while cooking, or a fork during dinner. The existing book and toy remain specific to reading/homework and play. Different arm gestures distinguish the routines, and relatives turn toward their activity station where a direction is available. Props remain hidden during the entire walking route, including intermediate waypoint transitions. These are local visual cues for existing server-confirmed activities, not new inventory items, meals, or resource consumption. Household seating and NPC-to-NPC avoidance remain limited.

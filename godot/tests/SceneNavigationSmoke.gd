@@ -316,6 +316,8 @@ func _exercise() -> void:
     if not _check(world._host_seated and world._guest_host.position.is_equal_approx(world._guest.routine_seat("FAMILY_DINNER")+Vector3(0,-0.34,0)),"host sits at dinner table"):
         return
     var child := family.get_node("Resident_guest-child") as Node3D
+    if not _check(child.get_node("ArmRight/FamilyFork").visible and not child.get_node("ArmRight/FamilyToy").visible,"dinner relative holds a fork instead of a toy"):
+        return
     var before_play := child.position
     var playing := {"activity":"FAMILY_DINNER","cleanliness":95,"household":{"members":3,"present":3,"dinnerNow":true,"visibleResidents":[{"id":"guest-child","age":8,"activity":"PLAYING"},{"id":"guest-adult","age":35,"activity":"FAMILY_DINNER"}]}}
     world._sync_host_routine(playing)
@@ -331,6 +333,16 @@ func _exercise() -> void:
     world._sync_host_routine(playing)
     if not _check(child.position.is_equal_approx(arrived) and child.get_meta("family_path").is_empty(),"unchanged snapshot does not restart movement"):
         return
+    if not _check(not child.get_node("ArmRight/FamilyFork").visible,"play hides dinner utensil"):
+        return
+    # Exercise the presentation for stationary routines independently of routing.
+    for routine in [["DRINKING","FamilyCup"],["CLEANING","FamilyCloth"],["COOKING","FamilySpoon"]]:
+        child.set_meta("activity",routine[0])
+        world._animate_guest_family(0.1)
+        for prop in ["FamilyCup","FamilyCloth","FamilySpoon","FamilyFork","FamilyBook","FamilyToy"]:
+            if not _check(child.get_node("ArmRight/"+prop).visible==(prop==routine[1]),"only the matching household prop is visible"):
+                return
+    child.set_meta("activity","PLAYING")
     world._sync_host_routine({"activity":"READING","cleanliness":95,"household":{"members":3,"present":1,"dinnerNow":false}})
     if not _check(not world._host_seated and world._guest_host.position.is_equal_approx(world._guest.routine_anchor("FAMILY_DINNER")),"host stands at safe approach when dinner ends"):
         return

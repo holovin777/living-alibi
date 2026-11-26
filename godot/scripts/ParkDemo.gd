@@ -5998,6 +5998,17 @@ func _sync_guest_family(household: Dictionary) -> void:
             var toy := hand.get_child(hand.get_child_count()-1) as Node3D
             toy.name="FamilyToy"
             toy.hide()
+            for prop in [
+                ["FamilyCup",Vector3(0.085,0.12,0.085),Color("#e1e7df"),Vector3(0,-0.48,-0.09)],
+                ["FamilyCloth",Vector3(0.18,0.035,0.13),Color("#e1c96d"),Vector3(0,-0.50,-0.10)],
+                ["FamilySpoon",Vector3(0.045,0.035,0.23),Color("#b88b5e"),Vector3(0,-0.49,-0.16)],
+                ["FamilyFork",Vector3(0.025,0.025,0.17),Color("#b5bec4"),Vector3(0,-0.49,-0.14)]
+            ]:
+                _box(hand,prop[1],prop[2],prop[3])
+                var held := hand.get_child(hand.get_child_count()-1) as Node3D
+                held.name=prop[0]
+                held.hide()
+        person.set_meta("family_focus",target)
         if not person.has_meta("family_goal") or person.get_meta("family_goal")!=goal:
             var path: Array[Vector3] = _guest.host_path(person.position,goal)
             # Keep a resident in place if there is no safe route.
@@ -6032,20 +6043,35 @@ func _animate_guest_family(delta: float) -> void:
                 path.pop_front()
         person.set_meta("family_path",path)
         var phase := float(Time.get_ticks_msec())*0.001+float(person.get_meta("phase",0.0))
-        var swing := sin(phase*9.0)*0.4 if walking else 0.0
+        # A waypoint can be popped without movement on this frame. Keep props
+        # hidden until the entire route finishes, not just between steps.
+        var travelling := walking or not path.is_empty()
+        if not travelling:
+            var focus: Vector3 = person.get_meta("family_focus",person.position)
+            var toward := focus-person.position
+            if toward.length_squared()>0.04:
+                person.rotation.y=lerp_angle(person.rotation.y,atan2(-toward.x,-toward.z),minf(delta*4.0,1.0))
+        var swing := sin(phase*9.0)*0.4 if travelling else 0.0
         for limb in ["LegLeft","LegRight"]:
             var leg := person.get_node(limb) as Node3D
             leg.rotation.x=lerpf(leg.rotation.x,swing if limb=="LegLeft" else -swing,minf(delta*8.0,1.0))
-        var gesture := -swing if walking else 0.0
-        if not walking:
+        var gesture := -swing if travelling else 0.0
+        if not travelling:
             match activity:
                 "PLAYING":gesture=0.55+sin(phase*5.0)*0.5
                 "HOMEWORK","READING":gesture=0.65+sin(phase*2.0)*0.15
-                "COOKING","CLEANING","DRINKING","FAMILY_DINNER":gesture=0.65+sin(phase*3.0)*0.25
+                "COOKING":gesture=0.65+sin(phase*4.0)*0.22
+                "CLEANING":gesture=0.45+sin(phase*6.0)*0.35
+                "DRINKING":gesture=0.9+sin(phase*1.7)*0.55
+                "FAMILY_DINNER":gesture=0.75+sin(phase*2.0)*0.4
         var arm := person.get_node("ArmRight") as Node3D
         arm.rotation.x=lerpf(arm.rotation.x,gesture,minf(delta*6.0,1.0))
-        arm.get_node("FamilyBook").visible=not walking and activity in ["HOMEWORK","READING"]
-        arm.get_node("FamilyToy").visible=not walking and activity=="PLAYING"
+        arm.get_node("FamilyBook").visible=not travelling and activity in ["HOMEWORK","READING"]
+        arm.get_node("FamilyToy").visible=not travelling and activity=="PLAYING"
+        arm.get_node("FamilyCup").visible=not travelling and activity=="DRINKING"
+        arm.get_node("FamilyCloth").visible=not travelling and activity=="CLEANING"
+        arm.get_node("FamilySpoon").visible=not travelling and activity=="COOKING"
+        arm.get_node("FamilyFork").visible=not travelling and activity=="FAMILY_DINNER"
 
 func _animate_guest_host(delta: float) -> void:
     if not is_instance_valid(_guest_host):return
