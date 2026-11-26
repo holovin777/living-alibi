@@ -5771,6 +5771,10 @@ func _open_guest(invitation: Dictionary) -> void:
     _residents_root = original_root
     _guest_host.position = _guest.host_anchor()
     _guest_host.set_meta("activity","AT_HOME")
+    var hand := _guest_host.get_node("ArmRight") as Node3D
+    var book := _box(hand,Vector3(0.20,0.025,0.15),Color("#9d6744"),Vector3(0,-0.48,-0.10))
+    book.name = "ReadingBook"
+    book.hide()
     _host_activity = ""
     _host_seated = false
     _host_path.clear()
@@ -5839,7 +5843,7 @@ func _animate_guest_host(delta: float) -> void:
         var anchor: Vector3 = _guest.routine_anchor(_host_activity)
         if _guest_host.position.distance_to(anchor)<0.1:
             _host_seated = true
-            _guest_host.position = _guest.routine_seat()+Vector3(0,0.02,0)
+            _guest_host.position = _guest.routine_seat()+Vector3(0,-0.34,0)
             _guest_host.rotation.y = PI
     if talking:
         var toward := _avatar.position-_guest_host.position
@@ -5859,6 +5863,7 @@ func _animate_guest_host(delta: float) -> void:
     elif _host_activity in ["COOKING","CLEANING","DRINKING","READING"]:
         gesture=0.7+sin(phase*3.0)*0.2
     arm.rotation.x = lerpf(arm.rotation.x,gesture,minf(delta*6,1.0))
+    arm.get_node("ReadingBook").visible = _host_seated and _host_activity=="READING" and not talking
 
 func _near_stairwell() -> bool:
     if _stairwell_active or _rebirth_active() or _drive_active() or _cycling() or _apartment_active or _current_place!="NORTH_RESIDENCES":
