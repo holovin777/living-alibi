@@ -48,6 +48,43 @@ final class PhoneLife {
                 &&(get(t,c.id,"meeting-state")==1||get(t,c.id,"meeting-state")==2)
                 &&clock.minute>=DEPART_MINUTE&&clock.minute<1170;
     }
+    static boolean playerHomeWindow(TownLife.Town t,TownLife.Citizen c,WorldState clock){
+        return available(t)&&t.player.ownsHouse&&get(t,c.id,"meeting-kind")==3
+                &&get(t,c.id,"meeting-day")==clock.day
+                &&(get(t,c.id,"meeting-state")==1||get(t,c.id,"meeting-state")==2)
+                &&clock.minute>=DEPART_MINUTE&&clock.minute<1170;
+    }
+    static boolean guestPresent(TownLife.Town t,String id,int day,int minute){
+        var c=t.people.get(id);
+        return available(t)&&t.player.ownsHouse&&t.player.place==HousingLife.HOUSE_DISTRICT
+                &&t.player.travelRemaining==0&&c!=null&&c.presentAt(HousingLife.HOUSE_DISTRICT)
+                &&get(t,id,"meeting-kind")==3&&get(t,id,"meeting-day")==day
+                &&get(t,id,"meeting-state")==2&&minute>=MEETING_MINUTE&&minute<1170
+                &&!Set.of("WORKING","SLEEPING","SICK_LEAVE","RESTING_WHILE_SICK").contains(c.activity);
+    }
+    static String cookTogether(TownLife.Town t,String id,int day,int minute){
+        if(!guestPresent(t,id,day,minute)||minute+25>=1170)
+            throw new IllegalArgumentException("A guest and enough visit time are required.");
+        if(get(t,id,"shared-meal-day")==day)throw new IllegalArgumentException("You already cooked together today.");
+        var recipe=FoodLife.recipe("pasta-verdure");
+        for(var ingredient:recipe.ingredients().entrySet())
+            if(FoodLife.quantity(t.player,ingredient.getKey(),true)<ingredient.getValue()*2)
+                throw new IllegalArgumentException("Two portions of pasta, vegetables and water are required.");
+        for(var ingredient:recipe.ingredients().entrySet())
+            FoodLife.change(t.player,ingredient.getKey(),true,-ingredient.getValue()*2);
+        var c=t.people.get(id);
+        t.player.hunger=Math.max(0,t.player.hunger-recipe.hunger());
+        t.player.thirst=Math.max(0,t.player.thirst-recipe.thirst());
+        c.hunger=Math.max(0,c.hunger-recipe.hunger());
+        c.thirst=Math.max(0,c.thirst-recipe.thirst());
+        var contact=t.player.contacts.get(id);
+        contact.trust=Math.min(100,contact.trust+2);contact.affinity=Math.min(100,contact.affinity+3);
+        contact.lastDay=day;contact.lastMinute=minute;
+        put(t,id,"shared-meal-day",day);
+        ConversationMemory.remember(contact,day,minute,"und","Cooked pasta together at your home","You cooked and ate together.");
+        ConversationMemory.mark(contact,ConversationMemory.Milestone.SHARED_MEAL,contact.dialogue.getLast());
+        return "You cooked and ate together.";
+    }
     static void visitArrived(TownLife.Town t,String id,int day,int minute){
         if(homeInvitation(t,id,day,minute))put(t,id,"meeting-state",2);
     }
@@ -91,28 +128,32 @@ final class PhoneLife {
             put(t,id,"out-state",4);return "Call ended.";
         }
         boolean home="ask-home-visit".equals(action);
-        if(!home&&!"invite-coffee".equals(action))throw new IllegalArgumentException("Choose a call action.");
+        boolean hosting="invite-my-home".equals(action);
+        if(hosting&&(!t.player.ownsHouse||contact.trust<75||contact.affinity<30||SocialMemoryLife.unresolved(t,id))){
+            put(t,id,"out-state",9);return "Mi dispiace, non posso venire a casa tua.";
+        }
+        if(!home&&!hosting&&!"invite-coffee".equals(action))throw new IllegalArgumentException("Choose a call action.");
         if(home&&!canHost(t,c,contact)){
             put(t,id,"out-state",7);return "Mi dispiace, preferisco non ricevere visite a casa.";
         }
         if(!canAnswer(c,minute)||contact.trust<65||contact.affinity<20||
                 t.player.contacts.values().stream().anyMatch(x->get(t,x.residentId,"meeting-state")==1)){
-            put(t,id,"out-state",home?7:5);return home?"Mi dispiace, preferisco non ricevere visite a casa.":"Mi dispiace, non posso prendere un caffè domani.";
+            put(t,id,"out-state",hosting?9:home?7:5);return hosting?"Mi dispiace, non posso venire a casa tua.":home?"Mi dispiace, preferisco non ricevere visite a casa.":"Mi dispiace, non posso prendere un caffè domani.";
         }
         put(t,id,"meeting-day",Math.addExact(day,1));put(t,id,"meeting-state",1);
-        put(t,id,"meeting-kind",home?2:1);
-        put(t,id,"out-state",home?8:6);
+        put(t,id,"meeting-kind",hosting?3:home?2:1);
+        put(t,id,"out-state",hosting?10:home?8:6);
         contact.lastDay=day;contact.lastMinute=minute;
-        return home?"Volentieri! Vieni a trovarmi domani alle 18.":"Volentieri! Domani alle 18 al bar.";
+        return hosting?"Volentieri! Vengo a casa tua domani alle 18.":home?"Volentieri! Vieni a trovarmi domani alle 18.":"Volentieri! Domani alle 18 al bar.";
     }
     private static String outgoingStatus(int state){
         return switch(state){case 1 -> "NO_ANSWER";case 2 -> "CONNECTED";case 3 -> "DECLINED";
-            case 4 -> "ENDED";case 5,7 -> "INVITATION_DECLINED";default -> "ACCEPTED";};
+            case 4 -> "ENDED";case 5,7,9 -> "INVITATION_DECLINED";default -> "ACCEPTED";};
     }
     private static String outgoingText(int state){
         return switch(state){case 2 -> "Ciao! Dimmi pure.";case 3 -> "Scusa, preferisco non parlare adesso.";
             case 5 -> "Mi dispiace, non posso prendere un caffè domani.";
-            case 6 -> "Volentieri! Domani alle 18 al bar.";case 7 -> "Mi dispiace, preferisco non ricevere visite a casa.";case 8 -> "Volentieri! Vieni a trovarmi domani alle 18.";default -> "";};
+            case 6 -> "Volentieri! Domani alle 18 al bar.";case 7 -> "Mi dispiace, preferisco non ricevere visite a casa.";case 8 -> "Volentieri! Vieni a trovarmi domani alle 18.";case 9 -> "Mi dispiace, non posso venire a casa tua.";case 10 -> "Volentieri! Vengo a casa tua domani alle 18.";default -> "";};
     }
     private static boolean ringing(TownLife.Town t,String id){return get(t,id,"call-state")==1;}
     private static long callStart(TownLife.Town t,String id){
@@ -181,7 +222,7 @@ final class PhoneLife {
     }
     static final int MEETING_MINUTE=1080, MEETING_END=1110, DEPART_MINUTE=1050;
     static boolean meetingWindow(TownLife.Town t,TownLife.Citizen c,WorldState clock){
-        return available(t)&&get(t,c.id,"meeting-kind")!=2&&(get(t,c.id,"meeting-state")==1||get(t,c.id,"meeting-state")==2)&&get(t,c.id,"meeting-day")==clock.day&&clock.minute>=DEPART_MINUTE&&clock.minute<MEETING_END;
+        return available(t)&&get(t,c.id,"meeting-kind")<2&&(get(t,c.id,"meeting-state")==1||get(t,c.id,"meeting-state")==2)&&get(t,c.id,"meeting-day")==clock.day&&clock.minute>=DEPART_MINUTE&&clock.minute<MEETING_END;
     }
     static void tick(TownLife.Town t,WorldState clock){
         tickCalls(t,clock);
@@ -194,7 +235,8 @@ final class PhoneLife {
             if(clock.day>day||(clock.day==day&&clock.minute>=MEETING_END)){
                 put(t,id,"meeting-state",3);continue;
             }
-            if(get(t,id,"meeting-kind")!=2&&clock.day==day&&clock.minute>=MEETING_MINUTE&&c.presentAt(TownLife.Place.CAFE)&&
+            if(get(t,id,"meeting-kind")==3&&clock.day==day&&clock.minute>=MEETING_MINUTE&&t.player.ownsHouse&&c.presentAt(HousingLife.HOUSE_DISTRICT)&&t.player.place==HousingLife.HOUSE_DISTRICT&&t.player.travelRemaining==0&&!Set.of("WORKING","SLEEPING","SICK_LEAVE","RESTING_WHILE_SICK").contains(c.activity))put(t,id,"meeting-state",2);
+            if(get(t,id,"meeting-kind")<2&&clock.day==day&&clock.minute>=MEETING_MINUTE&&c.presentAt(TownLife.Place.CAFE)&&
                     t.player.place==TownLife.Place.CAFE&&t.player.travelRemaining==0&&c.travelRemaining==0){
                 put(t,id,"meeting-state",2);
             }
@@ -234,7 +276,7 @@ final class PhoneLife {
             int callState=get(t,c.id,"call-state");
             if(callState>0)calls.add(new Call(c.id,c.name,get(t,c.id,"call-day"),get(t,c.id,"call-minute"),switch(callState){case 1 -> "RINGING";case 2 -> "ANSWERED";case 3 -> "DECLINED";case 4 -> "MISSED";default -> "ACCEPTED";},callState==2||callState==5?callText(get(t,c.id,"call-kind")):"",callState==2&&get(t,c.id,"call-kind")>=2));
             int meetingState=get(t,c.id,"meeting-state");
-            if(meetingState>0)meetings.add(new Meeting(c.id,c.name,get(t,c.id,"meeting-day"),MEETING_MINUTE,get(t,c.id,"meeting-kind")==2?"HOME":"CAFE",switch(meetingState){
+            if(meetingState>0)meetings.add(new Meeting(c.id,c.name,get(t,c.id,"meeting-day"),MEETING_MINUTE,get(t,c.id,"meeting-kind")==3?"PLAYER_HOME":get(t,c.id,"meeting-kind")==2?"HOME":"CAFE",switch(meetingState){
                 case 1 -> "SCHEDULED"; case 2 -> "MET"; case 3 -> "MISSED"; default -> "CANCELLED";
             }));
             int day=get(t,c.id,"day");
