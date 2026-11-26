@@ -13,6 +13,34 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void apartmentVisitRequiresInvitationAndExpires() throws Exception {
+        Path file=directory.resolve("guest-apartment.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=town.get("marco");
+            var contact=new PlayerLife.Contact(c.id);
+            town.player.contacts.put(c.id,contact);
+            PlayerLife.learnResident(town,c.id);
+            contact.knownName="Visitor";contact.trust=80;contact.affinity=35;
+            AddressLife.ask(town,c,contact);
+            town.player.place=TownLife.Place.NORTH_RESIDENCES;
+            c.place=c.home;c.activity="FREE_TIME";c.travelRemaining=0;c.money=260;
+            assertNull(IntercomLife.apartment(town,1,600));
+            assertThrows(IllegalArgumentException.class,()->IntercomLife.enter(town,c.id,1,1,600));
+            IntercomLife.ring(town,c.id,1,1,600);
+            assertEquals("Come in! Apartment 1.",IntercomLife.invite(town,c.id,1,1,601));
+            assertEquals("INVITED",IntercomLife.apartment(town,1,602).status());
+            assertEquals(2,IntercomLife.apartment(town,1,602).level());
+            assertEquals("Welcome inside.",IntercomLife.enter(town,c.id,1,1,603));
+            assertEquals("VISITING",IntercomLife.apartment(town,1,604).status());
+            assertNull(IntercomLife.apartment(town,1,631));
+            assertThrows(IllegalArgumentException.class,()->IntercomLife.enter(town,c.id,1,1,631));
+            IntercomLife.leave(town,c.id,1,1,605);
+            assertNull(IntercomLife.apartment(town,1,606));
+        }
+    }
+
+    @Test
     void doorCallsRequireKnownAddressPresenceAndConsent() throws Exception {
         Path file=directory.resolve("intercom.db");
         try(var db=new WorldDatabase(file)){
