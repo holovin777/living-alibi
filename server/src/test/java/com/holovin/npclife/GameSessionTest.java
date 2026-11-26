@@ -13,6 +13,49 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void phoneMessagesRespectRelationshipsAndPersistAcrossReload() throws Exception {
+        Path file=directory.resolve("phone.db");
+        String id;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var resident=PopulationGenerator.add(town,1).get(0);
+            id=resident.id;
+            resident.age=30;resident.alive=true;resident.sociability=80;resident.activity="FREE_TIME";
+            state.minute=540;
+            PhoneLife.tick(town,state);
+            assertTrue(PhoneLife.report(town).messages().isEmpty());
+            var contact=new PlayerLife.Contact(id);
+            contact.knownName="Visitor";contact.conversations=3;contact.trust=75;contact.affinity=40;
+            town.player.contacts.put(id,contact);
+            PhoneLife.tick(town,state);
+            assertEquals(1,PhoneLife.report(town).messages().size());
+            assertEquals("Coffee tomorrow at 18:00? Let me know.",PhoneLife.report(town).messages().get(0).text());
+            state.minute=600;
+            PhoneLife.tick(town,state);
+            assertEquals(540,PhoneLife.report(town).messages().get(0).minute());
+            assertEquals("Message sent.",PhoneLife.reply(town,id,1,state.day));
+            assertThrows(IllegalArgumentException.class,()->PhoneLife.reply(town,id,2,state.day));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(id,PhoneLife.report(town).messages().get(0).residentId());
+            assertEquals("Yes, coffee tomorrow at 18:00.",PhoneLife.report(town).messages().get(0).reply());
+            assertEquals("SCHEDULED",PhoneLife.report(town).meetings().get(0).status());
+            var clock=db.load();clock.day=2;clock.minute=1080;
+            var resident=town.get(id);
+            resident.place=TownLife.Place.CAFE;resident.destination=TownLife.Place.CAFE;resident.travelRemaining=0;
+            town.player.place=TownLife.Place.CAFE;town.player.travelRemaining=0;
+            assertTrue(PhoneLife.meetingWindow(town,resident,clock));
+            PhoneLife.tick(town,clock);
+            assertEquals("MET",PhoneLife.report(town).meetings().get(0).status());
+            town.player.incarnation++;
+            assertTrue(PhoneLife.report(town).messages().isEmpty());
+        }
+    }
+
+
+    @Test
     void controlledKumiteRequiresPartnerAndPersistsScoreWithoutInjury() throws Exception {
         Path file=directory.resolve("kumite.db");
         String id;

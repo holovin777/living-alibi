@@ -105,7 +105,7 @@ public final class GameSession implements AutoCloseable {
     }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth) { }
+                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone) { }
     public record ActionView(String message,WorldView world) { }
 
     public synchronized WorldView snapshot() {
@@ -135,7 +135,7 @@ public final class GameSession implements AutoCloseable {
                         weather.raining(),weather.snowing()),
                 player,residents,resources,MutualAidLife.notices(town,state.day),services(),RetailLife.hasCounter(p.place)
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
-                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute));
+                            town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town));
     }
 
     public synchronized BusinessView business() {
@@ -358,6 +358,12 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if(action!=null&&action.startsWith("phone-reply:")){
+            String[] parts=action.split(":",3);
+            if(parts.length!=3||!java.util.Set.of("1","2").contains(parts[1]))throw new IllegalArgumentException("Choose a message reply.");
+            var copy=town.copy();
+            return apply(copy,1,PhoneLife.reply(copy,parts[2],Integer.parseInt(parts[1]),state.day));
+        }
         if(action!=null&&action.startsWith("rebirth-")){
             var copy=town.copy();
             if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){

@@ -71,6 +71,7 @@ final class PopulationLife {
         else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;
         else if(journalist&&working)desired=NewspaperLife.assignment(clock.day,minute);
         else if(working)desired=c.workplace;
+        else if(PhoneLife.meetingWindow(town,c,clock))desired=TownLife.Place.CAFE;
         else if(DojoCommunityLife.scheduled(town,c,clock.day,minute))desired=TownLife.Place.SCHOOL;
         else if(minute>=960 && minute<1200) {
             // The same resident favors a location consistently for a given day.
