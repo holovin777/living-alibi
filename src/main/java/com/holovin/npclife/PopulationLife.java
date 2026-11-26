@@ -61,6 +61,7 @@ final class PopulationLife {
         else if(manual!=null)desired=manual;
         else if(freightRun)desired=freightDestination;
         else if(sleeping)desired=c.home;
+        else if(FamilyOutingLife.destination(town,c,clock)!=null)desired=FamilyOutingLife.destination(town,c,clock);
         else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:c.home;
         else if(itEmployee && working)desired=TownLife.Place.OFFICE;
         else if(carrier && working)desired=c.workplace;
