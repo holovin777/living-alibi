@@ -31,6 +31,24 @@ func _ready() -> void:
     _furniture("Table",Vector3(-2.5*side,0,-0.8),Vector3(1.25,0.75,0.9),wood)
     _furniture("Sofa",Vector3(2.9*side,0,1.8),Vector3(1.2,0.65,1.9),fabric)
     _box("SofaBack",Vector3(0.18,0.65,1.9),fabric,Vector3(3.38*side,0.9,1.8))
+    # Small shared tray, visible only after the server accepts coffee.
+    var tray := Node3D.new()
+    tray.name="CoffeeTray"
+    add_child(tray)
+    tray.position=Vector3(1.5*side,0.48,1.8)
+    for z in [-0.22,0.22]:
+        var cup := MeshInstance3D.new()
+        var mesh := CylinderMesh.new()
+        mesh.top_radius=0.065
+        mesh.bottom_radius=0.05
+        mesh.height=0.10
+        cup.mesh=mesh
+        cup.position=Vector3(0,0.05,z)
+        var material := StandardMaterial3D.new()
+        material.albedo_color=Color("#f3eee2")
+        cup.material_override=material
+        tray.add_child(cup)
+    tray.hide()
     _furniture("CoffeeTable",Vector3(1.5*side,0,1.8),Vector3(0.65,0.43,1.05),wood)
     _box("Window",Vector3(2.1,1.1,0.08),Color("#91b2c0"),Vector3(-1.3,1.7,-3.87))
     if level>=1:
@@ -76,3 +94,19 @@ func can_stand(at: Vector3,radius: float) -> bool:
 
 func near_exit(at: Vector3) -> bool:
     return absf(at.x)<1.2 and at.z>2.3
+
+func host_anchor() -> Vector3:
+    return Vector3(0.65 if unit%2==1 else -0.65,0,0.3)
+
+func sofa_anchor() -> Vector3:
+    return Vector3(-2.9 if unit%2==1 else 2.9,0,1.8)
+
+func near_sofa(at: Vector3) -> bool:
+    return at.distance_to(sofa_anchor())<2.1
+
+func near_table(at: Vector3) -> bool:
+    var side := -1.0 if unit%2==1 else 1.0
+    return at.distance_to(Vector3(-2.5*side,0,-0.8))<2.1
+
+func show_coffee() -> void:
+    get_node("CoffeeTray").show()
