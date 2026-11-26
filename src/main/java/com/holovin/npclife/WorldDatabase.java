@@ -244,6 +244,11 @@ final class WorldDatabase implements AutoCloseable {
             }
         }
         for(String table:List.of("player_contacts","player_life_contacts")) {
+            if(!columnExists(table,"dialogue_history")) {
+                try(Statement st=db.createStatement()) {
+                    st.executeUpdate("ALTER TABLE "+table+" ADD COLUMN dialogue_history TEXT NOT NULL DEFAULT '[]'");
+                }
+            }
             for(var col:Map.of("trust","50","affinity","0","last_positive_day","0").entrySet()) {
                 if(!columnExists(table,col.getKey())) {
                     try(Statement st=db.createStatement()) {
@@ -1032,6 +1037,7 @@ final class WorldDatabase implements AutoCloseable {
                 c.lastHeard=rs.getString("last_heard");
                 c.trust=rs.getInt("trust");c.affinity=rs.getInt("affinity");
                 c.lastPositiveDay=rs.getInt("last_positive_day");
+                ConversationMemory.decode(c,rs.getString("dialogue_history"));
                 town.player.contacts.put(id,c);
             }
         }
@@ -1297,20 +1303,20 @@ final class WorldDatabase implements AutoCloseable {
         }
         String contactSql=player.incarnation==1 ? """
                 INSERT INTO player_contacts
-                (resident_id,known_name,conversations,last_day,last_minute,last_heard,trust,affinity,last_positive_day)
-                VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
+                (resident_id,known_name,conversations,last_day,last_minute,last_heard,trust,affinity,last_positive_day,dialogue_history)
+                VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(resident_id) DO UPDATE SET
                 known_name=excluded.known_name,conversations=excluded.conversations,
                 last_day=excluded.last_day,last_minute=excluded.last_minute,
                 last_heard=excluded.last_heard,trust=excluded.trust,affinity=excluded.affinity,
-                last_positive_day=excluded.last_positive_day
+                last_positive_day=excluded.last_positive_day,dialogue_history=excluded.dialogue_history
                 """ : """
                 INSERT INTO player_life_contacts
-                (incarnation,resident_id,known_name,conversations,last_day,last_minute,last_heard,trust,affinity,last_positive_day)
-                VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(incarnation,resident_id) DO UPDATE SET
+                (incarnation,resident_id,known_name,conversations,last_day,last_minute,last_heard,trust,affinity,last_positive_day,dialogue_history)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(incarnation,resident_id) DO UPDATE SET
                 known_name=excluded.known_name,conversations=excluded.conversations,
                 last_day=excluded.last_day,last_minute=excluded.last_minute,
                 last_heard=excluded.last_heard,trust=excluded.trust,affinity=excluded.affinity,
-                last_positive_day=excluded.last_positive_day
+                last_positive_day=excluded.last_positive_day,dialogue_history=excluded.dialogue_history
                 """;
         try(PreparedStatement p=db.prepareStatement(contactSql)) {
             for(var c:player.contacts.values()) {
@@ -1327,6 +1333,7 @@ final class WorldDatabase implements AutoCloseable {
                 p.setString(offset+6,c.lastHeard);
                 p.setInt(offset+7,c.trust);p.setInt(offset+8,c.affinity);
                 p.setInt(offset+9,c.lastPositiveDay);
+                p.setString(offset+10,ConversationMemory.encode(c));
                 p.addBatch();
             }
             p.executeBatch();
