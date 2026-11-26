@@ -13,6 +13,35 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void barberServicePersistsStyleAndConservesMoney() throws Exception {
+        Path file=directory.resolve("barber.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            town.player.place=TownLife.Place.CENTRO;
+            town.player.travelRemaining=0;town.player.money=20;
+            int funds=town.employerFunds.get("barber");
+            assertThrows(IllegalArgumentException.class,()->GameSession.barberVisit(town,"trim",539));
+            assertThrows(IllegalArgumentException.class,()->GameSession.barberVisit(town,"trim",1120));
+            assertEquals(30,GameSession.barberVisit(town,"trim",600).minutes());
+            assertEquals(8,town.player.money);
+            assertEquals(funds+12,town.employerFunds.get("barber"));
+            assertEquals("CLASSIC",GameSession.barberView(town,630).hair());
+            assertEquals("TRIMMED",GameSession.barberView(town,630).beard());
+            assertThrows(IllegalArgumentException.class,()->GameSession.barberVisit(town,"style",630));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals("CLASSIC",GameSession.barberView(town,630).hair());
+            assertEquals("TRIMMED",GameSession.barberView(town,630).beard());
+            town.player.incarnation++;
+            assertEquals("NATURAL",GameSession.barberView(town,630).hair());
+            town.player.place=TownLife.Place.PARK;
+            assertThrows(IllegalArgumentException.class,()->GameSession.barberVisit(town,"shave",630));
+        }
+    }
+
+    @Test
     void foodWorkerPaysFromShopAndProducesFiniteStock(){
         var clock=new WorldState();clock.minute=720;
         var town=TownLife.create(clock);
