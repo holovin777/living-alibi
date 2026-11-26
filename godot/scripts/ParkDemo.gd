@@ -222,6 +222,10 @@ var _dialog_history: RichTextLabel
 var _dialog_more_scroll: ScrollContainer
 var _spoken_dialog_enabled := true
 var _hud_details: VBoxContainer
+var _hud_scroll: ScrollContainer
+var _interface_theme: Theme
+var _music: AudioStreamPlayer
+var _music_value: Label
 var _dialog_target := ""
 var _dialog_pending := false
 var _action_title: Label
@@ -231,6 +235,8 @@ func _ready() -> void:
     GameLanguage.install()
     GameLanguage.select_locale(GameLanguage.saved_locale(),false)
     _build_world()
+    _music = preload("res://scripts/TownMusic.gd").new()
+    add_child(_music)
     _create_interface()
     _api = preload("res://examples/WorldApi.gd").new()
     add_child(_api)
@@ -248,6 +254,7 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
+    _music.update_mix(delta,_dialog_panel.visible and _spoken_dialog_enabled)
     _tick_public_door(delta)
     if _phone_alert_remaining>0.0:
         _phone_alert_remaining = maxf(0.0,_phone_alert_remaining-delta)
@@ -614,6 +621,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _toggle_hud_details(enabled: bool) -> void:
     _hud_details.visible = enabled
+    _hud_scroll.visible = enabled
+    if not enabled:
+        _main_panel.reset_size()
 
 func _set_guide_enabled(enabled: bool) -> void:
     _guide_enabled=enabled
@@ -4919,6 +4929,7 @@ func _sphere(parent: Node3D, radius: float, color: Color,
 func _create_interface() -> void:
     var canvas := CanvasLayer.new()
     add_child(canvas)
+    _interface_theme = preload("res://scripts/TownInterface.gd").build()
 
     var panel := PanelContainer.new()
     _main_panel = panel
@@ -4931,45 +4942,60 @@ func _create_interface() -> void:
     _drive_hud.visible = false
     canvas.add_child(_drive_hud)
     panel.position = Vector2(15.0, 15.0)
-    panel.custom_minimum_size = Vector2(435.0, 0.0)
+    panel.custom_minimum_size = Vector2(350.0, 0.0)
+    panel.theme = _interface_theme
     canvas.add_child(panel)
     var column := VBoxContainer.new()
     panel.add_child(column)
 
     _heading = Label.new()
     _heading.text = "Living Alibi | public park"
+    preload("res://scripts/TownInterface.gd").title(_heading)
     column.add_child(_heading)
     _status = Label.new()
     _status.text = "A visitor with 50 EUR and no assigned profession"
+    _status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     column.add_child(_status)
-    var primary_actions := HBoxContainer.new()
+    var primary_actions := GridContainer.new()
+    primary_actions.columns = 2
     column.add_child(primary_actions)
     primary_actions.add_child(_button(tr("Talk (T)"),_open_dialog))
     primary_actions.add_child(_button(tr("Actions (F)"),_toggle_actions))
     primary_actions.add_child(_button(tr("Map (M)"),_toggle_map))
     primary_actions.add_child(_button(tr("Phone (H)"),_toggle_phone))
+    for primary in primary_actions.get_children():
+        primary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     var details_toggle := CheckButton.new()
     details_toggle.text = tr("More / settings")
     details_toggle.toggled.connect(_toggle_hud_details)
     column.add_child(details_toggle)
+    _hud_scroll = ScrollContainer.new()
+    _hud_scroll.custom_minimum_size = Vector2(320,270)
+    _hud_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _hud_scroll.hide()
+    column.add_child(_hud_scroll)
     _hud_details = VBoxContainer.new()
+    _hud_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     _hud_details.visible = false
-    column.add_child(_hud_details)
+    _hud_scroll.add_child(_hud_details)
     var guide_toggle := CheckButton.new()
     guide_toggle.text = "First steps / navigation"
     guide_toggle.button_pressed = true
     guide_toggle.toggled.connect(_set_guide_enabled)
-    column.add_child(guide_toggle)
+    _hud_details.add_child(guide_toggle)
     _guide_label=Label.new()
     _guide_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-    _guide_label.custom_minimum_size=Vector2(420,0)
+    _guide_label.custom_minimum_size=Vector2(320,0)
+    preload("res://scripts/TownInterface.gd").secondary(_guide_label)
     _guide_label.text=tr("First steps: connecting to the world...")
     column.add_child(_guide_label)
     _weather = Label.new()
     _weather.text = "Connecting to the local Java world..."
+    _weather.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _hud_details.add_child(_weather)
     _needs = Label.new()
     _needs.text = "Jobs, study and travel use the real game world."
+    _needs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _hud_details.add_child(_needs)
     _bag_label = Label.new()
     _bag_label.text = "Bag: empty"
@@ -4984,7 +5010,8 @@ func _create_interface() -> void:
     _car_label = Label.new()
     _car_label.text = "Car: none"
     _hud_details.add_child(_car_label)
-    var bag_row := HBoxContainer.new()
+    var bag_row := GridContainer.new()
+    bag_row.columns = 2
     _hud_details.add_child(bag_row)
     _eat_button = _button("Eat bread",_consume_product.bind("bread"))
     _water_button = _button("Drink bottle",_consume_product.bind("water"))
@@ -4996,10 +5023,12 @@ func _create_interface() -> void:
     _message = Label.new()
     _message.text = "No forced mission. Find your own direction."
     _message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    _message.custom_minimum_size = Vector2(420.0, 0.0)
+    _message.custom_minimum_size = Vector2(320.0, 0.0)
+    preload("res://scripts/TownInterface.gd").secondary(_message)
     column.add_child(_message)
 
-    var buttons := HBoxContainer.new()
+    var buttons := GridContainer.new()
+    buttons.columns = 2
     _hud_details.add_child(buttons)
     buttons.add_child(_button("Refresh", _refresh))
     buttons.add_child(_button("Jobs", _find_jobs))
@@ -5062,6 +5091,22 @@ func _create_interface() -> void:
     sound_toggle.button_pressed = true
     sound_toggle.toggled.connect(_set_town_audio)
     _hud_details.add_child(sound_toggle)
+    var music_row := HBoxContainer.new()
+    _hud_details.add_child(music_row)
+    var music_label := Label.new()
+    music_label.text = "Background music"
+    music_row.add_child(music_label)
+    _music_value = Label.new()
+    music_row.add_child(_music_value)
+    _music_value.text = "%d%%" % roundi(_music.level)
+    var music_slider := HSlider.new()
+    music_slider.min_value = 0
+    music_slider.max_value = 100
+    music_slider.step = 5
+    music_slider.value = _music.level
+    music_slider.custom_minimum_size = Vector2(180,24)
+    music_slider.value_changed.connect(_set_music_level)
+    _hud_details.add_child(music_slider)
     var head_bob_toggle := CheckButton.new()
     head_bob_toggle.text = tr("Camera motion")
     head_bob_toggle.button_pressed = _head_bob_enabled
@@ -5078,6 +5123,7 @@ func _create_interface() -> void:
     _refresh_held_item()
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    preload("res://scripts/TownInterface.gd").secondary(_hint)
     _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
     column.add_child(_hint)
     _jobs = Label.new()
@@ -5088,6 +5134,7 @@ func _create_interface() -> void:
     _map_panel = PanelContainer.new()
     _map_panel.position = Vector2(15, 15)
     _map_panel.visible = false
+    _map_panel.theme = _interface_theme
     canvas.add_child(_map_panel)
     var map_column := VBoxContainer.new()
     _map_panel.add_child(map_column)
@@ -5105,7 +5152,9 @@ func _create_interface() -> void:
     _travel_panel.position = Vector2(480.0, 15.0)
     _travel_panel.custom_minimum_size = Vector2(460.0, 0.0)
     _travel_panel.visible = false
+    _travel_panel.theme = _interface_theme
     canvas.add_child(_travel_panel)
+    _dock_right(_travel_panel,490.0)
     var travel_col := VBoxContainer.new()
     _travel_panel.add_child(travel_col)
     var travel_label := Label.new()
@@ -5119,23 +5168,34 @@ func _create_interface() -> void:
     _dialog_panel.position = Vector2(480,15)
     _dialog_panel.custom_minimum_size = Vector2(410,0)
     _dialog_panel.visible = false
+    _dialog_panel.theme = _interface_theme
     canvas.add_child(_dialog_panel)
+    _dock_right(_dialog_panel,450.0)
+    var dialog_scroll := ScrollContainer.new()
+    dialog_scroll.custom_minimum_size = Vector2(410,minf(470.0,maxf(250.0,get_viewport().get_visible_rect().size.y-54.0)))
+    dialog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _dialog_panel.add_child(dialog_scroll)
     var dialog_col := VBoxContainer.new()
-    _dialog_panel.add_child(dialog_col)
+    dialog_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    dialog_scroll.add_child(dialog_col)
     _dialog_title = Label.new()
+    preload("res://scripts/TownInterface.gd").title(_dialog_title)
     dialog_col.add_child(_dialog_title)
     _dialog_attitude = Label.new()
+    _dialog_attitude.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    preload("res://scripts/TownInterface.gd").secondary(_dialog_attitude)
     dialog_col.add_child(_dialog_attitude)
     _dialog_style = Label.new()
     _dialog_style.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_style)
     _dialog_reply = Label.new()
-    _dialog_reply.custom_minimum_size = Vector2(400,0)
+    _dialog_reply.custom_minimum_size = Vector2(370,0)
+    _dialog_reply.add_theme_color_override("font_color",Color("#f2cc87"))
     _dialog_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     dialog_col.add_child(_dialog_reply)
     _dialog_history = RichTextLabel.new()
     _dialog_history.bbcode_enabled = false
-    _dialog_history.custom_minimum_size = Vector2(400,140)
+    _dialog_history.custom_minimum_size = Vector2(370,140)
     _dialog_history.scroll_following = true
     dialog_col.add_child(_dialog_history)
     _dialog_input = LineEdit.new()
@@ -5144,7 +5204,8 @@ func _create_interface() -> void:
     _dialog_input.text_submitted.connect(_send_dialog)
     dialog_col.add_child(_dialog_input)
     dialog_col.add_child(_button(tr("Send message (Enter)"),_send_typed_dialog))
-    var quick := HBoxContainer.new()
+    var quick := GridContainer.new()
+    quick.columns = 2
     dialog_col.add_child(quick)
     quick.add_child(_button(tr("Say hello"),_send_dialog.bind("Hello")))
     quick.add_child(_button(tr("Ask their name"),_send_dialog.bind("What is your name?")))
@@ -5154,7 +5215,7 @@ func _create_interface() -> void:
     more_toggle.toggled.connect(_toggle_dialog_more)
     dialog_col.add_child(more_toggle)
     _dialog_more_scroll = ScrollContainer.new()
-    _dialog_more_scroll.custom_minimum_size = Vector2(400,170)
+    _dialog_more_scroll.custom_minimum_size = Vector2(370,170)
     _dialog_more_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     _dialog_more_scroll.visible = false
     dialog_col.add_child(_dialog_more_scroll)
@@ -5189,7 +5250,9 @@ func _create_interface() -> void:
     _action_panel.position = Vector2(480.0, 15.0)
     _action_panel.custom_minimum_size = Vector2(430.0, 0.0)
     _action_panel.visible = false
+    _action_panel.theme = _interface_theme
     canvas.add_child(_action_panel)
+    _dock_right(_action_panel,460.0)
     var action_scroll := ScrollContainer.new()
     action_scroll.custom_minimum_size = Vector2(420,420)
     action_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -5198,8 +5261,11 @@ func _create_interface() -> void:
     _action_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     action_scroll.add_child(_action_choices)
     _action_title = Label.new()
+    _action_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    preload("res://scripts/TownInterface.gd").title(_action_title)
     _action_choices.add_child(_action_title)
     _phone = TownPhone.new()
+    _phone.theme = _interface_theme
     _phone.hide()
     canvas.add_child(_phone)
     _phone.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
@@ -5233,7 +5299,9 @@ func _create_interface() -> void:
     _intercom = PanelContainer.new()
     _intercom.position = Vector2(480,15)
     _intercom.custom_minimum_size = Vector2(350,0)
+    _intercom.theme = _interface_theme
     canvas.add_child(_intercom)
+    _dock_right(_intercom,375.0)
     var intercom_col := VBoxContainer.new()
     _intercom.add_child(intercom_col)
     _intercom_title = Label.new()
@@ -5249,6 +5317,17 @@ func _create_interface() -> void:
     intercom_col.add_child(_button("Ask to come inside",_intercom_action.bind("invite")))
     intercom_col.add_child(_button("Leave entrance",_close_intercom))
     _intercom.hide()
+
+func _dock_right(panel: Control, width: float) -> void:
+    panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+    panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+    panel.offset_left = -width-15.0
+    panel.offset_right = -15.0
+    panel.offset_top = 15.0
+
+func _set_music_level(value: float) -> void:
+    _music.set_level(value)
+    _music_value.text = "%d%%" % roundi(value)
 
 func _on_language_selected(index: int) -> void:
     GameLanguage.select_locale("it" if index==1 else "en")
@@ -7538,7 +7617,7 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
     var player: Dictionary = snapshot.get("player", {})
     var job = player.get("jobId")
     var profession := tr("unemployed") if job == null else str(job)
-    _heading.text = "Living Alibi | " + str(player.get("place", "Park"))
+    _heading.text = tr(str(player.get("place", "Park")))
     _status.text = tr("Visitor #%s | %s EUR | %s") % [
         str(player.get("incarnation", 1)), str(player.get("money", 50)), profession
     ]
