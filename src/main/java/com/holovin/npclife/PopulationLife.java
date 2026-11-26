@@ -24,7 +24,9 @@ final class PopulationLife {
         // minute, rather than starting their autonomous commute mid-sentence.
         // GameSession removes this transient flag before persisting the world.
         if(TownLife.inPlayerConversation(town,c)) {
-            if(!PoliceLife.staff(c))c.activity="SOCIALIZING";
+            if(!PoliceLife.staff(c)&&!(c.place==TownLife.Place.SCHOOL
+                    &&("STUDYING".equals(c.activity)||"Teacher".equals(c.occupation)&&"WORKING".equals(c.activity))))
+                c.activity="SOCIALIZING";
             return;
         }
         if(RebirthLife.linkedAdult(town,c)&&minute%60==0){

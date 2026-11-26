@@ -1737,6 +1737,34 @@ func _exercise() -> void:
     if not _check(world._near_college() and _has_button(world._action_choices,"Enroll: Engineering"),"college registration menu"):
         return
     world._close_college()
+    campus["minute"]=600
+    campus["residents"]=[
+        {"id":"school-pupil-a","name":"Unknown resident","activity":"STUDYING","appearanceStage":"CHILD","outfitVisual":"BACKPACK"},
+        {"id":"school-pupil-b","name":"Unknown resident","activity":"STUDYING","appearanceStage":"TEEN"},
+        {"id":"school-teacher","name":"Unknown resident","activity":"WORKING","workVisual":"TEACHING"},
+        {"id":"school-visitor","name":"Unknown resident","activity":"FREE_TIME"}]
+    world._on_world_updated(campus)
+    var pupil_a = world._residents_root.get_node("Resident_school-pupil-a")
+    var pupil_b = world._residents_root.get_node("Resident_school-pupil-b")
+    var teacher = world._residents_root.get_node("Resident_school-teacher")
+    var visitor = world._residents_root.get_node("Resident_school-visitor")
+    if not _check(pupil_a.get_meta("seat_kind")=="classroom" and pupil_b.get_meta("seat_kind")=="classroom"
+            and pupil_a.position.distance_to(pupil_b.position)>0.8 and pupil_a.position.x < -4 and pupil_b.position.x < -4,
+            "studying residents occupy different real indoor classroom chairs"):
+        return
+    if not _check(teacher.position.x < -4 and teacher.position.z>3 and teacher.position.z<11
+            and teacher.get_meta("work_visual")=="TEACHING" and visitor.get_meta("seat_index",-1)==-1,
+            "teacher works inside classroom while unrelated visitors do not occupy pupil chairs"):
+        return
+    var pupil_at: Vector3=pupil_a.position
+    world._render_residents()
+    if not _check(pupil_a.position.is_equal_approx(pupil_at),"classroom seats remain stable across snapshots"):
+        return
+    campus["residents"][0]["activity"]="FREE_TIME"
+    world._on_world_updated(campus)
+    if not _check(pupil_a.get_meta("seat_index",-1)==-1 and pupil_a.get_meta("seat_kind","").is_empty(),
+            "pupil releases classroom seat when lesson ends"):
+        return
     var workshop := _world("WORKSHOP","Workshop")
     workshop["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","engineeringOrders":[{"id":"water-pump","title":"Park pump","district":"WORKSHOP","phase":"OPEN","condition":45,"materials":"2 spare-parts","wage":38,"canInspect":true,"canComplete":false}]}
     world._on_world_updated(workshop)
