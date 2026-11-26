@@ -920,6 +920,36 @@ func _exercise() -> void:
     marco.remove_meta("wave_remaining")
     marco.remove_meta("wave_near")
     marco.remove_meta("wave_cooldown")
+    var right_arm := marco.get_node("ArmRight") as Node3D
+    var right_elbow := right_arm.get_node("Elbow") as Node3D
+    var right_foot := marco.get_node("LegRight/Knee/Foot") as Node3D
+    if not _check(right_elbow.has_node("Palm") and right_elbow.get_node("Fingers").get_child_count()==5
+            and right_foot.get_child_count()>=2,
+            "resident has articulated hands with five digits and rounded shoes"):
+        return
+    var initial_gait: float=world._resident_gait(marco,0.0)
+    var advanced_gait: float=world._resident_gait(marco,0.35)
+    if not _check(not is_equal_approx(initial_gait,advanced_gait)
+            and is_equal_approx(advanced_gait,world._resident_gait(marco,0.0)),
+            "gait progresses only over actual distance"):
+        return
+    world._animate_resident_leg(marco.get_node("LegRight"),1.0,PI/2.0,true,false)
+    if not _check(marco.get_node("LegRight/Knee").rotation.x< -0.2
+            and absf(right_foot.rotation.x)>0.04,
+            "walking bends knee and ankle"):
+        return
+    var held_phone := right_arm.get_node("Phone") as Node3D
+    var phone_rest: Transform3D=held_phone.transform
+    world._animate_resident_elbow(right_arm,1.0,-0.5,true)
+    if not _check(right_elbow.rotation.x< -0.4
+            and not held_phone.position.is_equal_approx(phone_rest.origin)
+            and right_elbow.get_node("Fingers").rotation.x< -0.3,
+            "elbow articulation carries held objects and curls fingers"):
+        return
+    world._animate_resident_elbow(right_arm,1.0,0.0,false)
+    if not _check(held_phone.transform.is_equal_approx(phone_rest),
+            "held props restore their original pose"):
+        return
     var face_seed := absi(str(marco.get_meta("resident_id")).hash())
     var face_cycle := 3.2+float(face_seed%19)*0.11
     var blink_at := face_cycle-float(face_seed%97)*0.073+0.09
@@ -1035,7 +1065,7 @@ func _exercise() -> void:
     world._animate_residents(0.5)
     if not _check(int(marco.get_meta("seat_index",-1))==-1
             and is_zero_approx(marco.position.y)
-            and is_zero_approx(marco.get_node("LegLeft/Knee").rotation.x),
+            and marco.get_node("LegLeft/Knee").rotation.x>=-0.59,
             "walking releases the seat and restores standing pose"):
         return
     var rainy := _world("PARK", "Park")
