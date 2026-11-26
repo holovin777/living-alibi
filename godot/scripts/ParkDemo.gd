@@ -3772,7 +3772,11 @@ func _make_resident(id: String, index: int, display_name: String) -> Node3D:
     var accessory: int = profile["accessory"]
     if accessory == 0:
         for side in [-1.0,1.0]:
-            _box(person,Vector3(0.105,0.06,0.018),Color("#414b51"),Vector3(side*0.068,1.69,-0.213))
+            # Open frames keep the animated eyes visible.
+            for y in [-0.033,0.033]:
+                _box(person,Vector3(0.105,0.009,0.018),Color("#414b51"),Vector3(side*0.068,1.69+y,-0.225))
+            for x in [-0.048,0.048]:
+                _box(person,Vector3(0.009,0.06,0.018),Color("#414b51"),Vector3(side*0.068+x,1.69,-0.225))
         _box(person,Vector3(0.045,0.014,0.02),Color("#414b51"),Vector3(0,1.69,-0.214))
     elif accessory == 1:
         var bag := _cylinder(person,0.19,0.43,jacket.darkened(0.35),Vector3(0,1.14,0.22))
