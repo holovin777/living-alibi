@@ -85,6 +85,11 @@ var _guest_feedback := ""
 var _guest_feedback_time := 0.0
 var _guest_requested_action := ""
 var _npc_speech := preload("res://scripts/NpcSpeech.gd").new()
+var _voice_input := preload("res://scripts/VoiceInput.gd").new()
+var _voice_button: Button
+var _voice_status: Label
+var _dialog_voice_line := ""
+var _dialog_voice_sequence := 0
 var _town_subtitle: Label
 var _public_speech_slot := ""
 var _public_speech_pair: Array[String] = []
@@ -227,6 +232,7 @@ func _ready() -> void:
     GameLanguage.install()
     GameLanguage.select_locale(GameLanguage.saved_locale(),false)
     _build_world()
+    _npc_speech.setup(self)
     _create_interface()
     _api = preload("res://examples/WorldApi.gd").new()
     add_child(_api)
@@ -243,7 +249,12 @@ func _ready() -> void:
     _api.request_finished.connect(_on_request_finished)
     _api.refresh_world()
 
+func _exit_tree() -> void:
+    _voice_input.cleanup()
+    _npc_speech.stop()
+
 func _process(delta: float) -> void:
+    _update_voice_input()
     _update_npc_speech()
     if _phone_alert_remaining>0.0:
         _phone_alert_remaining = maxf(0.0,_phone_alert_remaining-delta)
@@ -3965,6 +3976,11 @@ func _create_interface() -> void:
     _dialog_input.max_length = 1000
     _dialog_input.text_submitted.connect(_send_dialog)
     dialog_col.add_child(_dialog_input)
+    _voice_button = _button("Record 5s / Registra 5s",_start_voice_input)
+    dialog_col.add_child(_voice_button)
+    _voice_status=Label.new()
+    _voice_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    dialog_col.add_child(_voice_status)
     dialog_col.add_child(_button("Speak",_send_typed_dialog))
     var close := Button.new()
     close.text = "Close conversation"
@@ -4103,6 +4119,8 @@ func _open_dialog() -> void:
     _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     _dialog_input.clear()
+    _dialog_voice_line=""
+    _voice_status.text=""
     _dialog_panel.visible = true
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
@@ -4129,14 +4147,49 @@ func _localized_resident_reply(message: String) -> String:
     return tr(spoken)
 
 func _close_dialog() -> void:
+    _voice_input.cleanup()
+    _npc_speech.stop()
+    _dialog_voice_line=""
     _dialog_panel.visible = false
     _dialog_target = ""
     _dialog_input.release_focus()
+
+func _start_voice_input() -> void:
+    if not _dialog_panel.visible or _dialog_pending or _api.is_busy() or not _connected:return
+    if not _voice_input.stage.is_empty():
+        _voice_input.cleanup()
+        _voice_status.text="Cancelled / Annullato"
+        return
+    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    if person==null or person.position.distance_to(_avatar.position)>=2.5:return
+    _npc_speech.stop()
+    _dialog_voice_line=""
+    var error := _voice_input.start(TranslationServer.get_locale())
+    _voice_status.text="Recording 5 seconds / Registrazione 5 secondi" if error.is_empty() else error
+
+func _update_voice_input() -> void:
+    if not is_instance_valid(_voice_button):return
+    if not _dialog_panel.visible and not _voice_input.stage.is_empty():_voice_input.cleanup()
+    _voice_button.text="Record 5s / Registra 5s" if _voice_input.stage.is_empty() else "Cancel recording / Annulla"
+    if _voice_input.stage.is_empty():return
+    var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+    if person==null or person.position.distance_to(_avatar.position)>=2.5:
+        _voice_input.cleanup()
+        return
+    var result := _voice_input.poll()
+    if result.has("text"):
+        _dialog_input.text=str(result["text"])
+        _voice_status.text="Check the text, then Speak / Controlla il testo, poi Parla"
+    elif result.has("error"):
+        _voice_status.text=str(result["error"])
+    elif _voice_input.stage=="transcribing":
+        _voice_status.text="Transcribing / Trascrizione"
 
 func _send_typed_dialog() -> void:
     _send_dialog(_dialog_input.text)
 
 func _send_dialog(message: String) -> void:
+    if not _voice_input.stage.is_empty():return
     if not _dialog_panel.visible or _dialog_pending or _api.is_busy() or not _connected:
         return
     var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
@@ -4145,6 +4198,8 @@ func _send_dialog(message: String) -> void:
         return
     if message.strip_edges().is_empty():
         return
+    _dialog_voice_line=""
+    _npc_speech.stop()
     _dialog_pending = true
     _api.speak_to(_dialog_target,message)
 
@@ -6008,6 +6063,14 @@ func public_dialogue_lines(place: String,working: bool,variant: int) -> Array:
 func _update_npc_speech() -> void:
     if not is_instance_valid(_town_subtitle):return
     _town_subtitle.hide()
+    if _dialog_panel.visible and _connected:
+        var person := _residents_root.get_node_or_null("Resident_"+_dialog_target) as Node3D
+        if not _voice_input.stage.is_empty() or _dialog_pending or _dialog_voice_line.is_empty() or person==null or person.position.distance_to(_avatar.position)>=2.5:
+            _npc_speech.stop()
+            return
+        var locale := "it" if TranslationServer.get_locale().begins_with("it") else "en"
+        _npc_speech.present("reply:"+str(_dialog_voice_sequence),_dialog_voice_line,_dialog_target,person.position.distance_to(_avatar.position),locale,person.global_position)
+        return
     if not _connected or _drive_active() or _travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible or _intercom.visible:
         _npc_speech.stop()
         return
@@ -6024,7 +6087,7 @@ func _update_npc_speech() -> void:
         var speaker := _guest_host if str(_guest_host.get_meta("resident_id",""))==id else _guest.get_node_or_null("GuestFamily/Resident_"+id) as Node3D
         var line := str(speech.get("italian" if language=="it" else "english",""))
         var key := "home:%s:%s:%s:%s" % [_last_snapshot.get("day",1),id,language,line]
-        _npc_speech.present(key,line,id,speaker.position.distance_to(_avatar.position),language)
+        _npc_speech.present(key,line,id,speaker.position.distance_to(_avatar.position),language,speaker.global_position)
         return
     if _stairwell_active or _apartment_active or _inside_guest_room() or not _road_pending.is_empty():
         _npc_speech.stop()
@@ -6035,7 +6098,9 @@ func _update_npc_speech() -> void:
         return
     _town_subtitle.text="— "+str(dialogue["text"])
     _town_subtitle.show()
-    _npc_speech.present(str(dialogue["key"]),str(dialogue["text"]),str(dialogue["id"]),float(dialogue["distance"]),language)
+    var speaker := _residents_root.get_node_or_null("Resident_"+str(dialogue["id"])) as Node3D
+    if speaker!=null:
+        _npc_speech.present(str(dialogue["key"]),str(dialogue["text"]),str(dialogue["id"]),float(dialogue["distance"]),language,speaker.global_position)
 
 func _sync_host_routine(invitation: Dictionary) -> void:
     if not is_instance_valid(_guest_host):return
@@ -6654,6 +6719,8 @@ func _on_action_feedback(message: String) -> void:
         _dialog_pending = false
         if _dialog_panel.visible:
             _dialog_reply.text = _localized_resident_reply(message)
+            _dialog_voice_line=_dialog_reply.text
+            _dialog_voice_sequence+=1
             _dialog_input.clear()
     if not _clock_pending:
         _message.text = tr(message)
