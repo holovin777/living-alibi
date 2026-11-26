@@ -25,7 +25,7 @@ final class PhoneLife {
     }
     static final int MEETING_MINUTE=1080, MEETING_END=1110, DEPART_MINUTE=1050;
     static boolean meetingWindow(TownLife.Town t,TownLife.Citizen c,WorldState clock){
-        return available(t)&&get(t,c.id,"meeting-state")==1&&get(t,c.id,"meeting-day")==clock.day&&clock.minute>=DEPART_MINUTE&&clock.minute<MEETING_END;
+        return available(t)&&(get(t,c.id,"meeting-state")==1||get(t,c.id,"meeting-state")==2)&&get(t,c.id,"meeting-day")==clock.day&&clock.minute>=DEPART_MINUTE&&clock.minute<MEETING_END;
     }
     static void tick(TownLife.Town t,WorldState clock){
         if(available(t))for(var contact:t.player.contacts.values()){
@@ -38,7 +38,7 @@ final class PhoneLife {
                 put(t,id,"meeting-state",3);continue;
             }
             if(clock.day==day&&clock.minute>=MEETING_MINUTE&&c.presentAt(TownLife.Place.CAFE)&&
-                    t.player.place==TownLife.Place.CAFE&&t.player.travelRemaining==0){
+                    t.player.place==TownLife.Place.CAFE&&t.player.travelRemaining==0&&c.travelRemaining==0){
                 put(t,id,"meeting-state",2);
             }
         }
@@ -99,6 +99,7 @@ final class PhoneLife {
         if(choice==1&&get(t,id,"kind")==2){
             if(t.player.contacts.values().stream().anyMatch(contact->get(t,contact.residentId,"meeting-state")==1))
                 throw new IllegalArgumentException("You already have a planned meeting.");
+            if(day!=get(t,id,"day"))throw new IllegalArgumentException("The invitation has expired. Reply not today.");
             put(t,id,"meeting-day",Math.addExact(day,1));
             put(t,id,"meeting-state",1);
         }
