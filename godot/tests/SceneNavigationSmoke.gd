@@ -1644,6 +1644,25 @@ func _exercise() -> void:
     if not _check(world._cafe_station()=="table" and _has_button(world._action_choices,"Rest at table") and _has_button(world._action_choices,"Talk with Marco"),"cafe table rest and actual guests"):
         return
     world._close_cafe()
+    var staffed_medical := _world("CLINIC","Clinic")
+    staffed_medical["residents"]=[
+        {"id":"pharmacy-worker","activity":"WORKING","workVisual":"PHARMACY","outfitVisual":"DOCTOR_COAT"},
+        {"id":"clinic-worker","activity":"WORKING","workVisual":"MEDICAL","outfitVisual":"SCRUBS"}]
+    world._on_world_updated(staffed_medical)
+    var pharmacist: Node3D=world._residents_root.get_node("Resident_pharmacy-worker")
+    var clinician: Node3D=world._residents_root.get_node("Resident_clinic-worker")
+    world._avatar.position=world.PHARMACY_COUNTER
+    if not _check(pharmacist.position.x>8.8 and pharmacist.position.z<-5.0
+            and clinician.position.x<-8.8 and clinician.position.z>5.0
+            and world._medical_staff_present("PHARMACY") and world._nearest_resident()=="pharmacy-worker",
+            "actual medical workers occupy separate interior desks and can be addressed"):
+        return
+    staffed_medical["residents"][0]["activity"]="FREE_TIME"
+    staffed_medical["residents"][0]["workVisual"]=""
+    world._on_world_updated(staffed_medical)
+    if not _check(not world._medical_staff_present("PHARMACY"),
+            "off-duty pharmacy worker no longer counts as staffing"):
+        return
     var medical := _world("CLINIC","Clinic")
     medical["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","medical":{"atClinic":true,"health":75,"ill":true,"canConsult":true,"canFirstAid":true}}
     world._on_world_updated(medical)
