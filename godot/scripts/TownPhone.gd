@@ -13,6 +13,7 @@ var _call_decline: Button
 var _dial_choice: OptionButton
 var _dial_hangup: Button
 var _dial_visit: Button
+var _dial_host: Button
 var _sms_seen: Dictionary = {}
 var _sms_initialized := false
 var _sms_choice: OptionButton
@@ -118,6 +119,10 @@ func _ready() -> void:
     _dial_visit.text = tr("Ask to visit at home")
     _dial_visit.pressed.connect(_send_outgoing.bind("ask-home-visit"))
     col.add_child(_dial_visit)
+    _dial_host = Button.new()
+    _dial_host.text = tr("Invite to your home")
+    _dial_host.pressed.connect(_send_outgoing.bind("invite-my-home"))
+    col.add_child(_dial_host)
     _action = Button.new()
     _action.pressed.connect(_app_action)
     col.add_child(_action)
@@ -244,6 +249,7 @@ func _refresh_dial_buttons() -> void:
     _action.text = tr("Invite for coffee") if connected else tr("Call contact")
     _dial_hangup.visible = connected
     _dial_visit.visible = connected
+    _dial_host.visible = connected and bool(_snapshot.get("player",{}).get("ownsHouse",false))
 
 func _send_call_action(action: String) -> void:
     if _call_choice.selected>=0:
@@ -278,6 +284,7 @@ func refresh() -> void:
     _dial_choice.hide()
     _dial_hangup.hide()
     _dial_visit.hide()
+    _dial_host.hide()
     _alarm_controls.visible = app=="alarm"
     _alarm_cancel.visible = app=="alarm" and alarm_at>=0
     match app:
@@ -356,10 +363,10 @@ func refresh() -> void:
             var phone = _snapshot.get("phone")
             if phone is Dictionary:
                 for meeting in phone.get("meetings",[]):
-                    var home_visit: bool = meeting.get("place","CAFE")=="HOME"
+                    var home_visit: bool = meeting.get("place","CAFE")!="CAFE"
                     var heading := tr("Visit with %s · day %s · %s") if home_visit else tr("Coffee with %s · day %s · %s")
                     lines.append("\n"+heading % [meeting.get("name",""),meeting.get("day",0),format_time(int(meeting.get("minute",1080)))])
-                    var destination := tr("Friend's home") if home_visit else tr("Cafe")
+                    var destination := tr("Your home") if meeting.get("place","")=="PLAYER_HOME" else (tr("Friend's home") if home_visit else tr("Cafe"))
                     lines.append(destination + " · " + tr(str(meeting.get("status","SCHEDULED"))))
             if alarm_at>=0:
                 lines.append(tr("Alarm: day %s, %s") % [alarm_at/1440+1,format_time(alarm_at%1440)])
