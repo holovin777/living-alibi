@@ -3056,7 +3056,8 @@ func _build_playground(park: Node3D) -> void:
         _cylinder(play,0.055,1.45,Color("#397b84"),Vector3(x,0.725,10.0))
         _cylinder(play,0.055,1.45,Color("#397b84"),Vector3(x,0.725,10.8))
     _box(play,Vector3(1.0,0.12,1.0),Color("#ce9e43"),Vector3(6.5,1.45,10.4))
-    var ramp := _box(play,Vector3(0.73,0.09,2.35),Color("#ce6a47"),Vector3(6.5,0.76,11.5))
+    _box(play,Vector3(0.73,0.09,2.35),Color("#ce6a47"),Vector3(6.5,0.76,11.5))
+    var ramp := play.get_child(play.get_child_count()-1) as Node3D
     ramp.rotation.x=0.62
     for i in range(4):
         _box(play,Vector3(0.75,0.07,0.18),Color("#637e8b"),Vector3(6.5,0.3+0.3*i,9.0+0.22*i))
