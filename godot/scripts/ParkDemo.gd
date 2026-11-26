@@ -4240,7 +4240,7 @@ func _animate_residents(delta: float) -> void:
                 var roll := (-0.42 if limb=="ArmRight" else 0.42) if guarded else (0.30 if wave and limb=="ArmRight" else 0.0)
                 var shoulder_sway := 0.035*sin(gait+(0.0 if limb=="ArmLeft" else PI)) if walking else 0.0
                 part.rotation.z=lerpf(part.rotation.z,roll+shoulder_sway,minf(delta*8.0,1.0))
-                var grip := limb=="ArmRight" and (phone or coffee or (work_prop!=null and work_prop.visible))
+                var grip: bool = limb=="ArmRight" and (phone or coffee or (work_prop!=null and work_prop.visible))
                 var elbow_bend := -0.12-0.18*maxf(0.0,sin(gait+(PI if limb=="ArmLeft" else 0.0))) if walking else 0.0
                 if grip:elbow_bend=-0.20
                 elif wave and limb=="ArmRight":elbow_bend=-0.36
