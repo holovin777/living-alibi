@@ -42,6 +42,13 @@ class GameSessionTest {
             var visible=java.util.List.of(a,b);
             assertEquals(1,GameSession.peerEncounters(town,visible,105).size());
             assertEquals("WARM",GameSession.peerEncounters(town,visible,105).getFirst().tone());
+            var friendly=new SocialLife.Interaction(1,100,"marco","elena",TownLife.Place.PARK,SocialLife.Kind.FRIENDLY_CHAT,"test");
+            var tense=new SocialLife.Interaction(1,100,"elena","marco",TownLife.Place.PARK,SocialLife.Kind.TENSE_EXCHANGE,"test");
+            var peace=new SocialLife.Interaction(1,100,"marco","elena",TownLife.Place.PARK,SocialLife.Kind.RECONCILIATION,"test");
+            assertEquals("LAUGH",GameSession.peerEncounters(town,visible,105,java.util.List.of(friendly)).getFirst().reaction());
+            assertEquals("ARGUMENT",GameSession.peerEncounters(town,visible,105,java.util.List.of(tense)).getFirst().reaction());
+            assertEquals("RECONCILE",GameSession.peerEncounters(town,visible,105,java.util.List.of(peace)).getFirst().reaction());
+            assertEquals("CHAT",GameSession.peerEncounters(town,visible,105).getFirst().reaction());
             assertTrue(GameSession.peerEncounters(town,visible,116).isEmpty());
             assertTrue(GameSession.peerEncounters(town,java.util.List.of(a),105).isEmpty());
             b.activity="WORKING";
