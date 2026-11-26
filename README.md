@@ -60,6 +60,16 @@ bash play.sh
 This is a development preview; distribution as a downloadable standalone
 Linux application (without installing Maven/Godot) is not yet implemented.
 
+
+
+### First-run voice setup on Linux and Windows
+
+The development launcher offers optional voice setup before opening the game. On Arch Linux run `bash play.sh`; missing espeak-ng and whisper-cpp packages are offered through the normal pacman confirmation, and a pinned multilingual base model (148 MB) is downloaded after consent and SHA-256 verification. No ALSA command-line recorder is needed. Run `bash play.sh --no-voice` to skip the setup. Existing cached model files are reused. Other Linux distributions can supply their own installed whisper-cli and model via LIVING_ALIBI_WHISPER_CLI and LIVING_ALIBI_WHISPER_MODEL.
+
+On Windows install JDK 21+, Maven 3.9+ and Godot 4 for this development preview. Add Java/Maven to PATH, and either add godot.exe to PATH or set LIVING_ALIBI_GODOT to its full executable path. In PowerShell at the repository root run `.\\play.ps1 -Check`, then `.\\play.ps1`. Optional voice setup downloads a pinned official Whisper CPU ZIP (x64 or ARM64) and the same multilingual model, verifies SHA-256 before extraction, and caches them under %LOCALAPPDATA%\\LivingAlibi\\voice. No administrator access is required for these voice downloads. Use `.\\play.ps1 -NoVoice` to skip. Windows system speech voices provide the non-positional TTS fallback; Italian/English voices may need to be enabled in Windows settings. The launcher preserves data/world.db and shuts down its own local server when Godot exits.
+
+Godot now records microphone input using its native audio bus on Linux and Windows, converts it to 16 kHz mono PCM, and sends only the locally recognized text to the existing local Java engine after review. Recording starts only with the Record button; Windows microphone privacy settings must allow desktop apps to access the microphone. No audio is sent over the network. The earlier arecord-specific instructions are superseded. A failed or declined optional setup does not prevent normal typed gameplay. Standalone end-user installers with bundled Java/Godot are not yet provided; Windows execution and microphone quality still need real-device testing.
+
 ## New in v1.16 (draft)
 
 The game still launches **from an empty SQLite file**. A new visitor is anonymous,

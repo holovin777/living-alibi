@@ -25,6 +25,19 @@ func _exercise() -> void:
     if not _check(not mic.start("it").is_empty() and mic.stage.is_empty(),"headless microphone refuses capture safely"):
         return
     mic.cleanup()
+    var raw := AudioStreamWAV.new()
+    raw.format=AudioStreamWAV.FORMAT_16_BITS
+    raw.mix_rate=48000
+    raw.stereo=true
+    var samples := PackedByteArray()
+    samples.resize(12*4)
+    for frame in range(12):
+        samples.encode_s16(frame*4,2000)
+        samples.encode_s16(frame*4+2,1000)
+    raw.data=samples
+    var mono: AudioStreamWAV = mic.pcm16_mono(raw)
+    if not _check(mono!=null and mono.mix_rate==16000 and not mono.stereo and mono.data.size()==8 and mono.data.decode_s16(0)==1500,"native microphone audio converts to Whisper PCM"):
+        return
 
     var clock = preload("res://scripts/LiveClock.gd").new()
     for i in range(5):

@@ -233,6 +233,7 @@ func _ready() -> void:
     GameLanguage.select_locale(GameLanguage.saved_locale(),false)
     _build_world()
     _npc_speech.setup(self)
+    _voice_input.setup(self)
     _create_interface()
     _api = preload("res://examples/WorldApi.gd").new()
     add_child(_api)
