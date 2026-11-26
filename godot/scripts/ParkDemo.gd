@@ -3392,6 +3392,7 @@ func _render_residents() -> void:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
+        person.set_meta("walking_companion",str(resident.get("walkingCompanion","")))
         _sync_work_prop(person,str(resident.get("workVisual","")))
         _sync_resident_uniform(person,str(resident.get("outfitVisual","")))
         _sync_resident_appearance(person,str(resident.get("appearanceStage","ADULT")))
@@ -4360,10 +4361,59 @@ func _tick_peer_encounters(delta: float) -> void:
     for key in _peer_seen.keys():
         if not valid.has(key):_peer_seen.erase(key)
 
+# Mutual server-selected pairs only. Keep the faster person from leaving a child behind.
+func _companion_available(person: Node3D) -> bool:
+    return _peer_available(person) and not person.has_meta("peer_face") and not person.has_meta("peer_target")
+
+func _tick_walking_companions() -> void:
+    if not is_instance_valid(_residents_root):return
+    for child in _residents_root.get_children():
+        child.remove_meta("companion_target")
+        child.remove_meta("companion_wait")
+        child.remove_meta("companion_pace")
+    for child in _residents_root.get_children():
+        var a := child as Node3D
+        var id := str(a.get_meta("resident_id",""))
+        var other := str(a.get_meta("walking_companion",""))
+        if other.is_empty() or id>=other:continue
+        var b := _residents_root.get_node_or_null("Resident_"+other) as Node3D
+        if not _companion_available(a) or not _companion_available(b):continue
+        if str(b.get_meta("walking_companion",""))!=id:continue
+        if a.position.distance_to(b.position)>5.0:continue
+        # Adult leads a child, otherwise use stable ID order.
+        var leader := a
+        var follower := b
+        if a.scale.y<b.scale.y*0.78:
+            leader=b
+            follower=a
+        var gap := leader.position.distance_to(follower.position)
+        var phase := float(leader.get_meta("phase",0.0))
+        var anchor: Vector3=leader.get_meta("anchor",leader.position)
+        var target := anchor+Vector3(sin(phase)*1.1,0,cos(phase)*0.8)
+        var direction := target-leader.position
+        direction.y=0.0
+        if direction.length_squared()<0.01:direction=-leader.basis.z
+        direction=direction.normalized()
+        var side := direction.cross(Vector3.UP).normalized()
+        var alongside := leader.position+side*0.88-direction*0.25
+        if not _can_stand(alongside,WALKER_RADIUS):
+            alongside=leader.position-side*0.88-direction*0.25
+        if not _can_stand(alongside,WALKER_RADIUS):
+            alongside=leader.position-direction*0.95
+        if not _can_stand(alongside,WALKER_RADIUS):continue
+        var speed := minf(ResidentAppearance.pace_factor(str(leader.get_meta("appearance_stage","ADULT"))),ResidentAppearance.pace_factor(str(follower.get_meta("appearance_stage","ADULT"))))
+        leader.set_meta("companion_pace",speed)
+        follower.set_meta("companion_pace",speed)
+        leader.set_meta("companion_wait",gap>1.65)
+        leader.set_meta("companion_target",target)
+        follower.set_meta("companion_target",alongside)
+        follower.set_meta("companion_wait",follower.position.distance_to(alongside)<0.10)
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
     _tick_peer_encounters(delta)
+    _tick_walking_companions()
     for child in _residents_root.get_children():
         var person := child as Node3D
         var activity := str(person.get_meta("activity", ""))
@@ -4381,6 +4431,10 @@ func _animate_residents(delta: float) -> void:
             if not talking:person.rotation.y=lerp_angle(person.rotation.y,PI,minf(delta*6.0,1.0))
         var peer_chat := person.has_meta("peer_face")
         var peer_approach := person.has_meta("peer_target")
+        var companion := person.has_meta("companion_target")
+        if companion:
+            pace=minf(pace,float(person.get_meta("companion_pace",pace)))
+            walking=not bool(person.get_meta("companion_wait",false))
         if peer_approach:walking=true
         if peer_chat:
             walking=false
@@ -4394,11 +4448,14 @@ func _animate_residents(delta: float) -> void:
             if toward.length_squared()>0.001:
                 person.rotation.y = lerp_angle(person.rotation.y,atan2(-toward.x,-toward.z),minf(delta*6.0,1.0))
         var walked := 0.0
+        if companion and bool(person.get_meta("companion_wait",false)):
+            phase+=delta*0.4*pace
+            person.set_meta("phase",phase)
         if walking:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
             var anchor: Vector3 = person.get_meta("anchor")
-            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (queue_target if queued else anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8))
+            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (person.get_meta("companion_target") if companion else (queue_target if queued else anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)))
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
@@ -4437,7 +4494,7 @@ func _animate_residents(delta: float) -> void:
             var to_visitor := _avatar.position-person.position
             if to_visitor.length_squared()>0.001:
                 person.rotation.y=lerp_angle(person.rotation.y,atan2(-to_visitor.x,-to_visitor.z),minf(delta*5.0,1.0))
-        var idle_ok := not peer_chat and not walking and not seated and not talking and not phone and not coffee and not umbrella and not wave and not joke and not queued and activity in ["RELAXING","RESTING","FREE_TIME"]
+        var idle_ok := not companion and not peer_chat and not walking and not seated and not talking and not phone and not coffee and not umbrella and not wave and not joke and not queued and activity in ["RELAXING","RESTING","FREE_TIME"]
         var idle_gesture := _tick_idle_gesture(person,delta,idle_ok)
         var guarded := idle_ok and idle_gesture.is_empty() and str(person.get_meta("mood","")) in ["IRRITATED","STRESSED"]
         if idle_gesture in ["CHECK_WATCH","LOOK_HANDS"]:
