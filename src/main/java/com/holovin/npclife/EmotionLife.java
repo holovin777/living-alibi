@@ -8,6 +8,7 @@ final class EmotionLife {
     enum Mood { CALM, HAPPY, ENTHUSIASTIC, TIRED, STRESSED, IRRITATED, SAD, LONELY }
     static Mood mood(TownLife.Town town,TownLife.Citizen c,int day,int minute) {
         if(c.health<45 || "SICK_LEAVE".equals(c.activity))return Mood.SAD;
+        if(PublicSafetyLife.alarmed(town,c,day,minute))return Mood.STRESSED;
         if(c.fatigue>=85)return Mood.TIRED;
         if(c.hunger>=85 || c.thirst>=85)return Mood.IRRITATED;
         long now=(long)(day-1)*1440L+minute;

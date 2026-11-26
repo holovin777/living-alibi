@@ -71,6 +71,7 @@ final class PopulationLife {
         if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;
         else if(freightRun)desired=freightDestination;
+        else if(!publicSafety&&!child&&!carrier&&!RebirthLife.linkedAdult(town,c)&&PublicSafetyLife.alarmed(town,c,clock.day,minute))desired=c.home;
         else if(sleeping)desired=c.home;
         else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:c.home;
         else if(itEmployee && working)desired=TownLife.Place.OFFICE;

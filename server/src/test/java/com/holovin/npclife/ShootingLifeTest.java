@@ -24,6 +24,16 @@ class ShootingLifeTest {
         assertFalse(WeaponLicenseLife.view(t,s).ownsSportWeapon());
         assertThrows(IllegalArgumentException.class,()->CombatLife.fire(t,s,"",truth,observations));
     }
+    @Test void witnessesBecomeStressedButRemoteResidentsDoNot(){
+        var s=new WorldState();var t=TownLife.create(s);s.minute=720;t.player.place=TownLife.Place.PARK;
+        var local=t.get("elena");local.place=TownLife.Place.PARK;local.travelRemaining=0;local.alive=true;
+        var remote=t.get("marco");remote.place=TownLife.Place.BAKERY;remote.travelRemaining=0;
+        PublicSafetyLife.alarm(t,s);
+        assertTrue(PublicSafetyLife.alarmed(t,local,s.day,s.minute));
+        assertFalse(PublicSafetyLife.alarmed(t,remote,s.day,s.minute));
+        assertTrue(PublicSafetyLife.alarmed(t.copy(),local,s.day,s.minute));
+        assertFalse(PublicSafetyLife.alarmed(t,local,s.day,s.minute+60));
+    }
     @Test void finitePracticeSupplyAndRefill(){
         var s=new WorldState();var t=TownLife.create(s);s.minute=720;t.player.money=200;
         t.player.place=TownLife.Place.OFFICE;WeaponLicenseLife.apply(t,s);

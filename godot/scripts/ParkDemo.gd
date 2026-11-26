@@ -6,6 +6,7 @@ extends Node3D
 
 const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
+const SPORT_COUNTER := Vector3(10.5,0,-6.0)
 const LIBRARY_DESK := Vector3(-7,0,6.1)
 const DEPOT_DESK := Vector3(-9.0,0.0,10.0)
 const DEPOT_BAYS := [Vector3(6.5,0,12.0),Vector3(12.5,0,12.0)]
@@ -701,11 +702,17 @@ func _update_first_steps() -> void:
     var service_target := GROCERY_COUNTER if _current_place=="PORTICI" else (DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)
     _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch") % [_guide_direction(GATE_POSITION),_guide_direction(service_target)])
     if not _entrance_hint().is_empty():_guide_label.text+="\n"+_entrance_hint()
+    if _current_place in ["MARKET","WORKSHOP"] and not _rebirth_active():
+        _guide_label.text+="\n"+("%s · F: %s" % ["Armeria" if _current_place=="MARKET" else "Poligono di tiro",_guide_direction(SPORT_COUNTER)])
 
 func _near_gate() -> bool:
     return _avatar.position.distance_to(GATE_POSITION) < INTERACTION_RADIUS
 
+func _near_sport_counter() -> bool:
+    return _current_place in ["MARKET","WORKSHOP"] and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(SPORT_COUNTER)<1.8
+
 func _near_kiosk() -> bool:
+    if _near_sport_counter():return true
     if _current_place=="PORTICI":return _avatar.position.distance_to(GROCERY_COUNTER)<1.5
     if _near_public_counter():return true
     var target := DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION
@@ -1411,6 +1418,7 @@ func _generate_chunk(place_id: String) -> void:
             _box(_scenery, Vector3(6.0, 0.18, 3.0), Color(0.90, 0.76, 0.31),
                     Vector3(4.0, 2.35, 8.0))
             _build_market_counters()
+            _build_sport_facility(false)
         "SCHOOL":
             _build_college()
             _build_dojo()
@@ -1419,6 +1427,7 @@ func _generate_chunk(place_id: String) -> void:
         "WORKSHOP":
             _building("Mechanical workshop", Color(0.41, 0.51, 0.59))
             _build_motor_court()
+            _build_sport_facility(true)
             _box(_scenery, Vector3(4.0, 1.2, 2.0), Color(0.27, 0.30, 0.32),
                     Vector3(-8.0, 0.7, 7.0))
         "OFFICE":
@@ -2951,6 +2960,26 @@ func _build_market_counters() -> void:
         for i in range(3):
             _sphere(stalls,0.09,[Color("#af4938"),Color("#7c964d"),Color("#dfaa4a")][i],Vector3(x-0.55+i*0.24,1.1,1.25))
         _box(stalls,Vector3(0.24,0.17,0.24),Color("#42494a"),Vector3(x+0.53,1.1,1.25))
+
+func _build_sport_facility(range_site: bool) -> void:
+    var site := Node3D.new()
+    site.name = "PoligonoDiTiro" if range_site else "Armeria"
+    _scenery.add_child(site)
+    var wall := Color("#c9baa4")
+    _box(site,Vector3(6.0,0.08,5.6),Color("#9d9b93"),Vector3(10.5,0.02,-8.5))
+    for x in [7.5,13.5]:
+        _room_wall(site,Vector3(x,0,-8.5),Vector2(0.24,5.6),wall)
+    _room_wall(site,Vector3(10.5,0,-11.3),Vector2(6.0,0.24),wall)
+    _box(site,Vector3(6.4,0.24,5.9),Color("#626a68"),Vector3(10.5,3.15,-8.5))
+    _room_furniture(site,Vector3(10.5,0,-7.4),Vector3(2.3,1.0,0.65),Color("#6e6456"))
+    _sign(site,"Poligono di tiro · F" if range_site else "Armeria · F",Vector3(10.5,2.65,-5.5))
+    _sign(site,"08:00–18:00" if range_site else "08:00–20:00",Vector3(10.5,1.5,-7.03))
+    if range_site:
+        for x in [9.0,12.0]:
+            _box(site,Vector3(0.9,0.9,0.10),Color("#d9d9cf"),Vector3(x,1.45,-10.7))
+            _box(site,Vector3(0.4,0.4,0.11),Color("#696c67"),Vector3(x,1.45,-10.62))
+    else:
+        _box(site,Vector3(2.0,1.4,0.35),Color("#7e8888"),Vector3(10.5,1.0,-10.8))
 
 func _build_bakery() -> void:
     var bakery := Node3D.new()
@@ -5901,7 +5930,7 @@ func _toggle_actions() -> void:
     if _action_panel.visible:
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
         _render_actions()
-        if _current_place == "WORKSHOP" and not _api.is_busy():
+        if _current_place == "WORKSHOP" and not _near_sport_counter() and not _api.is_busy():
             _api.view_business()
         elif _current_place == "OFFICE" and not _api.is_busy():
             _api.list_work_orders()
@@ -6409,19 +6438,27 @@ func _render_actions() -> void:
     if _custody_active:return
     var justice: Dictionary = _last_snapshot.get("player",{}).get("justice",{})
     var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
-    if _current_place=="WORKSHOP" and not _rebirth_active() and bool(permit.get("ownsSportWeapon",false)):
+    if _near_sport_counter() and not _rebirth_active() and _current_place=="MARKET":
+        _render_armeria(permit)
+        return
+    if _near_sport_counter() and not _rebirth_active() and _current_place=="WORKSHOP":
         var practice_info := Label.new()
         practice_info.text=tr("Training counter · 08:00–18:00")+"\n"+tr("Practice shots: %s · Sessions: %s") % [permit.get("practiceShots",0),permit.get("practiceSessions",0)]
         _action_choices.add_child(practice_info)
         var practice_btn := _button(tr("Practice shot"),_weapon_license_action.bind("weapon-practice"))
         var practice_minute := int(_last_snapshot.get("minute",0))
-        practice_btn.disabled = not bool(permit.get("valid",false)) or practice_minute<480 or practice_minute+2>1080 or int(permit.get("rounds",0))<=0
+        practice_btn.disabled = not bool(permit.get("ownsSportWeapon",false)) or not bool(permit.get("valid",false)) or practice_minute<480 or practice_minute+2>1080 or int(permit.get("rounds",0))<=0
         practice_btn.set_meta("sold_out",practice_btn.disabled)
         _action_choices.add_child(practice_btn)
         var refill_btn := _button(tr("Replenish training supply · 3 EUR"),_weapon_license_action.bind("weapon-refill"))
         refill_btn.disabled=not bool(permit.get("canRefill",false))
         refill_btn.set_meta("sold_out",refill_btn.disabled)
         _action_choices.add_child(refill_btn)
+        if not bool(permit.get("ownsSportWeapon",false)):
+            var training_hint := Label.new()
+            training_hint.text=tr("A registered sporting weapon is required.")
+            _action_choices.add_child(training_hint)
+        return
     if _current_place=="OFFICE" and not _rebirth_active():
         var permit_info := Label.new()
         permit_info.text = tr("Weapon license: active")+" · "+tr("%s days left") % permit.get("daysRemaining",0) if bool(permit.get("valid",false)) else tr("Weapon license: inactive")
@@ -6973,24 +7010,6 @@ func _render_actions() -> void:
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
             if _current_place == "MARKET":
-                if not bool(_last_snapshot.get("player",{}).get("ownsBaton",false)):
-                    var baton_button := _button(tr("Buy training baton · 12 EUR"),_buy_training_baton)
-                    baton_button.disabled = not bool(permit.get("valid",false)) or not shop_open or int(player.get("money",0))<12
-                    baton_button.set_meta("sold_out",baton_button.disabled)
-                    _action_choices.add_child(baton_button)
-                if not bool(permit.get("ownsSportWeapon",false)):
-                    var sport_button := _button(tr("Buy registered sporting weapon · 80 EUR"),_weapon_license_action.bind("weapon-buy-sport"))
-                    sport_button.disabled = not bool(permit.get("canBuySport",false))
-                    sport_button.set_meta("sold_out",sport_button.disabled)
-                    _action_choices.add_child(sport_button)
-                else:
-                    var owned_sport := Label.new()
-                    owned_sport.text=tr("Registered sporting weapon: owned")
-                    _action_choices.add_child(owned_sport)
-                if not bool(permit.get("valid",false)):
-                    var license_hint := Label.new()
-                    license_hint.text=tr("A valid weapon license is required. Visit the municipal office.")
-                    _action_choices.add_child(license_hint)
                 var stall: Dictionary = _last_snapshot.get("stall",{})
                 if not bool(stall.get("registered",false)):
                     _action_choices.add_child(_button("Register private stall · 20 EUR",_garden_action.bind("stall-register")))
@@ -7453,13 +7472,41 @@ func _try_shoot() -> void:
     var id := _looked_at_resident()
     _api.garden_action("weapon-fire" if id.is_empty() else "weapon-fire:"+id)
 
+func _render_armeria(permit: Dictionary) -> void:
+    var player: Dictionary = _last_snapshot.get("player",{})
+    var minute := int(_last_snapshot.get("minute",0))
+    var shop_open := minute>=480 and minute+2<=1200
+    var title := Label.new()
+    title.text="Armeria · 08:00–20:00"
+    _action_choices.add_child(title)
+    if not bool(player.get("ownsBaton",false)):
+        var baton_button := _button(tr("Buy training baton · 12 EUR"),_buy_training_baton)
+        baton_button.disabled = not bool(permit.get("valid",false)) or not shop_open or int(player.get("money",0))<12
+        baton_button.set_meta("sold_out",baton_button.disabled)
+        _action_choices.add_child(baton_button)
+    if not bool(permit.get("ownsSportWeapon",false)):
+        var sport_button := _button(tr("Buy registered sporting weapon · 80 EUR"),_weapon_license_action.bind("weapon-buy-sport"))
+        sport_button.disabled = not bool(permit.get("canBuySport",false))
+        sport_button.set_meta("sold_out",sport_button.disabled)
+        _action_choices.add_child(sport_button)
+    else:
+        var owned_sport := Label.new()
+        owned_sport.text=tr("Registered sporting weapon: owned")
+        _action_choices.add_child(owned_sport)
+    if not bool(permit.get("valid",false)):
+        var license_hint := Label.new()
+        license_hint.text=tr("A valid weapon license is required. Visit the municipal office.")
+        _action_choices.add_child(license_hint)
+
 func _weapon_license_action(action: String) -> void:
-    if not _connected or _api.is_busy() or not _near_kiosk():return
+    if not _connected or _api.is_busy():return
+    if action=="weapon-license-apply" and not _near_kiosk():return
+    if action!="weapon-license-apply" and not _near_sport_counter():return
     if (action=="weapon-license-apply" and _current_place=="OFFICE") or (action=="weapon-buy-sport" and _current_place=="MARKET") or (action in ["weapon-practice","weapon-refill"] and _current_place=="WORKSHOP"):
         _api.garden_action(action)
 
 func _buy_training_baton() -> void:
-    if _current_place=="MARKET" and _near_kiosk() and _connected and not _api.is_busy():
+    if _current_place=="MARKET" and _near_sport_counter() and _connected and not _api.is_busy():
         _api.garden_action("combat-buy-baton")
 
 func _holdable_items() -> Array[String]:

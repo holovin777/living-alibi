@@ -24,6 +24,7 @@ const IT := {
     "Registered sporting weapon purchased.": "Arma sportiva registrata acquistata.",
     "A valid weapon license is required.": "Serve una licenza valida.",
     "Sport": "Arma sportiva",
+    "A registered sporting weapon is required.": "Serve un’arma sportiva registrata.",
     "Rounds: %s/%s": "Colpi: %s/%s",
     "Practice shots: %s · Sessions: %s": "Tiri: %s · Sessioni: %s",
     "%s days left": "%s giorni rimanenti",

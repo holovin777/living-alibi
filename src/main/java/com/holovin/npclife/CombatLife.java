@@ -45,6 +45,7 @@ final class CombatLife {
         WeaponLicenseLife.spendRound(t);
         TownLife.publish(t,clock,"visitor:"+t.player.incarnation,t.player.place,
                 "A shot was fired in a public space.",truth,observations);
+        PublicSafetyLife.alarm(t,clock);
         boolean officer=PlayerLife.visible(t).stream().anyMatch(c->PoliceLife.scheduled(c,clock.day,clock.minute));
         t.industryStocks.merge(key(t,"police-reports"),1,Math::addExact);
         JusticeLife.reportDischarge(t,clock,officer,truth,observations);
@@ -69,6 +70,7 @@ final class CombatLife {
         // All testimony comes from the actual shared scene; no automatic player-name disclosure.
         TownLife.publish(t,clock,"visitor:"+t.player.incarnation,t.player.place,
                 ("sport".equals(weapon)?"A visitor fired a shot that injured ":"A visitor struck ")+victim.name+".",truth,observations);
+        if("sport".equals(weapon))PublicSafetyLife.alarm(t,clock);
         boolean officer=false;
         for(var witness:PlayerLife.visible(t)){
             var contact=t.player.contacts.computeIfAbsent(witness.id,PlayerLife.Contact::new);
