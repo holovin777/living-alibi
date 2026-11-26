@@ -75,6 +75,12 @@ var _guest: Node3D
 var _guest_active := false
 var _guest_return := Vector3.ZERO
 var _guest_pending := false
+var _guest_host: Node3D
+var _guest_sitting := false
+var _guest_stand_at := Vector3.ZERO
+var _guest_feedback := ""
+var _guest_feedback_time := 0.0
+var _guest_requested_action := ""
 var _home_entrance: Node3D
 var _home_transition := false
 var _grocery_menu := false
@@ -251,7 +257,7 @@ func _process(delta: float) -> void:
     var direction := Vector3.ZERO
     var moved := 0.0
     # Do not move away from an open clickable interaction menu.
-    if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
+    if not _guest_sitting and not _guest_pending and _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
             direction.z -= 1.0
         if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -280,7 +286,19 @@ func _process(delta: float) -> void:
     if _guest_active:
         _weather_fx.follow(_avatar.position)
         _weather_fx.set_sheltered(true,_environment)
-        _stairwell_hint.text = tr("G: leave apartment") if _guest.near_exit(_avatar.position) else tr("Visiting %s") % _guest.resident_name
+        _animate_guest_host(delta)
+        var hints := tr("Visiting %s") % _guest.resident_name
+        if _guest_sitting:
+            hints += "\n"+tr("E: stand up · R: relax")
+        else:
+            if _guest.near_exit(_avatar.position):hints += "\n"+tr("G: leave apartment")
+            if _guest.near_sofa(_avatar.position):hints += "\n"+tr("E: sit on sofa")
+            if _guest.near_table(_avatar.position):hints += "\n"+tr("C: coffee · F: snack")
+        if is_instance_valid(_guest_host) and _avatar.position.distance_to(_guest_host.position)<2.5:
+            hints += "\n"+tr("T: talk to host")
+        _guest_feedback_time = maxf(0.0,_guest_feedback_time-delta)
+        if _guest_feedback_time>0.0:hints += "\n"+_guest_feedback
+        _stairwell_hint.text = hints
         _tick_live_clock(delta)
         return
     if _stairwell_active:
@@ -388,8 +406,18 @@ func _unhandled_input(event: InputEvent) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
         if _guest_active:
-            if event.keycode==KEY_G and _guest.near_exit(_avatar.position):
+            if event.keycode==KEY_G and not _guest_sitting and _guest.near_exit(_avatar.position):
                 _guest_action("leave")
+            elif event.keycode==KEY_E and not _guest_pending:
+                _toggle_guest_seat()
+            elif event.keycode==KEY_T:
+                _guest_action("talk")
+            elif event.keycode==KEY_C:
+                _guest_action("coffee")
+            elif event.keycode==KEY_F:
+                _guest_action("snack")
+            elif event.keycode==KEY_R:
+                _guest_action("rest")
             get_viewport().set_input_as_handled()
             return
         if _stairwell_active:
@@ -992,7 +1020,7 @@ func _follow_player() -> void:
         var eye := EYE_HEIGHT
         if str(_last_snapshot.get("rebirth",{}).get("phase","ADULT")) == "CHILDHOOD":
             eye = lerpf(0.65,EYE_HEIGHT,clampf(float(_last_snapshot.get("rebirth",{}).get("age",0))/18.0,0.0,1.0))
-        _camera.position = _avatar.position + Vector3(0.0,eye * (1.0 - 0.35 * _crouch_amount) + _jump_height + _step_bob,0.0)
+        _camera.position = _avatar.position + Vector3(0.0,1.12 if _guest_sitting else eye * (1.0 - 0.35 * _crouch_amount) + _jump_height + _step_bob,0.0)
         _camera.rotation = Vector3(_view_pitch,_view_yaw,0.0)
 
 func _set_graphics_quality(index: int) -> void:
@@ -5710,6 +5738,11 @@ func _guest_action(action: String) -> void:
     if not invitation is Dictionary:return
     if action=="enter" and (_guest_active or not _stairwell_active or _stairwell.near_unit(_avatar.position)!=int(invitation.get("unit",0))):return
     if action=="leave" and (not _guest_active or not _guest.near_exit(_avatar.position)):return
+    if action in ["talk","coffee","snack","rest"] and not _guest_active:return
+    if action=="talk" and (not is_instance_valid(_guest_host) or _avatar.position.distance_to(_guest_host.position)>=2.5):return
+    if action in ["coffee","snack"] and not _guest.near_table(_avatar.position):return
+    if action=="rest" and not _guest_sitting:return
+    _guest_requested_action = action
     _guest_pending = true
     _api.garden_action("intercom:%s:1:%s" % [action,invitation.get("residentId","")])
 
@@ -5723,6 +5756,17 @@ func _open_guest(invitation: Dictionary) -> void:
     _guest.resident_name = str(invitation.get("name",""))
     add_child(_guest)
     _guest_active = true
+    _guest_sitting = false
+    _guest_feedback_time = 0.0
+    var original_root := _residents_root
+    var host_root := Node3D.new()
+    host_root.name = "GuestHost"
+    _guest.add_child(host_root)
+    _residents_root = host_root
+    _guest_host = _make_resident(str(invitation.get("residentId","guest-host")),0,_guest.resident_name)
+    _residents_root = original_root
+    _guest_host.position = _guest.host_anchor()
+    _guest_host.set_meta("activity","AT_HOME")
     _stairwell.hide()
     _avatar.position = GuestApartment.SPAWN
     _view_yaw = 0.0
@@ -5734,6 +5778,9 @@ func _open_guest(invitation: Dictionary) -> void:
 func _close_guest() -> void:
     if not _guest_active:return
     _guest_active = false
+    _guest_sitting = false
+    _guest_host = null
+    _guest_feedback_time = 0.0
     _guest.queue_free()
     _guest = null
     _stairwell.show()
@@ -5741,6 +5788,26 @@ func _close_guest() -> void:
     _reset_locomotion()
     _town_audio.play_effect("door")
     _follow_player()
+
+func _toggle_guest_seat() -> void:
+    if _guest_sitting:
+        _guest_sitting = false
+        _avatar.position = _guest_stand_at
+    elif _guest.near_sofa(_avatar.position):
+        _guest_stand_at = _avatar.position
+        _guest_sitting = true
+        _avatar.position = _guest.sofa_anchor()
+    _reset_locomotion()
+    _follow_player()
+
+func _animate_guest_host(delta: float) -> void:
+    if not is_instance_valid(_guest_host):return
+    var toward := _avatar.position-_guest_host.position
+    if toward.length_squared()>0.001:
+        _guest_host.rotation.y = lerp_angle(_guest_host.rotation.y,atan2(-toward.x,-toward.z),minf(delta*4.0,1.0))
+    var arm := _guest_host.get_node("ArmRight") as Node3D
+    var gesture := 0.25+sin(float(Time.get_ticks_msec())*0.003)*0.18 if _guest_feedback_time>0.0 else 0.0
+    arm.rotation.x = lerpf(arm.rotation.x,gesture,minf(delta*6.0,1.0))
 
 func _near_stairwell() -> bool:
     if _stairwell_active or _rebirth_active() or _drive_active() or _cycling() or _apartment_active or _current_place!="NORTH_RESIDENCES":
@@ -6173,6 +6240,11 @@ func _on_work_orders_updated(orders: Array) -> void:
         _render_actions()
 
 func _on_action_feedback(message: String) -> void:
+    if _guest_pending and _guest_active:
+        _guest_feedback = tr(message)
+        _guest_feedback_time = 7.0
+        if _guest_requested_action=="coffee" and message=="You shared a coffee.":
+            _guest.show_coffee()
     if _intercom_pending:
         _intercom_pending = false
         if _intercom.visible:
@@ -6216,7 +6288,8 @@ func _set_request_busy(busy: bool) -> void:
 func _on_request_failed(message: String) -> void:
     if _guest_pending:
         _guest_pending = false
-        _stairwell_hint.text = tr(message)
+        _guest_feedback = tr(message)
+        _guest_feedback_time = 7.0
     if _intercom_pending:
         _intercom_pending = false
         if _intercom.visible:
