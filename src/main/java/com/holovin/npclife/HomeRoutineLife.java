@@ -16,7 +16,12 @@ final class HomeRoutineLife {
         if(!atHome(c))return "AWAY";
         if(Set.of("SLEEPING","SICK_LEAVE","RESTING_WHILE_SICK","WORKING").contains(c.activity))return c.activity;
         if(HouseholdLife.dinnerNow(t,c,day,minute))return "FAMILY_DINNER";
-        if(c.age<18)return "READING";
+        if(c.age<18){
+            if(c.age<6)return "PLAYING";
+            int childSlot=Math.floorMod(minute/30+(int)(c.personalSeed%5)+day,4);
+            if(minute>=900&&minute<1140&&childSlot<2)return "HOMEWORK";
+            return childSlot==3?"READING":"PLAYING";
+        }
         if(c.hunger>=45&&c.food>0)return "COOKING";
         if(c.thirst>=45&&c.water>0)return "DRINKING";
         if(c.fatigue>=75)return "RESTING";
