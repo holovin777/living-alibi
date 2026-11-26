@@ -9,7 +9,7 @@ import java.util.Set;
 final class PhoneLife {
     private PhoneLife() {}
     record Message(String residentId,String name,int day,int minute,String text,String reply) {}
-    record Meeting(String residentId,String name,int day,int minute,String place,String status) {}
+    record Meeting(String residentId,String name,int day,int minute,String place,String status,boolean guestPresent,boolean mealServed) {}
     record Call(String residentId,String name,int day,int minute,String status,String text,boolean invitation) {}
     record DialContact(String residentId,String name,boolean connected) {}
     record OutgoingCall(String residentId,String name,int day,int minute,String status,String text) {}
@@ -58,6 +58,7 @@ final class PhoneLife {
         var c=t.people.get(id);
         return available(t)&&t.player.ownsHouse&&t.player.place==HousingLife.HOUSE_DISTRICT
                 &&t.player.travelRemaining==0&&c!=null&&c.presentAt(HousingLife.HOUSE_DISTRICT)
+                &&c.currentSpace().equals(TownLife.publicSpace(HousingLife.HOUSE_DISTRICT))
                 &&get(t,id,"meeting-kind")==3&&get(t,id,"meeting-day")==day
                 &&get(t,id,"meeting-state")==2&&minute>=MEETING_MINUTE&&minute<1170
                 &&!Set.of("WORKING","SLEEPING","SICK_LEAVE","RESTING_WHILE_SICK").contains(c.activity);
@@ -129,7 +130,7 @@ final class PhoneLife {
         }
         boolean home="ask-home-visit".equals(action);
         boolean hosting="invite-my-home".equals(action);
-        if(hosting&&(!t.player.ownsHouse||contact.trust<75||contact.affinity<30||SocialMemoryLife.unresolved(t,id))){
+        if(hosting&&(!t.player.ownsHouse||c.home==HousingLife.HOUSE_DISTRICT||contact.trust<75||contact.affinity<30||SocialMemoryLife.unresolved(t,id))){
             put(t,id,"out-state",9);return "Mi dispiace, non posso venire a casa tua.";
         }
         if(!home&&!hosting&&!"invite-coffee".equals(action))throw new IllegalArgumentException("Choose a call action.");
@@ -235,7 +236,7 @@ final class PhoneLife {
             if(clock.day>day||(clock.day==day&&clock.minute>=MEETING_END)){
                 put(t,id,"meeting-state",3);continue;
             }
-            if(get(t,id,"meeting-kind")==3&&clock.day==day&&clock.minute>=MEETING_MINUTE&&t.player.ownsHouse&&c.presentAt(HousingLife.HOUSE_DISTRICT)&&t.player.place==HousingLife.HOUSE_DISTRICT&&t.player.travelRemaining==0&&!Set.of("WORKING","SLEEPING","SICK_LEAVE","RESTING_WHILE_SICK").contains(c.activity))put(t,id,"meeting-state",2);
+            if(get(t,id,"meeting-kind")==3&&clock.day==day&&clock.minute>=MEETING_MINUTE&&t.player.ownsHouse&&c.presentAt(HousingLife.HOUSE_DISTRICT)&&c.currentSpace().equals(TownLife.publicSpace(HousingLife.HOUSE_DISTRICT))&&t.player.place==HousingLife.HOUSE_DISTRICT&&t.player.travelRemaining==0&&!Set.of("WORKING","SLEEPING","SICK_LEAVE","RESTING_WHILE_SICK").contains(c.activity))put(t,id,"meeting-state",2);
             if(get(t,id,"meeting-kind")<2&&clock.day==day&&clock.minute>=MEETING_MINUTE&&c.presentAt(TownLife.Place.CAFE)&&
                     t.player.place==TownLife.Place.CAFE&&t.player.travelRemaining==0&&c.travelRemaining==0){
                 put(t,id,"meeting-state",2);
@@ -260,7 +261,8 @@ final class PhoneLife {
             return;
         }
     }
-    static Report report(TownLife.Town t){
+    static Report report(TownLife.Town t){return report(t,0,0);}
+    static Report report(TownLife.Town t,int currentDay,int currentMinute){
         if(!available(t))return new Report(List.of(),false,List.of());
         var messages=new ArrayList<Message>();
         var meetings=new ArrayList<Meeting>();
@@ -278,7 +280,7 @@ final class PhoneLife {
             int meetingState=get(t,c.id,"meeting-state");
             if(meetingState>0)meetings.add(new Meeting(c.id,c.name,get(t,c.id,"meeting-day"),MEETING_MINUTE,get(t,c.id,"meeting-kind")==3?"PLAYER_HOME":get(t,c.id,"meeting-kind")==2?"HOME":"CAFE",switch(meetingState){
                 case 1 -> "SCHEDULED"; case 2 -> "MET"; case 3 -> "MISSED"; default -> "CANCELLED";
-            }));
+            },guestPresent(t,c.id,currentDay,currentMinute),currentDay>0&&get(t,c.id,"shared-meal-day")==currentDay));
             int day=get(t,c.id,"day");
             if(day==0)continue;
             String text=switch(get(t,c.id,"kind")){
