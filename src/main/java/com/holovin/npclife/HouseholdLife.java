@@ -71,13 +71,16 @@ final class HouseholdLife {
             }
         }
     }
+    static boolean dinnerNow(TownLife.Town t,TownLife.Citizen c,int day,int minute){
+        int start=get(t,c.homeUnit,"meal-minute");
+        return awake(c)&&get(t,c.homeUnit,"meal-day")==day&&minute>=start&&minute<start+20;
+    }
     record View(int members,int children,int present,int dinners,boolean dinnerNow){}
     static View view(TownLife.Town t,TownLife.Citizen host,int day,int minute){
         var members=t.people.values().stream().filter(c->c.alive&&host.homeUnit.equals(c.homeUnit)).toList();
         String unit=host.homeUnit;
-        int start=get(t,unit,"meal-minute");
         return new View(members.size(),(int)members.stream().filter(c->c.age<18).count(),
             (int)members.stream().filter(HouseholdLife::awake).count(),get(t,unit,"meals"),
-            get(t,unit,"meal-day")==day&&minute>=start&&minute<start+20);
+            dinnerNow(t,host,day,minute));
     }
 }
