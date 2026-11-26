@@ -75,20 +75,49 @@ final class HouseholdLife {
         int start=get(t,c.homeUnit,"meal-minute");
         return awake(c)&&get(t,c.homeUnit,"meal-day")==day&&minute>=start&&minute<start+20;
     }
-    record ResidentView(String id,int age,String activity){}
-    record View(int members,int children,int present,int dinners,boolean dinnerNow,List<ResidentView> visibleResidents){}
+    static boolean availableMember(TownLife.Citizen host,TownLife.Citizen member){
+        return member!=null&&member.alive&&member.age>=3&&host.homeUnit.equals(member.homeUnit)&&awake(member);
+    }
+    static String introduce(TownLife.Town t,TownLife.Citizen host,int day,int minute,String language){
+        boolean it="it".equals(language);
+        var names=new ArrayList<String>();
+        for(var member:t.people.values()){
+            if(member.id.equals(host.id)||!availableMember(host,member)||!related(t,host,member))continue;
+            var prior=t.player.contacts.get(member.id);
+            if(PlayerLife.knowsResident(t,member.id)||member.sociability<40||(prior!=null&&prior.trust<45))continue;
+            var mood=EmotionLife.mood(t,member,day,minute);
+            if(mood==EmotionLife.Mood.IRRITATED||mood==EmotionLife.Mood.STRESSED)continue;
+            PlayerLife.learnResident(t,member.id);
+            var contact=t.player.contacts.computeIfAbsent(member.id,PlayerLife.Contact::new);
+            if(contact.dialogue.isEmpty()&&!contact.important.containsKey(ConversationMemory.Milestone.FIRST_MEETING)){
+                var event=new ConversationMemory.Turn(day,minute,"und","Introduced by "+host.name,"Met "+member.name+".");
+                ConversationMemory.mark(contact,ConversationMemory.Milestone.FIRST_MEETING,event);
+            }
+            contact.lastDay=day;contact.lastMinute=minute;
+            names.add(member.name);
+        }
+        return names.isEmpty()?(it?"Non c'è nessuno da presentarti adesso.":"There is nobody to introduce right now.")
+                :(it?"Ti presento: ":"Let me introduce you to: ")+String.join(", ",names)+".";
+    }
+    record ResidentView(String id,int age,String activity,String name,String knownName,int conversations,String relationship){}
+    static ResidentView residentView(TownLife.Town t,TownLife.Citizen c,int day,int minute){
+        var contact=t.player.contacts.get(c.id);
+        return new ResidentView(c.id,c.age,HomeRoutineLife.activity(t,c,day,minute),PlayerLife.displayName(t,c),
+                contact==null?null:contact.knownName,contact==null?0:contact.conversations,PlayerLife.relationship(contact));
+    }
+    record View(int members,int children,int present,int dinners,boolean dinnerNow,List<ResidentView> visibleResidents,ResidentView host){}
     static View view(TownLife.Town t,TownLife.Citizen host,int day,int minute){
         return view(t,host,day,minute,false);
     }
     static View view(TownLife.Town t,TownLife.Citizen host,int day,int minute,boolean inside){
         var members=t.people.values().stream().filter(c->c.alive&&host.homeUnit.equals(c.homeUnit)).toList();
         var visible=inside?members.stream()
-            .filter(c->!c.id.equals(host.id)&&awake(c)&&c.age>=3)
-            .map(c->new ResidentView(c.id,c.age,HomeRoutineLife.activity(t,c,day,minute))).toList()
+            .filter(c->!c.id.equals(host.id)&&availableMember(host,c))
+            .map(c->residentView(t,c,day,minute)).toList()
             :List.<ResidentView>of();
         String unit=host.homeUnit;
         return new View(members.size(),(int)members.stream().filter(c->c.age<18).count(),
             (int)members.stream().filter(HouseholdLife::awake).count(),get(t,unit,"meals"),
-            dinnerNow(t,host,day,minute),visible);
+            dinnerNow(t,host,day,minute),visible,inside?residentView(t,host,day,minute):null);
     }
 }
