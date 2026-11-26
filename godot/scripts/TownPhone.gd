@@ -117,7 +117,7 @@ func update_data(snapshot: Dictionary,jobs: Array,locations: Array) -> void:
         alarm_at = -1
         _last_world_minute = -1
     for resident in snapshot.get("residents",[]):
-        if resident is Dictionary and int(resident.get("conversations",0))>0:
+        if resident is Dictionary and int(resident.get("conversations",0))>0 and str(resident.get("name","Unknown resident"))!="Unknown resident":
             var id := str(resident.get("id",""))
             if not id.is_empty():
                 _contacts[id] = str(resident.get("name",""))

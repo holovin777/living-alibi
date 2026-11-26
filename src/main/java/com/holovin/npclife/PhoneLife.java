@@ -47,7 +47,7 @@ final class PhoneLife {
         for(var contact:t.player.contacts.values()){
             var c=t.people.get(contact.residentId);
             if(c==null||!c.alive||c.age<18||c.sociability<45||contact.conversations<2||
-                    contact.knownName==null||contact.trust<60||contact.affinity<12||
+                    contact.knownName==null||!PlayerLife.knowsResident(t,c.id)||contact.trust<60||contact.affinity<12||
                     Set.of("SLEEPING","TRAVELING","SICK_LEAVE").contains(c.activity))continue;
             int last=get(t,c.id,"day");
             if(get(t,c.id,"meeting-state")==1||last>0&&clock.day-last<3)continue;
