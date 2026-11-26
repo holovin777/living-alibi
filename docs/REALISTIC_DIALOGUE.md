@@ -222,8 +222,28 @@ police response yet. Each visitor has separate weapon ownership and
 police report counts. This is a nonlethal prototype for adult targets:
 health is not reduced below 20 by strikes. The client checks local
 proximity; the server still only knows public districts, not precise
-3D coordinates. No firearms, physical NPC counterattacks, arrest,
-prison, or autonomous crime response are implemented yet.
+3D coordinates. No firearms or physical NPC counterattacks are implemented yet.
+
+## Police, court and prison (fictional compressed rules)
+
+A witnessed assault now creates a police report. An on-duty officer present
+at the incident detains the visitor immediately; otherwise the report leads
+to an abstract police transfer after 60 game minutes. A hearing follows
+after an additional 60 minutes. In this prototype, confirmed assaults carry
+one or more game days in prison (up to seven), with a 30 EUR fine per day.
+Weapon involvement, repeated assaults and prior convictions increase the
+fictional sentence. These are game balance rules, not Italian criminal law.
+Unpaid fines persist and can be paid from the Office kiosk after release.
+
+The player sees a simple first-person custody cell and can advance one
+hour or one day with dedicated buttons. Waiting stops at the next hearing
+or release; the town still advances normally. Normal world mutations are
+rejected by the server while confined. Custody, remaining time, fines and
+convictions persist in SQLite and are isolated by incarnation. Basic meals
+and rest are supplied in custody. Police transfer and adjudication are
+abstract, not a physical chase or a contested trial. The cell is a fixed
+view with controls, not a walkable prison complex. The system currently
+applies only to the adult visitor mode and assaults by the player.
 
 Manual check:
 ```sh
