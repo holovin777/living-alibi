@@ -2043,6 +2043,18 @@ func _build_construction_site() -> void:
     _box(roof,Vector3(1.0,2.0,0.08),Color("#72523e"),Vector3(0,1.2,-2.53))
     for x in [-1.5,1.5]:
         _box(roof,Vector3(0.85,0.9,0.08),Color("#7199aa"),Vector3(x,1.9,-2.53))
+    var stock := Node3D.new()
+    stock.name="ReservedMaterials"
+    site.add_child(stock)
+    for n in range(3):
+        _box(stock,Vector3(0.8,0.12,0.25),Color("#787f83"),Vector3(-2.0,0.11+0.13*n,-2.0))
+    var parts := Node3D.new()
+    parts.name="ReservedParts"
+    site.add_child(parts)
+    for n in range(2):
+        _box(parts,Vector3(0.42,0.35,0.42),Color("#aa8153"),Vector3(2.1,0.20+0.36*n,-2.0))
+    stock.hide()
+    parts.hide()
     foundation.visible = false
     walls.visible = false
     roof.visible = false
@@ -2058,6 +2070,13 @@ func _sync_construction_site() -> void:
     site.get_node("Foundation").visible = stage>=1
     site.get_node("Walls").visible = stage>=2
     site.get_node("Roof").visible = stage>=3
+    var construction: Dictionary = _last_snapshot.get("construction",{})
+    for key in ["ReservedMaterials","ReservedParts"]:
+        var stack := site.get_node(key) as Node3D
+        stack.show()
+        var count := int(construction.get("steel" if key=="ReservedMaterials" else "parts",0))
+        for n in range(stack.get_child_count()):
+            stack.get_child(n).visible=n<count
 
 # Fictional Lombard residential block, with a real street-facing home entrance.
 # Keep the established guesthouse, rental room, construction site and road lanes intact.
@@ -3257,6 +3276,9 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
     prop.position=Vector3(0,-0.48,-0.12)
     hand.add_child(prop)
     match kind:
+        "HAMMER":
+            _box(prop,Vector3(0.045,0.34,0.045),Color("#a78155"),Vector3(0,-0.13,0))
+            _box(prop,Vector3(0.23,0.09,0.08),Color("#676d70"),Vector3(0,-0.31,0))
         "BROOM":
             _box(prop,Vector3(0.035,0.92,0.035),Color("#a47c4c"),Vector3(0,-0.38,0))
             _box(prop,Vector3(0.30,0.14,0.12),Color("#ab9359"),Vector3(0,-0.88,0))
@@ -3292,6 +3314,9 @@ func _assign_work_stations() -> void:
     var stations: Array[Vector3] = []
     var yaw := 0.0
     match _current_place:
+        "NORTH_RESIDENCES":
+            stations=[Vector3(11,0,8.3),Vector3(13,0,8.3)]
+            yaw=PI
         "CENTRO":
             stations=[Vector3(-2,0,-5),Vector3(2,0,5),Vector3(-2,0,9)]
         "PARK":
@@ -3641,6 +3666,8 @@ func _animate_residents(delta: float) -> void:
                 var kind := str(person.get_meta("work_visual",""))
                 if kind=="PICK":
                     angle=0.9+sin(gesture_time*3.0)*0.8 if limb=="ArmRight" else 0.55
+                elif kind=="HAMMER":
+                    angle=0.8+sin(gesture_time*3.5)*0.65 if limb=="ArmRight" else 0.35
                 elif kind=="BROOM":
                     angle=0.18+sin(gesture_time*4.0)*0.32 if limb=="ArmRight" else 0.2
                     if limb=="ArmRight":part.rotation.z=sin(gesture_time*4.0)*0.28
