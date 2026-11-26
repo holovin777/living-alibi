@@ -111,12 +111,14 @@ final class PlayerLife {
         int lastDay;
         int lastMinute;
         String lastHeard;
+        final List<ConversationMemory.Turn> dialogue=new ArrayList<>();
         Contact(String residentId) {this.residentId=residentId;}
         Contact copy() {
             Contact c=new Contact(residentId);
             c.knownName=knownName;c.conversations=conversations;
             c.trust=trust;c.affinity=affinity;c.lastPositiveDay=lastPositiveDay;
             c.lastDay=lastDay;c.lastMinute=lastMinute;c.lastHeard=lastHeard;
+            c.dialogue.addAll(dialogue);
             return c;
         }
     }
