@@ -886,6 +886,29 @@ func _exercise() -> void:
             and is_equal_approx(marco.get_node("LegLeft/Knee").rotation.x,-PI/2.0),
             "resting residents use distinct bench seats and bend knees"):
         return
+    var before_bench: Vector3 = world._avatar.position
+    var bench_seats: Array = world._scenery.get_meta("resident_seats",[])
+    var chosen_bench := -1
+    for i in range(bench_seats.size()):
+        if bench_seats[i]["kind"]!="bench" or i in [marco.get_meta("seat_index"),elena.get_meta("seat_index")]:continue
+        var at: Vector3 = bench_seats[i]["at"]
+        world._avatar.position=Vector3(at.x,0,at.z-1.0)
+        if not world._can_stand(world._avatar.position,world.WALKER_RADIUS):continue
+        chosen_bench=world._find_free_bench()
+        if chosen_bench>=0:break
+    if not _check(chosen_bench>=0 and chosen_bench not in [marco.get_meta("seat_index"),elena.get_meta("seat_index")],"visitor can find an unoccupied bench from the front"):
+        return
+    var stand_at: Vector3=world._avatar.position
+    world._occupy_public_bench(chosen_bench)
+    if not _check(world._public_seat==chosen_bench and not world._can_jump() and absf(world._camera.position.y-1.12)<0.01,"public bench lowers first-person view and blocks jumping"):
+        return
+    world._assign_resident_seats()
+    if not _check(chosen_bench not in [marco.get_meta("seat_index"),elena.get_meta("seat_index")],"NPC allocation respects the occupied player bench"):
+        return
+    world._stand_public_bench()
+    if not _check(world._public_seat==-1 and world._avatar.position.is_equal_approx(stand_at),"standing restores unobstructed approach"):
+        return
+    world._avatar.position=before_bench
     populated_park["residents"][0]["activity"] = "WALKING"
     world._on_world_updated(populated_park)
     world._animate_residents(0.5)
