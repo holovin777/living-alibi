@@ -54,6 +54,64 @@ class GameSessionTest {
     }
 
     @Test
+    void autonomousShoppingUsesRealBudgetAndDeliversBirthdayGiftAtHome() throws Exception {
+        Path file=directory.resolve("autonomous-shopping.db");
+        String parentId,childId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var family=PopulationGenerator.add(town,2);
+            var parent=family.get(0);var child=family.get(1);
+            parentId=parent.id;childId=child.id;
+            for(var c:family){
+                c.alive=true;c.age=30;c.health=100;c.hunger=20;c.thirst=20;c.fatigue=20;
+                c.food=4;c.water=4;c.unpaidBills=0;c.money=150;c.carefulness=60;
+                c.home=TownLife.Place.NORTH_RESIDENCES;c.homeUnit=parent.homeUnit;
+                c.place=c.home;c.destination=c.home;c.travelRemaining=0;c.activity="FREE_TIME";
+            }
+            child.age=6;
+            DemographyLife.set(town,child,"parent-a",parent.generationIndex);
+            DemographyLife.set(town,child,"born",10);
+            RetailLife.ensure(town);
+            state.day=370;state.minute=960;
+            assertTrue(LeisureShoppingLife.wantsShop(town,parent,state));
+            assertFalse(LeisureShoppingLife.purchase(town,parent,state));
+            parent.place=TownLife.Place.PORTICI;parent.destination=parent.place;
+            int shop=town.employerFunds.getOrDefault("shop-assistant",0);
+            int stock=town.retailStock.get("teddy-bear");
+            parent.unpaidBills=1;
+            assertFalse(LeisureShoppingLife.purchase(town,parent,state));
+            parent.unpaidBills=0;parent.money=115;
+            assertFalse(LeisureShoppingLife.purchase(town,parent,state));
+            parent.money=150;
+            assertTrue(LeisureShoppingLife.purchase(town,parent,state));
+            assertEquals(138,parent.money);
+            assertEquals(shop+12,town.employerFunds.get("shop-assistant"));
+            assertEquals(stock-1,town.retailStock.get("teddy-bear"));
+            assertFalse(LeisureShoppingLife.purchase(town,parent,state));
+            assertTrue(LeisureShoppingLife.carryingBag(town,parent,370,970));
+            assertFalse(LeisureShoppingLife.carryingBag(town,parent,370,990));
+            parent.place=parent.home;parent.destination=parent.home;
+            state.day=374;state.minute=1200;
+            LeisureShoppingLife.home(town,parent,state);
+            assertEquals(1,town.industryStocks.get("gift:resident:"+parentId+":teddy-bear"));
+            state.day=375;child.travelRemaining=1;
+            LeisureShoppingLife.home(town,parent,state);
+            assertEquals(1,town.industryStocks.get("gift:resident:"+parentId+":teddy-bear"));
+            child.travelRemaining=0;
+            LeisureShoppingLife.home(town,parent,state);
+            LeisureShoppingLife.home(town,parent,state);
+            assertEquals(0,town.industryStocks.get("gift:resident:"+parentId+":teddy-bear"));
+            assertEquals(1,town.industryStocks.get("gift:resident:"+childId+":teddy-bear"));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            assertEquals(138,town.get(parentId).money);
+            assertEquals(1,town.industryStocks.get("gift:resident:"+childId+":teddy-bear"));
+        }
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";
