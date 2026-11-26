@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Character menu (I)
+
+Press I or click My character to open a separate, scrollable four-tab menu: Overview (identity, location, occupation, money and wellbeing), Inventory, People and Controls. All wellbeing bars mean full is good; urgent needs have explicit labels and suggested actions. Java now exposes the actual linked resident's needs, instead of displaying the inactive visitor shell. Existing F life choices and local service menus are preserved, and detailed HUD actions and settings are collapsed by default. The menu pauses local movement and time advancement until closed with I, Escape or Close; it is unavailable during travel, driving, a pending request or another interaction. Linked-life household supplies remain in F, ordinary visitor People lists disclosed address contacts, and the new-life choice screen remains separate. English and Italian labels are included. Tests cover tab content and bar direction; actual layout and keyboard behavior still require desktop verification.
