@@ -127,6 +127,12 @@ var _town_audio: Node3D
 var _hands: Node3D
 var _held_label: Label
 var _phone: PanelContainer
+var _intercom: PanelContainer
+var _intercom_title: Label
+var _intercom_reply: Label
+var _intercom_contacts: OptionButton
+var _intercom_code := 0
+var _intercom_pending := false
 var _phone_alert: Label
 var _phone_alert_remaining := 0.0
 var _api
@@ -235,7 +241,7 @@ func _process(delta: float) -> void:
     var direction := Vector3.ZERO
     var moved := 0.0
     # Do not move away from an open clickable interaction menu.
-    if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible:
+    if _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
             direction.z -= 1.0
         if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -307,6 +313,8 @@ func _process(delta: float) -> void:
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
+    elif _near_intercom()>0:
+        _hint.text = tr("E: ring the intercom")
     elif _near_truck():
         _hint.text = "F: assigned freight truck."
     elif _near_car():
@@ -343,10 +351,15 @@ func _unhandled_input(event: InputEvent) -> void:
         _follow_player()
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # UI consumes its own clicks before they reach this handler.
-        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible:
+        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and _intercom.visible:
+        if event.keycode in [KEY_E,KEY_ESCAPE]:
+            _close_intercom()
+        get_viewport().set_input_as_handled()
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         if event.keycode==KEY_H:
             _toggle_phone()
@@ -473,7 +486,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
             _toggle_transport()
             get_viewport().set_input_as_handled()
         elif event.keycode == KEY_E and not _map_panel.visible:
-            if _near_gate():
+            if _near_intercom()>0 and _foot_controls_available():
+                _open_intercom()
+            elif _near_gate():
                 _toggle_travel()
             else:
                 _message.text=tr("Find the yellow TRAVEL gate. Follow the distance and direction in First steps.")
@@ -867,7 +882,7 @@ func _foot_controls_available() -> bool:
         and (not _rebirth_active() or _child_can_walk()) \
         and _road_pending.is_empty() and not _home_transition \
         and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
-        and not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible)
+        and not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible or _intercom.visible)
 
 func _crouch_requested() -> bool:
     return Input.is_key_pressed(KEY_CTRL) and _jump_elapsed < 0.0
@@ -2023,6 +2038,14 @@ func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: 
         var pos := Vector3(at.x-1.15,1.05+0.20*float(n),face+0.13)
         _box(mailbox,Vector3(0.35,0.18,0.16),Color("#647078"),pos)
         _box(mailbox,Vector3(0.24,0.025,0.01),Color("#252e31"),pos+Vector3(0,0.035,0.086))
+    var bell := Node3D.new()
+    bell.name="Intercom"
+    bell.position=Vector3(at.x+1.2,1.35,face+0.17)
+    building.add_child(bell)
+    _box(bell,Vector3(0.22,0.36,0.08),Color("#8b969a"),Vector3.ZERO)
+    for n in range(3):
+        _box(bell,Vector3(0.13,0.018,0.012),Color("#343b40"),Vector3(0,0.12-float(n)*0.035,0.045))
+    _box(bell,Vector3(0.065,0.065,0.018),Color("#d6c6a0"),Vector3(0,-0.095,0.05))
     if id=="CasaMagnolia":
         var entrance := Marker3D.new()
         entrance.name="HomeApproach"
@@ -3779,6 +3802,24 @@ func _create_interface() -> void:
     _phone_alert.add_theme_constant_override("shadow_offset_y",2)
     _phone_alert.hide()
     canvas.add_child(_phone_alert)
+    _intercom = PanelContainer.new()
+    _intercom.position = Vector2(480,15)
+    _intercom.custom_minimum_size = Vector2(350,0)
+    canvas.add_child(_intercom)
+    var intercom_col := VBoxContainer.new()
+    _intercom.add_child(intercom_col)
+    _intercom_title = Label.new()
+    intercom_col.add_child(_intercom_title)
+    _intercom_contacts = OptionButton.new()
+    intercom_col.add_child(_intercom_contacts)
+    _intercom_reply = Label.new()
+    _intercom_reply.custom_minimum_size = Vector2(340,0)
+    _intercom_reply.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    intercom_col.add_child(_intercom_reply)
+    intercom_col.add_child(_button("Ring bell",_intercom_action.bind("ring")))
+    intercom_col.add_child(_button("Chat at entrance",_intercom_action.bind("visit")))
+    intercom_col.add_child(_button("Leave entrance",_close_intercom))
+    _intercom.hide()
 
 func _on_language_selected(index: int) -> void:
     GameLanguage.select_locale("it" if index==1 else "en")
@@ -5448,6 +5489,44 @@ func _refresh() -> void:
     if not _api.is_busy():
         _api.refresh_world()
 
+func _near_intercom() -> int:
+    if _rebirth_active() or _drive_active() or _cycling() or _apartment_active:
+        return 0
+    var paths := {1:"ViaDelleMagnolie/CasaMagnolia/Intercom",2:"ViaDelleMagnolie/CasaTiglio/Intercom",3:"CasaOlmo/Intercom"}
+    for code in paths:
+        var bell := _scenery.get_node_or_null(paths[code]) as Node3D
+        if bell!=null and _avatar.position.distance_to(bell.global_position-Vector3(0,bell.global_position.y,0))<1.8:
+            return code
+    return 0
+
+func _open_intercom() -> void:
+    _intercom_code = _near_intercom()
+    if _intercom_code==0:return
+    var address := str({1:"Via delle Magnolie 12",2:"Via delle Magnolie 14",3:"Via del Glicine 8"}[_intercom_code])
+    _intercom_title.text = address
+    _intercom_contacts.clear()
+    for contact in _last_snapshot.get("contacts",[]):
+        if str(contact.get("address",""))==address:
+            _intercom_contacts.add_item(str(contact.get("name","")))
+            _intercom_contacts.set_item_metadata(_intercom_contacts.item_count-1,str(contact.get("residentId","")))
+    _intercom_reply.text = tr("Choose a contact who shared this address.") if _intercom_contacts.item_count>0 else tr("You do not know anyone at this address.")
+    _intercom.show()
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _close_intercom() -> void:
+    _intercom.hide()
+    _intercom_code = 0
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _intercom_action(action: String) -> void:
+    if not _intercom.visible or _intercom_code==0 or _near_intercom()!=_intercom_code or not _connected or _api.is_busy() or _intercom_contacts.selected<0:
+        return
+    _intercom_pending = true
+    if action=="ring":
+        _town_audio.play_alarm()
+        _hands.reach()
+    _api.garden_action("intercom:%s:%s:%s" % [action,_intercom_code,_intercom_contacts.get_item_metadata(_intercom_contacts.selected)])
+
 func _phone_allowed() -> bool:
     if _drive_active() or _cycling() or _jump_elapsed>=0.0 or not _road_pending.is_empty() or _home_transition:
         return false
@@ -5461,7 +5540,7 @@ func _toggle_phone() -> void:
     if _phone.visible:
         _close_phone()
         return
-    if not _phone_allowed():return
+    if not _phone_allowed() or _intercom.visible:return
     _close_dialog()
     _travel_panel.hide()
     _map_panel.hide()
@@ -5515,7 +5594,7 @@ func _tick_live_clock(delta: float) -> void:
         return
     var eligible: bool = _connected and not _api.is_busy() and not _clock_pending \
             and _road_pending.is_empty() and not _travel_panel.visible \
-            and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible
+            and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _intercom.visible
     if _clock.advance(delta, eligible):
         _clock_pending = true
         # The existing atomic Java action advances needs, NPCs and SQLite.
@@ -5714,6 +5793,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _apply_weather()
     _render_actions()
     _phone.update_data(snapshot,_job_offers,_locations)
+    if _intercom.visible and _near_intercom()!=_intercom_code:
+        _close_intercom()
     if _phone.visible and not _phone_allowed():
         _close_phone()
     if _rebirth_active():
@@ -5937,6 +6018,10 @@ func _on_work_orders_updated(orders: Array) -> void:
         _render_actions()
 
 func _on_action_feedback(message: String) -> void:
+    if _intercom_pending:
+        _intercom_pending = false
+        if _intercom.visible:
+            _intercom_reply.text = tr(message)
     if _dialog_pending:
         _dialog_pending = false
         if _dialog_panel.visible:
@@ -5974,6 +6059,10 @@ func _set_request_busy(busy: bool) -> void:
         _update_bag()
 
 func _on_request_failed(message: String) -> void:
+    if _intercom_pending:
+        _intercom_pending = false
+        if _intercom.visible:
+            _intercom_reply.text = tr(message)
     _home_transition=false
     if _drive_pending:
         _end_driving(true)

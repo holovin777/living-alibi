@@ -37,6 +37,9 @@ final class AddressLife {
         t.industryStocks.put(key(t,c.id),code);
         return "I live at "+label(code)+".";
     }
+    static int sharedBuilding(TownLife.Town t,String residentId){
+        return t.industryStocks.getOrDefault(key(t,residentId),0);
+    }
     static List<Entry> contacts(TownLife.Town t){
         var result=new ArrayList<Entry>();
         for(var contact:t.player.contacts.values()){

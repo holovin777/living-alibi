@@ -945,7 +945,7 @@ final class WorldDatabase implements AutoCloseable {
         try(Statement st=db.createStatement();
                 ResultSet rs=st.executeQuery("SELECT stock_id,quantity FROM industry_stocks")) {
             while(rs.next()) {
-                if(town.industryStocks.containsKey(rs.getString(1)) || rs.getString(1).startsWith("social-memory:") || rs.getString(1).startsWith("peer-aid:") || rs.getString(1).startsWith("personal-loan:") || rs.getString(1).startsWith("phone:") || rs.getString(1).startsWith("introduction:") || rs.getString(1).startsWith("address:") || rs.getString(1).startsWith("family-budget:") || rs.getString(1).startsWith("home-market:") || rs.getString(1).startsWith("dojo-community:") || rs.getString(1).equals("population:seed-target"))
+                if(town.industryStocks.containsKey(rs.getString(1)) || rs.getString(1).startsWith("social-memory:") || rs.getString(1).startsWith("peer-aid:") || rs.getString(1).startsWith("personal-loan:") || rs.getString(1).startsWith("phone:") || rs.getString(1).startsWith("introduction:") || rs.getString(1).startsWith("address:") || rs.getString(1).startsWith("intercom:") || rs.getString(1).startsWith("family-budget:") || rs.getString(1).startsWith("home-market:") || rs.getString(1).startsWith("dojo-community:") || rs.getString(1).equals("population:seed-target"))
                     town.industryStocks.put(rs.getString(1),Math.max(0,rs.getInt(2)));
             }
         }
