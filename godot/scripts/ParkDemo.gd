@@ -3225,6 +3225,7 @@ func _render_residents() -> void:
         var person := _residents_root.get_node_or_null("Resident_" + id) as Node3D
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
+            person.set_meta("new_public_model",true)
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
         person.set_meta("mood",str(resident.get("mood","CALM")))
         var age := int(resident.get("age",30))
@@ -3253,6 +3254,8 @@ func _render_residents() -> void:
 
     _assign_resident_seats()
     _assign_playground_stations()
+    for person in _residents_root.get_children():
+        if person.has_meta("new_public_model"):person.remove_meta("new_public_model")
     _assign_work_stations()
     _sync_office_joker()
 
@@ -3602,6 +3605,8 @@ func _assign_playground_stations() -> void:
             if not person.has_meta("outing_anchor"):
                 person.set_meta("outing_anchor",person.get_meta("anchor",person.position))
             person.set_meta("anchor",target)
+            if bool(person.get_meta("new_public_model",false)):
+                person.position=target
         elif person.has_meta("outing_anchor"):
             person.set_meta("anchor",person.get_meta("outing_anchor"))
             person.remove_meta("outing_anchor")
