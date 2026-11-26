@@ -3631,6 +3631,33 @@ func _render_residents() -> void:
     _assign_work_stations()
     _assign_market_queues()
     _sync_office_joker()
+    _sync_hosted_guest()
+
+func _sync_hosted_guest() -> void:
+    var active_id := ""
+    var phone_data = _last_snapshot.get("phone")
+    if _current_place=="SOUTH_RESIDENCES" and _owns_house() and phone_data is Dictionary:
+        for meeting in phone_data.get("meetings",[]):
+            if bool(meeting.get("guestPresent",false)):
+                active_id=str(meeting.get("residentId",""))
+                break
+    for person in _residents_root.get_children():
+        var visiting: bool = str(person.get_meta("resident_id",""))==active_id
+        var was_visiting: bool = bool(person.get_meta("hosted_guest",false))
+        if visiting and not was_visiting:
+            person.set_meta("original_anchor",person.get_meta("anchor",person.position))
+            var at := _open_anchor(Vector3(-6.5,0,8.5))
+            person.set_meta("anchor",at)
+            person.position=at
+        elif was_visiting and not visiting:
+            var at: Vector3 = person.get_meta("original_anchor",Vector3.ZERO)
+            person.set_meta("anchor",at)
+            person.position=_open_anchor(at)
+        person.set_meta("hosted_guest",visiting)
+        if visiting:
+            person.set_meta("seat_index",-1)
+            person.set_meta("activity","SOCIALIZING")
+            person.set_meta("walking_companion","")
 
 # Presentation follows the server's current visible work equipment, never a guessed identity.
 func _sync_work_prop(person: Node3D, kind: String) -> void:
@@ -6674,7 +6701,7 @@ func _render_actions() -> void:
                 var phone_data = _last_snapshot.get("phone")
                 if _owns_house() and phone_data is Dictionary:
                     for meeting in phone_data.get("meetings",[]):
-                        if meeting.get("place","")=="PLAYER_HOME" and meeting.get("status","")=="MET" and int(meeting.get("day",0))==int(_last_snapshot.get("day",1)) and int(_last_snapshot.get("minute",0))<1145:
+                        if bool(meeting.get("guestPresent",false)) and not bool(meeting.get("mealServed",false)) and int(_last_snapshot.get("minute",0))<1145:
                             _action_choices.add_child(_button(tr("Cook pasta together · 25m"),_garden_action.bind("host-cook:"+str(meeting.get("residentId","")))))
                 var bag: Dictionary = player.get("bag",{"bread":player.get("bread",0),"water":player.get("bottledWater",0)})
                 var pantry: Dictionary = player.get("pantry",{"bread":player.get("storedBread",0),"water":player.get("storedWater",0)})
