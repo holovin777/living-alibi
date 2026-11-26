@@ -547,6 +547,24 @@ func _exercise() -> void:
             "car yields to pedestrian ahead and has a collision footprint"):
         return
     world._avatar.position = Vector3.ZERO
+    # Traffic is continuous at the former despawn point.
+    inbound["distance"]=33.99
+    inbound["delay"]=0.0
+    world._position_traffic_edge(traffic,"WORKSHOP")
+    var previous_car_pos: Vector3=inbound_car.position
+    world._advance_traffic(0.1)
+    if not _check(bool(inbound.get("turning",false)) and inbound_car.visible
+            and inbound_car.position.distance_to(previous_car_pos)<0.2,
+            "vehicle remains visible and starts a physical turnaround"):
+        return
+    inbound["turn_progress"]=0.99
+    world._position_traffic_edge(traffic,"WORKSHOP")
+    var turn_end: Vector3=inbound_car.position
+    world._advance_traffic(0.1)
+    if not _check(bool(inbound.get("reversed",false)) and inbound_car.visible
+            and inbound_car.position.distance_to(turn_end)<0.3,
+            "turn ends without teleporting to original spawn"):
+        return
     var garage_entry: Vector3 = world._move_on_ground(Vector3(7.5,0,5),Vector3(0,0,7),world.WALKER_RADIUS)
     if not _check(garage_entry.z > 11.9
             and not world._can_stand(Vector3(10,0,12),world.WALKER_RADIUS)
@@ -912,6 +930,14 @@ func _exercise() -> void:
             and world._residents_root.get_child(0).name == "Resident_marco",
             "only actually co-present residents appear in the park"):
         return
+    if not _check(not world._hud_details.visible and world._compact_status.visible,
+            "compact gameplay HUD is the default"):
+        return
+    world._set_details_open(true)
+    if not _check(world._hud_details.visible and world._hud_details.get_tab_count()==3,
+            "I menu separates character, settings and work"):
+        return
+    world._set_details_open(false)
     var marco = world._residents_root.get_node("Resident_marco")
     var appearance: Dictionary = marco.get_meta("appearance")
     var elena = world._residents_root.get_node("Resident_elena")

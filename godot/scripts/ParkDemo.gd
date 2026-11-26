@@ -187,6 +187,10 @@ var _transport_button: Button
 var _parking_button: Button
 var _car_label: Label
 var _main_panel: PanelContainer
+var _hud_details: TabContainer
+var _compact_status: Label
+var _compact_keys: Label
+var _details_open := false
 var _drive_hud: Label
 var _cockpit: Node3D
 var _steering_wheel: Node3D
@@ -264,7 +268,7 @@ func _process(delta: float) -> void:
     var direction := Vector3.ZERO
     var moved := 0.0
     # Do not move away from an open clickable interaction menu.
-    if not _guest_sitting and not _guest_pending and _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
+    if not _details_open and not _guest_sitting and not _guest_pending and _road_pending.is_empty() and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
         if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
             direction.z -= 1.0
         if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -400,7 +404,7 @@ func _process(delta: float) -> void:
     elif _near_kiosk():
         _hint.text = tr("F: local interactions. Esc: cursor.")
     elif not _nearest_resident().is_empty():
-        _hint.text = "T: talk to nearby resident · Esc: cursor."
+        _hint.text = _nearby_resident_hint()
     else:
         _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
 
@@ -415,10 +419,16 @@ func _unhandled_input(event: InputEvent) -> void:
         _follow_player()
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # UI consumes its own clicks before they reach this handler.
-        if not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
+        if not _details_open and not _travel_panel.visible and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _phone.visible and not _intercom.visible:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and not _drive_active() and not _stairwell_active:
+        if event.keycode==KEY_I or (_details_open and event.keycode==KEY_ESCAPE):
+            _set_details_open(not _details_open)
+            get_viewport().set_input_as_handled()
+            return
+        if _details_open:return
     if event is InputEventKey and event.pressed and not event.echo:
         if _guest_active:
             if event.keycode==KEY_G and not _guest_sitting and _guest.near_exit(_avatar.position):
@@ -1015,7 +1025,7 @@ func _foot_controls_available() -> bool:
         and (not _rebirth_active() or _child_can_walk()) \
         and _road_pending.is_empty() and not _home_transition \
         and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
-        and not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible or _intercom.visible)
+        and not _details_open and not (_travel_panel.visible or _action_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible or _intercom.visible)
 
 func _crouch_requested() -> bool:
     return Input.is_key_pressed(KEY_CTRL) and _jump_elapsed < 0.0
@@ -1522,7 +1532,7 @@ func _sync_traffic_edges(origin_id: String) -> void:
                     var palette_index := absi((key+str(i)).hash())%colors.size()
                     var car := _make_city_car(_traffic_root,colors[palette_index],palette_index%2)
                     car.visible = false
-                    cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0})
+                    cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0,"reversed":false,"turning":false,"turn_progress":0.0})
                 _traffic_edges[key] = {"first":str(first),"second":str(second),"cars":cars}
     for key in _traffic_edges.keys():
         if not wanted.has(key):
@@ -1534,18 +1544,30 @@ func _sync_traffic_edges(origin_id: String) -> void:
     for edge in _traffic_edges.values():
         _position_traffic_edge(edge,origin_id)
 
+# Local traffic follows a continuous two-lane loop on each loaded motor link.
+# The turn is an actual semicircle rather than a disappearance/reappearance.
+func _traffic_forward(i: int,record: Dictionary) -> bool:
+    return (i==0)!=bool(record.get("reversed",false))
+
 func _position_traffic_edge(edge: Dictionary,origin_id: String) -> void:
     var origin := TownLayout.world_center(origin_id)
     var first := TownLayout.world_center(edge["first"])-origin
     var second := TownLayout.world_center(edge["second"])-origin
     for i in range(2):
         var record: Dictionary = edge["cars"][i]
-        var start := first if i==0 else second
-        var direction := (second-first).normalized() if i==0 else (first-second).normalized()
+        var forward := _traffic_forward(i,record)
+        var start := first if forward else second
+        var direction := (second-first).normalized() if forward else (first-second).normalized()
         var right := Vector3(-direction.z,0,direction.x)
         var car: Node3D = record["node"]
-        car.position = start+direction*float(record["distance"])+right*1.6
-        car.rotation.y = atan2(-direction.x,-direction.z)
+        if bool(record.get("turning",false)):
+            var angle := float(record.get("turn_progress",0.0))*PI
+            car.position=start+direction*(34.0+1.6*sin(angle))+right*1.6*cos(angle)
+            var tangent := direction*cos(angle)-right*sin(angle)
+            car.rotation.y=atan2(-tangent.x,-tangent.z)
+        else:
+            car.position = start+direction*float(record["distance"])+right*1.6
+            car.rotation.y = atan2(-direction.x,-direction.z)
 
 func _car_footprint(car: Node3D) -> Rect2:
     var dimensions := Vector2(1.88,3.62) if absf(cos(car.rotation.y))>0.5 else Vector2(3.62,1.88)
@@ -1573,17 +1595,19 @@ func _advance_traffic(delta: float) -> void:
         for i in range(2):
             var record: Dictionary = edge["cars"][i]
             var car: Node3D = record["node"]
-            var start := first if i==0 else second
-            var direction := (second-first).normalized() if i==0 else (first-second).normalized()
+            var forward := _traffic_forward(i,record)
+            var start := first if forward else second
+            var direction := (second-first).normalized() if forward else (first-second).normalized()
             var right := Vector3(-direction.z,0,direction.x)
             var distance := float(record["distance"])
             var blocked := false
             # Yield to pedestrians anywhere immediately ahead, including
             # a pedestrian already on either crossing.
             for person in people:
-                var relative := person-(start+direction*distance+right*1.6)
-                var ahead := relative.dot(direction)
-                if ahead>=-2.2 and ahead<=4.3 and absf(relative.dot(right))<1.45:
+                var relative := person-car.position
+                var heading := -car.basis.z.normalized()
+                var ahead := relative.dot(heading)
+                if ahead>=-2.2 and ahead<=4.3 and absf(relative.dot(car.basis.x.normalized()))<1.45:
                     blocked = true
                     break
             if float(record["delay"])>0.0:
@@ -1595,16 +1619,35 @@ func _advance_traffic(delta: float) -> void:
             car.visible = true
             if blocked:
                 continue
+            # Avoid following another car too closely, including during turns.
+            var traffic_blocked := false
+            for other_record in edge["cars"]:
+                var other: Node3D=other_record["node"]
+                if other==car or not other.visible:continue
+                var offset := other.position-car.position
+                var ahead := offset.dot(-car.basis.z.normalized())
+                if ahead>0.0 and ahead<4.5 and absf(offset.dot(car.basis.x.normalized()))<1.8:
+                    traffic_blocked=true
+                    break
+            if traffic_blocked:continue
+            if bool(record.get("turning",false)):
+                var progress := minf(1.0,float(record.get("turn_progress",0.0))+dt*0.42)
+                record["turn_progress"]=progress
+                if progress>=1.0:
+                    record["turning"]=false
+                    record["reversed"]=not bool(record.get("reversed",false))
+                    record["distance"]=TownLayout.TILE_SPACING-34.0
+                continue
             var next := distance+dt*(2.0 if phase==-1 else 4.0)
             if phase in [0,1]:
                 for stop in [15.0,27.0]:
                     if distance<=stop and next>stop:
                         next = stop
                         break
-            if next>=33.8:
-                record["distance"] = 14.2
-                record["delay"] = 4.0
-                car.visible = false
+            if next>=34.0:
+                record["distance"]=34.0
+                record["turning"]=true
+                record["turn_progress"]=0.0
             else:
                 record["distance"] = next
         _position_traffic_edge(edge,_current_place)
@@ -4571,6 +4614,34 @@ func _tick_walking_companions() -> void:
         follower.set_meta("companion_target",alongside)
         follower.set_meta("companion_wait",follower.position.distance_to(alongside)<0.10)
 
+# Choose reachable short public walks, not a tiny circle around the spawn.
+func _resident_walk_target(person: Node3D,delta: float) -> Vector3:
+    var origin := person.position
+    var remaining := float(person.get_meta("walk_target_time",0.0))-delta
+    var goal: Vector3=person.get_meta("walk_target",origin)
+    if remaining>0.0 and origin.distance_to(goal)>0.25:
+        person.set_meta("walk_target_time",remaining)
+        return goal
+    var serial := int(person.get_meta("walk_serial",0))+1
+    person.set_meta("walk_serial",serial)
+    var seed := absi(str(person.get_meta("resident_id","")).hash())
+    for attempt in range(12):
+        var angle := float(posmod(seed+serial*5+attempt*7,24))*TAU/24.0
+        var length := 3.0+float(posmod(seed+serial+attempt,5))
+        var candidate := origin+Vector3(cos(angle),0,sin(angle))*length
+        var clear := true
+        for step in range(1,9):
+            if not _can_stand(origin.lerp(candidate,float(step)/8.0),WALKER_RADIUS):
+                clear=false
+                break
+        if clear and _resident_spawn_clear(candidate):
+            person.set_meta("walk_target",candidate)
+            person.set_meta("walk_target_time",8.0)
+            return candidate
+    person.set_meta("walk_target_time",0.8)
+    person.set_meta("walk_target",origin)
+    return origin
+
 func _animate_residents(delta: float) -> void:
     if _residents_root == null:
         return
@@ -4616,8 +4687,7 @@ func _animate_residents(delta: float) -> void:
         if walking:
             phase += delta * 0.65 * pace
             person.set_meta("phase", phase)
-            var anchor: Vector3 = person.get_meta("anchor")
-            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (person.get_meta("companion_target") if companion else (queue_target if queued else anchor + Vector3(sin(phase)*1.1,0,cos(phase)*0.8)))
+            var target: Vector3 = person.get_meta("peer_target") if peer_approach else (person.get_meta("companion_target") if companion else (queue_target if queued else _resident_walk_target(person,delta)))
             var motion := target-person.position
             if motion.length_squared() > 0.0001:
                 person.rotation.y = atan2(-motion.x,-motion.z)
@@ -4625,6 +4695,8 @@ func _animate_residents(delta: float) -> void:
             var old := person.position
             person.position = _move_among_people(old,next-old,WALKER_RADIUS,person)
             walked=person.position.distance_to(old)
+            if not peer_approach and not companion and not queued and walked<0.001:
+                person.set_meta("walk_target_time",0.0)
             if walked>0.001:
                 var actual := person.position-old
                 person.rotation.y=atan2(-actual.x,-actual.z)
@@ -4853,8 +4925,28 @@ func _create_interface() -> void:
     panel.position = Vector2(15.0, 15.0)
     panel.custom_minimum_size = Vector2(435.0, 0.0)
     canvas.add_child(panel)
+    var root_column := VBoxContainer.new()
+    panel.add_child(root_column)
+    _compact_status=Label.new()
+    _compact_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _compact_status.custom_minimum_size=Vector2(280,0)
+    _compact_status.text=tr("Connecting to the local Java world...")
+    root_column.add_child(_compact_status)
+    _compact_keys=Label.new()
+    _compact_keys.text=tr("I: character / settings · M: map · H: phone")
+    root_column.add_child(_compact_keys)
+    _hud_details=TabContainer.new()
+    _hud_details.custom_minimum_size=Vector2(440,0)
+    root_column.add_child(_hud_details)
     var column := VBoxContainer.new()
-    panel.add_child(column)
+    column.name="Character"
+    _hud_details.add_child(column)
+    var settings := VBoxContainer.new()
+    settings.name="Settings"
+    _hud_details.add_child(settings)
+    var work := VBoxContainer.new()
+    work.name="Work"
+    _hud_details.add_child(work)
 
     _heading = Label.new()
     _heading.text = "Living Alibi | public park"
@@ -4866,12 +4958,12 @@ func _create_interface() -> void:
     guide_toggle.text = "First steps / navigation"
     guide_toggle.button_pressed = true
     guide_toggle.toggled.connect(_set_guide_enabled)
-    column.add_child(guide_toggle)
+    settings.add_child(guide_toggle)
     _guide_label=Label.new()
     _guide_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _guide_label.custom_minimum_size=Vector2(420,0)
     _guide_label.text=tr("First steps: connecting to the world...")
-    column.add_child(_guide_label)
+    settings.add_child(_guide_label)
     _weather = Label.new()
     _weather.text = "Connecting to the local Java world..."
     column.add_child(_weather)
@@ -4904,10 +4996,12 @@ func _create_interface() -> void:
     _message.text = "No forced mission. Find your own direction."
     _message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _message.custom_minimum_size = Vector2(420.0, 0.0)
-    column.add_child(_message)
+    _message.custom_minimum_size=Vector2(280,0)
+    _message.max_lines_visible=2
+    root_column.add_child(_message)
 
     var buttons := HBoxContainer.new()
-    column.add_child(buttons)
+    work.add_child(buttons)
     buttons.add_child(_button("Refresh", _refresh))
     buttons.add_child(_button("Jobs", _find_jobs))
     buttons.add_child(_button("Industry", _view_industry))
@@ -4928,9 +5022,9 @@ func _create_interface() -> void:
     _language_selector.add_item("Italiano",1)
     _language_selector.select(1 if TranslationServer.get_locale()=="it" else 0)
     _language_selector.item_selected.connect(_on_language_selected)
-    column.add_child(_language_selector)
+    settings.add_child(_language_selector)
     var clock_row := HBoxContainer.new()
-    column.add_child(clock_row)
+    settings.add_child(clock_row)
     var clock_label := Label.new()
     clock_label.text = "World time:"
     clock_row.add_child(clock_label)
@@ -4942,7 +5036,7 @@ func _create_interface() -> void:
     _clock_selector.item_selected.connect(_on_clock_speed_selected)
     clock_row.add_child(_clock_selector)
     var graphics_row := HBoxContainer.new()
-    column.add_child(graphics_row)
+    settings.add_child(graphics_row)
     var graphics_label := Label.new()
     graphics_label.text = "Graphics quality"
     graphics_row.add_child(graphics_label)
@@ -4953,7 +5047,7 @@ func _create_interface() -> void:
     quality.item_selected.connect(_set_graphics_quality)
     graphics_row.add_child(quality)
     var atmosphere_row := HBoxContainer.new()
-    column.add_child(atmosphere_row)
+    settings.add_child(atmosphere_row)
     var effects_toggle := CheckButton.new()
     effects_toggle.text = "Weather FX"
     effects_toggle.button_pressed = true
@@ -4968,17 +5062,17 @@ func _create_interface() -> void:
     sound_toggle.text = "Town sound"
     sound_toggle.button_pressed = true
     sound_toggle.toggled.connect(_set_town_audio)
-    column.add_child(sound_toggle)
+    settings.add_child(sound_toggle)
     var head_bob_toggle := CheckButton.new()
     head_bob_toggle.text = tr("Camera motion")
     head_bob_toggle.button_pressed = _head_bob_enabled
     head_bob_toggle.toggled.connect(_set_head_bob)
-    column.add_child(head_bob_toggle)
+    settings.add_child(head_bob_toggle)
     var hands_toggle := CheckButton.new()
     hands_toggle.text = "First-person hands"
     hands_toggle.button_pressed = true
     hands_toggle.toggled.connect(_set_hands_enabled)
-    column.add_child(hands_toggle)
+    settings.add_child(hands_toggle)
     _held_label = Label.new()
     column.add_child(_held_label)
     column.add_child(_button("Open phone (H)",_toggle_phone))
@@ -4986,11 +5080,17 @@ func _create_interface() -> void:
     _hint = Label.new()
     _hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _hint.text = tr("WASD: walk · Shift: run · Ctrl: crouch · Space: jump · Esc: cursor.")
-    column.add_child(_hint)
+    _hint.custom_minimum_size=Vector2(280,0)
+    root_column.add_child(_hint)
     _jobs = Label.new()
     _jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _jobs.text = ""
-    column.add_child(_jobs)
+    work.add_child(_jobs)
+    _hud_details.hide()
+    panel.custom_minimum_size=Vector2(0,0)
+    _hud_details.set_tab_title(0,tr("Character"))
+    _hud_details.set_tab_title(1,tr("Settings"))
+    _hud_details.set_tab_title(2,tr("Work"))
 
     _map_panel = PanelContainer.new()
     _map_panel.position = Vector2(15, 15)
@@ -5142,7 +5242,24 @@ func _on_language_selected(index: int) -> void:
     if _software_menu:
         _render_actions()
 
+func _set_details_open(open: bool) -> void:
+    _details_open=open
+    _hud_details.visible=open
+    if open:
+        _travel_panel.hide()
+        _action_panel.hide()
+        _map_panel.hide()
+        _close_dialog()
+        if _phone.visible:_close_phone()
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if open else Input.MOUSE_MODE_CAPTURED)
+    _main_panel.reset_size()
+
 func _refresh_localized_hud() -> void:
+    if is_instance_valid(_hud_details):
+        _hud_details.set_tab_title(0,tr("Character"))
+        _hud_details.set_tab_title(1,tr("Settings"))
+        _hud_details.set_tab_title(2,tr("Work"))
+        _compact_keys.text=tr("I: character / settings · M: map · H: phone")
     if _last_snapshot.is_empty():return
     _render_hud_summary(_last_snapshot)
 
@@ -5175,6 +5292,22 @@ func _nearest_resident() -> String:
             best = distance
             nearest = str(person.get_meta("resident_id",""))
     return nearest
+
+func _nearby_resident_hint() -> String:
+    var id := _nearest_resident()
+    var person := _residents_root.get_node_or_null("Resident_"+id) as Node3D
+    if person==null:return ""
+    var activity := str(person.get_meta("activity",""))
+    var observed := tr("Nearby person")
+    match activity:
+        "WORKING":observed=tr("Appears to be working")
+        "SHOPPING":observed=tr("Shopping")
+        "RESTING","RELAXING":observed=tr("Resting")
+        "FREE_TIME","WANDERING","WALKING","STROLLING":observed=tr("Spending free time")
+        "STUDYING":observed=tr("Studying")
+        "JOB_SEARCH":observed=tr("Looking for work")
+    if person.has_meta("peer_face"):observed=tr("Talking to someone")
+    return tr("T: talk")+" · "+observed
 
 func _resident_caption(person: Node3D) -> String:
     var label := str(person.get_meta("display_name","Unknown resident"))
@@ -6934,7 +7067,7 @@ func _tick_live_clock(delta: float) -> void:
     if _api == null:
         return
     var eligible: bool = _connected and not _api.is_busy() and not _clock_pending \
-            and _road_pending.is_empty() and not _travel_panel.visible \
+            and not _details_open and _road_pending.is_empty() and not _travel_panel.visible \
             and not _action_panel.visible and not _map_panel.visible and not _dialog_panel.visible and not _intercom.visible
     if _clock.advance(delta, eligible):
         _clock_pending = true
@@ -7314,6 +7447,8 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
     var job = player.get("jobId")
     var profession := tr("unemployed") if job == null else str(job)
     _heading.text = "Living Alibi | " + str(player.get("place", "Park"))
+    var minute := int(snapshot.get("minute",450))
+    _compact_status.text="%s · %02d:%02d · %s €\n%s %s%% · %s %s%% · %s %s%%" % [str(player.get("place","Park")),floori(minute/60.0),minute%60,int(player.get("money",50)),tr("Hunger"),int(player.get("hunger",0)),tr("Thirst"),int(player.get("thirst",0)),tr("Fatigue"),int(player.get("fatigue",0))]
     _status.text = tr("Visitor #%s | %s EUR | %s") % [
         str(player.get("incarnation", 1)), str(player.get("money", 50)), profession
     ]
