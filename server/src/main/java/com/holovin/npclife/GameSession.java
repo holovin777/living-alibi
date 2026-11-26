@@ -74,7 +74,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
                              int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
-                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse) { }
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse,boolean ownsBaton,int policeReports) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -278,7 +278,7 @@ public final class GameSession implements AutoCloseable {
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,controlled?RebirthLife.hygiene(town,linked):p.hygiene,
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
-                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse);
+                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse,CombatLife.ownsBaton(town),CombatLife.reports(town));
         var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
         var companions=walkingCompanions(town,visible,state.minute);
         var residents=visible.stream()
@@ -605,6 +605,18 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if("combat-buy-baton".equals(action)){
+            var copy=town.copy();
+            return apply(copy,2,CombatLife.buyBaton(copy,state));
+        }
+        if(action!=null&&action.startsWith("combat-strike:")){
+            String[] parts=action.split(":",3);
+            if(parts.length!=3)throw new IllegalArgumentException("Choose an attack and resident.");
+            var copy=town.copy();var clock=state.copy();
+            var truth=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
+            var result=CombatLife.strike(copy,clock,parts[2],parts[1],truth,observations);
+            return applyInternal(copy,result.minutes(),result.message(),false,clock,truth,observations);
+        }
         if(action!=null&&action.startsWith("barber-")){
             var copy=town.copy();
             var service=barberVisit(copy,action.substring(7),state.minute);
@@ -876,8 +888,11 @@ public final class GameSession implements AutoCloseable {
         return applyInternal(candidateTown,minutes,message,false);
     }
     private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction) throws SQLException {
+        return applyInternal(candidateTown,minutes,message,rebirthAction,state.copy(),new ArrayList<>(),new ArrayList<>());
+    }
+    private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction,
+            WorldState candidateState,List<TownLife.Event> truth,List<TownLife.Observation> observations) throws SQLException {
         if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Choose a family or use childhood actions first.");
-        var candidateState=state.copy();
         if("You shared dinner.".equals(message)||"You cooked and ate together.".equals(message)){
             var host=candidateTown.get("marco");
             candidateState.food=host.food;candidateState.water=host.water;
@@ -885,8 +900,6 @@ public final class GameSession implements AutoCloseable {
         }
         ArchiveLife.transitions(town,candidateTown,state.day,state.minute);
         var events=new ArrayList<LifeSimulation.LifeEvent>();
-        var truth=new ArrayList<TownLife.Event>();
-        var observations=new ArrayList<TownLife.Observation>();
         var interactions=new ArrayList<SocialLife.Interaction>();
         int initialPhase=RebirthLife.phase(candidateTown);
         int initialMaxDays=RebirthLife.maxWaitDays(candidateTown);
