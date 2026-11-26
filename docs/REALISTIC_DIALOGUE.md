@@ -187,6 +187,26 @@ Godot currently renders up to five other household members in the
 existing apartment scene. This does not create a new family or invent
 relatives if the host lives alone.
 
+## NPC conversation autonomy
+
+In the visitor life, live world time keeps advancing with the dialogue
+panel open (unless explicitly paused or an API request is in flight).
+An NPC can leave when their schedule takes them elsewhere. Working
+residents no longer receive a movement hold during a typed reply.
+A free resident may pause for one simulation minute to reply; no hold
+is applied on the final turn. An on-duty police officer initially has
+up to two accepted turns or four game minutes; other working residents
+have two turns or five minutes, ordinary leisure contacts five turns
+or eight to twelve minutes, close friends eight turns or eighteen minutes.
+Urgent needs reduce the budget to one turn or two minutes. These are
+initial balance values. The server stores the budget per player life
+and resident; reopening the panel does not reset an exhausted budget.
+A new budget is available after fifteen game minutes without an accepted
+turn. Refused requests do not change relationship or conversation memory.
+The UI closes after a farewell, departure, or an elapsed conversation
+window. Explicitly paused time and the existing childhood/linked-life
+time controls are retained; model requests remain serialized.
+
 Manual check:
 ```sh
 ollama pull qwen2.5:3b
