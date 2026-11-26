@@ -456,6 +456,11 @@ public final class GameSession implements AutoCloseable {
                 rendered=reply!=null;
             }
         }
+        if(reply==null&&understood&&java.util.Set.of("can i give you my number","can i give you my phone number","ti posso dare il mio numero","posso darti il mio numero","share phone number").contains(NaturalDialogue.normalize(message))){
+            boolean shared=PhoneLife.shareNumber(copy,resident);
+            reply="it".equals(language)?(shared?"Certo, ti chiamerò ogni tanto.":"Preferisco aspettare di conoscerti meglio."):(shared?"Sure, I'll call you sometime.":"I'd rather get to know you better first.");
+            rendered=language!=null;
+        }
         if(reply==null){
             String previous=prior==null?null:prior.lastHeard;
             boolean recall=ConversationMemory.recallQuestion(message);
@@ -607,6 +612,12 @@ public final class GameSession implements AutoCloseable {
                 default -> IntercomLife.ring(copy,parts[3],building,state.day,state.minute);
             };
             return apply(copy,visit?5:1,reply);
+        }
+        if(action!=null&&action.startsWith("phone-call:")){
+            String[] parts=action.split(":",3);
+            if(parts.length!=3||!java.util.Set.of("answer","decline","accept").contains(parts[1]))throw new IllegalArgumentException("Choose a call action.");
+            var copy=town.copy();
+            return apply(copy,1,PhoneLife.answerCall(copy,parts[2],parts[1],state.day,state.minute));
         }
         if(action!=null&&action.startsWith("phone-reply:")){
             String[] parts=action.split(":",3);
