@@ -13,6 +13,32 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void doorCallsRequireKnownAddressPresenceAndConsent() throws Exception {
+        Path file=directory.resolve("intercom.db");
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var c=town.get("marco");
+            var contact=new PlayerLife.Contact(c.id);
+            town.player.contacts.put(c.id,contact);
+            PlayerLife.learnResident(town,c.id);
+            contact.knownName="Visitor";contact.trust=80;contact.affinity=30;
+            AddressLife.ask(town,c,contact);
+            assertThrows(IllegalArgumentException.class,()->IntercomLife.ring(town,c.id,1,1,600));
+            town.player.place=TownLife.Place.NORTH_RESIDENCES;
+            c.place=TownLife.Place.BAKERY;c.activity="WORKING";c.travelRemaining=0;
+            assertEquals("No answer at the intercom.",IntercomLife.ring(town,c.id,1,1,600));
+            c.place=c.home;c.activity="FREE_TIME";
+            assertEquals("Please wait before ringing again.",IntercomLife.ring(town,c.id,1,1,601));
+            assertEquals("Hello! We can chat at the entrance for a few minutes.",IntercomLife.ring(town,c.id,1,1,610));
+            assertEquals("You chatted together at the entrance.",IntercomLife.visit(town,c.id,1,1,611));
+            assertEquals(82,contact.trust);assertEquals(33,contact.affinity);
+            assertThrows(IllegalArgumentException.class,()->IntercomLife.visit(town,c.id,1,1,612));
+            assertEquals("Hello! We can chat at the entrance for a few minutes.",IntercomLife.ring(town,c.id,1,1,620));
+            assertThrows(IllegalArgumentException.class,()->IntercomLife.visit(town,c.id,1,1,631));
+        }
+    }
+
+    @Test
     void addressRequiresConsentAndSurvivesReload() throws Exception {
         Path file=directory.resolve("addresses.db");
         try(var db=new WorldDatabase(file)){
