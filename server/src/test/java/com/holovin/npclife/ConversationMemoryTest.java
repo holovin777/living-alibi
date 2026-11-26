@@ -83,6 +83,7 @@ class ConversationMemoryTest {
         try(var game=new GameSession(file)){}
         try(var db=new WorldDatabase(file)){
             var state=db.load();var town=db.loadTown(state);
+            state.minute=1000;state.loneliness=0;state.fatigue=20;state.hunger=20;state.thirst=20;state.personalityCurious=80;
             var resident=town.get("marco");
             resident.place=TownLife.Place.PARK;resident.travelRemaining=0;resident.activity="FREE_TIME";
             town.player.place=TownLife.Place.PARK;
