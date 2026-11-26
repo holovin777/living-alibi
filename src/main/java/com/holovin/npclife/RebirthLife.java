@@ -519,7 +519,7 @@ final class RebirthLife {
         c.money-=10;p.money=wallet;
         return "Transferred EUR 10 to "+p.name+".";
     }
-    record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations,String bond){}
+    record KnownPerson(String id,String name,boolean family,boolean alive,int affinity,int trust,int conversations,String bond,int sharedChildhoodDays,int firstChildhoodDay){}
     private static String bond(boolean family,SocialLife.Relationship r){
         if(family)return "Family";
         if(r==null)return "Stranger";
@@ -568,7 +568,7 @@ final class RebirthLife {
             var relation=t.peerRelationships.get(SocialNetwork.key(c.id,p.id));
             if(!family&&(relation==null||relation.conversations==0))continue;
             known.add(new KnownPerson(p.id,p.name,family,p.alive,relation==null?0:relation.affinity,
-                    relation==null?0:relation.trust,relation==null?0:relation.conversations,bond(family,relation)));
+                    relation==null?0:relation.trust,relation==null?0:relation.conversations,bond(family,relation),ChildhoodLife.playDays(t,c,p),ChildhoodLife.firstDay(t,c,p)));
         }
         known.sort(java.util.Comparator.comparing(KnownPerson::family).reversed()
                 .thenComparing(KnownPerson::name).thenComparing(KnownPerson::id));

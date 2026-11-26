@@ -4762,6 +4762,9 @@ func _render_actions() -> void:
                     var relation := Label.new()
                     relation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                     relation.text = "%s · %s%s · Trust %s · Affinity %s" % [person.get("name",""),person.get("bond","Acquaintance")," (deceased)" if not person.get("alive",true) else "",person.get("trust",0),person.get("affinity",0)]
+                    var shared_days := int(person.get("sharedChildhoodDays",0))
+                    if shared_days>0:
+                        relation.text+="\n"+(tr("Childhood memories: %s shared school breaks · first day %s") % [shared_days,person.get("firstChildhoodDay",0)])
                     _action_choices.add_child(relation)
             if age >= 6:
                 var skills: Dictionary = rebirth.get("skills",{})

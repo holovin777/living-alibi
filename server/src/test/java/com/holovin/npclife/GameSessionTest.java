@@ -13,6 +13,49 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void childhoodMemoriesPersistIntoAdultLife() throws Exception {
+        Path file=directory.resolve("childhood-friends.db");
+        String firstId,secondId;
+        try(var db=new WorldDatabase(file)){
+            var state=db.load();var town=db.loadTown(state);
+            var pupils=PopulationGenerator.add(town,3);
+            var a=pupils.get(0);var b=pupils.get(1);var remote=pupils.get(2);
+            firstId=a.id;secondId=b.id;
+            for(var c:pupils){
+                c.alive=true;c.age=9;c.health=100;c.hunger=10;c.thirst=10;c.fatigue=10;
+                c.home=TownLife.Place.NORTH_RESIDENCES;c.place=TownLife.Place.SCHOOL;
+                c.destination=c.place;c.travelRemaining=0;c.activity="STUDYING";
+            }
+            remote.travelRemaining=5;
+            state.day=1;state.minute=ChildhoodLife.RECESS;
+            ChildhoodLife.tick(town,state);
+            ChildhoodLife.tick(town,state);
+            assertEquals(1,ChildhoodLife.playDays(town,a,b));
+            assertEquals(0,ChildhoodLife.playDays(town,a,remote));
+            assertEquals(1,ChildhoodLife.firstDay(town,a,b));
+            state.day=2;ChildhoodLife.tick(town,state);
+            assertEquals(2,ChildhoodLife.playDays(town,a,b));
+            assertEquals(2,town.existingRelationship(a.id,b.id).conversations);
+            state.day=6;ChildhoodLife.tick(town,state);
+            assertEquals(2,ChildhoodLife.playDays(town,a,b));
+            a.age=25;b.age=25;
+            state.day=8;ChildhoodLife.tick(town,state);
+            assertEquals(2,ChildhoodLife.playDays(town,a,b));
+            db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var town=db.loadTown(db.load());
+            var a=town.get(firstId);var b=town.get(secondId);
+            var memory=RebirthLife.identity(town,a).relationships().stream()
+                .filter(p->p.id().equals(secondId)).findFirst().orElseThrow();
+            assertEquals(2,memory.sharedChildhoodDays());
+            assertEquals(1,memory.firstChildhoodDay());
+            assertEquals(25,a.age);
+            assertEquals(2,ChildhoodLife.playDays(town,b,a));
+        }
+    }
+
+    @Test
     void visibleWorkEquipmentMatchesActualActivityAndLocation() {
         var miner=new TownLife.Citizen("test-miner","Test miner","Miner",TownLife.Place.QUARRY);
         miner.activity="WORKING";
