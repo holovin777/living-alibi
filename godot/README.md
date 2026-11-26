@@ -785,3 +785,7 @@ Established autonomous partners may move into one existing private home after 30
 ### Seated family dinner
 
 During a server-confirmed FAMILY_DINNER routine, the invited host walks to a clear approach beside the dining chair, sits facing the table and plays a simple eating gesture. When the routine changes, the host stands at the unobstructed approach and resumes navigation. The chair is solid furniture in both mirrored layouts. This is presentation only: no extra meal, food consumption, or additional household member models are created.
+
+### Public bench rest
+
+As an ordinary visitor on foot, approach the front of an unoccupied public bench and press R to sit. The first-person camera lowers, walking and jumping are disabled, and NPC seat allocation skips the occupied seat. Look around freely; game time continues at the selected pace. Press E for a 15-game-minute rest using the existing authoritative Java rest endpoint, or R/Esc to stand at the previous collision-safe approach. Sitting alone does not grant fatigue recovery. District changes, rebirth or cycling clear the local seat. Exact seat occupancy is not saved or server-owned, and this feature is not yet available in the linked childhood/adult life mode.
