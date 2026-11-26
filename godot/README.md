@@ -761,3 +761,7 @@ Every district receives a fictional Italian street marker. North residential bui
 ### Residential intercoms
 
 Approach a numbered residential facade and press E near its intercom. Select only a contact who shared that address, then Ring bell. Java checks the visitor's district, known building, actual resident home presence and awake/free state, daytime and relationship. Repeated ringing has a 10-minute cooldown; a willing resident grants a 10-minute invitation to chat at the entrance. Chat consumes five game minutes, modestly improves trust/affinity once per day and consumes the invitation. The frontend enforces exact local door proximity while Java validates district-level location. No actual interior access, NPC doorway animation, postal delivery or invitation to the player's home yet. Ordinary visitor only. English/Italian labels.
+
+### Public stairwell preview
+
+At Casa Magnolia (Via delle Magnolie 12), G opens the schematic common stairwell in first person, E remains the outdoor intercom. Walk up two flights of 18 steps to floors 1 and 2; landings have numbered locked doors, handrails and lighting. Ground height follows steps and collision prevents leaving the stair corridor. Descend and press G near the exit to return to the exact street position. This is a separate local preview scene, not yet the actual facade footprint or a server-modeled interior. No private apartment entry, resident floor assignment, lift or saved indoor position. Jumping/other key-driven town actions are disabled indoors; the Java district stays unchanged.

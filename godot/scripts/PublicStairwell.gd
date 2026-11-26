@@ -5,7 +5,7 @@ const RISE := 3.1
 const RUN := 5.4
 const STEP_COUNT := 18
 const PITCH := 7.4
-const MIN_Z := -16.0
+const MIN_Z := -14.8
 const MAX_Z := 2.0
 
 func _ready() -> void:
@@ -21,7 +21,7 @@ func _ready() -> void:
             _box(Vector3(0.12,2.2,1.0),Color("#6c503c"),door)
             _box(Vector3(0.12,0.08,0.08),Color("#cfb46e"),door+Vector3(-side*0.08,-0.05,0.37))
             _label("%s" % (floor*2+(1 if side<0 else 2)),door+Vector3(-side*0.085,0.78,0),-side*PI/2.0)
-        _label("PIANO %s" % floor,Vector3(0,y+2.2,z+0.02),PI)
+        _label("PIANO %s" % floor,Vector3(-1.64,y+2.35,z+1.0),PI/2.0)
         var lamp := OmniLight3D.new()
         lamp.position=Vector3(0,y+2.55,z+0.9)
         lamp.light_color=Color("#ffe5bd")
@@ -39,7 +39,7 @@ func _ready() -> void:
                 _box(Vector3(0.07,0.07,step_depth+0.015),Color("#785a40"),Vector3(side*1.42,y+h+0.82,z-(float(n)+0.5)*step_depth))
     for side in [-1.0,1.0]:
         _box(Vector3(0.15,9.4,19.0),wall,Vector3(side*1.75,4.5,-7.0))
-    _box(Vector3(3.65,9.4,0.15),wall,Vector3(0,4.5,-16.1))
+    _box(Vector3(3.65,9.4,0.15),wall,Vector3(0,4.5,-14.9))
     _box(Vector3(3.65,9.4,0.15),wall,Vector3(0,4.5,2.1))
     _box(Vector3(3.65,0.2,19.0),wall,Vector3(0,9.25,-7.0))
     _box(Vector3(1.3,2.2,0.12),Color("#77563e"),Vector3(0,1.1,1.99))

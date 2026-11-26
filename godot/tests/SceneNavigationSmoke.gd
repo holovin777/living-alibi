@@ -293,6 +293,22 @@ func _exercise() -> void:
     if not _check(world._intercom.visible and world._intercom_contacts.item_count==1 and not world._foot_controls_available(),"intercom lists only shared contacts and blocks movement"):
         return
     world._close_intercom()
+    world._avatar.position=Vector3(11,0,-2.8)
+    if not _check(world._near_stairwell(),"public stairwell is accessed from Magnolia entrance"):
+        return
+    world._set_stairwell(true)
+    var climb: Vector3 = world._move_on_ground(world._avatar.position,Vector3(0,0,-14.8),world.WALKER_RADIUS)
+    if not _check(world._stairwell_active and absf(climb.y-6.2)<0.01 and world._stairwell.floor_number(climb)==2
+            and not world._can_stand(Vector3(1.5,climb.y,climb.z),world.WALKER_RADIUS)
+            and not world._can_walk_roads(),"stairs reach second upper level; side walls and district travel blocked"):
+        return
+    var down: Vector3 = world._move_on_ground(climb,Vector3(0,0,14.8),world.WALKER_RADIUS)
+    if not _check(absf(down.y)<0.01 and world._stairwell.near_exit(down),"stairs descend back to entrance"):
+        return
+    world._avatar.position=down
+    world._set_stairwell(false)
+    if not _check(not world._stairwell_active and world._avatar.position.is_equal_approx(Vector3(11,0,-2.8)),"exit restores street position"):
+        return
     world._avatar.position=Vector3.ZERO
     if not _check(world._near_intercom()==0,"door cannot be called from across the district"):
         return

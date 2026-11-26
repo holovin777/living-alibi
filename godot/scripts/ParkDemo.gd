@@ -58,6 +58,7 @@ var _lantern_glass: StandardMaterial3D
 var _shop_glass: StandardMaterial3D
 var _graphics_details: Array[Node3D] = []
 const FamilyApartment = preload("res://scripts/FamilyApartment.gd")
+const PublicStairwell = preload("res://scripts/PublicStairwell.gd")
 const GameLanguage = preload("res://scripts/GameLanguage.gd")
 const ResidentPersonality = preload("res://scripts/ResidentPersonality.gd")
 const ResidentAppearance = preload("res://scripts/ResidentAppearance.gd")
@@ -65,6 +66,10 @@ var _guide_label: Label
 var _guide_enabled := true
 var _apartment: Node3D
 var _apartment_active := false
+var _stairwell: Node3D
+var _stairwell_active := false
+var _stairwell_return := Vector3.ZERO
+var _stairwell_hint: Label
 var _home_entrance: Node3D
 var _home_transition := false
 var _grocery_menu := false
@@ -267,6 +272,12 @@ func _process(delta: float) -> void:
     _follow_player()
     _update_town_audio(delta,moved)
     _hands.update_pose(delta,_step_bob,not _cycling() and (not _rebirth_active() or _child_can_walk()))
+    if _stairwell_active:
+        _weather_fx.follow(_avatar.position)
+        _weather_fx.set_sheltered(true,_environment)
+        _stairwell_hint.text = tr("G: leave stairwell") if _stairwell.near_exit(_avatar.position) else tr("Stairwell · floor %s · apartment doors locked") % _stairwell.floor_number(_avatar.position)
+        _tick_live_clock(delta)
+        return
 
     if _apartment_active:
         _update_first_steps()
@@ -281,7 +292,7 @@ func _process(delta: float) -> void:
     _animate_residents(delta)
     _tick_office_joker(delta)
     _weather_fx.follow(_avatar.position)
-    _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
+    _weather_fx.set_sheltered(_stairwell_active or _apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
         _update_first_steps()
         if _near_software():
@@ -313,6 +324,8 @@ func _process(delta: float) -> void:
         _hint.text = "Waiting for Java to confirm arrival..."
     elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
         _hint.text = "District crossing · walk forward to travel"
+    elif _near_stairwell():
+        _hint.text = tr("G: enter stairwell · E: intercom")
     elif _near_intercom()>0:
         _hint.text = tr("E: ring the intercom")
     elif _near_truck():
@@ -355,6 +368,16 @@ func _unhandled_input(event: InputEvent) -> void:
             Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        if _stairwell_active:
+            if event.keycode==KEY_G and _stairwell.near_exit(_avatar.position):
+                _set_stairwell(false)
+            get_viewport().set_input_as_handled()
+            return
+        if event.keycode==KEY_G and _near_stairwell() and _foot_controls_available():
+            _set_stairwell(true)
+            get_viewport().set_input_as_handled()
+            return
     if event is InputEventKey and event.pressed and not event.echo and _intercom.visible:
         if event.keycode in [KEY_E,KEY_ESCAPE]:
             _close_intercom()
@@ -888,7 +911,7 @@ func _crouch_requested() -> bool:
     return Input.is_key_pressed(KEY_CTRL) and _jump_elapsed < 0.0
 
 func _can_jump() -> bool:
-    return _jump_elapsed < 0.0 and not _crouch_requested() and _crouch_amount < 0.1 and _foot_controls_available()
+    return not _stairwell_active and _jump_elapsed < 0.0 and not _crouch_requested() and _crouch_amount < 0.1 and _foot_controls_available()
 
 func _reset_locomotion() -> void:
     _crouch_amount = 0.0
@@ -1523,6 +1546,8 @@ func _add_obstacle(center: Vector3, size: Vector2) -> void:
     _obstacles.append(Rect2(Vector2(center.x, center.z) - size * 0.5, size))
 
 func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
+    if _stairwell_active:
+        return _stairwell.can_stand(at,radius)
     if _apartment_active:
         return _apartment.can_stand(at,radius)
     if absf(at.x) > 17.0 or absf(at.z) > 17.0:
@@ -1585,6 +1610,8 @@ func _move_on_ground(from: Vector3, displacement: Vector3, radius: float,
             candidate = at + Vector3(0.0, 0.0, step.z)
             if _can_stand(candidate, radius, allow_roads):
                 at = candidate
+    if _stairwell_active:
+        at.y = _stairwell.ground_height(at)
     return at
 
 func _open_anchor(preferred: Vector3) -> Vector3:
@@ -3802,6 +3829,14 @@ func _create_interface() -> void:
     _phone_alert.add_theme_constant_override("shadow_offset_y",2)
     _phone_alert.hide()
     canvas.add_child(_phone_alert)
+    _stairwell_hint = Label.new()
+    _stairwell_hint.position = Vector2(20,20)
+    _stairwell_hint.add_theme_color_override("font_color",Color.WHITE)
+    _stairwell_hint.add_theme_color_override("font_shadow_color",Color.BLACK)
+    _stairwell_hint.add_theme_constant_override("shadow_offset_x",2)
+    _stairwell_hint.add_theme_constant_override("shadow_offset_y",2)
+    _stairwell_hint.hide()
+    canvas.add_child(_stairwell_hint)
     _intercom = PanelContainer.new()
     _intercom.position = Vector2(480,15)
     _intercom.custom_minimum_size = Vector2(350,0)
@@ -5490,6 +5525,7 @@ func _refresh() -> void:
         _api.refresh_world()
 
 func _near_intercom() -> int:
+    if _stairwell_active:return 0
     if _rebirth_active() or _drive_active() or _cycling() or _apartment_active:
         return 0
     var paths := {1:"ViaDelleMagnolie/CasaMagnolia/Intercom",2:"ViaDelleMagnolie/CasaTiglio/Intercom",3:"CasaOlmo/Intercom"}
@@ -5528,6 +5564,7 @@ func _intercom_action(action: String) -> void:
     _api.garden_action("intercom:%s:%s:%s" % [action,_intercom_code,_intercom_contacts.get_item_metadata(_intercom_contacts.selected)])
 
 func _phone_allowed() -> bool:
+    if _stairwell_active:return false
     if _drive_active() or _cycling() or _jump_elapsed>=0.0 or not _road_pending.is_empty() or _home_transition:
         return false
     var rebirth = _last_snapshot.get("rebirth")
@@ -5605,7 +5642,7 @@ func _wait_one_hour() -> void:
         _api.wait_for(60)
 
 func _can_walk_roads() -> bool:
-    return not _apartment_active and (not _rebirth_active() or str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT")
+    return not _stairwell_active and not _apartment_active and (not _rebirth_active() or str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT")
 
 func _near_family_entrance() -> bool:
     return is_instance_valid(_home_entrance) and _home_entrance.visible and not _apartment_active and _avatar.position.distance_to(_home_entrance.position)<2.0
@@ -5638,6 +5675,48 @@ func _apartment_action() -> String:
         return ""
     var home = _last_snapshot.get("rebirth",{}).get("homeOptions")
     return _apartment.nearby_action(_avatar.position,home.get("actions",[])) if home is Dictionary else ""
+
+func _near_stairwell() -> bool:
+    if _stairwell_active or _rebirth_active() or _drive_active() or _cycling() or _apartment_active or _current_place!="NORTH_RESIDENCES":
+        return false
+    var marker := _scenery.get_node_or_null("ViaDelleMagnolie/CasaMagnolia/HomeApproach") as Node3D
+    return marker!=null and _avatar.position.distance_to(marker.global_position)<1.6
+
+func _set_stairwell(active: bool) -> void:
+    if active==_stairwell_active:return
+    if active and not _near_stairwell():return
+    _reset_jump()
+    _reset_locomotion()
+    _stairwell_active = active
+    if active:
+        _stairwell_return = _avatar.position
+        if not is_instance_valid(_stairwell):
+            _stairwell = PublicStairwell.new()
+            add_child(_stairwell)
+        _stairwell.show()
+        for chunk in _chunks.values():
+            chunk["root"].hide()
+        _traffic_root.hide()
+        _bike_model.hide()
+        _main_panel.hide()
+        _stairwell_hint.show()
+        _avatar.position = PublicStairwell.SPAWN
+        _view_yaw = 0.0
+        _view_pitch = 0.0
+        _town_audio.play_effect("door")
+    else:
+        _stairwell.hide()
+        for chunk in _chunks.values():
+            chunk["root"].show()
+        _traffic_root.show()
+        _main_panel.show()
+        _stairwell_hint.hide()
+        _avatar.position = _stairwell_return
+        _view_yaw = PI
+        _view_pitch = 0.0
+        _town_audio.play_effect("door")
+    _follow_player()
+    _weather_fx.set_sheltered(active,_environment)
 
 func _set_apartment(active: bool) -> void:
     if active == _apartment_active:
@@ -5726,6 +5805,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if not _road_pending.is_empty():
         _road_blocked = "" if road_arrival else _road_pending
         _road_pending = ""
+    if _stairwell_active and (new_place!=_current_place or _rebirth_active()):
+        _set_stairwell(false)
     if new_place != _current_place:
         _reset_jump()
         _reset_locomotion()
@@ -5831,7 +5912,7 @@ func _footstep_surface() -> String:
 
 func _update_town_audio(delta: float,moved: float) -> void:
     var at := _avatar.position
-    var sheltered := _apartment_active or _inside_guest_room() or _drive_active()
+    var sheltered := _stairwell_active or _apartment_active or _inside_guest_room() or _drive_active()
     _town_audio.footstep(moved,_footstep_surface(),_movement_speed()>=RUN_SPEED,
         _jump_elapsed<0.0,not _drive_active() and not _cycling())
     var fountain: Variant = null
@@ -5924,7 +6005,7 @@ func _apply_weather() -> void:
     _sky_material.ground_horizon_color=_sky_material.sky_horizon_color
     _sky_material.ground_bottom_color=Color("#272e28").lerp(Color("#777f68"),daylight)
     _weather_fx.follow(_avatar.position)
-    _weather_fx.set_sheltered(_apartment_active or _inside_guest_room(),_environment)
+    _weather_fx.set_sheltered(_stairwell_active or _apartment_active or _inside_guest_room(),_environment)
     _weather_fx.apply(climate,_environment)
     var services: Dictionary = _last_snapshot.get("services", {})
     _lantern_glass.emission_enabled = night and bool(services.get("lightsWorking",false))
