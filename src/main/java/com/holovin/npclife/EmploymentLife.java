@@ -12,10 +12,10 @@ final class EmploymentLife {
     record Event(int day,int minute,String residentId,Kind kind,String detail) { }
 
     private static final String[] JOBS={"Teacher","Mechanic","Librarian","Barista",
-            "Office clerk","Nurse","Baker","Market vendor","Miner","Factory machinist","Transport driver",NewspaperLife.OCCUPATION,"Doctor","Engineer","Programmer","Detective"};
+            "Office clerk","Nurse","Baker","Market vendor","Miner","Factory machinist","Transport driver",NewspaperLife.OCCUPATION,"Doctor","Engineer","Programmer","Detective","Pizzaiolo","Gelataio"};
     private static final TownLife.Place[] WORK={TownLife.Place.SCHOOL,TownLife.Place.WORKSHOP,
             TownLife.Place.LIBRARY,TownLife.Place.CAFE,TownLife.Place.OFFICE,
-            TownLife.Place.CLINIC,TownLife.Place.BAKERY,TownLife.Place.MARKET,TownLife.Place.QUARRY,TownLife.Place.FACTORY,TownLife.Place.QUARRY,TownLife.Place.LIBRARY,TownLife.Place.CLINIC,TownLife.Place.WORKSHOP,TownLife.Place.OFFICE,TownLife.Place.OFFICE};
+            TownLife.Place.CLINIC,TownLife.Place.BAKERY,TownLife.Place.MARKET,TownLife.Place.QUARRY,TownLife.Place.FACTORY,TownLife.Place.QUARRY,TownLife.Place.LIBRARY,TownLife.Place.CLINIC,TownLife.Place.WORKSHOP,TownLife.Place.OFFICE,TownLife.Place.OFFICE,TownLife.Place.CENTRO,TownLife.Place.CENTRO};
 
     static boolean sick(TownLife.Citizen person,int day) {
         return person.sickUntilDay>=day;
@@ -45,11 +45,12 @@ final class EmploymentLife {
             // wider local job market instead of starving in an unpaid post.
             String industryAccount=IndustryLife.companyFor(p.occupation);
             boolean workshopEmployee=BusinessLife.isEmployee(town,p);
+            boolean insolventFood=RetailLife.foodRole(p.occupation)&&town.employerFunds.getOrDefault(RetailLife.foodAccount(p.occupation),0)<RetailLife.FOOD_WAGE;
             boolean insolventWorkshop=workshopEmployee &&
                     town.business.cash<BusinessLife.HOURLY_WAGE;
             if(p.employed && ((industryAccount!=null &&
                     town.employerFunds.getOrDefault(industryAccount,0)<IndustryLife.HOURLY_WAGE) ||
-                    (NewspaperLife.reporter(p)&&town.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY) || insolventWorkshop || (MarketStallLife.isEmployee(town,p)&&MarketStallLife.get(town,MarketStallLife.RESERVE)<MarketStallLife.WAGE))) {
+                    (NewspaperLife.reporter(p)&&town.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY) || insolventWorkshop || insolventFood || (MarketStallLife.isEmployee(town,p)&&MarketStallLife.get(town,MarketStallLife.RESERVE)<MarketStallLife.WAGE))) {
                 loseJob(town,clock,p);
             }
             if(!p.employed) {
