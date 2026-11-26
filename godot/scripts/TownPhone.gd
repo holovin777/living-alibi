@@ -10,6 +10,8 @@ signal call_action_requested(resident_id: String, action: String)
 var _call_seen: Dictionary = {}
 var _call_choice: OptionButton
 var _call_decline: Button
+var _dial_choice: OptionButton
+var _dial_hangup: Button
 var _sms_seen: Dictionary = {}
 var _sms_initialized := false
 var _sms_choice: OptionButton
@@ -104,6 +106,13 @@ func _ready() -> void:
     _call_decline.text = tr("Decline call")
     _call_decline.pressed.connect(_send_call_action.bind("decline"))
     col.add_child(_call_decline)
+    _dial_choice = OptionButton.new()
+    _dial_choice.item_selected.connect(func(_index): _refresh_dial_buttons())
+    col.add_child(_dial_choice)
+    _dial_hangup = Button.new()
+    _dial_hangup.text = tr("End call")
+    _dial_hangup.pressed.connect(_send_outgoing.bind("hangup"))
+    col.add_child(_dial_hangup)
     _action = Button.new()
     _action.pressed.connect(_app_action)
     col.add_child(_action)
@@ -205,6 +214,10 @@ func _app_action() -> void:
         set_alarm(int(_alarm_hour.value),int(_alarm_minute.value))
     elif app=="sms":
         _send_sms_reply(1)
+    elif app=="contacts":
+        if _dial_choice.selected>=0:
+            var entry: Dictionary = _dial_choice.get_item_metadata(_dial_choice.selected)
+            _send_outgoing("invite-coffee" if entry.get("connected",false) else "dial")
     elif app=="calls":
         if _call_choice.selected>=0:
             var entry: Dictionary = _call_choice.get_item_metadata(_call_choice.selected)
@@ -213,6 +226,18 @@ func _app_action() -> void:
 func _send_sms_reply(choice: int) -> void:
     if _sms_choice.selected>=0:
         sms_reply_requested.emit(str(_sms_choice.get_item_metadata(_sms_choice.selected)),choice)
+
+func _send_outgoing(action: String) -> void:
+    if _dial_choice.selected>=0:
+        var entry: Dictionary = _dial_choice.get_item_metadata(_dial_choice.selected)
+        call_action_requested.emit(str(entry.get("residentId","")),action)
+
+func _refresh_dial_buttons() -> void:
+    if _dial_choice.selected<0:return
+    var entry: Dictionary = _dial_choice.get_item_metadata(_dial_choice.selected)
+    var connected := bool(entry.get("connected",false))
+    _action.text = tr("Invite for coffee") if connected else tr("Call contact")
+    _dial_hangup.visible = connected
 
 func _send_call_action(action: String) -> void:
     if _call_choice.selected>=0:
@@ -244,6 +269,8 @@ func refresh() -> void:
     _sms_decline.hide()
     _call_choice.hide()
     _call_decline.hide()
+    _dial_choice.hide()
+    _dial_hangup.hide()
     _alarm_controls.visible = app=="alarm"
     _alarm_cancel.visible = app=="alarm" and alarm_at>=0
     match app:
@@ -278,6 +305,28 @@ func refresh() -> void:
                 if not str(contact.get("address","")).is_empty():
                     lines.append("  "+str(contact["address"]))
             lines.append("\n"+tr("Share your number in person to receive calls."))
+            var phone = _snapshot.get("phone")
+            var selected_id := ""
+            if _dial_choice.selected>=0:
+                var previous: Dictionary = _dial_choice.get_item_metadata(_dial_choice.selected)
+                selected_id = str(previous.get("residentId",""))
+            _dial_choice.clear()
+            if phone is Dictionary and phone.get("available",false):
+                var preferred := -1
+                for contact in phone.get("dialContacts",[]):
+                    _dial_choice.add_item(str(contact.get("name","")))
+                    var index := _dial_choice.item_count-1
+                    _dial_choice.set_item_metadata(index,contact)
+                    if str(contact.get("residentId",""))==selected_id:preferred=index
+                    if contact.get("connected",false):preferred=index
+                if _dial_choice.item_count>0:
+                    _dial_choice.select(maxi(0,preferred))
+                    _dial_choice.show()
+                    _action.show()
+                    _refresh_dial_buttons()
+                for call in phone.get("outgoingCalls",[]):
+                    lines.append("\n%s · %s" % [call.get("name",""),tr(str(call.get("status","")))])
+                    if not str(call.get("text","")).is_empty():lines.append(str(call.get("text","")))
         "bank":
             var bank = _snapshot.get("bank")
             lines.append(tr("Phone bank"))
@@ -365,7 +414,11 @@ func refresh() -> void:
                     if status=="RINGING" or (status=="ANSWERED" and call.get("invitation",false) and int(call.get("day",0))==int(_snapshot.get("day",1))):
                         _call_choice.add_item(str(call.get("name","")))
                         _call_choice.set_item_metadata(_call_choice.item_count-1,{"id":call.get("residentId",""),"action":"answer" if status=="RINGING" else "accept"})
-                if phone.get("calls",[]).is_empty():lines.append(tr("No calls yet. Share your number with a friend."))
+                for call in phone.get("outgoingCalls",[]):
+                    lines.append("\n%s · %s · %s %s · %s" % [tr("Outgoing call"),call.get("name",""),tr("Day"),call.get("day",0),format_time(int(call.get("minute",0)))])
+                    lines.append(tr(str(call.get("status",""))))
+                    if not str(call.get("text","")).is_empty():lines.append(str(call.get("text","")))
+                if phone.get("calls",[]).is_empty() and phone.get("outgoingCalls",[]).is_empty():lines.append(tr("No calls yet. Share your number with a friend."))
                 if _call_choice.item_count>0:
                     _call_choice.select(0)
                     _call_choice.show()
