@@ -11,8 +11,12 @@ final class PhoneLife {
     record Message(String residentId,String name,int day,int minute,String text,String reply) {}
     record Meeting(String residentId,String name,int day,int minute,String place,String status) {}
     record Call(String residentId,String name,int day,int minute,String status,String text,boolean invitation) {}
-    record Report(List<Message> messages,boolean available,List<Meeting> meetings,List<Call> calls) {
-        Report(List<Message> messages,boolean available,List<Meeting> meetings){this(messages,available,meetings,List.of());}
+    record DialContact(String residentId,String name,boolean connected) {}
+    record OutgoingCall(String residentId,String name,int day,int minute,String status,String text) {}
+    record Report(List<Message> messages,boolean available,List<Meeting> meetings,List<Call> calls,
+                  List<DialContact> dialContacts,List<OutgoingCall> outgoingCalls) {
+        Report(List<Message> messages,boolean available,List<Meeting> meetings){this(messages,available,meetings,List.of(),List.of(),List.of());}
+        Report(List<Message> messages,boolean available,List<Meeting> meetings,List<Call> calls){this(messages,available,meetings,calls,List.of(),List.of());}
     }
     private static String key(TownLife.Town t,String id,String field){
         return "phone:"+t.player.incarnation+":"+id+":"+field;
@@ -33,6 +37,61 @@ final class PhoneLife {
         put(t,c.id,"number-shared",1);return true;
     }
     private static final int CALL_WINDOW=5;
+    private static final int OUTGOING_WINDOW=10;
+    private static long outgoingStart(TownLife.Town t,String id){
+        return (get(t,id,"out-day")-1L)*1440+get(t,id,"out-minute");
+    }
+    private static boolean canAnswer(TownLife.Citizen c,int minute){
+        return c.alive&&c.age>=18&&minute>=480&&minute<1260&&c.travelRemaining==0&&
+                Set.of("FREE_TIME","RELAXING","SOCIALIZING").contains(c.activity);
+    }
+    static String outgoing(TownLife.Town t,String id,String action,int day,int minute){
+        var c=t.people.get(id);
+        var contact=t.player.contacts.get(id);
+        if(!available(t)||t.player.travelRemaining>0||t.player.cycling||c==null||!c.alive||
+                contact==null||get(t,id,"number-shared")!=1)
+            throw new IllegalArgumentException("Call unavailable.");
+        long now=(day-1L)*1440+minute;
+        if("dial".equals(action)){
+            if(t.player.contacts.keySet().stream().anyMatch(x->ringing(t,x)||get(t,x,"out-state")==2))
+                throw new IllegalArgumentException("Finish the current call first.");
+            if(get(t,id,"out-day")>0&&now-outgoingStart(t,id)<30)
+                return "Please wait before calling again.";
+            put(t,id,"out-day",day);put(t,id,"out-minute",minute);
+            if(!canAnswer(c,minute)){
+                put(t,id,"out-state",1);return "No answer.";
+            }
+            if(contact.trust<50||contact.affinity<5||SocialMemoryLife.unresolved(t,id)){
+                put(t,id,"out-state",3);return "Scusa, preferisco non parlare adesso.";
+            }
+            put(t,id,"out-state",2);
+            contact.lastDay=day;contact.lastMinute=minute;
+            return "Ciao! Dimmi pure.";
+        }
+        if(get(t,id,"out-state")!=2||now-outgoingStart(t,id)>=OUTGOING_WINDOW)
+            throw new IllegalArgumentException("Call has ended.");
+        if("hangup".equals(action)){
+            put(t,id,"out-state",4);return "Call ended.";
+        }
+        if(!"invite-coffee".equals(action))throw new IllegalArgumentException("Choose a call action.");
+        if(!canAnswer(c,minute)||contact.trust<65||contact.affinity<20||
+                t.player.contacts.values().stream().anyMatch(x->get(t,x.residentId,"meeting-state")==1)){
+            put(t,id,"out-state",5);return "Mi dispiace, non posso prendere un caffè domani.";
+        }
+        put(t,id,"meeting-day",Math.addExact(day,1));put(t,id,"meeting-state",1);
+        put(t,id,"out-state",6);
+        contact.lastDay=day;contact.lastMinute=minute;
+        return "Volentieri! Domani alle 18 al bar.";
+    }
+    private static String outgoingStatus(int state){
+        return switch(state){case 1 -> "NO_ANSWER";case 2 -> "CONNECTED";case 3 -> "DECLINED";
+            case 4 -> "ENDED";case 5 -> "INVITATION_DECLINED";default -> "ACCEPTED";};
+    }
+    private static String outgoingText(int state){
+        return switch(state){case 2 -> "Ciao! Dimmi pure.";case 3 -> "Scusa, preferisco non parlare adesso.";
+            case 5 -> "Mi dispiace, non posso prendere un caffè domani.";
+            case 6 -> "Volentieri! Domani alle 18 al bar.";default -> "";};
+    }
     private static boolean ringing(TownLife.Town t,String id){return get(t,id,"call-state")==1;}
     private static long callStart(TownLife.Town t,String id){
         return (get(t,id,"call-day")-1L)*1440+get(t,id,"call-minute");
@@ -43,8 +102,12 @@ final class PhoneLife {
         boolean active=false;
         for(var contact:t.player.contacts.values()){
             String id=contact.residentId;
-            if(!ringing(t,id))continue;
             var c=t.people.get(id);
+            if(get(t,id,"out-state")==2){
+                if(c==null||!c.alive||now-outgoingStart(t,id)>=OUTGOING_WINDOW)put(t,id,"out-state",4);
+                else active=true;
+            }
+            if(!ringing(t,id))continue;
             if(c==null||!c.alive||now-callStart(t,id)>=CALL_WINDOW)put(t,id,"call-state",4);
             else active=true;
         }
@@ -135,9 +198,14 @@ final class PhoneLife {
         var messages=new ArrayList<Message>();
         var meetings=new ArrayList<Meeting>();
         var calls=new ArrayList<Call>();
+        var dialContacts=new ArrayList<DialContact>();
+        var outgoingCalls=new ArrayList<OutgoingCall>();
         for(var contact:t.player.contacts.values()){
             var c=t.people.get(contact.residentId);
             if(c==null)continue;
+            int outState=get(t,c.id,"out-state");
+            if(c.alive&&get(t,c.id,"number-shared")==1)dialContacts.add(new DialContact(c.id,c.name,outState==2));
+            if(outState>0)outgoingCalls.add(new OutgoingCall(c.id,c.name,get(t,c.id,"out-day"),get(t,c.id,"out-minute"),outgoingStatus(outState),outgoingText(outState)));
             int callState=get(t,c.id,"call-state");
             if(callState>0)calls.add(new Call(c.id,c.name,get(t,c.id,"call-day"),get(t,c.id,"call-minute"),switch(callState){case 1 -> "RINGING";case 2 -> "ANSWERED";case 3 -> "DECLINED";case 4 -> "MISSED";default -> "ACCEPTED";},callState==2||callState==5?callText(get(t,c.id,"call-kind")):"",callState==2&&get(t,c.id,"call-kind")==2));
             int meetingState=get(t,c.id,"meeting-state");
@@ -161,7 +229,8 @@ final class PhoneLife {
         messages.sort(Comparator.comparingInt(Message::day).thenComparingInt(Message::minute).reversed());
         meetings.sort(Comparator.comparingInt(Meeting::day).reversed());
         calls.sort(Comparator.comparingInt(Call::day).thenComparingInt(Call::minute).reversed());
-        return new Report(List.copyOf(messages),true,List.copyOf(meetings),List.copyOf(calls));
+        outgoingCalls.sort(Comparator.comparingInt(OutgoingCall::day).thenComparingInt(OutgoingCall::minute).reversed());
+        return new Report(List.copyOf(messages),true,List.copyOf(meetings),List.copyOf(calls),List.copyOf(dialContacts),List.copyOf(outgoingCalls));
     }
     static String reply(TownLife.Town t,String id,int choice,int day){
         if(!available(t)||t.player.travelRemaining>0)throw new IllegalArgumentException("Phone messaging is unavailable.");
