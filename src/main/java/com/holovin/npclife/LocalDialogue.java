@@ -14,6 +14,11 @@ final class LocalDialogue {
             .connectTimeout(Duration.ofSeconds(2)).build();
     private static final String MODEL=System.getenv().getOrDefault("LIVING_ALIBI_OLLAMA_MODEL","qwen2.5:3b");
     private LocalDialogue(){}
+    private static String promptExcerpt(String text){
+        if(text.length()<=280)return text;
+        int end=Character.isHighSurrogate(text.charAt(279))?279:280;
+        return text.substring(0,end)+"…";
+    }
     static String smallTalk(TownLife.Citizen resident,PlayerLife.Contact contact,String previous,
                             String message,WorldSpeechRegion region,String language,boolean recall) {
         String instructions="You are a fictional resident of a town in country "+region.countryCode+". Respond only in "
@@ -39,7 +44,7 @@ final class LocalDialogue {
             var history=input.putArray("rememberedTurns");
             for(var turn:ConversationMemory.context(contact,message)){
                 var entry=history.addObject();entry.put("day",turn.day());entry.put("minute",turn.minute());
-                entry.put("language",turn.language());entry.put("playerSaid",turn.player());entry.put("npcReply",turn.reply());
+                entry.put("language",turn.language());entry.put("playerSaid",promptExcerpt(turn.player()));entry.put("npcReply",promptExcerpt(turn.reply()));
             }
             input.put("currentPlayerMessage",message);
             messages.addObject().put("role","user").put("content",input.toString());
