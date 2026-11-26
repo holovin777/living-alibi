@@ -3990,7 +3990,7 @@ func _box(parent: Node3D, size: Vector3, color: Color,
     parent.add_child(node)
 
 func _sphere(parent: Node3D, radius: float, color: Color,
-        where: Vector3) -> void:
+        where: Vector3) -> MeshInstance3D:
     var mesh := SphereMesh.new()
     mesh.radius = radius
     mesh.height = radius * 2.0
@@ -4001,6 +4001,7 @@ func _sphere(parent: Node3D, radius: float, color: Color,
     node.material_override = mat
     node.position = where
     parent.add_child(node)
+    return node
 
 func _create_interface() -> void:
     var canvas := CanvasLayer.new()
