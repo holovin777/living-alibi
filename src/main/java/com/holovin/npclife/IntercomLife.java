@@ -96,6 +96,53 @@ final class IntercomLife {
         put(t,id,"inside",1);
         return "Welcome inside.";
     }
+    record SocialResult(int minutes,String message) {}
+    static SocialResult socialize(TownLife.Town t,String id,int building,String action,int day,int minute){
+        var host=validate(t,id,building);
+        var invitation=apartment(t,day,minute);
+        if(invitation==null||!invitation.residentId().equals(id)||!"VISITING".equals(invitation.status()))
+            throw new IllegalArgumentException("You need an active apartment visit.");
+        int duration=switch(action){
+            case "talk" -> 5;
+            case "coffee" -> 5;
+            case "snack" -> 8;
+            case "rest" -> 10;
+            default -> throw new IllegalArgumentException("Unknown guest activity.");
+        };
+        if(now(day,minute)+duration>=invitation.until())
+            throw new IllegalArgumentException("There is not enough time left in this visit.");
+        if(get(t,id,"social-"+action)==day)
+            throw new IllegalArgumentException("You already did this together today.");
+        var contact=t.player.contacts.get(id);
+        String message;
+        switch(action){
+            case "talk" -> {
+                contact.conversations++;
+                contact.lastDay=day;contact.lastMinute=minute;contact.lastHeard="Conversation at home";
+                message="You talked together at home.";
+            }
+            case "coffee" -> {
+                if(host.water<1)throw new IllegalArgumentException("Sorry, I have no water for coffee.");
+                host.water--;
+                t.player.thirst=Math.max(0,t.player.thirst-16);
+                message="You shared a coffee.";
+            }
+            case "snack" -> {
+                if(host.food<1)throw new IllegalArgumentException("Sorry, I have no food to share.");
+                host.food--;
+                t.player.hunger=Math.max(0,t.player.hunger-25);
+                message="You shared a snack.";
+            }
+            default -> {
+                t.player.fatigue=Math.max(0,t.player.fatigue-12);
+                message="You relaxed together on the sofa.";
+            }
+        }
+        put(t,id,"social-"+action,day);
+        contact.trust=Math.min(100,contact.trust+1);
+        contact.affinity=Math.min(100,contact.affinity+2);
+        return new SocialResult(duration,message);
+    }
     static String leave(TownLife.Town t,String id,int building,int day,int minute){
         validate(t,id,building);
         put(t,id,"inside-until",0);

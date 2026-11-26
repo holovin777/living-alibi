@@ -305,6 +305,18 @@ func _exercise() -> void:
             and not world._guest.can_stand(Vector3(-3.1,0,-2.6),world.WALKER_RADIUS)
             and world._guest.can_stand(world._avatar.position,world.WALKER_RADIUS),"furnished guest room has walkable space and solid furniture"):
         return
+    if not _check(is_instance_valid(world._guest_host) and world._guest_host.get_parent().name=="GuestHost","host uses resident model in apartment"):
+        return
+    world._avatar.position=Vector3(-1.0,0,1.8)
+    world._toggle_guest_seat()
+    if not _check(world._guest_sitting and absf(world._camera.position.y-1.12)<0.01,"sitting lowers first person viewpoint"):
+        return
+    world._toggle_guest_seat()
+    if not _check(not world._guest_sitting and world._avatar.position.is_equal_approx(Vector3(-1,0,1.8)),"stand restores original position"):
+        return
+    world._guest.show_coffee()
+    if not _check(world._guest.get_node("CoffeeTray").visible,"coffee cups appear after accepted action"):
+        return
     world._close_guest()
     if not _check(not world._guest_active and world._avatar.position.is_equal_approx(Vector3(-0.9,0,1)),"guest exit returns to apartment door"):
         return
