@@ -898,40 +898,62 @@ func _exercise() -> void:
             and marco.has_node("LegLeft") and marco.has_node("ArmRight"),
             "residents have stable distinct visual profiles and articulated limbs"):
         return
+    if not _check(marco.has_node("Head") and marco.has_node("CasualDetails")
+            and marco.get_node("CasualDetails").get_child_count()>0
+            and appearance.has("clothing_style") and appearance.has("shoe_color"),
+            "resident has stable style details and an articulated head"):
+        return
+    world._animate_resident_head(marco,1.0,2.0,false,false)
+    var head_pivot := marco.get_node("Head") as Node3D
+    if not _check(absf(head_pivot.rotation.y)>0.001
+            and (head_pivot.transform*Vector3(0,1.49,0)).is_equal_approx(Vector3(0,1.49,0)),
+            "head looks around without moving its neck pivot"):
+        return
+    if not _check(world._resident_wave(marco,0.1,true,true)
+            and not world._resident_wave(marco,2.0,true,true),
+            "familiar greeting ends after a bounded duration"):
+        return
+    world._resident_wave(marco,0.1,true,false)
+    if not _check(not world._resident_wave(marco,0.1,true,true),
+            "greeting cooldown prevents repeated waving"):
+        return
+    marco.remove_meta("wave_remaining")
+    marco.remove_meta("wave_near")
+    marco.remove_meta("wave_cooldown")
     var face_seed := absi(str(marco.get_meta("resident_id")).hash())
     var face_cycle := 3.2+float(face_seed%19)*0.11
     var blink_at := face_cycle-float(face_seed%97)*0.073+0.09
     marco.set_meta("mood","CALM")
     world._animate_resident_face(marco,1.0,blink_at,false)
-    if not _check(marco.get_node("EyeLeft").scale.y<0.15,"resident blinks at stable individual timing"):
+    if not _check(marco.get_node("Head/EyeLeft").scale.y<0.15,"resident blinks at stable individual timing"):
         return
     world._animate_resident_face(marco,1.0,blink_at+0.6,false)
-    if not _check(marco.get_node("EyeLeft").scale.y>0.9,"resident eyes reopen"):
+    if not _check(marco.get_node("Head/EyeLeft").scale.y>0.9,"resident eyes reopen"):
         return
     marco.set_meta("mood","HAPPY")
     world._animate_resident_face(marco,1.0,blink_at+0.6,false)
-    if not _check(marco.get_node("Mouth/Right").rotation.z>0.0
-            and marco.get_node("Mouth/Left").rotation.z<0.0,
+    if not _check(marco.get_node("Head/Mouth/Right").rotation.z>0.0
+            and marco.get_node("Head/Mouth/Left").rotation.z<0.0,
             "happy mood produces a smile"):
         return
     marco.set_meta("mood","SAD")
     world._animate_resident_face(marco,1.0,blink_at+0.6,false)
-    if not _check(marco.get_node("Mouth/Right").rotation.z<0.0,"sad mood produces a frown"):
+    if not _check(marco.get_node("Head/Mouth/Right").rotation.z<0.0,"sad mood produces a frown"):
         return
     marco.set_meta("mood","IRRITATED")
     world._animate_resident_face(marco,1.0,blink_at+0.6,false)
-    if not _check(marco.get_node("Hair/BrowRight").rotation.z>0.3,"irritated mood changes brow angle"):
+    if not _check(marco.get_node("Head/Hair/BrowRight").rotation.z>0.3,"irritated mood changes brow angle"):
         return
     world._begin_resident_reply(marco,"Hello there.")
     world._animate_resident_face(marco,1.0,blink_at+0.6,true)
     if not _check(float(marco.get_meta("reply_remaining",0.0))>0.0
-            and marco.get_node("Mouth/Opening").visible
-            and not marco.get_node("Mouth/Center").visible,
+            and marco.get_node("Head/Mouth/Opening").visible
+            and not marco.get_node("Head/Mouth/Center").visible,
             "delivered replies have bounded mouth motion"):
         return
     world._animate_resident_face(marco,1.0,blink_at+1.0,false)
-    if not _check(not marco.get_node("Mouth/Opening").visible
-            and marco.get_node("Mouth/Center").visible,"mouth closes while listening"):
+    if not _check(not marco.get_node("Head/Mouth/Opening").visible
+            and marco.get_node("Head/Mouth/Center").visible,"mouth closes while listening"):
         return
     marco.set_meta("reply_remaining",0.0)
     marco.set_meta("mood","CALM")
@@ -942,12 +964,12 @@ func _exercise() -> void:
     if not _check(world._residents_root.get_node("Resident_marco")==marco
             and marco.scale.y<adult_scale.y*0.8
             and marco.scale.x<adult_scale.x
-            and not marco.get_node("FacialHair").visible,
+            and not marco.get_node("Head/FacialHair").visible,
             "children have smaller bodies, no facial hair and retain the same resident model"):
         return
     populated_park["residents"][0]["appearanceStage"]="SENIOR"
     world._on_world_updated(populated_park)
-    var hair_mesh := marco.get_node("Hair").get_child(0) as MeshInstance3D
+    var hair_mesh := marco.get_node("Head/Hair").get_child(0) as MeshInstance3D
     if not _check(hair_mesh.material_override.albedo_color.is_equal_approx(world.ResidentAppearance.hair_color(original_appearance["hair"],"SENIOR"))
             and marco.get_meta("appearance")==original_appearance
             and marco.scale.y>adult_scale.y*0.9,
