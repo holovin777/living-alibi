@@ -556,7 +556,7 @@ final class RebirthLife {
         return new Personality(c.sociability,c.carefulness,c.curiosity,ambition,canChooseAmbition(t,c)?AMBITIONS:List.of());
     }
     record Identity(String residentId,int generationIndex,int bornDay,int savings,boolean graduated,List<KnownPerson> relationships,int fitness,int hobbyDays,int allowanceTotal,Personality personality,BirthdayLife.Memory birthday){}
-    static Identity identity(TownLife.Town t,TownLife.Citizen c){
+    static Identity identity(TownLife.Town t,TownLife.Citizen c,int day){
         if(c==null)return null;
         int a=DemographyLife.get(t,c,"parent-a"),b=DemographyLife.get(t,c,"parent-b");
         var known=new ArrayList<KnownPerson>();
