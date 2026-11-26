@@ -13,6 +13,36 @@ class GameSessionTest {
     @TempDir Path directory;
 
     @Test
+    void publicSafetyStaffUsesRealResidentsAndVisibleDutyClothes() {
+        var clock=new WorldState();
+        var town=TownLife.create(clock);
+        PopulationGenerator.add(town,20);PopulationGenerator.add(town,8);
+        int size=town.people.size();
+        assertTrue(PoliceLife.establish(town,clock,28));
+        assertEquals(size,town.people.size());
+        assertEquals(2,town.people.values().stream().filter(PoliceLife::officer).count());
+        assertEquals(1,town.people.values().stream().filter(PoliceLife::detective).count());
+        assertFalse(PoliceLife.establish(town,clock,28));
+        var officer=town.people.values().stream().filter(PoliceLife::officer).findFirst().orElseThrow();
+        int start=PoliceLife.shiftStart(officer);
+        assertNotEquals(PoliceLife.assignment(town,officer,1,start),PoliceLife.assignment(town,officer,1,start+75));
+        officer.place=PoliceLife.assignment(town,officer,1,start);
+        officer.activity="WORKING";officer.travelRemaining=0;
+        assertEquals("POLICE",GameSession.outfitVisual(officer));
+        assertEquals("",GameSession.workVisual(officer));
+        town.player.place=officer.place;
+        assertTrue(PlayerLife.speak(town,officer.id,"Sei di pattuglia?",1,start).contains("on patrol"));
+        officer.activity="FREE_TIME";
+        assertEquals("",GameSession.outfitVisual(officer));
+        var detective=town.people.values().stream().filter(PoliceLife::detective).findFirst().orElseThrow();
+        detective.place=TownLife.Place.OFFICE;detective.activity="WORKING";detective.travelRemaining=0;
+        assertEquals("DETECTIVE",GameSession.outfitVisual(detective));
+        assertEquals(TownLife.Place.OFFICE,PoliceLife.assignment(town,detective,1,600));
+        assertEquals("I have no open investigation in this district to discuss.",PoliceLife.assistance(town,detective,"@police-cases",1,600));
+        assertEquals("@police-help",NaturalDialogue.canonical("Voglio fare una denuncia",null));
+    }
+
+    @Test
     void naturalDialogueParaphrasesAndContextPreserveWorldFacts() {
         var town=TownLife.create(new WorldState());
         var resident=town.get("marco");

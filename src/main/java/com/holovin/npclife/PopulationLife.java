@@ -24,7 +24,7 @@ final class PopulationLife {
         // minute, rather than starting their autonomous commute mid-sentence.
         // GameSession removes this transient flag before persisting the world.
         if(TownLife.inPlayerConversation(town,c)) {
-            c.activity="SOCIALIZING";
+            if(!PoliceLife.staff(c))c.activity="SOCIALIZING";
             return;
         }
         if(RebirthLife.linkedAdult(town,c)&&minute%60==0){
@@ -50,8 +50,9 @@ final class PopulationLife {
         boolean freightRun=carrier && freightDestination!=null && !sick;
         boolean journalist=NewspaperLife.reporter(c);
         boolean foodWorker=RetailLife.foodRole(c.occupation);
-        boolean working=!child&&!retired&&c.employed && !sick && (foodWorker?(clock.day-1)%7!=0:workday) &&
-                (itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):foodWorker?(minute>=660&&minute<1140):
+        boolean publicSafety=PoliceLife.staff(c);
+        boolean working=!child&&!retired&&c.employed && !sick && (publicSafety?PoliceLife.scheduled(c,clock.day,minute):(foodWorker?(clock.day-1)%7!=0:workday)) &&
+                (publicSafety?true:itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):foodWorker?(minute>=660&&minute<1140):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,clock.day,minute)!=null);
@@ -77,6 +78,7 @@ final class PopulationLife {
         else if(marketOpen && needFood)desired=TownLife.Place.MARKET;
         else if(marketOpen && publicWater)desired=TownLife.Place.PARK;
         else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;
+        else if(publicSafety&&working)desired=PoliceLife.assignment(town,c,clock.day,minute);
         else if(journalist&&working)desired=NewspaperLife.assignment(clock.day,minute);
         else if(working)desired=c.workplace;
         else if(PhoneLife.meetingWindow(town,c,clock))desired=TownLife.Place.CAFE;
@@ -141,7 +143,7 @@ final class PopulationLife {
         else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
         else if(freightRun)c.activity="WORKING";
         else if(journalist&&working&&c.place==NewspaperLife.assignment(clock.day,minute))c.activity="WORKING";
-        else if(working && c.place==c.workplace){
+        else if(working && (c.place==c.workplace||publicSafety&&c.place==PoliceLife.assignment(town,c,clock.day,minute))){
             c.activity="WORKING";
             if(minute%60==0){
                 if(foodWorker)RetailLife.foodShift(town,c,clock,events,observations);
