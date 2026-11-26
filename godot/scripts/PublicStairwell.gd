@@ -83,3 +83,11 @@ func floor_number(at: Vector3) -> int:
 
 func near_exit(at: Vector3) -> bool:
     return at.z>0.3 and at.y<0.1
+
+func near_unit(at: Vector3) -> int:
+    if absf(at.x)<0.72:return 0
+    for floor in range(3):
+        var landing := Vector3(0,float(floor)*RISE,-float(floor)*PITCH+1.0)
+        if absf(at.z-landing.z)<0.65 and absf(at.y-landing.y)<0.08:
+            return floor*2+(1 if at.x<0 else 2)
+    return 0
