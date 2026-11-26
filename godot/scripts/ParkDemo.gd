@@ -1653,7 +1653,8 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
     # Extra walkable garden space inside the existing 48 m park tile.
     # Keep the road axes and inter-district triggers unchanged.
     var extended_park := _current_place=="PARK" and absf(at.x)<=20.0-radius and at.z>=12.0 and at.z<=21.0-radius
-    if (absf(at.x) > 17.0 or absf(at.z) > 17.0) and not extended_park:
+    var extended_centro := _current_place=="CENTRO" and absf(at.x)<=10.5-radius and at.z>=15.0 and at.z<=21.0-radius
+    if (absf(at.x) > 17.0 or absf(at.z) > 17.0) and not extended_park and not extended_centro:
         if not allow_roads or _road_destination(at, 17.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
@@ -2922,6 +2923,21 @@ func _build_bakery() -> void:
     light.omni_range=7
     bakery.add_child(light)
 
+func _build_centro_south_walk(parent: Node3D) -> void:
+    var lane := Node3D.new()
+    lane.name="PasseggiataDeiTigli"
+    parent.add_child(lane)
+    var stone := Color("#bcb19b")
+    for side in [-1.0,1.0]:
+        _box(lane,Vector3(7.6,0.045,6.0),stone,Vector3(side*6.3,0.018,18.0),"paving")
+        _bench(lane,Vector3(side*7.5,0,20.0))
+        for z in [16.5,19.5]:
+            var at := Vector3(side*10,0,z)
+            _add_obstacle(at,Vector2(0.85,0.85))
+            _box(lane,Vector3(0.85,0.42,0.85),Color("#a36e4a"),at+Vector3(0,0.21,0))
+            _sphere(lane,0.48,Color("#5f7547"),at+Vector3(0,0.75,0))
+    _physical_sign(lane,"Passeggiata dei Tigli",Vector3(6.0,2.2,20.4),PI,3.0)
+
 func _build_portici() -> void:
     var street := Node3D.new()
     street.name = "ViaDeiPortici"
@@ -3026,6 +3042,7 @@ func _build_centro() -> void:
             _centro_portico(piazza,float(side),float(row)*9.0,colors[variant],variant)
             variant += 1
     _centro_courtyard(piazza)
+    _build_centro_south_walk(piazza)
     # Landmark offset from the northern exit; no fictional church access.
     var tower := Vector3(6.8,0,-14.1)
     _add_obstacle(tower,Vector2(3.0,3.0))
@@ -3200,6 +3217,7 @@ func _build_park() -> void:
         _park_flowers(garden,Vector3(x*1.4,0,19.9))
     _tree(Vector3(-18.5,0,13.0))
     _tree(Vector3(18.5,0,13.0))
+    _build_playground(park)
     # The pool is decorative; drinking still requires the validated Java action.
     var fountain := Node3D.new()
     fountain.name = "PublicFountain"
@@ -3243,6 +3261,44 @@ func _build_park() -> void:
             _box(park,Vector3(0.98,1.28,0.10),Color("#ddc7a6"),Vector3(x+offset,2.8,-17.70))
             _box(park, Vector3(0.8,1.1,0.08), Color(0.32,0.49,0.57), Vector3(x+offset,2.8,-17.62))
             _box(park,Vector3(0.055,1.08,0.08),Color("#e0c6a0"),Vector3(x+offset,2.8,-17.56))
+
+func _build_playground(parent: Node3D) -> void:
+    var play := Node3D.new()
+    play.name="ParcoGiochi"
+    play.position=Vector3(-7.8,0,14.5)
+    parent.add_child(play)
+    _box(play,Vector3(6.8,0.06,5.2),Color("#c2a17b"),Vector3(0,0.025,0))
+    var blue := Color("#527f9b")
+    var yellow := Color("#e6b54c")
+    # Swing frame, with a collision footprint; no fake ride interaction.
+    var swing := Node3D.new()
+    swing.name="SwingFrame"
+    swing.position=Vector3(-1.7,0,-0.6)
+    play.add_child(swing)
+    for x in [-1.15,1.15]:
+        for z in [-0.65,0.65]:
+            var leg := _cylinder(swing,0.055,2.35,blue,Vector3(x,1.08,z*0.5))
+            leg.rotation.x=-z*0.42
+    _box(swing,Vector3(2.5,0.11,0.11),blue,Vector3(0,2.2,0))
+    for x in [-0.28,0.28]:
+        _cylinder(swing,0.018,1.65,Color("#777b79"),Vector3(x,1.32,0))
+    _box(swing,Vector3(0.65,0.10,0.38),yellow,Vector3(0,0.49,0))
+    _add_obstacle(play.position+swing.position,Vector2(2.65,1.7))
+    # Small slide and climbing steps, reserved as physical scenery.
+    var slide := Node3D.new()
+    slide.name="Slide"
+    slide.position=Vector3(1.5,0,0)
+    play.add_child(slide)
+    for x in [-0.42,0.42]:
+        _cylinder(slide,0.055,1.5,blue,Vector3(x,0.75,-0.65))
+    _box(slide,Vector3(1.0,0.12,0.85),yellow,Vector3(0,1.45,-0.65))
+    for i in range(4):
+        _box(slide,Vector3(0.82,0.08,0.27),blue,Vector3(0,0.33+float(i)*0.30,-1.4+float(i)*0.16))
+    var chute := _box_node(slide,Vector3(0.88,0.10,2.2),yellow,Vector3(0,0.78,0.45))
+    chute.rotation.x=0.59
+    _add_obstacle(play.position+slide.position,Vector2(1.15,3.1))
+    _physical_sign(play,"Parco giochi",Vector3(0,1.65,2.55),0,2.0)
+    # Leave the south edge open for access from the promenade.
 
 func _add_fountain_spray(water: MeshInstance3D) -> void:
     var spray := CPUParticles3D.new()
