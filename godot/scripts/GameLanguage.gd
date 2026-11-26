@@ -1,6 +1,7 @@
 extends RefCounted
 ## Local UI translations; English source strings remain the fallback.
 const IT := {
+    "I remember we had a disagreement, but it was a while ago.": "Ricordo che abbiamo avuto un disaccordo, ma è passato del tempo.",
     "Closed · %s": "Chiuso · %s",
     "Walk through the open entrance: %s": "Entra a piedi dalla porta aperta: %s",
     "E / F: use the counter · Esc: close": "E / F: usa il bancone · Esc: chiudi",
