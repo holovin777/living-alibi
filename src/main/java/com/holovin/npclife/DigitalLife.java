@@ -9,13 +9,14 @@ final class DigitalLife {
     private DigitalLife(){}
     record Site(String name,String status,String description){}
     record Notice(int day,String text){}
-    record View(boolean online,int wallet,int bills,boolean canPay,List<Site> sites,List<String> jobs,List<Notice> news){}
+    record View(boolean online,int wallet,int bills,boolean canPay,List<Site> sites,List<String> jobs,List<Notice> news,TelecomLife.View telecom){}
     static boolean online(TownLife.Town t){return EnergyLife.publicPower(t);}
     static View view(TownLife.Town t,WorldState s){
         var c=RebirthLife.child(t);
         if(!RebirthLife.linkedAdult(t,c)||NpcJusticeLife.confined(t,c,s))return null;
-        boolean online=online(t);
-        if(!online)return new View(false,0,0,false,List.of(),List.of(),List.of());
+        var telecom=TelecomLife.view(t,c,s);
+        boolean online=online(t)&&TelecomLife.connected(t,c,s);
+        if(!online)return new View(false,c.money,c.unpaidBills,false,List.of(),List.of(),List.of(),telecom);
         boolean shop=SoftwareLife.deployed(t,"retail-api")&&!DevOpsLife.unavailable(t);
         boolean utility=SoftwareLife.deployed(t,"water-control");
         var sites=List.of(
@@ -28,7 +29,7 @@ final class DigitalLife {
             .sorted(Comparator.comparingInt(ArchiveLife.Entry::day).thenComparingInt(ArchiveLife.Entry::minute).reversed())
             .limit(8).map(n->new Notice(n.day(),n.text())).toList();
         return new View(true,c.money,c.unpaidBills,RebirthLife.awakePresent(c)&&c.unpaidBills>0&&c.money>20,
-            sites,EmploymentLife.openRoles(t,c,s.day),news);
+            sites,EmploymentLife.openRoles(t,c,s.day),news,telecom);
     }
     static String pay(TownLife.Town t,WorldState s){
         var view=view(t,s);

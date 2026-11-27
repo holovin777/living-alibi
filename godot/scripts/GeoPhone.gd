@@ -146,8 +146,14 @@ func _render_web() -> void:
     if not web is Dictionary:
         _label("Web portal unavailable / Portale non disponibile")
         return
+    var telecom=web.get("telecom")
+    if telecom is Dictionary:
+        _label("Living Mobile · SIM: "+str(telecom.get("number",""))+" · Valid until day "+str(telecom.get("paidUntil",0)))
+        _label("Network / Rete: "+str(telecom.get("status",""))+" · Equipment / Impianto: "+str(telecom.get("condition",0))+"%")
+        for action in data.get("actions",[]):
+            if str(action.get("id",""))=="phone-telecom-subscribe":_button(str(action.get("label","")),func():requested_action.emit("phone-telecom-subscribe"))
     if not bool(web.get("online",false)):
-        _label("Network offline / Rete non disponibile")
+        _label("Network offline or subscription expired / Rete non disponibile o abbonamento scaduto")
         return
     _label("LIVING NET · In-game web / Rete interna")
     _label("Wallet / Portafoglio: €%s · Bills / Debiti: €%s" % [web.get("wallet",0),web.get("bills",0)])

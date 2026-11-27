@@ -41,7 +41,7 @@ final class ITStaffLife {
             &&!EmploymentLife.sick(w,day)&&w.presentAt(TownLife.Place.OFFICE)&&"WORKING".equals(w.activity)
             &&get(t,owner,"last-assignment")<day;
         return new Staff(w==null?null:new Employee(w.id,w.name,EducationLife.get(t,w,"technical"),w.activity,EmploymentLife.sick(w,day)),
-            cv,ready&&w!=null,get(t,owner,"delegated"),canDelegate?offers.stream().filter(ITBusinessLife.Offer::available).map(ITBusinessLife.Offer::id).toList():List.of(),get(t,owner,"managed")>0,get(t,owner,"management-profit"),get(t,owner,"management-failures"));
+            cv,ready&&w!=null,get(t,owner,"delegated"),canDelegate?offers.stream().filter(ITBusinessLife.Offer::available).map(ITBusinessLife.Offer::id).toList():List.of(),get(t,owner,"managed")>0,get(t,owner,"management-profit")-get(t,owner,"management-loss"),get(t,owner,"management-failures"));
     }
     static void release(TownLife.Town t,TownLife.Citizen owner){
         var w=employee(t,owner);
@@ -84,7 +84,7 @@ final class ITStaffLife {
         int quality=Math.floorMod(w.personalSeed^((long)day*0x9E3779B97F4A7C15L),100);
         if(quality>=Math.min(98,65+skill/3)){
             set(t,owner,"management-failures",Math.addExact(get(t,owner,"management-failures"),1));
-            set(t,owner,"management-profit",Math.subtractExact(get(t,owner,"management-profit"),WAGE));
+            set(t,owner,"management-loss",Math.addExact(get(t,owner,"management-loss"),WAGE));
             return;
         }
         t.employerFunds.merge(client,-gross,Integer::sum);ITBusinessLife.credit(t,MunicipalLife.CITY,tax);

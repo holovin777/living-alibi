@@ -33,6 +33,7 @@ final class GeoProjection {
         if(!report.available()){
             var actions=new ArrayList<Choice>();
             if(digital!=null&&digital.canPay())actions.add(new Choice("phone-digital-pay","Pay outstanding bills / Paga bollette"));
+            if(digital!=null&&digital.telecom().canSubscribe())actions.add(new Choice("phone-telecom-subscribe","Activate or renew SIM / Attiva o rinnova SIM · €"+TelecomLife.FEE));
             return new PhoneView(report,List.of(),null,List.of(),null,List.copyOf(actions),Map.of(),digital);
         }
         var jobs=CareerLife.offers().stream().map(j->new PhoneJob(j.id(),j.title(),district(j.workplace()),j.subject(),

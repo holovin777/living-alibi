@@ -743,7 +743,7 @@ public final class GameSession implements AutoCloseable {
     synchronized void geoEnter(GeoProjection map,String destination,double x,double z) throws SQLException {
         JusticeLife.requireFree(town);
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
-        if("phone-digital-pay".equals(action)){
+        if("phone-digital-pay".equals(action)||"phone-telecom-subscribe".equals(action)){
             if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action)))throw new IllegalArgumentException("Digital action unavailable.");
             return new GeoProjection.ActionResult(gardenAction(action).message(),null);
         }
@@ -950,6 +950,10 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if("phone-telecom-subscribe".equals(action)){
+            var copy=town.copy();TelecomLife.subscribe(copy,RebirthLife.requireAdult(copy),state);
+            return applyInternal(copy,0,"SIM activated for 30 days.",true);
+        }
         if("phone-digital-pay".equals(action)){
             var copy=town.copy();var message=DigitalLife.pay(copy,state);
             return applyInternal(copy,0,message,true);

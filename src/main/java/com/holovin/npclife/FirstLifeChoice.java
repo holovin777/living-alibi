@@ -6,8 +6,8 @@ package com.holovin.npclife;
 final class FirstLifeChoice {
     private FirstLifeChoice(){}
     private static final String PREFERENCE="identity:first-sex";
-    static void require(TownLife.Town t){t.industryStocks.putIfAbsent(PREFERENCE,-1);}
-    static boolean pending(TownLife.Town t){return t.player.incarnation==1&&t.industryStocks.getOrDefault(PREFERENCE,0)==-1;}
+    static void require(TownLife.Town t){t.industryStocks.putIfAbsent(PREFERENCE,3);}
+    static boolean pending(TownLife.Town t){return t.player.incarnation==1&&t.industryStocks.getOrDefault(PREFERENCE,0)==3;}
     static void choose(TownLife.Town t,int sex){
         if(!pending(t)||RebirthLife.phase(t)!=RebirthLife.CHOICE||(sex!=1&&sex!=2))
             throw new IllegalArgumentException("First character selection is unavailable.");

@@ -15,6 +15,7 @@ final class StaffingLife {
         job("Glass worker",FACTORY,2),job("Chemical plant operator",FACTORY,2),job("Plastics worker",FACTORY,2),job("Packaging worker",FACTORY,2),job("Cement worker",FACTORY,2),job("Building materials worker",FACTORY,2),
         job("Waste collector",LOGISTICS_DEPOT,2),job("Recycling operator",FACTORY,2),
         job("Gas network operator",FUEL_STATION,1),
+        job(TelecomLife.NETWORK,OFFICE,2),job(TelecomLife.SYSTEMS,OFFICE,1),
         job("Water treatment operator",RIVER,1),job("Wastewater operator",FACTORY,1),
         job("Centre grid technician",OFFICE,1),job("North grid technician",NORTH_RESIDENCES,1),job("South grid technician",SOUTH_RESIDENCES,1),job("Industrial grid technician",FACTORY,1),
         job("Solar plant operator",FARM,1),job("Hydropower operator",RIVER,1),job("Thermal plant operator",FACTORY,1),
