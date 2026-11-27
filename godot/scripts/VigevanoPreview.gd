@@ -588,6 +588,12 @@ func _open_actions() -> void:
     var info:=Label.new()
     info.text="Java validates availability, money and time."
     action_list.add_child(info)
+    var enterprise=residents.world.get("enterprise")
+    if enterprise is Dictionary and bool(enterprise.get("yours",false)):
+        var summary:=Label.new()
+        summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        summary.text="Workshop / Officina\nCompany cash: €%s · machine: %s/100\nParts: %s · staff: %s\nPaid hours today: %s" % [enterprise.get("cash",0),enterprise.get("machineCondition",0),enterprise.get("spareParts",0),enterprise.get("employeeName","—"),enterprise.get("paidHoursToday",0)]
+        action_list.add_child(summary)
     for action in residents.world.get("actions",[]):
         var button:=Button.new()
         button.text=str(action.get("label",""))

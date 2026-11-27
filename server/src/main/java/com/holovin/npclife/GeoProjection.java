@@ -63,7 +63,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -349,6 +349,40 @@ final class GeoProjection {
         Point at=point(p.carPlace);
         return player.distance(new Point(at.x+2.5,at.z))<=5;
     }
+    List<Choice> enterpriseChoices(TownLife.Town t,WorldState s,Point player,TownLife.Place room){
+        var p=t.player;var result=new ArrayList<Choice>();
+        if(!p.alive||p.travelRemaining>0||p.cycling||JusticeLife.confined(t)||RebirthLife.active(t)||IntercomLife.insideVisit(t,s.day,s.minute)
+            ||room!=p.place||point(p.place).distance(player)>18)return List.of();
+        if(room==TownLife.Place.OFFICE&&s.minute>=540&&s.minute<1020){
+            var bank=BankLife.report(t);
+            if(p.money>=BankLife.STEP)result.add(new Choice("bank-deposit-personal","Deposit savings / Versa · €10"));
+            if(bank.personal()>0)result.add(new Choice("bank-withdraw-personal","Withdraw savings / Preleva · up to €10"));
+            if(bank.businessAvailable()){
+                if(p.money>=BankLife.STEP)result.add(new Choice("bank-deposit-business","Deposit business / Versa azienda · €10"));
+                if(bank.business()>0)result.add(new Choice("bank-withdraw-business","Withdraw business / Preleva azienda · up to €10"));
+            }
+            if(bank.eligible()&&bank.debt()==0&&bank.lendable()>=BankLife.LOAN)result.add(new Choice("bank-borrow","Borrow / Prestito · €50"));
+            if(bank.debt()>0&&p.money>=Math.min(BankLife.STEP,bank.debt()))result.add(new Choice("bank-repay","Repay / Rimborsa · up to €10"));
+        }
+        if(room==TownLife.Place.WORKSHOP){
+            var b=BusinessLife.status(t,s.day);
+            if(!b.yours()){
+                if(p.money>=BusinessLife.REGISTRATION&&(!b.registered()||t.pastLives.containsKey(b.ownerIncarnation())))
+                    result.add(new Choice("enterprise:open","Register workshop company / Apri azienda · €15"));
+            }else{
+                if(p.money>=10)result.add(new Choice("enterprise:invest:10","Invest in company / Investi · €10"));
+                if(p.money>=25)result.add(new Choice("enterprise:invest:25","Invest in company / Investi · €25"));
+                if(b.cash()>=10)result.add(new Choice("enterprise:withdraw:10","Withdraw company reserves / Preleva · €10"));
+                if(!b.machine()&&b.cash()>=BusinessLife.MACHINE_PRICE)result.add(new Choice("enterprise:machine","Buy machine / Compra macchina · €25"));
+                if(b.machine()&&b.machineCondition()<100&&b.cash()>=BusinessLife.SERVICE_PRICE&&t.technicalMaterials.getOrDefault("spare-parts",0)>=BusinessLife.SERVICE_PARTS)
+                    result.add(new Choice("enterprise:service","Service machine / Manutenzione · €10"));
+                if(b.machine()&&b.employeeId()==null&&b.cash()>=BusinessLife.SIGNING_BONUS+2*BusinessLife.HOURLY_WAGE+BusinessLife.STEEL_PRICE)
+                    for(var c:BusinessLife.candidates(t,s.day))
+                        result.add(new Choice("enterprise:hire:"+c.id,"Hire / Assumi "+PlayerLife.displayName(t,c)));
+            }
+        }
+        return List.copyOf(result);
+    }
     static boolean outsideAction(String id){return id.startsWith("car:")||id.startsWith("bike:")||id.equals("bike-buy")||id.startsWith("drive:")||id.startsWith("bus:");}
     List<Choice> choices(TownLife.Town t,WorldState s,Point player){
         var p=t.player;var result=new ArrayList<Choice>();
@@ -424,9 +458,10 @@ final class GeoProjection {
         var availableActions=new ArrayList<Choice>();
         if(!privateRoom)availableActions.addAll(choices(t,s,player).stream().filter(a->room==null||!outsideAction(a.id())).toList());
         availableActions.addAll(homeChoices(t,s,player,room));
+        availableActions.addAll(enterpriseChoices(t,s,player,room));
         return new View(s.day,s.minute,population,commuting,room==null?List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))):inside,
             district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(player))).limit(32).toList():List.of(),interior,weather(s),phone(t,s));
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(player))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null);
     }
 }

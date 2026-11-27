@@ -706,6 +706,23 @@ public final class GameSession implements AutoCloseable {
             if(action.startsWith("intercom:enter:")&&IntercomLife.insideVisit(town,state.day,state.minute))geoInterior=before;
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.startsWith("bank-")){
+            var result=gardenAction(action);
+            return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.startsWith("enterprise:")){
+            String[] command=action.split(":",3);
+            ActionView result=switch(command[1]){
+                case "open" -> openBusiness();
+                case "invest" -> investBusiness(Integer.parseInt(command[2]));
+                case "withdraw" -> withdrawBusiness(Integer.parseInt(command[2]));
+                case "machine" -> buyBusinessMachine();
+                case "service" -> serviceBusinessMachine();
+                case "hire" -> hireBusinessWorker(command[2]);
+                default -> throw new IllegalArgumentException("Unknown workshop action.");
+            };
+            return new GeoProjection.ActionResult(result.message(),null);
+        }
         String[] parts=action.split(":",2);
         String arg=parts.length>1?parts[1]:"";
         ActionView result=switch(parts[0]){
