@@ -170,6 +170,7 @@ const IT := {
     "The invitation has expired. Reply not today.": "L'invito è scaduto. Rispondi non oggi.",
     "You already have a planned meeting.": "Hai già un incontro programmato.",
     "Unknown resident": "Persona sconosciuta",
+    "Your home · E": "Casa tua · E",
     "Familiar face": "Volto familiare",
     "Family": "Famiglia",
     "This person is part of your family.": "Questa persona fa parte della tua famiglia.",

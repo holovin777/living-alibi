@@ -2803,8 +2803,8 @@ func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: 
                 for bar in range(7):
                     _box(building,Vector3(0.045,0.65,0.045),Color("#444442"),Vector3(x-0.84+float(bar)*0.28,y-0.48,face+0.77))
                 _box(building,Vector3(1.85,0.055,0.055),Color("#444442"),Vector3(x,y-0.14,face+0.77))
-    var number := "12" if id=="CasaMagnolia" else "14" if id=="CasaTiglio" else "8"
-    var building_name := "Casa Magnolia" if id=="CasaMagnolia" else "Casa Tiglio" if id=="CasaTiglio" else "Casa Olmo"
+    var number := "12" if id=="CasaMagnolia" else "14" if id=="CasaTiglio" else "8" if id=="CasaOlmo" else str(2+2*posmod(id.hash(),24))
+    var building_name := "Casa Magnolia" if id=="CasaMagnolia" else "Casa Tiglio" if id=="CasaTiglio" else "Casa Olmo" if id=="CasaOlmo" else id
     _physical_sign(building,building_name,Vector3(at.x,2.8,face+0.18),0,2.1)
     _physical_sign(building,number,Vector3(at.x+1.18,1.9,face+0.13),0,0.52)
     var mailbox := Node3D.new()
@@ -2822,11 +2822,10 @@ func _lombardy_facade(parent: Node3D,id: String,at: Vector3,wall: Color,floors: 
     for n in range(3):
         _box(bell,Vector3(0.13,0.018,0.012),Color("#343b40"),Vector3(0,0.12-float(n)*0.035,0.045))
     _box(bell,Vector3(0.065,0.065,0.018),Color("#d6c6a0"),Vector3(0,-0.095,0.05))
-    if id=="CasaMagnolia":
-        var entrance := Marker3D.new()
-        entrance.name="HomeApproach"
-        entrance.position=Vector3(at.x,0,face+1.2)
-        building.add_child(entrance)
+    var entrance := Marker3D.new()
+    entrance.name="HomeApproach"
+    entrance.position=Vector3(at.x,0,face+1.2)
+    building.add_child(entrance)
 
 func _build_guesthouse(owned: bool = false) -> void:
     var house := Node3D.new()
@@ -9449,21 +9448,39 @@ func _request_home_transition(action: String) -> void:
 
 func _sync_family_entrance(home) -> void:
     if is_instance_valid(_home_entrance):
+        remove_child(_home_entrance)
         _home_entrance.queue_free()
         _home_entrance=null
     if not home is Dictionary or not home.get("outsideHome",false) or _apartment_active:
         return
+    var unit := str(_last_snapshot.get("rebirth",{}).get("homeUnit",""))
+    var candidates: Array[Node] = _scenery.find_children("HomeApproach","Marker3D",true,false)
+    candidates = candidates.filter(func(node: Node) -> bool:
+        return node.get_parent().name != "StazioneFerroviaria")
+    candidates.sort_custom(func(a: Node,b: Node) -> bool: return str(a.get_path()) < str(b.get_path()))
+    # In districts without residential facades, add a house only on a free
+    # off-axis parcel. Never put a floating door on the carriageway.
+    if candidates.is_empty():
+        for at in [Vector3(-11,0,-10),Vector3(11,0,-10),Vector3(-11,0,9),Vector3(11,0,9)]:
+            if _can_stand(at,4.1) and _can_stand(at+Vector3(0,0,4),WALKER_RADIUS):
+                _lombardy_facade(_scenery,"CasaResidenza",at,Color("#d3b895"),2)
+                candidates = _scenery.find_children("HomeApproach","Marker3D",true,false)
+                break
+    if candidates.is_empty():
+        return
+    var approach := candidates[posmod(unit.hash(),candidates.size())] as Marker3D
+    # Match named market properties when their facade is already available.
+    var preferred := "CasaTiglio" if unit.ends_with("home-market-tiglio") else "CasaOlmo" if unit.ends_with("home-market-olmo") else ""
+    if not preferred.is_empty():
+        for candidate in candidates:
+            if str(candidate.get_parent().name)==preferred:
+                approach=candidate as Marker3D
+                break
     _home_entrance=Node3D.new()
     _home_entrance.name="FamilyHomeEntrance"
     add_child(_home_entrance)
-    var approach := _scenery.get_node_or_null("ViaDelleMagnolie/CasaMagnolia/HomeApproach") as Marker3D
-    if approach != null:
-        _home_entrance.position=approach.global_position
-        _sign(_home_entrance,"Your home · E",Vector3(0,2.3,-0.6))
-    else:
-        _home_entrance.position=_open_anchor(Vector3(0,0,6))
-        _box(_home_entrance,Vector3(1.25,2.25,0.16),Color("#987653"),Vector3(0,1.125,-0.65))
-        _sign(_home_entrance,"Your home",Vector3(0,2.45,-0.65))
+    _home_entrance.position=approach.global_position
+    _sign(_home_entrance,tr("Your home · E"),Vector3(0,2.5,-0.8))
 
 func _apartment_action() -> String:
     if not _apartment_active:
