@@ -2445,7 +2445,9 @@ class GameSessionTest {
             MunicipalLife.tick(town,8,360);MunicipalLife.tick(town,8,360);
             var report=MunicipalLife.report(town);
             assertEquals(195,p.money);assertEquals(138,resident.money);
-            assertEquals(7,report.taxes());assertEquals(city+7-26,report.budget());
+            assertEquals(7,report.taxes());
+            assertEquals(SocialProtectionLife.WEEKLY_GRANT,town.employerFunds.get(SocialProtectionLife.ACCOUNT));
+            assertEquals(city+7-26-SocialProtectionLife.WEEKLY_GRANT,report.budget());
             assertEquals(school+6,report.schoolFunds());assertEquals(library+4,report.libraryFunds());
             assertEquals(8,report.clinicFunds());assertEquals(8,report.maintenance());
             assertEquals(83,pump.condition);assertEquals(85,lights.condition);
@@ -2463,6 +2465,7 @@ class GameSessionTest {
             assertEquals(7,MunicipalLife.report(town).taxes());
             assertEquals(8,MunicipalLife.report(town).medicalAid());
             assertEquals(8,town.employerFunds.get(MunicipalLife.CARE));
+            assertEquals(SocialProtectionLife.WEEKLY_GRANT,town.employerFunds.get(SocialProtectionLife.ACCOUNT));
             assertEquals(83,town.technicalOrders.get("water-pump").condition);
             MunicipalLife.tick(town,8,360);
             assertEquals(195,p.money);assertEquals(7,MunicipalLife.report(town).taxes());

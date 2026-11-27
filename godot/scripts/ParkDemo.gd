@@ -749,11 +749,14 @@ func _near_gate() -> bool:
 func _near_sport_counter() -> bool:
     return _current_place in ["MARKET","WORKSHOP"] and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(SPORT_COUNTER)<1.8
 
+func _near_shelter() -> bool:
+    return _current_place=="LIBRARY" and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(Vector3(8,0,-6.7))<1.8
+
 func _near_charity() -> bool:
     return _current_place=="LIBRARY" and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(Vector3(8,0,7.4))<1.8
 
 func _near_kiosk() -> bool:
-    if _near_charity():return true
+    if _near_charity() or _near_shelter():return true
     if _near_sport_counter():return true
     if _current_place=="PORTICI":return _avatar.position.distance_to(GROCERY_COUNTER)<1.5
     if _near_public_counter():return true
@@ -1467,6 +1470,7 @@ func _generate_chunk(place_id: String) -> void:
         "LIBRARY":
             _build_library()
             _build_caritas()
+            _build_shelter()
         "WORKSHOP":
             _building("Mechanical workshop", Color(0.41, 0.51, 0.59))
             _build_motor_court()
@@ -3141,6 +3145,33 @@ func _build_caritas() -> void:
     light.omni_range=8
     light.light_energy=1.5
     hall.add_child(light)
+
+func _build_shelter() -> void:
+    var room := Node3D.new()
+    room.name="DormitorioSolidale"
+    _scenery.add_child(room)
+    var plaster := Color("#d9d5c5")
+    for part in [[Vector3(4.8,0,-7.5),Vector2(0.24,5.5)],
+            [Vector3(11.2,0,-7.5),Vector2(0.24,5.5)],
+            [Vector3(8,0,-10.25),Vector2(6.4,0.24)],
+            [Vector3(6,0,-4.75),Vector2(2.4,0.24)],
+            [Vector3(10,0,-4.75),Vector2(2.4,0.24)]]:
+        _room_wall(room,part[0],part[1],plaster)
+    _box(room,Vector3(6.4,0.06,5.5),Color("#b6b1a0"),Vector3(8,0.03,-7.5))
+    _box(room,Vector3(6.6,0.25,5.7),Color("#687278"),Vector3(8,3.15,-7.5))
+    _physical_sign(room,"DORMITORIO SOLIDALE",Vector3(8,2.65,-4.56),0.0,4.0)
+    _room_furniture(room,Vector3(6.05,0,-8.9),Vector3(0.95,0.45,2.0),Color("#867760"))
+    _box(room,Vector3(0.92,0.16,1.96),Color("#d8dbcf"),Vector3(6.05,0.53,-8.9))
+    _box(room,Vector3(0.89,0.06,1.3),Color("#567b80"),Vector3(6.05,0.64,-8.65))
+    _box(room,Vector3(0.75,0.10,0.40),Color("#f0ede3"),Vector3(6.05,0.68,-9.6))
+    _room_furniture(room,Vector3(10.3,0,-9.4),Vector3(0.8,0.83,0.55),Color("#e1e4e1"))
+    _room_wall(room,Vector3(9.7,0,-8.7),Vector2(0.15,1.7),Color("#b5c8c8"))
+    _box(room,Vector3(1.0,0.07,1.0),Color("#c4d1d1"),Vector3(10.4,0.08,-7.9))
+    var light := OmniLight3D.new()
+    light.position=Vector3(8,2.7,-7.5)
+    light.omni_range=7.0
+    light.light_energy=1.4
+    room.add_child(light)
 
 # The market has real walkable counters, with separate vendor and customer sides.
 func _build_market_counters() -> void:
@@ -6709,6 +6740,21 @@ func _render_barber() -> void:
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _custody_active:return
+    if _near_shelter() and not _rebirth_active():
+        _action_title.text=tr("Shelter · Dormitorio solidale")
+        var shelter: Dictionary=_last_snapshot.get("shelter",{})
+        var info := Label.new()
+        info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        info.text=tr("Free emergency bed · check-in 20:00–22:00")
+        info.text+="\n"+tr("For visitors without housing and less than 35 EUR.")
+        _action_choices.add_child(info)
+        var bed := _button(tr("Sleep safely · 8 hours"),_garden_action.bind("shelter-sleep"))
+        bed.disabled=not bool(shelter.get("canSleep",false))
+        _action_choices.add_child(bed)
+        var wash := _button(tr("Free shower · 10 min"),_garden_action.bind("shelter-wash"))
+        wash.disabled=not bool(shelter.get("canWash",false))
+        _action_choices.add_child(wash)
+        return
     if _near_charity() and not _rebirth_active():
         _action_title.text=tr("Caritas · Community kitchen")
         var charity: Dictionary=_last_snapshot.get("caritas",{})
@@ -7762,6 +7808,9 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("shelter-"):
+        if _near_shelter() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("caritas-"):
         if _near_charity() and _connected and not _api.is_busy():_api.garden_action(action)
         return
