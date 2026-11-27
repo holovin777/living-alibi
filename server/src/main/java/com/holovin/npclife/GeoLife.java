@@ -81,13 +81,9 @@ final class GeoLife {
     static boolean atHome(TownLife.Citizen c){return c!=null&&c.alive&&c.travelRemaining==0&&c.currentSpace().equals(c.homeUnit);}
     static List<GeoProjection.Actor> household(TownLife.Town t,WorldState s,GeoProjection map){
         var self=RebirthLife.child(t);if(!atHome(self))return List.of();
-        var center=map.point(self.place);
-        var people=RebirthLife.visible(t).stream().filter(c->!"SLEEPING".equals(c.activity)).limit(8).toList();
-        var result=new ArrayList<GeoProjection.Actor>();
-        for(int i=0;i<people.size();i++){
-            var c=people.get(i);
-            result.add(new GeoProjection.Actor(c.id,center.x()-4.5+i%4*3,center.z()-1.5+i/4*3,HomeRoutineLife.activity(t,c,s.day,s.minute),canTalk(t,c),"STAND",0,"","",GameSession.appearanceStage(c)));
-        }
-        return List.copyOf(result);
+        var people=RebirthLife.visible(t).stream()
+            .filter(c->!c.id.equals(self.id)&&HomeRoutineLife.atHome(c)&&c.homeUnit.equals(self.homeUnit)&&!"SLEEPING".equals(c.activity))
+            .sorted(Comparator.comparing(c->c.id)).limit(8).toList();
+        return GeoHome.actors(t,s,map.point(self.place),people,c->canTalk(t,c));
     }
 }
