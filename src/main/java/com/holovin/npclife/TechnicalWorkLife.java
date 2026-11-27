@@ -53,6 +53,22 @@ final class TechnicalWorkLife {
                 new Order("street-lights","Public lighting efficiency upgrade",
                         "engineer",TownLife.Place.OFFICE,50,
                         "steel",1,"copper",1));
+        town.technicalOrders.computeIfAbsent("magnolia-lift",id->{
+            var o=new Order(id,"Casa Magnolia elevator / Ascensore","technician",
+                    TownLife.Place.NORTH_RESIDENCES,78,"spare-parts",2,null,0);
+            o.phase=Phase.COMPLETED;
+            return o;
+        });
+        town.technicalOrders.putIfAbsent("magnolia-lighting",
+                new Order("magnolia-lighting","Casa Magnolia common lighting / Luci condominiali",
+                        "technician",TownLife.Place.NORTH_RESIDENCES,55,"spare-parts",1,"copper",1));
+    }
+
+    record MagnoliaServices(int liftCondition,boolean liftWorking,int lightingCondition,boolean lightingWorking){}
+    static MagnoliaServices magnolia(TownLife.Town town){
+        int lift=town.technicalOrders.get("magnolia-lift").condition;
+        int lights=town.technicalOrders.get("magnolia-lighting").condition;
+        return new MagnoliaServices(lift,lift>65,lights,lights>65);
     }
 
     static List<Order> orders(TownLife.Town town) {
@@ -118,7 +134,8 @@ final class TechnicalWorkLife {
                 o.condition+"/100. Consumed stocked materials. Today's technical shift is now earned."+
                 (o.id.equals("water-pump")?
                     " Park fountain now has "+town.cleanWater+" clean-water unit(s).":
-                    " Better street lighting reduces night fatigue for people outdoors.");
+                    o.id.equals("street-lights")?" Better street lighting reduces night fatigue for people outdoors.":
+                    " Casa Magnolia communal equipment has been restored.");
     }
 
     // Linked citizens operate on the very same physical orders as the visitor.

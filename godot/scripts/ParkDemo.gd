@@ -347,7 +347,8 @@ func _process(delta: float) -> void:
         var unit: int = _stairwell.near_unit(_avatar.position)
         var invitation = _last_snapshot.get("apartmentVisit")
         if _stairwell.near_elevator(_avatar.position):
-            _stairwell_hint.text=tr("Elevator · floor %s · E: up · R: down") % _stairwell.floor_number(_avatar.position)
+            var services: Dictionary = _last_snapshot.get("magnoliaServices",{})
+            _stairwell_hint.text=(tr("Elevator · floor %s · E: up · R: down") % _stairwell.floor_number(_avatar.position)) if bool(services.get("liftWorking",true)) else tr("Elevator out of service · use stairs")
         elif unit>0 and invitation is Dictionary and int(invitation.get("unit",0))==unit:
             _stairwell_hint.text=tr("E: enter apartment %s") % unit
         elif unit>0:
@@ -493,6 +494,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 get_viewport().set_input_as_handled()
                 return
             if event.keycode in [KEY_E,KEY_R] and _stairwell.near_elevator(_avatar.position):
+                var services: Dictionary = _last_snapshot.get("magnoliaServices",{})
+                if not bool(services.get("liftWorking",true)):
+                    get_viewport().set_input_as_handled()
+                    return
                 var destination: Vector3 = _stairwell.elevator_destination(_avatar.position,1 if event.keycode==KEY_E else -1)
                 if destination!=_avatar.position:
                     _avatar.position=destination
@@ -6070,7 +6075,7 @@ func _toggle_actions() -> void:
         _render_actions()
         if _current_place == "WORKSHOP" and not _near_sport_counter() and not _api.is_busy():
             _api.view_business()
-        elif _current_place == "OFFICE" and not _api.is_busy():
+        elif _current_place in ["OFFICE","NORTH_RESIDENCES"] and not _api.is_busy():
             _api.list_work_orders()
 
 func _render_logistics(logistics: Dictionary) -> void:
@@ -7455,7 +7460,7 @@ func _render_actions() -> void:
             work_site = "WORKSHOP"
         "engineer", "investigator":
             work_site = "OFFICE"
-    if _current_place in ["WORKSHOP", "OFFICE"]:
+    if _current_place in ["WORKSHOP", "OFFICE","NORTH_RESIDENCES"]:
         for order in _work_orders:
             if str(order.get("place", "")) != _current_place:
                 continue
@@ -8226,6 +8231,11 @@ func _sync_stairwell_arrivals() -> void:
         _sync_resident_appearance(person,str(entry.get("appearanceStage","ADULT")))
         _sync_resident_uniform(person,str(entry.get("outfitVisual","")))
 
+func _sync_magnolia_services() -> void:
+    if not is_instance_valid(_stairwell):return
+    var services: Dictionary = _last_snapshot.get("magnoliaServices",{})
+    _stairwell.set_lighting_working(bool(services.get("lightingWorking",true)))
+
 func _near_stairwell() -> bool:
     if _stairwell_active or _rebirth_active() or _drive_active() or _cycling() or _apartment_active or _current_place!="NORTH_RESIDENCES":
         return false
@@ -8247,6 +8257,7 @@ func _set_stairwell(active: bool) -> void:
             add_child(_stairwell)
         _stairwell.show()
         _sync_stairwell_arrivals()
+        _sync_magnolia_services()
         for chunk in _chunks.values():
             chunk["root"].hide()
         _traffic_root.hide()
@@ -8456,6 +8467,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _set_stairwell(false)
     if _stairwell_active:
         _sync_stairwell_arrivals()
+        _sync_magnolia_services()
     if new_place != _current_place:
         _reset_jump()
         _reset_locomotion()

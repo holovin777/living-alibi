@@ -83,6 +83,12 @@ func _label(caption: String,at: Vector3,yaw: float) -> void:
     node.outline_size=0
     add_child(node)
 
+# Keep emergency light so broken common lighting never makes the stairs invisible.
+func set_lighting_working(working: bool) -> void:
+    for child in get_children():
+        if child is OmniLight3D:
+            child.light_energy=1.4 if working else 0.22
+
 func can_stand(at: Vector3,radius: float) -> bool:
     return absf(at.x)<=1.35-radius and at.z>=MIN_Z+radius and at.z<=MAX_Z-radius
 
