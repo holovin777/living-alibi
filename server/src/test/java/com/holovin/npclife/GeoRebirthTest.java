@@ -45,6 +45,35 @@ class GeoRebirthTest {
         assertEquals(residents+1,t.people.size());assertEquals(balance-20,a.money+b.money);
         assertEquals(1,t.pastLives.size());
     }
+    @Test void familyTreeUsesPersistedParentLinksAndKeepsDeceasedAncestors(){
+        var t=TownLife.create(new WorldState());
+        var p=PopulationGenerator.add(t,8);
+        var grand=p.get(0);var parent=p.get(1);var uncle=p.get(2);var other=p.get(3);
+        var self=p.get(4);var sibling=p.get(5);var cousin=p.get(6);var stranger=p.get(7);
+        DemographyLife.set(t,parent,"parent-a",grand.generationIndex);
+        DemographyLife.set(t,uncle,"parent-a",grand.generationIndex);
+        for(var c:java.util.List.of(self,sibling)){
+            DemographyLife.set(t,c,"parent-a",parent.generationIndex);
+            DemographyLife.set(t,c,"parent-b",other.generationIndex);
+        }
+        DemographyLife.set(t,cousin,"parent-a",uncle.generationIndex);
+        grand.alive=false;
+        DemographyLife.set(t,grand,"played-incarnation",1);
+        var relatives=GenealogyLife.relatives(t,self);
+        assertEquals(6,relatives.size());
+        assertTrue(relatives.stream().anyMatch(r->r.id().equals(grand.id)&&r.role().equals("Grandparent")&&!r.alive()&&r.incarnation()==1));
+        assertTrue(relatives.stream().anyMatch(r->r.id().equals(sibling.id)&&r.role().equals("Sibling")));
+        assertTrue(relatives.stream().anyMatch(r->r.id().equals(uncle.id)&&r.role().equals("Aunt/uncle")));
+        assertTrue(relatives.stream().anyMatch(r->r.id().equals(cousin.id)&&r.role().equals("Cousin")));
+        assertTrue(relatives.stream().noneMatch(r->r.id().equals(stranger.id)||r.id().equals(self.id)));
+        assertEquals(relatives,GenealogyLife.relatives(t.copy(),t.copy().get(self.id)));
+        for(long seed=-100;seed<100;seed++){
+            int trait=GenealogyLife.inheritedTrait(40,60,seed);
+            assertTrue(trait>=35&&trait<=65);
+            assertTrue(GenealogyLife.inheritedTrait(15,15,seed)>=15);
+            assertTrue(GenealogyLife.inheritedTrait(90,90,seed)<=90);
+        }
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

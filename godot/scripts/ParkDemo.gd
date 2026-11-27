@@ -7400,6 +7400,15 @@ func _render_actions() -> void:
                     _action_choices.add_child(traits)
                     for goal in personality.get("choices",[]):
                         _action_choices.add_child(_button("Aim: "+str(goal).replace("_"," ").capitalize(),_garden_action.bind("rebirth-ambition-"+str(goal))))
+                var relatives: Array=identity.get("familyTree",[])
+                if not relatives.is_empty():
+                    var tree:=Label.new()
+                    tree.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                    tree.text="Family tree / Albero genealogico"
+                    for relative in relatives:
+                        tree.text+="\n%s / %s: %s · %s%s" % [relative.get("role",""),relative.get("roleIt",""),relative.get("name",""),relative.get("age",0),"" if relative.get("alive",true) else " · Deceased / Deceduto"]
+                        if int(relative.get("incarnation",0))>0:tree.text+=" · Life / Vita #"+str(relative.get("incarnation"))
+                    _action_choices.add_child(tree)
                 for person in identity.get("relationships",[]):
                     var relation := Label.new()
                     relation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

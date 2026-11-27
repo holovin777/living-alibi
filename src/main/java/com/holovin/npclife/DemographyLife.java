@@ -69,9 +69,9 @@ final class DemographyLife {
         var c=new TownLife.Citizen(id,names[Math.floorMod(next,names.length)]+" "+surname,"Child",a.home);
         c.age=0;c.money=20;c.food=2;c.water=2;c.employed=false;c.occupation="Child";c.activity="AT_HOME";
         c.generationIndex=next;c.personalSeed=a.personalSeed^Long.rotateLeft(b.personalSeed,17)^next;
-        c.sociability=15+Math.floorMod(c.personalSeed,76);
-        c.carefulness=15+Math.floorMod(Long.rotateLeft(c.personalSeed,21),76);
-        c.curiosity=15+Math.floorMod(Long.rotateLeft(c.personalSeed,43),76);
+        c.sociability=GenealogyLife.inheritedTrait(a.sociability,b.sociability,c.personalSeed);
+        c.carefulness=GenealogyLife.inheritedTrait(a.carefulness,b.carefulness,Long.rotateLeft(c.personalSeed,21));
+        c.curiosity=GenealogyLife.inheritedTrait(a.curiosity,b.curiosity,Long.rotateLeft(c.personalSeed,43));
         c.goal="FIND_BALANCE";
         c.home=a.home;c.homeUnit=a.homeUnit;c.workplace=TownLife.Place.SCHOOL;
         a.money-=10;b.money-=10;t.people.put(id,c);

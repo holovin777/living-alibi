@@ -669,6 +669,15 @@ func _open_actions(work_only: bool=false) -> void:
         biography.text=_life_summary()+"\nSavings / Risparmi: €"+str(life.get("savings",0))
         if life.get("parentA")!=null:biography.text+="\nParents / Genitori: "+str(life.get("parentA"))+" + "+str(life.get("parentB"))
         action_list.add_child(biography)
+        var relatives: Array=life.get("familyTree",[])
+        if not relatives.is_empty():
+            var tree:=Label.new()
+            tree.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            tree.text="Family tree / Albero genealogico"
+            for relative in relatives:
+                tree.text+="\n%s / %s: %s · %s%s" % [relative.get("role",""),relative.get("roleIt",""),relative.get("name",""),relative.get("age",0),"" if relative.get("alive",true) else " · Deceased / Deceduto"]
+                if int(relative.get("incarnation",0))>0:tree.text+=" · Life / Vita #"+str(relative.get("incarnation"))
+            action_list.add_child(tree)
     var work: Dictionary=residents.world.get("work",{})
     if work_only or str(room.get("id",""))=="SCHOOL":WorkPanel.build(action_list,work,_perform_action)
     elif work.get("workspace") is Dictionary:
