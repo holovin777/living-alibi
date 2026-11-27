@@ -91,7 +91,14 @@ public final class GameSession implements AutoCloseable {
                                 String phase,int condition,int completedDay,
                                 String materialA,int requiredA,String materialB,int requiredB) { }
     public record DestinationView(String id,String label,int travelMinutes) { }
-    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual,String appearanceStage,String walkingCompanion,int conversationMinutes,String conversationReason) { }
+    public record ResidentView(String id,String name,String activity,String knownName,int conversations,String relationship,String mood,int personalDebt,int personalDebtDueDay,String workVisual,String outfitVisual,String appearanceStage,String walkingCompanion,int conversationMinutes,String conversationReason,String factoryStation) { }
+    // Only the observable workstation of an on-duty resident, never private employment history.
+    static String factoryStation(TownLife.Citizen c){
+        if(!c.alive||c.travelRemaining>0||!"WORKING".equals(c.activity)||c.place!=TownLife.Place.FACTORY)return "";
+        if("Factory machinist".equals(c.occupation))return "metalworks";
+        return FactoryNetworkLife.PLANTS.stream().filter(p->p.site()==c.place&&p.occupation().equals(c.occupation))
+            .map(FactoryNetworkLife.Plant::id).findFirst().orElse("");
+    }
     // Observable equipment, not a disclosure of a stranger's name or private employment record.
     static String workVisual(TownLife.Citizen c){
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
@@ -105,7 +112,7 @@ public final class GameSession implements AutoCloseable {
             case MARKET -> role.contains("vendor")||role.contains("seller")||role.equals("Shopkeeper")?"CRATE":"";
             case QUARRY -> role.equals("Miner")?"PICK":"";
             case WORKSHOP -> role.equals("Mechanic")||role.equals("Engineer")||role.equals("Independent fabricator")?"WRENCH":"";
-            case FACTORY -> role.equals("Factory machinist")?"WRENCH":"";
+            case FACTORY -> factoryStation(c).isEmpty()?"":"WRENCH";
             case SCHOOL -> role.equals("Teacher")?"TEACHING":"PAPERS";
             case OFFICE, LIBRARY, CLINIC -> "PAPERS";
             default -> "";
@@ -135,7 +142,7 @@ public final class GameSession implements AutoCloseable {
             case CAFE -> role.equals("Barista")?"CAFE_APRON":"";
             case CLINIC -> role.equals("Doctor")?"DOCTOR_COAT":role.equals("Nurse")?"SCRUBS":"";
             case QUARRY -> role.equals("Miner")?"HIGH_VIS":"";
-            case FACTORY -> role.equals("Factory machinist")?"HIGH_VIS":"";
+            case FACTORY -> factoryStation(c).isEmpty()?"":"HIGH_VIS";
             case WORKSHOP -> switch(role){
                 case "Engineer","Electrician","Technician","Mechanic","Independent fabricator" -> "TECHNICIAN";
                 case "Construction worker","Builder" -> "HIGH_VIS";
@@ -294,7 +301,7 @@ public final class GameSession implements AutoCloseable {
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
                             contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""),ConversationAvailability.minutes(town,c,state.day,state.minute),ConversationAvailability.reason(c,state.day,state.minute));
+                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""),ConversationAvailability.minutes(town,c,state.day,state.minute),ConversationAvailability.reason(c,state.day,state.minute),factoryStation(c));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();

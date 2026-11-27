@@ -1569,14 +1569,7 @@ func _generate_chunk(place_id: String) -> void:
                 _box(_scenery, Vector3(1.8, 1.1, 2.0), Color(0.57, 0.38, 0.28),
                         Vector3(offset, 0.55, 3.0))
         "FACTORY":
-            for x in [-8.0, -5.0, -2.0]:
-                _add_obstacle(Vector3(x, 0.0, 2.2), Vector2(2.0, 1.6))
-            _building("Parts factory", Color(0.50, 0.53, 0.56))
-            _box(_scenery, Vector3(1.5, 8.0, 1.5), Color(0.36, 0.37, 0.40),
-                    Vector3(-10.0, 8.0, 7.0))
-            for offset in [-8.0, -5.0, -2.0]:
-                _box(_scenery, Vector3(2.0, 1.0, 1.6), Color(0.32, 0.38, 0.42),
-                        Vector3(offset, 0.5, 2.2))
+            _build_factory_district()
         "RIVER":
             # A bridge keeps the east-west public road dry.
             for z in [-10.0, 10.0]:
@@ -3311,6 +3304,101 @@ func _build_dojo() -> void:
 func _near_dojo() -> bool:
     return not _apartment_active and _current_place=="SCHOOL" and Rect2(5.9,4.0,5.9,5.2).has_point(Vector2(_avatar.position.x,_avatar.position.z))
 
+# Stable bay identifiers match FactoryNetworkLife; these are local tile coordinates.
+func _factory_bays() -> Array:
+    return [
+        ["sawmill","Segheria",-1.0,6.0,Color("#a58a70")],
+        ["paper-mill","Cartiera",-1.0,13.0,Color("#b9b5a7")],
+        ["textile-mill","Tessitura",1.0,6.0,Color("#8d9eae")],
+        ["printing-house","Tipografia",1.0,13.0,Color("#a7a19b")],
+        ["garment-factory","Confezioni",-1.0,-6.0,Color("#aa989c")],
+        ["electronics-factory","Elettronica",-1.0,-13.0,Color("#8196a0")],
+        ["phone-assembly","Telefonia",1.0,-6.0,Color("#a7b0b0")],
+        ["watch-assembly","Orologeria",1.0,-13.0,Color("#999b90")]
+    ]
+
+func _build_factory_district() -> void:
+    var district := Node3D.new()
+    district.name="IndustrialDistrict"
+    _scenery.add_child(district)
+    var asphalt := Color("#676c70")
+    var dark := Color("#42494d")
+    var steel := Color("#9ba7ab")
+    for bay in _factory_bays():
+        var id := str(bay[0])
+        var side := float(bay[2])
+        var z := float(bay[3])
+        var wall: Color=bay[4]
+        var hall := Node3D.new()
+        hall.name=id
+        district.add_child(hall)
+        # Front faces the central road; a 2.4 m doorway is left physically clear.
+        for part in [[Vector3(side*14.8,0,z),Vector2(0.24,5.8)],
+                [Vector3(side*10,0,z-2.9),Vector2(9.6,0.24)],
+                [Vector3(side*10,0,z+2.9),Vector2(9.6,0.24)],
+                [Vector3(side*5.2,0,z-2.05),Vector2(0.24,1.7)],
+                [Vector3(side*5.2,0,z+2.05),Vector2(0.24,1.7)]]:
+            _room_wall(hall,part[0],part[1],wall)
+        _box(hall,Vector3(9.6,0.08,5.8),asphalt,Vector3(side*10,0.03,z))
+        _box(hall,Vector3(9.9,0.22,6.0),dark,Vector3(side*10,3.16,z))
+        _box(hall,Vector3(0.28,0.45,2.4),steel,Vector3(side*5.2,2.78,z))
+        _physical_sign(hall,str(bay[1]),Vector3(side*5.0,3.48,z),-side*PI/2.0,3.5)
+        _box(hall,Vector3(2.7,0.06,2.6),Color("#858c8e"),Vector3(side*3.8,0.03,z))
+        # Back-wall stock racks and two separated working benches.
+        for offset in [-1.45,1.45]:
+            _room_furniture(hall,Vector3(side*12.8,0,z+offset),Vector3(1.8,0.95,1.35),dark)
+            _box(hall,Vector3(1.9,0.10,1.45),steel,Vector3(side*12.8,1.0,z+offset))
+            var machine_color := Color("#5c796c") if id in ["sawmill","paper-mill","textile-mill"] else Color("#687c8e")
+            _box(hall,Vector3(0.9,0.68,0.9),machine_color,Vector3(side*13.0,1.39,z+offset))
+            _box(hall,Vector3(0.08,0.25,0.40),Color("#263b42"),Vector3(side*12.5,1.48,z+offset))
+            _box(hall,Vector3(0.09,0.10,0.10),Color("#90c6a2"),Vector3(side*12.45,1.48,z+offset-0.24))
+        _room_furniture(hall,Vector3(side*8.2,0,z+1.9),Vector3(2.0,0.7,0.8),Color("#927650"))
+        for i in range(3):
+            _box(hall,Vector3(0.5,0.35,0.54),Color("#bf9b67"),Vector3(side*(7.6+i*0.55),0.88,z+1.9))
+        var lamp := OmniLight3D.new()
+        lamp.position=Vector3(side*10,2.65,z)
+        lamp.omni_range=7.0
+        lamp.light_energy=1.2
+        hall.add_child(lamp)
+    # Shared industrial receiving yard, beside the existing job kiosk.
+    for z in [-3.6,3.6]:
+        _room_furniture(district,Vector3(-3.6,0,z),Vector3(1.4,0.7,0.85),Color("#a88a62"))
+        for x in [-4.0,-3.2]:
+            _box(district,Vector3(0.6,0.45,0.6),Color("#a88a62"),Vector3(x,0.91,z))
+    _physical_sign(district,"Zona industriale",Vector3(-3.6,2.5,3.6),PI,3.3)
+
+func _assign_factory_staff() -> void:
+    var spots: Dictionary={}
+    for bay in _factory_bays():
+        var side := float(bay[2])
+        var z := float(bay[3])
+        spots[str(bay[0])]=[Vector3(side*10.85,0,z-1.45),Vector3(side*10.85,0,z+1.45)]
+    # Metalworking remains a shared workshop bay inside the industrial district.
+    spots["metalworks"]=[Vector3(-9.1,0,-13.0),Vector3(-9.1,0,-14.5),Vector3(-9.1,0,-11.5)]
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b):return str(a.get_meta("resident_id",""))<str(b.get_meta("resident_id","")))
+    for child in people:
+        var person := child as Node3D
+        var bay := str(person.get_meta("factory_station",""))
+        var working := str(person.get_meta("activity",""))=="WORKING" and spots.has(bay)
+        var assigned := false
+        if working:
+            var available: Array=spots[bay]
+            while not available.is_empty():
+                var at: Vector3=available.pop_front()
+                if not _can_stand(at,WALKER_RADIUS):continue
+                if not person.has_meta("pre_work_anchor"):person.set_meta("pre_work_anchor",person.get_meta("anchor",person.position))
+                person.position=at
+                person.set_meta("anchor",at)
+                person.rotation.y=PI/2.0 if at.x<0 else -PI/2.0
+                assigned=true
+                break
+        if not assigned and person.has_meta("pre_work_anchor"):
+            var previous: Vector3=person.get_meta("pre_work_anchor")
+            person.set_meta("anchor",previous)
+            person.position=_open_anchor(previous)
+            person.remove_meta("pre_work_anchor")
+
 func _build_medical_building(pharmacy: bool) -> void:
     var building := Node3D.new()
     building.name="FarmaciaDelBorgo" if pharmacy else "AmbulatorioCivico"
@@ -4358,6 +4446,7 @@ func _render_residents() -> void:
         if person == null:
             person = _make_resident(id, i, str(resident.get("name", "Resident")))
         person.set_meta("activity", str(resident.get("activity", "")).to_upper())
+        person.set_meta("factory_station",str(resident.get("factoryStation","")))
         person.set_meta("conversation_minutes",int(resident.get("conversationMinutes",10)))
         person.set_meta("conversation_reason",str(resident.get("conversationReason","PERSONAL")))
         person.set_meta("mood",str(resident.get("mood","CALM")))
@@ -4611,6 +4700,9 @@ func _assign_work_stations() -> void:
     if _current_place=="SCHOOL":
         _assign_school_staff()
         return
+    if _current_place=="FACTORY":
+        _assign_factory_staff()
+        return
     var stations: Array[Vector3] = []
     var yaw := 0.0
     match _current_place:
@@ -4622,9 +4714,6 @@ func _assign_work_stations() -> void:
             yaw=-PI/2.0
         "QUARRY":
             stations=[Vector3(-11,0,4.7),Vector3(-8,0,4.7),Vector3(-5,0,4.7)]
-        "FACTORY":
-            stations=[Vector3(-8,0,0.8),Vector3(-5,0,0.8),Vector3(-2,0,0.8)]
-            yaw=PI
         "WORKSHOP":
             stations=[Vector3(12.5,0,9.5),Vector3(7.5,0,10.0)]
             yaw=PI
@@ -7627,6 +7716,7 @@ func _render_actions() -> void:
             if employed=="freight-driver" and not bool(_last_snapshot.get("freight",{}).get("active",false)):
                 _action_choices.add_child(_button("Load parts truck · paid delivery",_freight_action.bind("load")))
             _action_choices.add_child(_job_button("machinist","Apply: factory machinist"))
+            _render_factory_report()
         "CENTRO":
             var food_id := _centro_food_counter()
             if food_id.is_empty():
@@ -8332,6 +8422,18 @@ func _render_personal_goods() -> void:
                     _action_choices.add_child(_button(tr("Lend %s to %s") % [label,name_text],_garden_action.bind("personal-good:lend:"+id+":"+who)))
             elif str(item.get("borrowerId",""))==who:
                 _action_choices.add_child(_button(tr("Request %s back from %s") % [label,name_text],_garden_action.bind("personal-good:return:"+id+":"+who)))
+
+func _render_factory_report() -> void:
+    var report: Dictionary=_last_snapshot.get("factories",{})
+    if not bool(report.get("active",false)):return
+    var heading := Label.new()
+    heading.text=tr("Industrial enterprises")
+    _action_choices.add_child(heading)
+    for plant in report.get("plants",[]):
+        var line := Label.new()
+        line.text=tr("%s · Staff: %s · Stock: %s") % [tr(str(plant.get("id",""))),plant.get("employees",0),plant.get("stock",0)]
+        line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        _action_choices.add_child(line)
 
 func _render_home_services() -> void:
     var services: Dictionary=_last_snapshot.get("homeServices",{})
