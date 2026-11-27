@@ -460,8 +460,9 @@ final class GeoProjection {
         var visit=IntercomLife.apartment(t,s.day,s.minute);
         boolean privateRoom=room!=null&&(residential(room)||linkedHome);
         var interior=room==null?null:new Interior(privateRoom?"HOME":room.name(),privateRoom?(visit!=null&&"VISITING".equals(visit.status())?"Apartment / Appartamento "+visit.unit():"Your home / Casa tua"):room.label,point(room).x,point(room).z,inside.size());
+        final boolean insideRoom=room!=null;
         var availableActions=new ArrayList<Choice>();
-        if(!privateRoom)availableActions.addAll(choices(t,s,player).stream().filter(a->room==null||!outsideAction(a.id())).toList());
+        if(!privateRoom)availableActions.addAll(choices(t,s,player).stream().filter(a->!privateRoom&&(!insideRoom||!outsideAction(a.id()))).toList());
         availableActions.addAll(homeChoices(t,s,player,room));
         availableActions.addAll(enterpriseChoices(t,s,player,room));
         if(rebirth){availableActions.clear();availableActions.addAll(GeoLife.choices(t,s,this));}
