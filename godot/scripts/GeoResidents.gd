@@ -10,6 +10,11 @@ var day:=1
 var minute:=0
 var traffic: Node3D
 var enabled:=false
+var world: Dictionary={}
+var action_http: HTTPRequest
+var last_message:=""
+signal first_snapshot(point: Vector2)
+var first:=true
 
 func configure(source: Node3D, use_server: bool) -> void:
     traffic=source
@@ -19,6 +24,10 @@ func configure(source: Node3D, use_server: bool) -> void:
     http.timeout=3.0
     add_child(http)
     http.request_completed.connect(_received)
+    action_http=HTTPRequest.new()
+    action_http.timeout=30.0
+    add_child(action_http)
+    action_http.request_completed.connect(_action_received)
 
 func update_residents(pos: Vector2,delta: float) -> void:
     if not enabled:return
@@ -48,6 +57,11 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
         return
     connected=true
     traffic.set_java_population(true)
+    world=parsed
+    if first and parsed.get("playerDistrict") is Dictionary:
+        first=false
+        var place: Dictionary=parsed["playerDistrict"]
+        first_snapshot.emit(Vector2(float(place["x"]),float(place["z"])))
     population=int(parsed.get("population",0))
     commuting=int(parsed.get("commuting",0))
     day=int(parsed.get("day",1))
@@ -61,16 +75,48 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
             var node: Node3D=traffic._person()
             add_child(node)
             node.position=goal
-            people[id]={"node":node,"goal":goal,"phase":0.0}
+            people[id]={"node":node,"goal":goal,"phase":0.0,"talkable":bool(person.get("talkable",false))}
         else:
             people[id]["goal"]=goal
+            people[id]["talkable"]=bool(person.get("talkable",false))
     for id in people.keys():
         if not seen.has(id):
             people[id]["node"].queue_free()
             people.erase(id)
 
+func enter_district(pos: Vector2) -> void:
+    if not connected or not bool(world.get("canEnter",false)):return
+    var destination: Dictionary=world.get("nearestDistrict",{})
+    _action("enter",{"destination":destination.get("id",""),"x":pos.x,"z":pos.y})
+
+func nearby_talker(pos: Vector2) -> String:
+    var best:=4.0
+    var id:=""
+    for key in people:
+        var record: Dictionary=people[key]
+        if not bool(record.get("talkable",false)):continue
+        var node: Node3D=record["node"]
+        var distance:=pos.distance_to(Vector2(node.position.x,node.position.z))
+        if distance<best:
+            best=distance
+            id=str(key)
+    return id
+
+func speak(id: String,message: String,pos: Vector2) -> void:
+    _action("speak",{"id":id,"message":message,"language":"it","x":pos.x,"z":pos.y})
+
+func _action(endpoint: String,data: Dictionary) -> void:
+    if not connected or action_http.get_http_client_status()!=HTTPClient.STATUS_DISCONNECTED:return
+    action_http.request("http://127.0.0.1:8091/geo/"+endpoint,["Content-Type: application/json"],HTTPClient.METHOD_POST,JSON.stringify(data))
+
+func _action_received(result: int,_code: int,_headers: PackedStringArray,body: PackedByteArray) -> void:
+    var parsed=JSON.parse_string(body.get_string_from_utf8())
+    last_message=str(parsed.get("message","Action failed")) if result==HTTPRequest.RESULT_SUCCESS and parsed is Dictionary else "Java action failed"
+    elapsed=1.0
+
 func _offline() -> void:
     connected=false
-    traffic.set_java_population(false)
+    world.clear()
+    traffic.set_java_population(enabled)
     for record in people.values():record["node"].queue_free()
     people.clear()

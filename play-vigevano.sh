@@ -20,16 +20,17 @@ fi
 if [[ "${1:-}" == "--preview-only" ]]; then
     exec "$GODOT" --path "$ROOT/godot" res://scenes/vigevano.tscn -- "--city-map=$ROOT/data/vigevano.json"
 fi
-for cmd in python3 java javac curl; do
-    command -v "$cmd" >/dev/null || { echo "$cmd required for Java population."; exit 1; }
+for cmd in python3 java mvn curl; do
+    command -v "$cmd" >/dev/null || { echo "$cmd required for the shared Java world."; exit 1; }
 done
-if curl -fsS --max-time 1 http://127.0.0.1:8091/geo/nearby >/dev/null 2>&1; then
-    echo "Geo world already running on port 8091. Close it first."; exit 1
+if curl -fsS --max-time 1 http://127.0.0.1:8080/api/v1/world >/dev/null 2>&1 || curl -fsS --max-time 1 http://127.0.0.1:8091/geo/nearby >/dev/null 2>&1; then
+    echo "Living Alibi already running. Close the other server first."; exit 1
 fi
 python3 tools/export_geo_population.py data/vigevano.json data/vigevano-graph.tsv
-mkdir -p target/geo-world
-javac -d target/geo-world tools/geoworld/GeoWorld.java
-java -cp target/geo-world GeoWorld data/vigevano-graph.tsv data/vigevano-world.properties "${GEO_POPULATION:-500}" 8091 >data/vigevano-server.log 2>&1 &
+echo "Building shared Java world and Spring API..."
+mvn -q -DskipTests install
+mvn -q -f server/pom.xml -DskipTests package
+java -jar server/target/living-alibi-server-1.16.0.jar --server.port=8091 --server.address=127.0.0.1 --living-alibi.database="$ROOT/data/world.db" --living-alibi.geo-graph="$ROOT/data/vigevano-graph.tsv" >data/vigevano-server.log 2>&1 &
 SERVER_PID=$!
 cleanup(){ kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; }
 trap cleanup EXIT
@@ -37,11 +38,11 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 READY=false
 for _ in {1..60}; do
-    if curl -fsS --max-time 1 http://127.0.0.1:8091/geo/nearby >/dev/null 2>&1; then READY=true; break; fi
+    if curl -fsS --max-time 2 http://127.0.0.1:8091/geo/nearby >/dev/null 2>&1; then READY=true; break; fi
     kill -0 "$SERVER_PID" 2>/dev/null || break
     sleep 1
 done
 if [[ "$READY" != true ]]; then
-    echo "Geographic world failed. Existing saves preserved."; tail -n 20 data/vigevano-server.log; exit 1
+    echo "Shared Java world failed."; tail -n 20 data/vigevano-server.log; exit 1
 fi
 "$GODOT" --path "$ROOT/godot" res://scenes/vigevano.tscn -- "--city-map=$ROOT/data/vigevano.json" --geo-world

@@ -68,7 +68,7 @@ if [[ ! -f "$ROOT/godot/project.godot" || ! -f "$ROOT/server/pom.xml" ]]; then
     exit 1
 fi
 
-if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/world >/dev/null 2>&1; then
+if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/world >/dev/null 2>&1 || curl -fsS --max-time 2 http://127.0.0.1:8091/geo/nearby >/dev/null 2>&1; then
     echo "A Living Alibi server already answers on port 8080." >&2
     echo "Close the other server before launching another instance." >&2
     exit 1

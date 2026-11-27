@@ -25,6 +25,10 @@ const Traffic=preload("res://scripts/GeoTraffic.gd")
 var traffic: Node3D
 const Residents=preload("res://scripts/GeoResidents.gd")
 var residents: Node3D
+var chat: LineEdit
+var chat_target:=""
+var shared_mode:=false
+var district_sign: Label3D
 
 func _ready() -> void:
     var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
@@ -54,7 +58,25 @@ func _ready() -> void:
     traffic.configure(city.get("graph",{}))
     residents=Residents.new()
     add_child(residents)
-    residents.configure(traffic,"--geo-world" in OS.get_cmdline_user_args())
+    shared_mode="--geo-world" in OS.get_cmdline_user_args()
+    residents.configure(traffic,shared_mode)
+    traffic.set_java_population(shared_mode)
+    residents.first_snapshot.connect(_sync_spawn)
+    district_sign=Label3D.new()
+    district_sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+    district_sign.font_size=42
+    district_sign.pixel_size=0.012
+    district_sign.modulate=Color("#f2d38a")
+    district_sign.hide()
+    add_child(district_sign)
+    chat=LineEdit.new()
+    canvas.add_child(chat)
+    chat.position=Vector2(12,145)
+    chat.custom_minimum_size=Vector2(430,36)
+    chat.placeholder_text="Scrivi / Write a message, then Enter"
+    chat.max_length=400
+    chat.text_submitted.connect(_send_chat)
+    chat.hide()
     city_map=CityMap.new()
     canvas.add_child(city_map)
     city_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -124,6 +146,25 @@ func _material(color: Color) -> StandardMaterial3D:
 
 func _input(event: InputEvent) -> void:
     if not ready_to_walk:return
+    if chat.visible:
+        if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
+            chat.hide()
+            Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+            get_viewport().set_input_as_handled()
+        return
+    if event is InputEventKey and event.pressed and not event.echo and not city_map.visible:
+        var pos:=Vector2(walker.position.x,walker.position.z)
+        if event.keycode==KEY_E:
+            residents.enter_district(pos)
+        elif event.keycode==KEY_T:
+            chat_target=residents.nearby_talker(pos)
+            if not chat_target.is_empty():
+                chat.clear()
+                chat.show()
+                Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+                chat.grab_focus()
+                get_viewport().set_input_as_handled()
+                return
     if event is InputEventKey and event.pressed and not event.echo and (event.keycode==KEY_M or (event.keycode==KEY_ESCAPE and city_map.visible)):
         city_map.visible=not city_map.visible
         Input.mouse_mode=Input.MOUSE_MODE_VISIBLE if city_map.visible else Input.MOUSE_MODE_CAPTURED
@@ -144,9 +185,13 @@ func _physics_process(delta: float) -> void:
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
-    if city_map.visible:
+    if city_map.visible or chat.visible or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)))):
         walker.velocity.x=0
         walker.velocity.z=0
+        street_timer+=delta
+        if street_timer>=0.5:
+            street_timer=0
+            _update_navigation()
         return
     if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):direction.z-=1
     if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):direction.z+=1
@@ -206,10 +251,35 @@ func _update_navigation() -> void:
     city_map.queue_redraw()
     hud.text="VIGEVANO · "+(street_name if not street_name.is_empty() else "Geographic preview")+"\nWASD · Space jump · M map · Esc cursor | chunks %s/9" % chunks.size()
     if residents.connected:
-        hud.text+="\nDay %s · %02d:%02d · Java residents %s · commuting %s · nearby %s · cars %s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.population,residents.commuting,residents.people.size(),traffic.count("drive")]
+        var world: Dictionary=residents.world
+        var district: Dictionary=world.get("playerDistrict",{})
+        var nearest: Dictionary=world.get("nearestDistrict",{})
+        hud.text+="\nDay %s · %02d:%02d · residents %s · nearby %s · €%s · health %s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.population,residents.people.size(),world.get("money",0),world.get("health",0)]
+        hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk"
+        if bool(world.get("confined",false)) or bool(world.get("rebirth",false)):hud.text+="\nOpen regular game to continue custody / rebirth."
+        if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
+        if not nearest.is_empty():
+            district_sign.position=Vector3(float(nearest["x"]),2.5,float(nearest["z"]))
+            district_sign.text=str(nearest.get("label",""))+" · E"
+            district_sign.show()
+    elif shared_mode:
+        district_sign.hide()
+        hud.text+="\nConnecting to shared Java world..."
     else:
         hud.text+="\nLocal traffic: %s cars · %s pedestrians (preview)" % [traffic.count("drive"),traffic.count("walk")]
     if not route_status.is_empty():hud.text+="\n"+route_status
+
+func _sync_spawn(point: Vector2) -> void:
+    walker.position=Vector3(point.x,1.05,point.y)
+    walker.velocity=Vector3.ZERO
+    _stream()
+    _update_navigation()
+
+func _send_chat(message: String) -> void:
+    chat.hide()
+    Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+    if not message.strip_edges().is_empty():
+        residents.speak(chat_target,message,Vector2(walker.position.x,walker.position.z))
 
 func _point(value: Array,y: float) -> Vector3:
     return Vector3(float(value[0]),y,float(value[1]))

@@ -531,6 +531,34 @@ public final class GameSession implements AutoCloseable {
         return apply(town.copy(),minutes,"Waited "+minutes+" minute(s).");
     }
 
+    synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z){
+        return map.view(town,state,new GeoProjection.Point(x,z));
+    }
+    synchronized void geoTick(int minutes) throws SQLException {
+        if(!RebirthLife.active(town))waitMinutes(minutes);
+    }
+    synchronized void geoEnter(GeoProjection map,String destination,double x,double z) throws SQLException {
+        JusticeLife.requireFree(town);
+        if(RebirthLife.active(town))throw new IllegalArgumentException("Use regular mode for rebirth.");
+        PlayerLife.requireAlive(town.player);
+        var place=PlayerLife.destination(destination);
+        var view=map.view(town,state,new GeoProjection.Point(x,z));
+        if(!view.canEnter()||!view.nearestDistrict().id().equals(place.name()))
+            throw new IllegalArgumentException("Approach the district marker.");
+        if(town.player.place==place)return;
+        if(IntercomLife.insideVisit(town,state.day,state.minute))
+            throw new IllegalArgumentException("Finish the apartment visit.");
+        var copy=town.copy();
+        // The player has walked there in Godot; avoid charging travel twice.
+        copy.player.place=place;copy.player.destination=place;copy.player.travelRemaining=0;
+        apply(copy,0,"Entered "+place.label+".");
+    }
+    synchronized String geoSpeak(GeoProjection map,String id,String message,String language,double x,double z) throws SQLException {
+        var actor=geoNearby(map,x,z).residents().stream().filter(a->a.id().equals(id)&&a.talkable()
+                &&Math.hypot(a.x()-x,a.z()-z)<=4).findFirst().orElseThrow(()->new IllegalArgumentException("Approach an available resident in your current district."));
+        return speak(actor.id(),message,language).message();
+    }
+
     public synchronized ActionView move(String destination) throws SQLException {
         var copy=town.copy();
         var place=PlayerLife.destination(destination);
