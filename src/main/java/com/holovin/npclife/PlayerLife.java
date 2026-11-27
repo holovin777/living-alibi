@@ -441,7 +441,10 @@ final class PlayerLife {
             KnowledgeLife.shareableIntroduction(town,resident,contact.knownName,day,minute);
             return "All right. I may mention that we met.";
         }
-        if(recall)return SocialMemoryLife.recollection(town,id);
+        if(recall){
+            String lasting=LifetimeMemoryLife.recollect(town,resident,"en");
+            return lasting==null?SocialMemoryLife.recollection(town,id):lasting;
+        }
         if(support)return SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT)==day?"Thank you for being here.":"Thank you for the kind words.";
         if(askingMood)return EmotionLife.reply(EmotionLife.mood(town,resident,day,minute),contact.trust>=55);
         if(spoken.equalsIgnoreCase("Any news about visitors?"))

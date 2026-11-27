@@ -106,12 +106,16 @@ final class KnowledgeLife {
         // Choose the freshest useful claim, never rewrite it as a first-hand observation.
         for(Belief claim:source.values()) {
             long age=current-((long)(claim.eventDay()-1)*1440+claim.eventMinute());
-            if(age<0 || age>14L*1440 || claim.hops()>=3 ||
+            boolean lasting=LifetimeMemoryLife.episode(claim);
+            if(age<0 || (!lasting&&age>14L*1440) || claim.hops()>=3 ||
                     receiver.containsKey(claim.eventKey()))continue;
             // Visitor news travels only through ordinary trusted social encounters.
-            if(claim.actorId().startsWith("visitor-")) {
+            if(lasting||claim.actorId().startsWith("visitor-")) {
                 var bond=town.existingRelationship(speaker.id,listener.id);
                 if(bond==null || bond.trust<45 || speaker.sociability<40)continue;
+                // Anonymous personal recollections stay private: a rumor must
+                // have a voluntarily disclosed alias, not identify a stranger.
+                if(lasting&&claim.statement().contains("someone I know"))continue;
             }
             if(chosen==null || claim.eventDay()>chosen.eventDay() ||
                     (claim.eventDay()==chosen.eventDay() && claim.eventMinute()>chosen.eventMinute()))

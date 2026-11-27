@@ -48,6 +48,11 @@ final class SpontaneousSpeechLife {
             // Stable opportunities in a one-hour window. More sociable people
             // initiate more often, without consuming the world's RNG on reads.
             if(Math.floorMod(c.personalSeed^slot,100)>=c.sociability/3)continue;
+            if(known&&Math.floorMod(c.personalSeed+slot,7)==0){
+                String en=LifetimeMemoryLife.recollect(t,c,"en");
+                String it=LifetimeMemoryLife.recollect(t,c,"it");
+                if(en!=null&&it!=null){result.add(offer(t,c,"RECOLLECTION",en,it,55,tick/1440));continue;}
+            }
             if(friend&&Math.floorMod(c.personalSeed+slot,3)==0)
                 result.add(offer(t,c,"INVITE","Would you like to go for a walk?","Ti va di fare una passeggiata?",50,slot));
             else if(known)

@@ -15,6 +15,7 @@ final class SocialMemoryLife {
     }
     static void remember(TownLife.Town town,String resident,Kind kind,int day) {
         town.industryStocks.merge(key(town,resident,kind),day,Math::max);
+        LifetimeMemoryLife.remember(town,resident,kind,day);
         if(kind==Kind.HURT||kind==Kind.BROKEN_TRUST)town.industryStocks.put(key(town,resident,Kind.UNRESOLVED),1);
         if(kind==Kind.APOLOGY)town.industryStocks.put(key(town,resident,Kind.UNRESOLVED),0);
     }

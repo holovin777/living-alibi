@@ -537,7 +537,10 @@ public final class GameSession implements AutoCloseable {
             reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")
                     ?NewspaperLife.interview(copy,resident,state.day,state.minute)
                     :PlayerLife.speak(copy,residentId,message,state.day,state.minute,stairwell);
-            if(ConversationMemory.importantQuestion(message)){
+            if(LifetimeMemoryLife.question(message)&&LifetimeMemoryLife.recollect(copy,resident,language)!=null){
+                reply=LifetimeMemoryLife.recollect(copy,resident,language);
+                rendered=language!=null;
+            }else if(ConversationMemory.importantQuestion(message)){
                 reply=ConversationMemory.firstMeeting(prior,language);
                 rendered=language!=null;
             } else if(recall){
