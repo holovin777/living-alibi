@@ -101,7 +101,7 @@ final class FactoryNetworkLife {
             for(var p:PLANTS)if(SupplyChainLife.attending(t,p.site(),p.occupation()))produce(t,p);
         }
         if(s.minute==900&&SupplyChainLife.once(t,"network-delivery",s.day)&&freight){
-            for(var p:PLANTS)deliver(t,p);
+            for(var p:PLANTS)if(deliver(t,p))WorkplaceRewards.afterSale(t,s,p);
         }
     }
     record PlantView(String id,String district,String output,int stock,int employees,int funds){}
