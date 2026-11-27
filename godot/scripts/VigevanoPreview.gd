@@ -265,7 +265,7 @@ func _input(event: InputEvent) -> void:
             elif civilian_car.visible and walker.position.distance_to(civilian_car.position)<5:
                 residents.drive_command("steal",pos)
             return
-        if event.keycode==KEY_P and residents.connected and not bool(residents.world.get("rebirth",false)):
+        if event.keycode==KEY_P and residents.connected:
             phone_panel.open_phone(residents.world)
             Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
             get_viewport().set_input_as_handled()

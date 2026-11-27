@@ -743,6 +743,10 @@ public final class GameSession implements AutoCloseable {
     synchronized void geoEnter(GeoProjection map,String destination,double x,double z) throws SQLException {
         JusticeLife.requireFree(town);
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
+        if("phone-digital-pay".equals(action)){
+            if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action)))throw new IllegalArgumentException("Digital action unavailable.");
+            return new GeoProjection.ActionResult(gardenAction(action).message(),null);
+        }
         if(RebirthLife.active(town)){
             var c=RebirthLife.child(town);
             if(!GeoLife.canWalk(town,state)||!RebirthLife.linkedAdult(town,c)||!GeoLife.atHome(c))throw new IllegalArgumentException("Use F for permitted travel.");
@@ -946,6 +950,10 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if("phone-digital-pay".equals(action)){
+            var copy=town.copy();var message=DigitalLife.pay(copy,state);
+            return applyInternal(copy,0,message,true);
+        }
         if(persistentWorld&&action!=null&&action.startsWith("rebirth-wait"))
             throw new IllegalArgumentException("The server clock runs at 1:24. Waiting cannot advance the entire world.");
         if("justice-pay-fine".equals(action)){

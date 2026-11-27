@@ -29,7 +29,7 @@ func _ready() -> void:
     var tabs:=GridContainer.new()
     tabs.columns=3
     outer.add_child(tabs)
-    for tab in ["Calls","Messages","Contacts","Jobs","Bank","Meetings"]:
+    for tab in ["Web","Calls","Messages","Contacts","Jobs","Bank","Meetings"]:
         var btn:=Button.new()
         btn.text=tab
         btn.size_flags_horizontal=Control.SIZE_EXPAND_FILL
@@ -47,6 +47,7 @@ func _ready() -> void:
 
 func open_phone(world: Dictionary) -> void:
     show()
+    if bool(world.get("rebirth",false)):current_tab="Web"
     refresh(world,"",false,true)
 
 func refresh(world: Dictionary,message: String,pending: bool,force: bool=false) -> void:
@@ -90,6 +91,9 @@ func _render() -> void:
         content.remove_child(child)
         child.queue_free()
     var report: Dictionary=data.get("report",{})
+    if current_tab=="Web":
+        _render_web()
+        return
     if not bool(report.get("available",false)):
         _label("Phone unavailable / Telefono non disponibile")
         return
@@ -136,3 +140,23 @@ func _render() -> void:
             for meeting in report.get("meetings",[]):
                 var minute:=int(meeting.get("minute",0))
                 _label("%s · Day %s %02d:%02d\n%s · %s" % [meeting.get("name",""),meeting.get("day",0),int(float(minute)/60.0),minute%60,meeting.get("place",""),meeting.get("status","")])
+
+func _render_web() -> void:
+    var web=data.get("digital")
+    if not web is Dictionary:
+        _label("Web portal unavailable / Portale non disponibile")
+        return
+    if not bool(web.get("online",false)):
+        _label("Network offline / Rete non disponibile")
+        return
+    _label("LIVING NET · In-game web / Rete interna")
+    _label("Wallet / Portafoglio: €%s · Bills / Debiti: €%s" % [web.get("wallet",0),web.get("bills",0)])
+    for action in data.get("actions",[]):
+        if str(action.get("id",""))=="phone-digital-pay":_button(str(action.get("label","")),func():requested_action.emit("phone-digital-pay"))
+    for site in web.get("sites",[]):
+        _label(str(site.get("name",""))+" · "+str(site.get("status",""))+"\n"+str(site.get("description","")))
+    _label("Job board / Offerte di lavoro")
+    for job in web.get("jobs",[]):_label(str(job))
+    _label("Apply in person / Candidati di persona")
+    _label("Local news / Notizie locali")
+    for notice in web.get("news",[]):_label("Day "+str(notice.get("day",0))+" · "+str(notice.get("text","")))

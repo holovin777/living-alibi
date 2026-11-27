@@ -26,10 +26,15 @@ final class GeoProjection {
     record Choice(String id,String label){}
     record PhoneJob(String id,String title,District workplace,String subject,int requiredSkill,int currentSkill,int wage,boolean funded){}
     record PhoneView(PhoneLife.Report report,List<AddressLife.Entry> contacts,BankLife.Report bank,
-                     List<PhoneJob> jobs,District bankLocation,List<Choice> actions,Map<String,District> contactEntrances){}
+                     List<PhoneJob> jobs,District bankLocation,List<Choice> actions,Map<String,District> contactEntrances,DigitalLife.View digital){}
     PhoneView phone(TownLife.Town t,WorldState s){
         var report=PhoneLife.report(t,s.day,s.minute);
-        if(!report.available())return new PhoneView(report,List.of(),null,List.of(),null,List.of(),Map.of());
+        var digital=DigitalLife.view(t,s);
+        if(!report.available()){
+            var actions=new ArrayList<Choice>();
+            if(digital!=null&&digital.canPay())actions.add(new Choice("phone-digital-pay","Pay outstanding bills / Paga bollette"));
+            return new PhoneView(report,List.of(),null,List.of(),null,List.copyOf(actions),Map.of(),digital);
+        }
         var jobs=CareerLife.offers().stream().map(j->new PhoneJob(j.id(),j.title(),district(j.workplace()),j.subject(),
             j.requiredSkill(),CareerLife.skill(t.player,j.subject()),j.wage(),t.employerFunds.getOrDefault(j.id(),0)>=j.wage())).toList();
         var actions=new ArrayList<Choice>();
@@ -59,7 +64,7 @@ final class GeoProjection {
             int building=AddressLife.sharedBuilding(t,contact.residentId());
             if(building>=1&&building<=3)locations.put(contact.residentId(),entrance(building));
         }
-        return new PhoneView(report,contacts,BankLife.report(t),jobs,district(TownLife.Place.OFFICE),List.copyOf(actions),Map.copyOf(locations));
+        return new PhoneView(report,contacts,BankLife.report(t),jobs,district(TownLife.Place.OFFICE),List.copyOf(actions),Map.copyOf(locations),digital);
     }
     record Interior(String id,String label,double x,double z,int occupants){}
     record Weather(String season,String sky,int temperatureC,boolean raining,boolean snowing){}
