@@ -326,7 +326,7 @@ func _physics_process(delta: float) -> void:
     var linked:=bool(residents.world.get("rebirth",false))
     if not actions_panel.visible and not residents.action_pending and linked and str(life.get("phase",""))=="CHOICE":
         for action in residents.world.get("actions",[]):
-            if str(action.get("id",""))=="rebirth-first-boy":
+            if str(action.get("id","")) in ["rebirth-first-boy","rebirth-return"]:
                 _open_actions()
                 break
     var age:=int(life.get("age",0)) if linked else -1

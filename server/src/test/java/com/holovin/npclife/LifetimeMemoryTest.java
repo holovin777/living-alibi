@@ -30,6 +30,7 @@ class LifetimeMemoryTest {
         assertTrue(t.beliefs.get(child.id).containsKey(ownKey));
         s.day=3;s.minute=600;parent.alive=false;
         assertTrue(RebirthLife.settleLinkedDeath(t,s.day,s.minute));
+        RebirthLife.resumeAfterDeath(t,s.day);
         assertSame(child,RebirthLife.child(t));
         assertTrue(t.player.contacts.isEmpty());
         assertEquals(0,SocialMemoryLife.last(t,witness.id,SocialMemoryLife.Kind.SUPPORT));

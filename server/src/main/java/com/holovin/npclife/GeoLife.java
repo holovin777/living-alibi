@@ -18,6 +18,10 @@ final class GeoLife {
         if(!RebirthLife.active(t)||JusticeLife.confined(t))return result;
         var life=view(t,s);var c=RebirthLife.child(t);
         if(life.phase().equals("CHOICE")){
+            if(RebirthLife.returnPending(t)){
+                add(result,"rebirth-return","Continue next life / Continua la prossima vita");
+                return List.copyOf(result);
+            }
             if(FirstLifeChoice.pending(t)){
                 add(result,"rebirth-first-boy","Boy / Bambino");
                 add(result,"rebirth-first-girl","Girl / Bambina");

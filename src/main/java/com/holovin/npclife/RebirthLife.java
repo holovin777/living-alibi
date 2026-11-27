@@ -9,6 +9,8 @@ final class RebirthLife {
     private RebirthLife(){}
     static final String PHASE="rebirth:phase", CHILD="rebirth:child";
     static final int ADULT=0, CHOICE=1, CHILDHOOD=2, LINKED_ADULT=3;
+    static final String RETURN_PENDING="rebirth:return-pending", DECEASED_PARENT="rebirth:deceased-parent";
+    static boolean returnPending(TownLife.Town t){return t.industryStocks.getOrDefault(RETURN_PENDING,0)>0;}
     static void ensure(TownLife.Town t){
         t.industryStocks.putIfAbsent(PHASE,ADULT);t.industryStocks.putIfAbsent(CHILD,0);
         t.industryStocks.putIfAbsent(FOCUS,0);t.industryStocks.putIfAbsent(LAST_CHAT,0);
@@ -29,7 +31,7 @@ final class RebirthLife {
         return changed;
     }
     static boolean acceptNaturalBirths(TownLife.Town t,WorldState clock,List<TownLife.Citizen> births){
-        if(!randomBirth(t)||phase(t)!=CHOICE||FirstLifeChoice.pending(t))return false;
+        if(!randomBirth(t)||phase(t)!=CHOICE||FirstLifeChoice.pending(t)||returnPending(t))return false;
         var eligible=births.stream().filter(c->c.alive&&c.age==0
                 &&DemographyLife.get(t,c,"born")==clock.day
                 &&DemographyLife.get(t,c,"played-incarnation")==0&&!FirstLifeChoice.accountOwned(t,c)
@@ -86,6 +88,7 @@ final class RebirthLife {
         return List.copyOf(result);
     }
     static String choose(TownLife.Town t,int day,int first,int second){
+        if(returnPending(t))throw new IllegalArgumentException("Resume after your previous death first.");
         if(randomBirth(t))throw new IllegalArgumentException("Birth is assigned by the world.");
         if(phase(t)!=CHOICE)throw new IllegalArgumentException("No family selection is pending.");
         var a=DemographyLife.byIndex(t,first);var b=DemographyLife.byIndex(t,second);
@@ -161,13 +164,21 @@ final class RebirthLife {
         t.player=next;
         t.industryStocks.put(CHILD,0);t.industryStocks.put(PHASE,CHOICE);
         t.industryStocks.put(FOCUS,0);t.industryStocks.put(LAST_CHAT,0);t.industryStocks.put(TRAVEL,0);
-        var successor=eldestSuccessor(t,c,day,incarnation);
-        if(successor!=null){
-            linkNewborn(t,successor); // Links the existing resident; does not create or reset one.
-            if(successor.age>=18)t.industryStocks.put(PHASE,LINKED_ADULT);
-            synchronize(t);
-        }
+        t.industryStocks.put(RETURN_PENDING,1);
+        t.industryStocks.put(DECEASED_PARENT,c.generationIndex);
         return true;
+    }
+    /** Explicit return: select among children still alive and unclaimed now, never at death. */
+    static String resumeAfterDeath(TownLife.Town t,int day){
+        if(!returnPending(t)||phase(t)!=CHOICE)throw new IllegalArgumentException("No ended life is awaiting your return.");
+        var parent=DemographyLife.byIndex(t,t.industryStocks.getOrDefault(DECEASED_PARENT,0));
+        var successor=parent==null?null:eldestSuccessor(t,parent,day,t.player.incarnation-1);
+        t.industryStocks.put(RETURN_PENDING,0);t.industryStocks.put(DECEASED_PARENT,0);
+        if(successor==null)return "No available living child. Await your next birth.";
+        linkNewborn(t,successor);
+        if(successor.age>=18)t.industryStocks.put(PHASE,LINKED_ADULT);
+        synchronize(t);
+        return "Continue as "+successor.name+".";
     }
     record PastLife(int incarnation,String name,String residentId,int day,int minute,int age,String district){}
     static List<PastLife> history(TownLife.Town t){
@@ -526,6 +537,7 @@ final class RebirthLife {
     record Conversation(String id,String name){}
     // Bound each request: early childhood is faster, adolescence is slower.
     static int maxWaitDays(TownLife.Town t){
+        if(returnPending(t))return 0;
         if(phase(t)==CHOICE)return randomBirth(t)?7:1;
         var c=child(t);
         if(phase(t)!=CHILDHOOD||c==null||!c.alive||c.age>=18)return 0;
@@ -541,6 +553,7 @@ final class RebirthLife {
         return phase(t)==initialPhase&&maxWaitDays(t)>0&&maxWaitDays(t)==initialMaxDays;
     }
     static String adultFallback(TownLife.Town t){
+        if(returnPending(t))throw new IllegalArgumentException("Resume after your previous death first.");
         if(randomBirth(t))throw new IllegalArgumentException("Wait for a natural birth.");
         if(phase(t)!=CHOICE)throw new IllegalArgumentException("Only available before choosing a family.");
         var p=new PlayerLife.Player();p.incarnation=t.player.incarnation;t.player=p;

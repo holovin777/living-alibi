@@ -233,6 +233,10 @@ class GeoRebirthTest {
         assertEquals(expected.id,RebirthLife.eldestSuccessor(copy,copy.get(parent.id),day,incarnation).id);
         int wallet=expected.money;
         assertTrue(RebirthLife.settleLinkedDeath(t,day,360));
+        assertTrue(RebirthLife.returnPending(t));assertNull(RebirthLife.child(t));
+        assertEquals(0,DemographyLife.get(t,expected,"played-incarnation"));
+        var waiting=t.copy();assertTrue(RebirthLife.returnPending(waiting));
+        RebirthLife.resumeAfterDeath(t,day);
         assertSame(expected,RebirthLife.child(t));
         assertEquals(RebirthLife.LINKED_ADULT,RebirthLife.phase(t));
         assertEquals(30,expected.age);assertEquals(wallet,expected.money);
@@ -255,8 +259,26 @@ class GeoRebirthTest {
         DemographyLife.set(t,parent,"played-incarnation",t.player.incarnation);
         parent.alive=false;
         assertTrue(RebirthLife.settleLinkedDeath(t,4600,360));
+        RebirthLife.resumeAfterDeath(t,4600);
         assertSame(older,RebirthLife.child(t));
         assertEquals(12,older.age);assertEquals(RebirthLife.CHILDHOOD,RebirthLife.phase(t));
+    }
+    @Test void returnChoosesOnlyChildrenStillAvailable(){
+        var s=new WorldState();var t=TownLife.create(s);
+        var people=PopulationGenerator.add(t,3);
+        var parent=people.get(0);var older=people.get(1);var younger=people.get(2);
+        older.age=40;younger.age=30;
+        for(var c:java.util.List.of(older,younger))DemographyLife.set(t,c,"parent-a",parent.generationIndex);
+        t.industryStocks.put(RebirthLife.CHILD,parent.generationIndex);
+        t.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+        DemographyLife.set(t,parent,"played-incarnation",t.player.incarnation);
+        parent.alive=false;
+        assertTrue(RebirthLife.settleLinkedDeath(t,100,360));
+        assertNull(RebirthLife.child(t));
+        FirstLifeChoice.reserveForAccount(t,older,99);
+        younger.age=35;
+        RebirthLife.resumeAfterDeath(t,1925);
+        assertSame(younger,RebirthLife.child(t));assertEquals(35,younger.age);
     }
     @Test void initialFamiliesDoNotAlterLaterLives(){
         var s=new WorldState();var t=TownLife.create(s);

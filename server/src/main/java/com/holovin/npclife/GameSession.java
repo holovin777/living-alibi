@@ -1149,6 +1149,8 @@ public final class GameSession implements AutoCloseable {
         }
         if(action!=null&&action.startsWith("rebirth-")){
             var copy=town.copy();
+            if(action.equals("rebirth-return"))return applyInternal(copy,0,RebirthLife.resumeAfterDeath(copy,state.day),true);
+            if(RebirthLife.returnPending(copy))throw new IllegalArgumentException("Continue your next life first.");
             if(action.equals("rebirth-first-boy")||action.equals("rebirth-first-girl")){
                 FirstLifeChoice.choose(copy,action.endsWith("boy")?1:2);
                 InitialFamilyLife.start(copy,state);
@@ -1432,9 +1434,10 @@ public final class GameSession implements AutoCloseable {
         boolean initiallyConfined=JusticeLife.confined(candidateTown);
         int initialPhase=RebirthLife.phase(candidateTown);
         int initialMaxDays=RebirthLife.maxWaitDays(candidateTown);
+        boolean background="Persistent world routine.".equals(message)||"Routine while away.".equals(message);
         events.addAll(LifeSimulation.advance(candidateState,minutes,
                 current->TownLife.tick(candidateTown,current,truth,observations,interactions),
-                ()->(initiallyConfined||!JusticeLife.confined(candidateTown))&&(!rebirthAction||minutes==0||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays)))));
+                ()->(initiallyConfined||!JusticeLife.confined(candidateTown))&&(!rebirthAction||minutes==0||background&&RebirthLife.returnPending(candidateTown)||(initialPhase==RebirthLife.LINKED_ADULT?RebirthLife.continueAdultWaiting(candidateTown):RebirthLife.canContinueWaiting(candidateTown,initialPhase,initialMaxDays)))));
         if(!initiallyConfined&&JusticeLife.confined(candidateTown))message+=" Police detained you.";
         TownLife.clearConversationHolds(candidateTown);
         if(rebirthAction&&minutes>1){ // Keep one-minute dialogue replies free of clock diagnostics.
@@ -1446,9 +1449,7 @@ public final class GameSession implements AutoCloseable {
             message+=RebirthLife.randomBirth(candidateTown)?" Your previous life ended. Await your next birth.":" Your previous life ended. Choose a family for your next life.";
         }
         if(RebirthLife.settleLinkedDeath(candidateTown,candidateState.day,candidateState.minute)){
-            if(RebirthLife.phase(candidateTown)!=RebirthLife.CHOICE)
-                message+=" Your life ended. Its history is preserved. Continue as "+RebirthLife.child(candidateTown).name+".";
-            else message+=RebirthLife.randomBirth(candidateTown)?" Your life ended. Its history is preserved. Await your next birth.":" Your life ended. Its history is preserved. Choose a new family.";
+            message+=" Your life ended. Its history is preserved. Your next life awaits your return.";
         }
         if(initialPhase==RebirthLife.CHOICE&&RebirthLife.phase(candidateTown)==RebirthLife.CHILDHOOD&&RebirthLife.randomBirth(candidateTown))
             message+=" Born as "+RebirthLife.child(candidateTown).name+".";
