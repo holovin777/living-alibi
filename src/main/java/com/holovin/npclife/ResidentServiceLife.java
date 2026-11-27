@@ -112,7 +112,7 @@ final class ResidentServiceLife {
             busy.add(slot(t,i,"mechanic"));scheduled.add(slot(t,i,"customer"));
         }
         for(var c:queue){
-            if(scheduled.contains(c.generationIndex)||busy.contains(c.generationIndex))continue;
+            if(PlayerRepairLife.reserved(t,c)||scheduled.contains(c.generationIndex)||busy.contains(c.generationIndex))continue;
             int free=-1;
             for(int i=0;i<MAX_PARALLEL;i++)if(slot(t,i,"day")==0){free=i;break;}
             if(free<0)break;

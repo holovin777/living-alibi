@@ -7681,6 +7681,7 @@ func _render_actions() -> void:
             _action_choices.add_child(_button(tr("Refuel · up to 3 units / 2 EUR each"),_car_action.bind("refuel")))
             _action_choices.add_child(_button(tr("Service car · 15 EUR"),_car_action.bind("repair")))
         return
+    _render_personal_repair()
     var logistics: Dictionary = _last_snapshot.get("logistics",{})
     if _current_place in ["FARM","QUARRY","FACTORY"] and bool(logistics.get("yours",false)) and bool(logistics.get("truck",false)) and not bool(_last_snapshot.get("freight",{}).get("active",false)):
         var relocation := " · relocation 8 EUR + fuel" if str(logistics.get("truckPlace",""))!=_current_place else ""
@@ -8436,6 +8437,31 @@ func _render_factory_report() -> void:
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
 
+func _render_personal_repair() -> void:
+    var report: Dictionary = _last_snapshot.get("personalRepair",{})
+    var phase := int(report.get("phase",0))
+    if phase==0 and report.get("offers",[]).is_empty():return
+    var heading := Label.new()
+    heading.text=tr("Personal repair orders")
+    _action_choices.add_child(heading)
+    for offer in report.get("offers",[]):
+        _action_choices.add_child(_button(tr("Reserve repair")+" · "+str(offer.get("district",""))+" · "+str(offer.get("condition",0))+"%",_garden_action.bind("personal-repair:claim:"+str(offer.get("id","")))))
+    if phase==0:return
+    var status := Label.new()
+    status.text=tr("Customer district")+": "+str(report.get("district",""))+" · 19:30–21:30 · "+str(report.get("price",0))+" EUR"
+    _action_choices.add_child(status)
+    if bool(report.get("ready",false)):
+        if phase==1:_action_choices.add_child(_button(tr("Inspect appliance"),_garden_action.bind("personal-repair:inspect")))
+        if phase==2:_action_choices.add_child(_button(tr("Run diagnostic simulator"),_garden_action.bind("personal-repair:measure")))
+        if phase==3:
+            var reading := Label.new()
+            reading.text=tr(str(report.get("reading","")))
+            _action_choices.add_child(reading)
+            for part in ["pump","sensor","controller"]:
+                _action_choices.add_child(_button(tr(str(part)),_garden_action.bind("personal-repair:choose:"+str(part))))
+        if phase==4:_action_choices.add_child(_button(tr("Functional test"),_garden_action.bind("personal-repair:test")))
+    _action_choices.add_child(_button(tr("Cancel reserved repair"),_garden_action.bind("personal-repair:cancel")))
+
 func _render_repair_business() -> void:
     var b: Dictionary = _last_snapshot.get("repairBusiness",{})
     if b.is_empty():return
@@ -8556,6 +8582,9 @@ func _render_home_goods() -> void:
         _action_choices.add_child(info)
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("personal-repair:"):
+        if _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("repair-business:"):
         if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
         return

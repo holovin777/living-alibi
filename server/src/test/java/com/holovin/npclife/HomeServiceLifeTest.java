@@ -208,4 +208,34 @@ class HomeServiceLifeTest {
         assertEquals(186,c.money);assertEquals(14,PlayerServiceBusiness.get(t,"revenue"));
         assertEquals(3,PlayerServiceBusiness.workers(t.copy()).size());
     }
+    @Test void ownerDiagnosticRequiresCorrectPartAndRealCustomerPayment(){
+        var s=new WorldState();s.day=8;s.minute=600;var t=TownLife.create(s);
+        t.player.place=WORKSHOP;t.player.money=100;
+        PlayerServiceBusiness.act(t,s,"register");
+        PlayerServiceBusiness.act(t,s,"invest");PlayerServiceBusiness.act(t,s,"invest");
+        PlayerServiceBusiness.act(t,s,"rent");PlayerServiceBusiness.act(t,s,"tools");
+        var customer=new TownLife.Citizen("manual-client","Client","Retired",NORTH_RESIDENCES);
+        customer.age=70;customer.generationIndex=901;customer.money=200;t.people.put(customer.id,customer);
+        EducationLife.set(t,customer,"interior-laundry",1);ResidentServiceLife.set(t,customer,"wear",90);
+        ResidentServiceLife.set(t,customer,"queued-day",8);
+        PlayerRepairLife.act(t,s,"claim:"+customer.id);
+        assertTrue(PlayerRepairLife.reserved(t,customer));
+        t.player.place=NORTH_RESIDENCES;s.minute=1200;
+        assertThrows(IllegalArgumentException.class,()->PlayerRepairLife.act(t,s,"test"));
+        PlayerRepairLife.act(t,s,"inspect");PlayerRepairLife.act(t,s,"measure");
+        String correct=PlayerRepairLife.part(PlayerRepairLife.get(t,"fault"));
+        PlayerRepairLife.act(t,s,"choose:"+(correct.equals("pump")?"sensor":"pump"));
+        assertEquals(3,PlayerRepairLife.get(t,"phase"));
+        PlayerRepairLife.act(t,s,"choose:"+correct);
+        t.technicalMaterials.put("spare-parts",0);
+        assertThrows(IllegalArgumentException.class,()->PlayerRepairLife.act(t,s,"test"));
+        t.technicalMaterials.put("spare-parts",1);
+        PlayerRepairLife.act(t,s,"test");
+        assertEquals(185,customer.money);
+        assertEquals(19,PlayerServiceBusiness.get(t,"cash"));
+        assertEquals(1,PlayerServiceBusiness.get(t,"manual-jobs"));
+        assertEquals(100,ResidentServiceLife.condition(t,customer));
+        assertEquals(0,t.technicalMaterials.get("spare-parts").intValue());
+        assertEquals(0,PlayerRepairLife.get(t,"phase"));
+    }
 }
