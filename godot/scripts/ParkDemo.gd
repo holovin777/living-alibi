@@ -8177,6 +8177,43 @@ func _animate_guest_host(delta: float) -> void:
     arm.rotation.x = lerpf(arm.rotation.x,gesture,minf(delta*6,1.0))
     arm.get_node("ReadingBook").visible = _host_seated and _host_activity=="READING" and not talking
 
+# A short lobby appearance is supplied by real Java travel arrivals, not random NPC spawning.
+func _sync_stairwell_arrivals() -> void:
+    if not _stairwell_active or not is_instance_valid(_stairwell):return
+    var root := _stairwell.get_node_or_null("ArrivingNeighbors") as Node3D
+    if root==null:
+        root=Node3D.new()
+        root.name="ArrivingNeighbors"
+        _stairwell.add_child(root)
+    var entries = _last_snapshot.get("stairwellResidents",[])
+    if not entries is Array:entries=[]
+    var desired := {}
+    for entry in entries:
+        if not entry is Dictionary:continue
+        var id := str(entry.get("id",""))
+        if not id.is_empty() and desired.size()<2:desired[id]=entry
+    for child in root.get_children():
+        if not desired.has(str(child.get_meta("resident_id",""))):
+            root.remove_child(child)
+            child.queue_free()
+    var ids := desired.keys()
+    ids.sort()
+    for i in range(ids.size()):
+        var id := str(ids[i])
+        var entry: Dictionary = desired[id]
+        var person := root.get_node_or_null("Resident_"+id) as Node3D
+        if person==null:
+            var previous_root := _residents_root
+            _residents_root=root
+            person=_make_resident(id,i,"")
+            _residents_root=previous_root
+        person.position=Vector3(-0.82 if i==0 else 0.82,0,0.18)
+        person.rotation.y=PI if i==0 else 0.0
+        person.set_meta("activity","ARRIVING_HOME")
+        person.get_node("ResidentName").hide()
+        _sync_resident_appearance(person,str(entry.get("appearanceStage","ADULT")))
+        _sync_resident_uniform(person,str(entry.get("outfitVisual","")))
+
 func _near_stairwell() -> bool:
     if _stairwell_active or _rebirth_active() or _drive_active() or _cycling() or _apartment_active or _current_place!="NORTH_RESIDENCES":
         return false
@@ -8196,6 +8233,7 @@ func _set_stairwell(active: bool) -> void:
             _stairwell = PublicStairwell.new()
             add_child(_stairwell)
         _stairwell.show()
+        _sync_stairwell_arrivals()
         for chunk in _chunks.values():
             chunk["root"].hide()
         _traffic_root.hide()
@@ -8403,6 +8441,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _sync_host_routine(invitation)
     if _stairwell_active and (new_place!=_current_place or _rebirth_active()):
         _set_stairwell(false)
+    if _stairwell_active:
+        _sync_stairwell_arrivals()
     if new_place != _current_place:
         _reset_jump()
         _reset_locomotion()

@@ -871,6 +871,7 @@ final class TownLife {
             c.travelRemaining--;
             if(c.travelRemaining==0) {
                 c.place=c.destination;
+                ResidentialArrivalLife.arrived(town,c,clock);
                 publish(town,clock,c.id,c.place,c.name+" arrived at "+c.place.label+".",events,observations);
             }
             return;
