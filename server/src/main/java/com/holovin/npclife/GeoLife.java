@@ -4,19 +4,19 @@ import java.util.*;
 /** An adapter for the original linked life, not a second playable identity. */
 final class GeoLife {
     record View(String phase,String name,int age,String activity,int savings,int maxWaitDays,
-                int schoolDays,boolean graduated,String parentA,String parentB){}
-    static View view(TownLife.Town t){
+                int schoolDays,boolean graduated,String parentA,String parentB,boolean canWalk,int radius){}
+    static View view(TownLife.Town t,WorldState s){
         int phase=RebirthLife.phase(t);var c=RebirthLife.child(t);
         var a=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-a"));
         var b=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-b"));
         return new View(switch(phase){case RebirthLife.CHOICE->"CHOICE";case RebirthLife.CHILDHOOD->"CHILDHOOD";case RebirthLife.LINKED_ADULT->"LINKED_ADULT";default->"ADULT";},
             c==null?null:c.name,c==null?0:c.age,c==null?"":c.activity,c==null?t.player.money:c.money,RebirthLife.maxWaitDays(t),
-            c==null?0:EducationLife.get(t,c,"school-days"),c!=null&&EducationLife.get(t,c,"graduate")>0,a==null?null:a.name,b==null?null:b.name);
+            c==null?0:EducationLife.get(t,c,"school-days"),c!=null&&EducationLife.get(t,c,"graduate")>0,a==null?null:a.name,b==null?null:b.name,canWalk(t,s),24);
     }
     static List<GeoProjection.Choice> choices(TownLife.Town t,WorldState s,GeoProjection map){
         var result=new ArrayList<GeoProjection.Choice>();
         if(!RebirthLife.active(t)||JusticeLife.confined(t))return result;
-        var life=view(t);var c=RebirthLife.child(t);
+        var life=view(t,s);var c=RebirthLife.child(t);
         if(life.phase().equals("CHOICE")){
             for(var f:RebirthLife.families(t,s.day))add(result,"rebirth-family-"+f.first()+"-"+f.second(),f.firstName()+" + "+f.secondName()+" · "+f.district()+" ("+f.firstJob()+" / "+f.secondJob()+")");
             add(result,"rebirth-wait","Wait 1 day / Attendi un giorno");
@@ -61,6 +61,17 @@ final class GeoLife {
         return List.copyOf(result);
     }
     private static void add(List<GeoProjection.Choice> choices,String id,String label){choices.add(new GeoProjection.Choice(id,label));}
+    static boolean canWalk(TownLife.Town t,WorldState s){
+        var c=RebirthLife.child(t);
+        return RebirthLife.active(t)&&c!=null&&c.age>=6&&RebirthLife.awakePresent(c)&&!JusticeLife.confined(t)
+                &&!EmploymentLife.sick(c,s.day)&&!"IN_CUSTODY".equals(c.activity)
+                &&(RebirthLife.linkedChild(t,c)||RebirthLife.linkedAdult(t,c));
+    }
+    static boolean canTalk(TownLife.Town t,TownLife.Citizen c){
+        var self=RebirthLife.child(t);
+        return self!=null&&self.age>=3&&RebirthLife.awakePresent(self)&&RebirthLife.awakePresent(c)
+                &&RebirthLife.visible(t).contains(c)&&!JusticeLife.confined(t);
+    }
     static boolean atHome(TownLife.Citizen c){return c!=null&&c.alive&&c.travelRemaining==0&&c.currentSpace().equals(c.homeUnit);}
     static List<GeoProjection.Actor> household(TownLife.Town t,WorldState s,GeoProjection map){
         var self=RebirthLife.child(t);if(!atHome(self))return List.of();
@@ -69,7 +80,7 @@ final class GeoLife {
         var result=new ArrayList<GeoProjection.Actor>();
         for(int i=0;i<people.size();i++){
             var c=people.get(i);
-            result.add(new GeoProjection.Actor(c.id,center.x()-4.5+i%4*3,center.z()-1.5+i/4*3,HomeRoutineLife.activity(t,c,s.day,s.minute),false,"STAND",0,"","",GameSession.appearanceStage(c)));
+            result.add(new GeoProjection.Actor(c.id,center.x()-4.5+i%4*3,center.z()-1.5+i/4*3,HomeRoutineLife.activity(t,c,s.day,s.minute),canTalk(t,c),"STAND",0,"","",GameSession.appearanceStage(c)));
         }
         return List.copyOf(result);
     }

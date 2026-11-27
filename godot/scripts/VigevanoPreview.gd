@@ -59,6 +59,7 @@ const InteriorScene=preload("res://scripts/GeoInterior.gd")
 var interior_node: Node3D
 var room: Dictionary={}
 var room_exit:=Vector2.ZERO
+var linked_age:=-1
 
 func _ready() -> void:
     var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
@@ -250,13 +251,13 @@ func _input(event: InputEvent) -> void:
             if event.keycode==KEY_G:
                 residents.drive_command("exit",pos)
             return
-        if event.keycode==KEY_G and residents.connected and room.is_empty():
+        if event.keycode==KEY_G and residents.connected and room.is_empty() and not bool(residents.world.get("rebirth",false)):
             if owned_car.visible and walker.position.distance_to(owned_car.position)<5:
                 residents.drive_command("start",pos)
             elif civilian_car.visible and walker.position.distance_to(civilian_car.position)<5:
                 residents.drive_command("steal",pos)
             return
-        if event.keycode==KEY_P and residents.connected:
+        if event.keycode==KEY_P and residents.connected and not bool(residents.world.get("rebirth",false)):
             phone_panel.open_phone(residents.world)
             Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
             get_viewport().set_input_as_handled()
@@ -304,10 +305,16 @@ func _physics_process(delta: float) -> void:
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
     precipitation.update_weather(residents.world.get("weather",{}),walker.position,not room.is_empty(),delta)
     if phone_panel.visible:phone_panel.refresh(residents.world,residents.last_message,residents.action_pending)
+    var life: Dictionary=residents.world.get("life",{})
+    var linked:=bool(residents.world.get("rebirth",false))
+    var age:=int(life.get("age",0)) if linked else -1
+    if age!=linked_age:
+        linked_age=age
+        head.position.y=0.18 if age>=0 and age<6 else (0.35 if age>=6 and age<13 else (0.52 if age>=13 and age<18 else 0.65))
     if driving:
         _drive_frame(delta)
         return
-    if city_map.visible or chat.visible or actions_panel.visible or phone_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)))):
+    if city_map.visible or chat.visible or actions_panel.visible or phone_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or (linked and not bool(life.get("canWalk",false))))):
         walker.velocity.x=0
         walker.velocity.z=0
         street_timer+=delta
@@ -322,6 +329,15 @@ func _physics_process(delta: float) -> void:
     direction=walker.basis*direction.normalized()
     var cycling:=room.is_empty() and bool(residents.world.get("cycling",false))
     var speed := 8.0 if cycling else (7.0 if Input.is_physical_key_pressed(KEY_SHIFT) else 4.5)
+    if linked:
+        speed*=0.72 if age<13 else (0.88 if age<18 else 1.0)
+        if room.is_empty():
+            var district: Dictionary=residents.world.get("playerDistrict",{})
+            if not district.is_empty():
+                var center:=Vector2(float(district["x"]),float(district["z"]))
+                var current:=Vector2(walker.position.x,walker.position.z)
+                var predicted:=current+Vector2(direction.x,direction.z)*speed*delta
+                if predicted.distance_to(center)>float(life.get("radius",24)) and predicted.distance_to(center)>current.distance_to(center):direction=Vector3.ZERO
     walker.velocity.x=direction.x*speed
     walker.velocity.z=direction.z*speed
     if not walker.is_on_floor():walker.velocity.y-=9.8*delta
@@ -365,7 +381,7 @@ func _update_navigation() -> void:
     var pos:=Vector2(walker.position.x,walker.position.z)
     if not room.is_empty():
         hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions · P phone\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
-        if bool(residents.world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions"
+        if bool(residents.world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions · E: leave home"
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         return
     city_map.player=pos
@@ -387,7 +403,7 @@ func _update_navigation() -> void:
         hud.text+="\nDay %s · %02d:%02d · residents %s · nearby %s · €%s · health %s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.population,residents.people.size(),world.get("money",0),world.get("health",0)]
         hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk · F: actions · P: phone"
         if bool(world.get("confined",false)):hud.text+="\nOpen regular game to continue custody."
-        if bool(world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions"
+        if bool(world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · Local walking · F: travel/life"
         var phone: Dictionary=world.get("phone",{})
         var report: Dictionary=phone.get("report",{})
         for call in report.get("calls",[]):

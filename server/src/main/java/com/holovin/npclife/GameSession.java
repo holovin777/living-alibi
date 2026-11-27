@@ -654,12 +654,20 @@ public final class GameSession implements AutoCloseable {
             var copy=town.copy();copy.industryStocks.put(NpcTransportLife.ENABLED,1);apply(copy,0,"Resident transport enabled.");
         }
         if(!RebirthLife.active(town))waitMinutes(minutes);
+        else if(RebirthLife.linkedAdult(town,RebirthLife.child(town))||RebirthLife.linkedChild(town,RebirthLife.child(town))&&RebirthLife.child(town).age>=6)
+            applyInternal(town.copy(),minutes,"Time passed.",true);
         if(JusticeLife.confined(town)||RebirthLife.active(town)||!town.player.alive)geoDrive=null;
     }
     synchronized void geoEnter(GeoProjection map,String destination,double x,double z) throws SQLException {
         JusticeLife.requireFree(town);
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
-        if(RebirthLife.active(town))throw new IllegalArgumentException("Use F for your current life and permitted travel.");
+        if(RebirthLife.active(town)){
+            var c=RebirthLife.child(town);
+            if(!GeoLife.canWalk(town,state)||!RebirthLife.linkedAdult(town,c)||!GeoLife.atHome(c))throw new IllegalArgumentException("Use F for permitted travel.");
+            var door=map.point(c.place);
+            if(Math.hypot(x-door.x(),z-(door.z()+5.6))>3)throw new IllegalArgumentException("Approach the exit door.");
+            gardenAction("rebirth-home-exit");return;
+        }
         PlayerLife.requireAlive(town.player);
         if(geoInterior!=null){
             var door=map.point(geoInterior);
@@ -682,6 +690,7 @@ public final class GameSession implements AutoCloseable {
     }
     synchronized String geoSpeak(GeoProjection map,String id,String message,String language,double x,double z) throws SQLException {
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
+        if(RebirthLife.active(town)&&map.point(town.player.place).distance(new GeoProjection.Point(x,z))>24)throw new IllegalArgumentException("Stay in your current district.");
         var actor=geoNearby(map,x,z).residents().stream().filter(a->a.id().equals(id)&&a.talkable()
                 &&Math.hypot(a.x()-x,a.z()-z)<=4).findFirst().orElseThrow(()->new IllegalArgumentException("Approach an available resident in your current district."));
         return speak(actor.id(),message,language).message();

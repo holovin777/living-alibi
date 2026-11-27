@@ -15,12 +15,13 @@ class GeoRebirthTest {
         var view=map.view(t,s,map.point(t.player.place));
         assertEquals("CHOICE",view.life().phase());
         assertFalse(view.alive());
+        assertFalse(view.life().canWalk());
         assertTrue(view.actions().stream().anyMatch(a->a.id().equals("rebirth-adult")));
         assertTrue(view.actions().stream().noneMatch(a->a.id().startsWith("bank-")));
         assertEquals(1,t.pastLives.size());
         RebirthLife.adultFallback(t);
         assertTrue(t.player.alive);
-        assertEquals("ADULT",GeoLife.view(t).phase());
+        assertEquals("ADULT",GeoLife.view(t,s).phase());
         assertEquals(1,t.pastLives.size());
     }
 }
