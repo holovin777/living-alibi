@@ -209,6 +209,55 @@ class GeoRebirthTest {
             assertTrue(game.snapshot().rebirth().pastLives().isEmpty());
         }
     }
+    @Test void deathContinuesAsOldestLivingChildWithoutCreatingResident(){
+        var s=new WorldState();var t=TownLife.create(s);
+        var people=PopulationGenerator.add(t,5);
+        var parent=people.get(0);var oldest=people.get(1);var twin=people.get(2);
+        var younger=people.get(3);var deadOlder=people.get(4);
+        parent.age=60;oldest.age=30;twin.age=30;younger.age=25;deadOlder.age=35;
+        for(var c:java.util.List.of(oldest,twin,younger,deadOlder))
+            DemographyLife.set(t,c,"parent-a",parent.generationIndex);
+        DemographyLife.set(t,oldest,"born",100);DemographyLife.set(t,twin,"born",100);
+        DemographyLife.set(t,younger,"born",1925);deadOlder.alive=false;
+        oldest.money=123;twin.money=456;
+        t.industryStocks.put(RebirthLife.CHILD,parent.generationIndex);
+        t.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+        DemographyLife.set(t,parent,"played-incarnation",t.player.incarnation);
+        RebirthLife.enableRandomBirth(t,false);
+        parent.alive=false;parent.money=0;
+        int count=t.people.size(),incarnation=t.player.incarnation;
+        int day=12000;
+        var expected=RebirthLife.eldestSuccessor(t,parent,day,incarnation);
+        assertTrue(expected==oldest||expected==twin);
+        var copy=t.copy();
+        assertEquals(expected.id,RebirthLife.eldestSuccessor(copy,copy.get(parent.id),day,incarnation).id);
+        int wallet=expected.money;
+        assertTrue(RebirthLife.settleLinkedDeath(t,day,360));
+        assertSame(expected,RebirthLife.child(t));
+        assertEquals(RebirthLife.LINKED_ADULT,RebirthLife.phase(t));
+        assertEquals(30,expected.age);assertEquals(wallet,expected.money);
+        assertEquals(count,t.people.size());
+        assertEquals(incarnation+1,t.player.incarnation);
+        assertEquals(incarnation+1,DemographyLife.get(t,expected,"played-incarnation"));
+        assertTrue(t.pastLives.containsKey(incarnation));
+        assertFalse(RebirthLife.settleLinkedDeath(t,day,360));
+    }
+    @Test void successorCanBeMinorAndUsesExactBirthDate(){
+        var s=new WorldState();var t=TownLife.create(s);
+        var people=PopulationGenerator.add(t,3);
+        var parent=people.get(0);var older=people.get(1);var younger=people.get(2);
+        older.age=12;younger.age=12;
+        for(var c:java.util.List.of(older,younger))
+            DemographyLife.set(t,c,"parent-b",parent.generationIndex);
+        DemographyLife.set(t,older,"born",100);DemographyLife.set(t,younger,"born",150);
+        t.industryStocks.put(RebirthLife.CHILD,parent.generationIndex);
+        t.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+        DemographyLife.set(t,parent,"played-incarnation",t.player.incarnation);
+        parent.alive=false;
+        assertTrue(RebirthLife.settleLinkedDeath(t,4600,360));
+        assertSame(older,RebirthLife.child(t));
+        assertEquals(12,older.age);assertEquals(RebirthLife.CHILDHOOD,RebirthLife.phase(t));
+    }
     @Test void initialFamiliesDoNotAlterLaterLives(){
         var s=new WorldState();var t=TownLife.create(s);
         PopulationGenerator.add(t,20);

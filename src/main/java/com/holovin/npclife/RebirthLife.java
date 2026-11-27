@@ -122,6 +122,22 @@ final class RebirthLife {
         DemographyLife.set(t,c,"played-incarnation",t.player.incarnation);
         return true;
     }
+    /** Succession follows the oldest living direct child, not a new generated person. */
+    static TownLife.Citizen eldestSuccessor(TownLife.Town t,TownLife.Citizen parent,int day,int incarnation){
+        var eligible=t.people.values().stream()
+                .filter(c->c!=parent&&c.generationIndex>0&&c.alive&&childOf(t,c,parent.generationIndex)
+                        &&DemographyLife.get(t,c,"played-incarnation")==0)
+                .sorted(java.util.Comparator.comparingInt((TownLife.Citizen c)->c.age).reversed()
+                        .thenComparingInt(c->DemographyLife.get(t,c,"born")).thenComparing(c->c.id))
+                .toList();
+        if(eligible.isEmpty())return null;
+        var oldest=eligible.getFirst();
+        int birthday=DemographyLife.get(t,oldest,"born");
+        var tied=eligible.stream().filter(c->c.age==oldest.age&&DemographyLife.get(t,c,"born")==birthday).toList();
+        // Stable server choice for siblings sharing a birthday (e.g. twins/triplets).
+        var rng=new java.util.SplittableRandom(parent.personalSeed^((long)day<<32)^incarnation);
+        return tied.get(rng.nextInt(tied.size()));
+    }
     /** Settle a real resident, not the inactive visitor shell, exactly once. */
     static boolean settleLinkedDeath(TownLife.Town t,int day,int minute){
         if(phase(t)!=CHILDHOOD&&phase(t)!=LINKED_ADULT)return false;
@@ -144,6 +160,12 @@ final class RebirthLife {
         t.player=next;
         t.industryStocks.put(CHILD,0);t.industryStocks.put(PHASE,CHOICE);
         t.industryStocks.put(FOCUS,0);t.industryStocks.put(LAST_CHAT,0);t.industryStocks.put(TRAVEL,0);
+        var successor=eldestSuccessor(t,c,day,incarnation);
+        if(successor!=null){
+            linkNewborn(t,successor); // Links the existing resident; does not create or reset one.
+            if(successor.age>=18)t.industryStocks.put(PHASE,LINKED_ADULT);
+            synchronize(t);
+        }
         return true;
     }
     record PastLife(int incarnation,String name,String residentId,int day,int minute,int age,String district){}

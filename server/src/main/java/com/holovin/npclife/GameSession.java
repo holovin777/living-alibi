@@ -1425,8 +1425,11 @@ public final class GameSession implements AutoCloseable {
             RebirthLife.prepare(candidateTown,candidateState.day,candidateState.minute);
             message+=RebirthLife.randomBirth(candidateTown)?" Your previous life ended. Await your next birth.":" Your previous life ended. Choose a family for your next life.";
         }
-        if(RebirthLife.settleLinkedDeath(candidateTown,candidateState.day,candidateState.minute))
-            message+=RebirthLife.randomBirth(candidateTown)?" Your life ended. Its history is preserved. Await your next birth.":" Your life ended. Its history is preserved. Choose a new family.";
+        if(RebirthLife.settleLinkedDeath(candidateTown,candidateState.day,candidateState.minute)){
+            if(RebirthLife.phase(candidateTown)!=RebirthLife.CHOICE)
+                message+=" Your life ended. Its history is preserved. Continue as "+RebirthLife.child(candidateTown).name+".";
+            else message+=RebirthLife.randomBirth(candidateTown)?" Your life ended. Its history is preserved. Await your next birth.":" Your life ended. Its history is preserved. Choose a new family.";
+        }
         if(initialPhase==RebirthLife.CHOICE&&RebirthLife.phase(candidateTown)==RebirthLife.CHILDHOOD&&RebirthLife.randomBirth(candidateTown))
             message+=" Born as "+RebirthLife.child(candidateTown).name+".";
         RebirthLife.synchronize(candidateTown);
