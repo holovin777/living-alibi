@@ -730,6 +730,7 @@ final class TownLife {
         DemographyLife.tick(town,marco,truth,observations);
         EmploymentLife.tick(town,marco,truth,observations);
         EmploymentContractLife.tick(town,marco);
+        SocialProtectionLife.tick(town,marco);
         NpcJusticeLife.tick(town,marco);
         PopulationLife.tick(town,marco,truth,observations);
         EmergencyLife.tick(town,marco);

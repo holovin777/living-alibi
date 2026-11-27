@@ -7403,6 +7403,14 @@ func _render_actions() -> void:
                 pension_label.text=tr("Pension fund · balance %s EUR · arrears %s EUR") % [pension.get("fund",0),pension.get("arrears",0)]
                 pension_label.text+="\n"+tr("Pensioners %s · weekly entitlement %s EUR") % [pension.get("retirees",0),pension.get("weeklyPension",35)]
                 _action_choices.add_child(pension_label)
+            var social: Dictionary = _last_snapshot.get("socialProtection",{})
+            if not social.is_empty():
+                var welfare := Label.new()
+                welfare.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                welfare.text=tr("Social fund · balance %s EUR") % social.get("fund",0)
+                welfare.text+="\n"+tr("Unemployment paid %s · Sick leave paid %s EUR") % [social.get("unemploymentPaid",0),social.get("sicknessPaid",0)]
+                welfare.text+="\n"+tr("Eligible job seekers %s · Eligible sick workers %s") % [social.get("eligibleUnemployed",0),social.get("eligibleSick",0)]
+                _action_choices.add_child(welfare)
             var registry: Dictionary = _last_snapshot.get("registry",{})
             if not registry.is_empty():
                 var identity := Label.new()
