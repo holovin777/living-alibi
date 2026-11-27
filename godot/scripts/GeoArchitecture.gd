@@ -61,7 +61,7 @@ func facade(feature: Dictionary) -> void:
         var door_column:=columns/2
         for floor_index in range(floors):
             for column in range(columns):
-                if windows_count>=MAX_WINDOWS:return
+                if windows_count>=MAX_WINDOWS:break
                 var middle:=a.lerp(b,(column+0.5)/columns)+normal*0.04
                 var is_door:=floor_index==0 and i==0 and column==door_column
                 if is_door:

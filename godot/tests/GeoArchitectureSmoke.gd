@@ -13,5 +13,13 @@ func _initialize() -> void:
         if Architecture.material(kind)==null:
             quit(1)
             return
+    var capped=Architecture.new()
+    capped.windows_count=Architecture.MAX_WINDOWS
+    capped.facade({"id":"1","kind":"apartments","height":9.6,"points":[[0,0],[12,0],[12,10],[0,10]]})
+    var wall_key: String="wall_%d" % posmod("1".hash(),Architecture.PALETTE.size())
+    if capped.batches.get(wall_key,PackedVector3Array()).size()!=24:
+        push_error("Window cap must not remove facade walls")
+        quit(1)
+        return
     print("GeoArchitectureSmoke: ALL CHECKS PASSED")
     quit(0)
