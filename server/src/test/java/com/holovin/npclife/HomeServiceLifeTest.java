@@ -25,4 +25,34 @@ class HomeServiceLifeTest {
         assertEquals(100,HomeServiceLife.condition(t,"fridge"));assertEquals(35,t.player.money);
         assertEquals(28,c.money);assertFalse(HomeServiceLife.pending(t));
     }
+    @Test void warrantyChargesMerchantAndConsumesOnePartOnlyAfterRepair(){
+        var s=new WorldState();s.day=10;s.minute=600;var t=TownLife.create(s);
+        t.player.ownsHouse=true;t.player.place=PORTICI;t.player.money=80;
+        HomeGoodsLife.buy(t,s,"fridge");
+        assertEquals(0,t.player.money);
+        HomeServiceLife.wear(t,"fridge",100);
+        var c=new TownLife.Citizen("repairer","Repairer","Mechanic",WORKSHOP);
+        c.age=35;c.generationIndex=301;c.money=20;t.people.put(c.id,c);
+        t.player.place=SOUTH_RESIDENCES;
+        assertEquals(0,HomeServiceLife.quote(t,"fridge",s.day));
+        assertEquals(15,HomeServiceLife.quote(t,"fridge",70));
+        HomeServiceLife.request(t,s,"fridge");
+        s.day=HomeServiceLife.get(t,"appointment-day");
+        c.place=SOUTH_RESIDENCES;c.travelRemaining=0;
+        int cash=t.employerFunds.get("shop-assistant");
+        t.technicalMaterials.put("spare-parts",0);
+        HomeServiceLife.tick(t,s);
+        assertEquals(0,HomeServiceLife.get(t,"minutes"));
+        assertEquals(cash,t.employerFunds.get("shop-assistant").intValue());
+        t.technicalMaterials.put("spare-parts",1);
+        for(int i=0;i<30;i++){s.minute=600+i;HomeServiceLife.tick(t,s);}
+        assertEquals(100,HomeServiceLife.condition(t,"fridge"));
+        assertEquals(0,t.player.money);
+        assertEquals(cash-15,t.employerFunds.get("shop-assistant").intValue());
+        assertEquals(28,c.money);
+        assertEquals(0,t.technicalMaterials.get("spare-parts").intValue());
+        assertFalse(HomeServiceLife.pending(t));
+        HomeServiceLife.wear(t,"fridge",100);
+        assertEquals(15,HomeServiceLife.quote(t,"fridge",s.day));
+    }
 }

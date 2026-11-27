@@ -8451,7 +8451,11 @@ func _render_home_services() -> void:
         status.text=tr("%s · Condition %s%%") % [label,device.get("condition",100)]
         _action_choices.add_child(status)
         if bool(device.get("canRequest",false)):
-            _action_choices.add_child(_button(tr("Schedule repair: %s · 15 EUR") % label,_garden_action.bind("home-service:repair:"+id)))
+            var repair_price := int(device.get("repairPrice",15))
+            var repair_label := tr("Schedule repair: %s · 15 EUR") % label
+            if repair_price==0:
+                repair_label = tr("Warranty repair") + ": " + label + " · 0 EUR"
+            _action_choices.add_child(_button(repair_label,_garden_action.bind("home-service:repair:"+id)))
         if id=="boiler":
             var settings := HBoxContainer.new()
             _action_choices.add_child(settings)

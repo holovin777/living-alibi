@@ -26,7 +26,7 @@ final class HomeGoodsLife {
         SupplyChainLife.take(t,id);
         t.player.money-=p.price();
         t.employerFunds.merge(p.shop()==WORKSHOP?"technician":"shop-assistant",p.price(),Math::addExact);
-        set(t,id,1);
+        set(t,id,1);HomeServiceLife.purchased(t,id,s.day);
         return "Household item delivered and installed.";
     }
     static int available(TownLife.Town t,String id){return SupplyChainLife.stock(t,id);}
