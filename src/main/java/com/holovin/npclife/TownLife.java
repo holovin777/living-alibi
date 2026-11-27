@@ -736,7 +736,9 @@ final class TownLife {
         SocialProtectionLife.tick(town,marco);
         NpcJusticeLife.tick(town,marco);
         CaritasLife.prepare(town,marco);
+        ResidentServiceLife.prepare(town,marco);
         PopulationLife.tick(town,marco,truth,observations);
+        ResidentServiceLife.tick(town,marco);
         WorkplaceManagement.tick(town,marco,truth,observations);
         WorkplacePerformance.tick(town,marco);
         HomeServiceLife.tick(town,marco);

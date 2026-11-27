@@ -71,4 +71,31 @@ class HomeServiceLifeTest {
         assertEquals(supplier+5,t.employerFunds.get("city-maintenance").intValue());
         assertEquals(ServiceCompanyLife.view(t),ServiceCompanyLife.view(t.copy()));
     }
+    @Test void residentsBuyWearAndRepairWithoutPlayerFunds(){
+        var s=new WorldState();s.day=8;s.minute=360;var t=TownLife.create(s);
+        t.industryStocks.put(StaffingLife.ENABLED,1);
+        var customer=new TownLife.Citizen("resident-0301","Customer","Retired",NORTH_RESIDENCES);
+        customer.generationIndex=301;customer.age=70;customer.money=400;
+        var tech=new TownLife.Citizen("resident-0302","Technician","Mechanic",WORKSHOP);
+        tech.generationIndex=302;tech.home=SOUTH_RESIDENCES;tech.money=20;
+        t.people.put(customer.id,customer);t.people.put(tech.id,tech);
+        t.industryStocks.put(SupplyChainLife.retail("washer"),1);
+        int player=t.player.money;
+        assertTrue(ResidentServiceLife.buy(t,customer));
+        assertEquals(0,SupplyChainLife.stock(t,"washer"));
+        assertEquals(305,customer.money);
+        ResidentServiceLife.set(t,customer,"wear",70);
+        ResidentServiceLife.prepare(t,s);ResidentServiceLife.prepare(t,s);
+        assertTrue(ResidentServiceLife.pending(t));
+        s.minute=1200;tech.place=NORTH_RESIDENCES;tech.activity="WORKING";tech.travelRemaining=0;
+        assertEquals(NORTH_RESIDENCES,ResidentServiceLife.destination(t,tech,s));
+        t.technicalMaterials.put("spare-parts",1);
+        for(int i=0;i<30;i++){s.minute=1200+i;ResidentServiceLife.tick(t,s);}
+        assertEquals(290,customer.money);
+        assertEquals(28,tech.money);
+        assertEquals(100,ResidentServiceLife.condition(t,customer));
+        assertEquals(1,ServiceCompanyLife.get(t,"resident-completed"));
+        assertEquals(player,t.player.money);
+        assertFalse(ResidentServiceLife.pending(t));
+    }
 }
