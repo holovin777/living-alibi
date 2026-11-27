@@ -18,6 +18,37 @@ final class GeoProjection {
         }
     }
     record Choice(String id,String label){}
+    record PhoneJob(String id,String title,District workplace,String subject,int requiredSkill,int currentSkill,int wage,boolean funded){}
+    record PhoneView(PhoneLife.Report report,List<AddressLife.Entry> contacts,BankLife.Report bank,
+                     List<PhoneJob> jobs,District bankLocation,List<Choice> actions){}
+    PhoneView phone(TownLife.Town t,WorldState s){
+        var report=PhoneLife.report(t,s.day,s.minute);
+        if(!report.available())return new PhoneView(report,List.of(),null,List.of(),null,List.of());
+        var jobs=CareerLife.offers().stream().map(j->new PhoneJob(j.id(),j.title(),district(j.workplace()),j.subject(),
+            j.requiredSkill(),CareerLife.skill(t.player,j.subject()),j.wage(),t.employerFunds.getOrDefault(j.id(),0)>=j.wage())).toList();
+        var actions=new ArrayList<Choice>();
+        if(t.player.travelRemaining==0&&!t.player.cycling){
+            for(var c:report.dialContacts()){
+                if(c.connected()){
+                    actions.add(new Choice("phone-out:hangup:"+c.residentId(),"Hang up / Chiudi"));
+                    actions.add(new Choice("phone-out:invite-coffee:"+c.residentId(),"Invite for coffee / Invita al bar"));
+                    actions.add(new Choice("phone-out:ask-home-visit:"+c.residentId(),"Ask to visit / Chiedi visita"));
+                    if(t.player.ownsHouse)actions.add(new Choice("phone-out:invite-my-home:"+c.residentId(),"Invite home / Invita a casa"));
+                }else actions.add(new Choice("phone-out:dial:"+c.residentId(),"Call / Chiama "+c.name()));
+            }
+            for(var c:report.calls()){
+                if("RINGING".equals(c.status())){
+                    actions.add(new Choice("phone-call:answer:"+c.residentId(),"Answer / Rispondi "+c.name()));
+                    actions.add(new Choice("phone-call:decline:"+c.residentId(),"Decline / Rifiuta"));
+                }else if(c.invitation())actions.add(new Choice("phone-call:accept:"+c.residentId(),"Accept invitation / Accetta"));
+            }
+            for(var m:report.messages())if(m.reply().isEmpty()){
+                actions.add(new Choice("phone-reply:1:"+m.residentId(),"Positive reply / Rispondi sì"));
+                actions.add(new Choice("phone-reply:2:"+m.residentId(),"Not today / Non oggi"));
+            }
+        }
+        return new PhoneView(report,AddressLife.contacts(t),BankLife.report(t),jobs,district(TownLife.Place.OFFICE),List.copyOf(actions));
+    }
     record Interior(String id,String label,double x,double z,int occupants){}
     record Weather(String season,String sky,int temperatureC,boolean raining,boolean snowing){}
     static Weather weather(WorldState s){
@@ -32,7 +63,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -396,6 +427,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,room==null?List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))):inside,
             district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(player))).limit(32).toList():List.of(),interior,weather(s));
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(player))).limit(32).toList():List.of(),interior,weather(s),phone(t,s));
     }
 }

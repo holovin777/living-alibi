@@ -38,6 +38,8 @@ var chat_target:=""
 var shared_mode:=false
 var district_sign: Label3D
 var actions_panel: PanelContainer
+const PhonePanel=preload("res://scripts/GeoPhone.gd")
+var phone_panel: PanelContainer
 var action_list: VBoxContainer
 var owned_car: Node3D
 var parked_bike: Node3D
@@ -117,6 +119,13 @@ func _ready() -> void:
     action_list.size_flags_horizontal=Control.SIZE_EXPAND_FILL
     action_scroll.add_child(action_list)
     actions_panel.hide()
+    phone_panel=PhonePanel.new()
+    canvas.add_child(phone_panel)
+    phone_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
+    phone_panel.position=Vector2(maxf(12,get_viewport().get_visible_rect().size.x-350),65)
+    phone_panel.requested_action.connect(_phone_action)
+    phone_panel.destination_selected.connect(_phone_route)
+    phone_panel.closed.connect(_close_phone)
     owned_car=traffic._car()
     add_child(owned_car)
     owned_car.hide()
@@ -218,6 +227,11 @@ func _material(color: Color) -> StandardMaterial3D:
 
 func _input(event: InputEvent) -> void:
     if not ready_to_walk:return
+    if phone_panel.visible:
+        if event is InputEventKey and event.pressed and event.keycode in [KEY_P,KEY_ESCAPE]:
+            _close_phone()
+            get_viewport().set_input_as_handled()
+        return
     if actions_panel.visible:
         if event is InputEventKey and event.pressed and event.keycode in [KEY_ESCAPE,KEY_F]:
             actions_panel.hide()
@@ -241,6 +255,11 @@ func _input(event: InputEvent) -> void:
                 residents.drive_command("start",pos)
             elif civilian_car.visible and walker.position.distance_to(civilian_car.position)<5:
                 residents.drive_command("steal",pos)
+            return
+        if event.keycode==KEY_P and residents.connected:
+            phone_panel.open_phone(residents.world)
+            Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+            get_viewport().set_input_as_handled()
             return
         if event.keycode==KEY_F and residents.connected:
             _open_actions()
@@ -284,10 +303,11 @@ func _physics_process(delta: float) -> void:
     impact_overlay.color=Color(0.8,0.15,0.05,impact_flash*0.32)
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
     precipitation.update_weather(residents.world.get("weather",{}),walker.position,not room.is_empty(),delta)
+    if phone_panel.visible:phone_panel.refresh(residents.world,residents.last_message,residents.action_pending)
     if driving:
         _drive_frame(delta)
         return
-    if city_map.visible or chat.visible or actions_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)))):
+    if city_map.visible or chat.visible or actions_panel.visible or phone_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)))):
         walker.velocity.x=0
         walker.velocity.z=0
         street_timer+=delta
@@ -344,7 +364,7 @@ func _update_navigation() -> void:
     _update_daylight()
     var pos:=Vector2(walker.position.x,walker.position.z)
     if not room.is_empty():
-        hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
+        hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions · P phone\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         return
     city_map.player=pos
@@ -364,8 +384,14 @@ func _update_navigation() -> void:
         var district: Dictionary=world.get("playerDistrict",{})
         var nearest: Dictionary=world.get("nearestDistrict",{})
         hud.text+="\nDay %s · %02d:%02d · residents %s · nearby %s · €%s · health %s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.population,residents.people.size(),world.get("money",0),world.get("health",0)]
-        hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk · F: actions / housing / intercom"
+        hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk · F: actions · P: phone"
         if bool(world.get("confined",false)) or bool(world.get("rebirth",false)):hud.text+="\nOpen regular game to continue custody / rebirth."
+        var phone: Dictionary=world.get("phone",{})
+        var report: Dictionary=phone.get("report",{})
+        for call in report.get("calls",[]):
+            if str(call.get("status",""))=="RINGING":
+                hud.text+="\nIncoming call: "+str(call.get("name",""))+" · P to answer"
+                break
         var weather: Dictionary=world.get("weather",{})
         hud.text+="\n%s · %s · %s°C" % [weather.get("season",""),weather.get("sky",""),weather.get("temperatureC","—")]
         hud.text+="\nHunger %s · Thirst %s · %s" % [world.get("hunger",0),world.get("thirst",0),"Cycling" if world.get("cycling",false) else "Walking"]
@@ -536,6 +562,21 @@ func _sync_parked_vehicle(node: Node3D,record,pos: Vector2,offset: Vector3) -> v
     var location:=Vector2(float(record["x"]),float(record["z"]))
     node.visible=pos.distance_to(location)<=110
     node.position=Vector3(location.x,0,location.y)+offset
+
+func _close_phone() -> void:
+    phone_panel.hide()
+    Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+
+func _phone_action(id: String) -> void:
+    residents.perform(id,Vector2(walker.position.x,walker.position.z))
+
+func _phone_route(point: Vector2) -> void:
+    _close_phone()
+    _select_destination(point)
+    if room.is_empty():
+        city_map.show()
+        Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+        city_map.queue_redraw()
 
 func _open_actions() -> void:
     for child in action_list.get_children():
