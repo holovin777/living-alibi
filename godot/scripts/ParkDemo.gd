@@ -5,6 +5,7 @@ extends Node3D
 ## First-person only. Escape: release mouse. E: gate. F: local kiosk.
 
 const GATE_POSITION := Vector3(0.0, 0.0, -12.0)
+const OUTER_GATE_POSITION := Vector3(-6.0,0,-13.0)
 const KIOSK_POSITION := Vector3(7.0, 0.0, 3.0)
 const SPORT_COUNTER := Vector3(12.5,0,2.0)
 const LIBRARY_DESK := Vector3(-7,0,6.1)
@@ -725,18 +726,18 @@ func _update_first_steps() -> void:
         if _current_place=="MARKET":
             guide=tr("Optional goal: find the blue SERVICES kiosk %s. Press F and choose Apply: market assistant.") % _guide_direction(KIOSK_POSITION)
         else:
-            guide=tr("Optional goal: earn your first money. Walk to yellow TRAVEL gate %s, press E and choose Market.") % _guide_direction(GATE_POSITION)
+            guide=tr("Optional goal: earn your first money. Walk to yellow TRAVEL gate %s, press E and choose Market.") % _guide_direction(_gate_position(_current_place))
     else:
         var workplaces := {"shop-assistant":"MARKET","technician":"WORKSHOP","engineer":"OFFICE","investigator":"OFFICE","miner":"QUARRY","machinist":"FACTORY","journalist":"LIBRARY","farm-worker":"FARM","fuel-attendant":"FUEL_STATION"}
         var site := str(workplaces.get(str(job),""))
         if site==_current_place:
             guide=tr("Your job: blue SERVICES kiosk %s. Press F for work actions during working hours.") % _guide_direction(KIOSK_POSITION)
         elif not site.is_empty():
-            guide=tr("Your job: %s. Travel gate %s (E).") % [str(TownLayout.LABELS.get(site,site)),_guide_direction(GATE_POSITION)]
+            guide=tr("Your job: %s. Travel gate %s (E).") % [str(TownLayout.LABELS.get(site,site)),_guide_direction(_gate_position(_current_place))]
         else:
             guide=tr("Explore freely: use the blue SERVICES kiosk for local actions.")
     var service_target := GROCERY_COUNTER if _current_place=="PORTICI" else (DEPOT_DESK if _current_place=="LOGISTICS_DEPOT" else KIOSK_POSITION)
-    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch") % [_guide_direction(GATE_POSITION),_guide_direction(service_target)])
+    _guide_label.text=guide+"\n"+(tr("Travel E: %s · Services F: %s · Map M · Talk T · Space: jump · Shift: run · Ctrl: crouch") % [_guide_direction(_gate_position(_current_place)),_guide_direction(service_target)])
     if not _entrance_hint().is_empty():_guide_label.text+="\n"+_entrance_hint()
     if _current_place in ["MARKET","WORKSHOP"] and not _rebirth_active():
         _guide_label.text+="\n"+("%s · F: %s" % ["Armeria" if _current_place=="MARKET" else "Poligono di tiro",_guide_direction(SPORT_COUNTER)])
@@ -744,8 +745,11 @@ func _update_first_steps() -> void:
     if bool(safety.get("localAlert",false)):
         _guide_label.text+="\n"+tr("Public safety alert in this district.")
 
+func _gate_position(id: String) -> Vector3:
+    return OUTER_GATE_POSITION if TownLayout.outer(id) else GATE_POSITION
+
 func _near_gate() -> bool:
-    return _avatar.position.distance_to(GATE_POSITION) < INTERACTION_RADIUS
+    return _avatar.position.distance_to(_gate_position(_current_place)) < INTERACTION_RADIUS
 
 func _near_sport_counter() -> bool:
     return _current_place in ["MARKET","WORKSHOP"] and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(SPORT_COUNTER)<1.8
@@ -1553,6 +1557,8 @@ func _build_road_links(place_id: String) -> void:
     var roads := Node3D.new()
     roads.name = "DistrictRoads"
     _scenery.add_child(roads)
+    if TownLayout.outer(place_id):
+        _box(roads,Vector3(6.4,0.06,6.4),Color("#42484b"),Vector3(0,0.07,0),"asphalt")
     for id in TownLayout.DISTRICTS:
         if not TownLayout.adjacent(place_id, str(id)):
             continue
@@ -1566,6 +1572,12 @@ func _build_road_links(place_id: String) -> void:
         _box(roads, dimensions, Color("#42484b") if motor else Color(0.49,0.47,0.42),
                 direction * 16.5 + Vector3(0,0.025,0),"asphalt" if motor else "paving")
         if motor:
+            if TownLayout.outer(place_id):
+                var approach := Vector3(6.4,0.06,9.2) if vertical else Vector3(9.2,0.06,6.4)
+                _box(roads,approach,Color("#42484b"),direction*4.6+Vector3(0,0.07,0),"asphalt")
+                var marking := Vector3(0.10,0.018,1.4) if vertical else Vector3(1.4,0.018,0.10)
+                for d in [4.5,7.5]:
+                    _box(roads,marking,Color("#ddd9c7"),direction*float(d)+Vector3(0,0.11,0))
             _mark_motor_road(roads,direction)
         var roadside := direction*19.0+Vector3(-direction.z,0,direction.x)*(width/2.0+0.65)
         var yaw := atan2(-direction.x,-direction.z)
@@ -1677,6 +1689,14 @@ func _sync_traffic_edges(origin_id: String) -> void:
                 car.queue_free()
             _traffic_edges.erase(key)
     for edge in _traffic_edges.values():
+        var cars: Array=edge["cars"]
+        for i in range(cars.size()-1,-1,-1):
+            var route: Dictionary=cars[i].get("junction",{})
+            if not route.is_empty() and not _traffic_edges.has(route["key"]):
+                var car: Node3D=cars[i]["node"]
+                car.visible=false
+                car.queue_free()
+                cars.remove_at(i)
         _position_traffic_edge(edge,origin_id)
 
 func _position_traffic_edge(edge: Dictionary,origin_id: String) -> void:
@@ -1692,6 +1712,20 @@ func _position_traffic_car(record: Dictionary,first: Vector3,second: Vector3) ->
     var direction := (first-second).normalized() if reverse else (second-first).normalized()
     var right := Vector3(-direction.z,0,direction.x)
     var car: Node3D = record["node"]
+    var route: Dictionary=record.get("junction",{})
+    if not route.is_empty():
+        var centre := second if not reverse else first
+        var exit_dir: Vector3=route["direction"]
+        var exit_right := Vector3(-exit_dir.z,0,exit_dir.x)
+        var a := centre-direction*14.2+right*1.6
+        var b := a+direction*10.0
+        var d := centre+exit_dir*14.2+exit_right*1.6
+        var c := d-exit_dir*10.0
+        var progress := float(route["progress"])
+        car.position=a.bezier_interpolate(b,c,d,progress)
+        direction=a.bezier_derivative(b,c,d,progress).normalized()
+        car.rotation.y=atan2(-direction.x,-direction.z)
+        return
     var angle := float(record.get("turn",-1.0))
     if angle>=0.0:
         # Continuous semicircle on the existing six-metre roadway. At PI
@@ -1716,6 +1750,46 @@ func _traffic_people() -> Array[Vector3]:
                 people.append(person.position)
     return people
 
+# Only the rebuilt peripheral blocks have an unobstructed centre junction.
+# Central/historic districts retain their safe local loops until rebuilt.
+func _junction_route(edge: Dictionary,record: Dictionary) -> Dictionary:
+    var reverse := bool(record.get("reverse",false))
+    var from := str(edge["second"] if reverse else edge["first"])
+    var at := str(edge["first"] if reverse else edge["second"])
+    if not TownLayout.outer(at):return {}
+    var incoming := (TownLayout.world_center(at)-TownLayout.world_center(from)).normalized()
+    var candidates: Array[Dictionary]=[]
+    for key in _traffic_edges:
+        var target: Dictionary=_traffic_edges[key]
+        var destination := str(target["second"]) if target["first"]==at else (str(target["first"]) if target["second"]==at else "")
+        if destination.is_empty() or destination==from:continue
+        var direction := (TownLayout.world_center(destination)-TownLayout.world_center(at)).normalized()
+        candidates.append({"key":key,"at":at,"direction":direction,"reverse":target["second"]==at,
+            "progress":0.0,"straight":direction.dot(incoming)>0.9})
+    if candidates.is_empty():return {}
+    candidates.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
+        if a["straight"]!=b["straight"]:return bool(a["straight"])
+        return str(a["key"])<str(b["key"]))
+    # Prefer a through route; every third crossing selects a side street if available.
+    var count := int(record.get("junction_count",0))
+    return candidates[1] if count%3==2 and candidates.size()>1 else candidates[0]
+
+func _junction_clear(route: Dictionary,record: Dictionary) -> bool:
+    var centre := TownLayout.world_center(str(route["at"]))-TownLayout.world_center(_current_place)
+    var direction: Vector3=route["direction"]
+    var right := Vector3(-direction.z,0,direction.x)
+    var exit_at := centre+direction*14.2+right*1.6
+    for edge in _traffic_edges.values():
+        for other in edge["cars"]:
+            if other==record:continue
+            var active: Dictionary=other.get("junction",{})
+            if not active.is_empty() and active.get("at")==route["at"]:return false
+            var vehicle: Node3D=other["node"]
+            if not vehicle.visible:continue
+            var offset := vehicle.position-exit_at
+            if absf(offset.dot(direction))<5.2 and absf(offset.dot(right))<1.7:return false
+    return true
+
 func _advance_traffic(delta: float) -> void:
     if not is_instance_valid(_traffic_root):
         return
@@ -1724,6 +1798,7 @@ func _advance_traffic(delta: float) -> void:
     var phase := _traffic_phase(_traffic_seconds)
     var origin := TownLayout.world_center(_current_place)
     var people := _traffic_people()
+    var transfers: Array[Dictionary]=[]
     for edge in _traffic_edges.values():
         var first := TownLayout.world_center(edge["first"])-origin
         var second := TownLayout.world_center(edge["second"])-origin
@@ -1734,7 +1809,11 @@ func _advance_traffic(delta: float) -> void:
             var direction := (first-second).normalized() if reverse else (second-first).normalized()
             var right := Vector3(-direction.z,0,direction.x)
             var distance := float(record["distance"])
+            var route: Dictionary=record.get("junction",{})
             var angle := float(record.get("turn",-1.0))
+            if not route.is_empty():
+                direction=-car.transform.basis.z.normalized()
+                right=Vector3(-direction.z,0,direction.x)
             if angle>=0.0:
                 direction=direction*cos(angle)-right*sin(angle)
                 right=Vector3(-direction.z,0,direction.x)
@@ -1747,14 +1826,24 @@ func _advance_traffic(delta: float) -> void:
                     break
             # Never overtake on these narrow streets. Wait for another car
             # in the lane or for the receiving lane before starting a turn.
-            for other in edge["cars"]:
+            var onward := _junction_route(edge,record) if route.is_empty() and angle<0.0 and distance>=33.0 else {}
+            var nearby_cars: Array=[]
+            if route.is_empty():
+                nearby_cars.append_array(edge["cars"])
+                for other_edge in _traffic_edges.values():
+                    if other_edge==edge:continue
+                    for other in other_edge["cars"]:
+                        if not other.get("junction",{}).is_empty():nearby_cars.append(other)
+            else:
+                for other_edge in _traffic_edges.values():nearby_cars.append_array(other_edge["cars"])
+            for other in nearby_cars:
                 var other_car: Node3D=other["node"]
                 if other_car==car or not other_car.visible:continue
                 var offset := other_car.position-car.position
                 var ahead := offset.dot(direction)
                 if ahead>0.0 and ahead<5.2 and absf(offset.dot(right))<2.0:
                     blocked=true
-                if angle<0.0 and distance>=33.0 and bool(other.get("reverse",false))!=reverse:
+                if route.is_empty() and onward.is_empty() and angle<0.0 and distance>=33.0 and bool(other.get("reverse",false))!=reverse:
                     var exit_at := start+direction*33.8-right*1.6
                     if other_car.position.distance_to(exit_at)<5.2:blocked=true
                 if angle>=0.0 and offset.length()<3.2 and ahead>0.0:blocked=true
@@ -1772,7 +1861,16 @@ func _advance_traffic(delta: float) -> void:
                 continue
             var limit := 2.0 if phase==-1 else 4.0
             if angle>=0.0 or distance>=32.0:limit=minf(limit,2.0)
+            if not route.is_empty():limit=3.0 if phase!=-1 else 2.0
             var speed := move_toward(float(record.get("speed",4.0)),limit,dt*5.0)
+            if not route.is_empty():
+                route["progress"]=minf(1.0,float(route["progress"])+speed*dt/28.4)
+                record["speed"]=speed
+                brakes.visible=false
+                _position_traffic_car(record,first,second)
+                if float(route["progress"])>=1.0:
+                    transfers.append({"source":edge,"record":record,"route":route})
+                continue
             if angle>=0.0:
                 angle+=speed*dt/1.6
                 if angle>=PI:
@@ -1793,12 +1891,31 @@ func _advance_traffic(delta: float) -> void:
                             break
                 if next>=33.8:
                     record["distance"]=33.8
-                    record["turn"]=minf(PI,(next-33.8)/1.6)
+                    if not onward.is_empty():
+                        if _junction_clear(onward,record):
+                            record["junction"]=onward
+                            record["junction_count"]=int(record.get("junction_count",0))+1
+                        else:
+                            speed=0.0
+                    else:
+                        record["turn"]=minf(PI,(next-33.8)/1.6)
                 else:
                     record["distance"]=next
                 record["speed"]=speed
                 brakes.visible=speed<0.1 or speed<limit-0.1
             _position_traffic_car(record,first,second)
+    # Move the same node and identity to the next road, outside iteration.
+    for transfer in transfers:
+        var record: Dictionary=transfer["record"]
+        var route: Dictionary=transfer["route"]
+        var target: Dictionary=_traffic_edges[route["key"]]
+        transfer["source"]["cars"].erase(record)
+        record.erase("junction")
+        record["reverse"]=bool(route["reverse"])
+        record["distance"]=14.2
+        record["turn"]=-1.0
+        target["cars"].append(record)
+        _position_traffic_car(record,TownLayout.world_center(target["first"])-origin,TownLayout.world_center(target["second"])-origin)
     for chunk in _chunks.values():
         var root: Node3D = chunk["root"]
         var roads := root.get_node_or_null("DistrictRoads")
@@ -2356,9 +2473,7 @@ func _build_outer_block(id: String) -> void:
     var green := label.begins_with("Giardino")
     var square := label.begins_with("Piazzetta")
     var positions := [Vector3(-10,0,-8),Vector3(-10,0,9),Vector3(10,0,10),Vector3(14,0,5)]
-    _box(block,Vector3(34,0.04,3.4),Color("#777c78"),Vector3(0,0.025,0),"paving")
-    for z in [-2.8,2.8]:
-        _box(block,Vector3(34,0.07,1.2),Color("#beb7a6"),Vector3(0,0.035,z),"paving")
+    # The connected motor-road geometry is generated by _build_road_links.
     if rural:
         for x in [-10.0,10.0]:
             _box(block,Vector3(9,0.04,9),Color("#8e9860"),Vector3(x,0.015,9))
@@ -5434,17 +5549,18 @@ func _building(_title: String, wall_color: Color) -> void:
     _box(_scenery,Vector3(11.0,0.18,0.14),trim,Vector3(-7,2.42,3.9))
 
 func _create_gate_and_kiosk() -> void:
+    var gate := _gate_position(str(_scenery.name).trim_prefix("PublicScene_"))
     # In historic districts use restrained physical wayfinding, not a bright game portal.
     if _scenery.name in ["PublicScene_CENTRO","PublicScene_PORTICI"]:
         var iron := Color("#56574f")
         for offset in [-1.6,1.6]:
-            var at := GATE_POSITION+Vector3(offset,0,0)
+            var at := gate+Vector3(offset,0,0)
             _add_obstacle(at,Vector2(0.4,0.4))
             _cylinder(_scenery,0.10,1.05,iron,at+Vector3(0,0.525,0))
             _sphere(_scenery,0.12,iron,at+Vector3(0,1.08,0))
-        _box(_scenery,Vector3(0.09,2.35,0.09),iron,GATE_POSITION+Vector3(1.6,1.175,0))
-        _physical_sign(_scenery,tr("TRAVEL · E"),GATE_POSITION+Vector3(1.6,2.4,0),0,1.7)
-        _physical_sign(_scenery,tr("TRAVEL · E"),GATE_POSITION+Vector3(1.6,2.4,-0.10),PI,1.7)
+        _box(_scenery,Vector3(0.09,2.35,0.09),iron,gate+Vector3(1.6,1.175,0))
+        _physical_sign(_scenery,tr("TRAVEL · E"),gate+Vector3(1.6,2.4,0),0,1.7)
+        _physical_sign(_scenery,tr("TRAVEL · E"),gate+Vector3(1.6,2.4,-0.10),PI,1.7)
         if _scenery.name=="PublicScene_CENTRO":
             _add_obstacle(KIOSK_POSITION,Vector2(2.4,1.6))
             _box(_scenery,Vector3(2.4,1.4,1.6),Color("#727c69"),KIOSK_POSITION+Vector3(0,0.7,0),"wood")
@@ -5454,16 +5570,16 @@ func _create_gate_and_kiosk() -> void:
         return
     # A yellow gate is a map transition — actual travel is authorized by Java.
     for offset in [-1.6, 1.6]:
-        _add_obstacle(GATE_POSITION + Vector3(offset, 0.0, 0.0), Vector2(0.4, 0.4))
+        _add_obstacle(gate + Vector3(offset, 0.0, 0.0), Vector2(0.4, 0.4))
     if _scenery.name not in ["PublicScene_LOGISTICS_DEPOT","PublicScene_PORTICI"]:
         _add_obstacle(KIOSK_POSITION, Vector2(2.4, 1.6))
     _box(_scenery, Vector3(0.4, 3.1, 0.4), Color(0.94, 0.69, 0.12),
-            GATE_POSITION + Vector3(-1.6, 1.55, 0.0))
+            gate + Vector3(-1.6, 1.55, 0.0))
     _box(_scenery, Vector3(0.4, 3.1, 0.4), Color(0.94, 0.69, 0.12),
-            GATE_POSITION + Vector3(1.6, 1.55, 0.0))
+            gate + Vector3(1.6, 1.55, 0.0))
     _box(_scenery, Vector3(3.6, 0.38, 0.45), Color(0.94, 0.69, 0.12),
-            GATE_POSITION + Vector3(0.0, 3.2, 0.0))
-    _sign(_scenery,tr("TRAVEL · E"),GATE_POSITION+Vector3(0,3.65,0))
+            gate + Vector3(0.0, 3.2, 0.0))
+    _sign(_scenery,tr("TRAVEL · E"),gate+Vector3(0,3.65,0))
     if _scenery.name not in ["PublicScene_LOGISTICS_DEPOT","PublicScene_PORTICI"]:
         # Blue kiosk: only offers actions physically available in this district.
         _sign(_scenery,tr("SERVICES · F"),KIOSK_POSITION+Vector3(0,2.25,0))

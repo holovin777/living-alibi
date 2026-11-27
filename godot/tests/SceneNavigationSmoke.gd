@@ -1470,6 +1470,35 @@ func _exercise() -> void:
     if not _check(layout.current_place == "MARKET" and layout.travel_minutes.is_empty(),
             "map follows committed arrival and clears stale travel estimates"):
         return
+    # A through road in a rebuilt peripheral district carries the same car
+    # across the junction into an adjacent loaded edge, without teleporting.
+    world._on_world_updated(_world("OUTER_06_06","Outer junction"))
+    world._avatar.position=Vector3(5,0,5)
+    var through_source: Dictionary=world._traffic_edges["OUTER_05_06:OUTER_06_06"]
+    var through_target: Dictionary=world._traffic_edges["OUTER_06_06:OUTER_07_06"]
+    for traffic_edge in world._traffic_edges.values():
+        for entry in traffic_edge["cars"]:
+            entry["delay"]=100.0
+            entry["node"].visible=false
+    var through: Dictionary=through_source["cars"][0]
+    var through_car: Node3D=through["node"]
+    through["delay"]=0.0
+    through["distance"]=33.7
+    through["speed"]=2.0
+    world._traffic_seconds=0.0
+    world._position_traffic_edge(through_source,"OUTER_06_06")
+    var last_at: Vector3=through_car.position
+    for frame in range(130):
+        world._advance_traffic(0.1)
+        if not _check(through_car.visible and through_car.position.distance_to(last_at)<0.6,
+                "through traffic stays continuous across peripheral junction"):
+            return
+        last_at=through_car.position
+        if through_target["cars"].has(through):break
+    if not _check(through_target["cars"].has(through) and not through_source["cars"].has(through)
+            and through_car.position.x>=14.19,
+            "same traffic car continues on the next road"):
+        return
     # Generate a distant tile and return without retaining its neighbors.
     world._on_world_updated(_world("OUTER_20_20","Campagna 416"))
     if not _check(world._chunks.size()==4 and world._scenery.has_node("ProceduralBlock") and world._scenery.has_node("PublicCarPark") and world._scenery.has_node("BicycleRack") and world._can_stand(world.CAR_ARRIVAL,world.WALKER_RADIUS) and world._road_links.size()==2 and not world._chunks.has("PARK"),"distant procedural district streams only nearby blocks"):
