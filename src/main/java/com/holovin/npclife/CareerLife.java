@@ -103,8 +103,15 @@ final class CareerLife {
                     vacancy.requiredSkill+" skill required.");
         if(town.employerFunds.getOrDefault(vacancy.id,0)<vacancy.wage)
             throw new IllegalArgumentException("Employer cannot fund another shift right now.");
+        EmploymentContractLife.clearVisitor(town);
         p.jobId=vacancy.id;
         return "Hired as "+vacancy.title+". You may work a paid two-hour shift each day.";
+    }
+
+    static String apply(TownLife.Town town,String job,int day){
+        String result=apply(town,job);
+        EmploymentContractLife.signVisitor(town,day);
+        return result+" Signed a 30-day contract with a 7-day probation.";
     }
 
     /** Paid instruction requires a physical school or library and available cash. */
@@ -160,6 +167,7 @@ final class CareerLife {
         town.employerFunds.put(vacancy.id,funds-vacancy.wage);
         p.money=Math.addExact(p.money,vacancy.wage);
         p.lastWorkDay=day;
+        EmploymentContractLife.recordPay(town,day,vacancy.wage);
         p.fatigue=Math.min(100,p.fatigue+8);
         return "Worked two hours as "+vacancy.title+
                 ". Earned "+vacancy.wage+" EUR from employer funds."+

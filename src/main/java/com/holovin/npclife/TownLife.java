@@ -729,6 +729,7 @@ final class TownLife {
         if(e.alive&&!inPlayerConversation(town,e))move(town,e,PhoneLife.playerHomeWindow(town,e,marco)&&"FREE_TIME".equals(e.activity)?HousingLife.HOUSE_DISTRICT:PhoneLife.homeVisitWindow(town,e,marco)&&"FREE_TIME".equals(e.activity)?e.home:PhoneLife.meetingWindow(town,e,marco)&&"FREE_TIME".equals(e.activity)?Place.CAFE:desiredElena(marco.day,marco.minute,e,town),marco,truth,observations);
         DemographyLife.tick(town,marco,truth,observations);
         EmploymentLife.tick(town,marco,truth,observations);
+        EmploymentContractLife.tick(town,marco);
         NpcJusticeLife.tick(town,marco);
         PopulationLife.tick(town,marco,truth,observations);
         EmergencyLife.tick(town,marco);

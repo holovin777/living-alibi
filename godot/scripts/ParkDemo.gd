@@ -6982,6 +6982,17 @@ func _render_actions() -> void:
     _action_title.text = "Local actions — " + _current_place.capitalize()
     var player: Dictionary = _last_snapshot.get("player", {})
     var employed := str(player.get("jobId", ""))
+    var contract: Dictionary = _last_snapshot.get("employmentContract",{})
+    if bool(contract.get("active",false)) and _near_kiosk() and not _near_car() and not _near_truck():
+        var contract_label := Label.new()
+        contract_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        contract_label.text=tr("Employment contract: %s") % tr(str(contract.get("status","PERMANENT")))
+        if int(contract.get("endDay",0))>0:
+            contract_label.text+="\n"+tr("Expires on day %s") % contract.get("endDay",0)
+        contract_label.text+="\n"+tr("Paid shifts: %s · Total earnings: %s EUR") % [contract.get("paidShifts",0),contract.get("totalPaid",0)]
+        _action_choices.add_child(contract_label)
+        if bool(contract.get("canResign",false)):
+            _action_choices.add_child(_button(tr("Resign from job"),_garden_action.bind("employment-resign")))
     if _near_truck():
         var cargo: Dictionary = _last_snapshot.get("freight",{})
         _action_title.text = "Freight truck · "+_cargo_caption(cargo)
@@ -7633,6 +7644,10 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action=="employment-resign":
+        if _near_kiosk() and _connected and not _api.is_busy():
+            _api.garden_action(action)
+        return
     if action=="registry-consult":
         if _current_place=="CLINIC" and _near_kiosk() and _connected and not _api.is_busy():
             _api.garden_action(action)

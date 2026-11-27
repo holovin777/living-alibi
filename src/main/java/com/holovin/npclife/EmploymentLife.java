@@ -99,6 +99,7 @@ final class EmploymentLife {
         if(!p.alive || p.generationIndex<=0 || !p.employed)
             throw new IllegalArgumentException("Only employed procedural residents can lose a job.");
         p.employed=false;p.unemploymentDays=0;
+        EmploymentContractLife.endCitizen(town,p,clock.day);
         log(town,clock,p,Kind.JOB_LOSS,"Employment ended: "+p.occupation+".");
     }
 
@@ -109,6 +110,7 @@ final class EmploymentLife {
         p.employed=true;p.unemploymentDays=0;p.lastHiredDay=clock.day;
         p.occupation=JOBS[roleIndex];p.workplace=WORK[roleIndex];
         p.jobChanges++;
+        EmploymentContractLife.signCitizen(town,p,clock.day);
         log(town,clock,p,Kind.HIRED,"Hired as "+p.occupation+" at "+p.workplace.label+
                 " (previous occupation: "+previous+").");
     }

@@ -96,7 +96,7 @@ public final class Main {
                     }
                     if(lower.startsWith("apply ")) {
                         var candidate=town.copy();
-                        String result=CareerLife.apply(candidate,arg(input));
+                        String result=CareerLife.apply(candidate,arg(input),state.day);
                         advanceAndSave(db,state,candidate,15);
                         town.copyFrom(candidate);
                         System.out.println(result);

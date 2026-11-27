@@ -264,7 +264,7 @@ public final class GameSession implements AutoCloseable {
     public record StairwellResident(String id,String name,String appearanceStage,String outfitVisual,String knownName,int conversations,String relationship,String mood) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber,PublicSafetyLife.View publicSafety,BusLife.View bus,List<StairwellResident> stairwellResidents,TechnicalWorkLife.MagnoliaServices magnoliaServices,CondominiumLife.Report condominium,PostalLife.Report postal,CivilRegistryLife.Report registry) { }
+                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber,PublicSafetyLife.View publicSafety,BusLife.View bus,List<StairwellResident> stairwellResidents,TechnicalWorkLife.MagnoliaServices magnoliaServices,CondominiumLife.Report condominium,PostalLife.Report postal,CivilRegistryLife.Report registry,EmploymentContractLife.Report employmentContract) { }
     public record ActionView(String message,WorldView world,String dialogueLanguage,boolean dialogueRendered,String dialogueLocale,String dialogueFarewell) {
         public ActionView(String message,WorldView world){this(message,world,null,false,null,null);}
         public ActionView(String message,WorldView world,String language,boolean rendered,String locale){this(message,world,language,rendered,locale,null);}
@@ -306,7 +306,7 @@ public final class GameSession implements AutoCloseable {
                             return new StairwellResident(c.id,PlayerLife.displayName(town,c),appearanceStage(c),outfitVisual(c),
                                     contact==null?null:contact.knownName,contact==null?0:contact.conversations,
                                     PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name());
-                        }).toList(),TechnicalWorkLife.magnolia(town),CondominiumLife.report(town),PostalLife.report(town),CivilRegistryLife.report(town,state));
+                        }).toList(),TechnicalWorkLife.magnolia(town),CondominiumLife.report(town),PostalLife.report(town),CivilRegistryLife.report(town,state),EmploymentContractLife.report(town,state.day));
     }
 
     public synchronized BusinessView business() {
@@ -412,7 +412,7 @@ public final class GameSession implements AutoCloseable {
 
     public synchronized ActionView applyJob(String jobId) throws SQLException {
         var candidate=town.copy();
-        String message=CareerLife.apply(candidate,jobId);
+        String message=CareerLife.apply(candidate,jobId,state.day);
         return apply(candidate,15,message);
     }
 
@@ -883,6 +883,10 @@ public final class GameSession implements AutoCloseable {
         if("registry-identity".equals(action)||"registry-residence".equals(action)||"registry-health".equals(action)){
             var copy=town.copy();
             return apply(copy,15,CivilRegistryLife.act(copy,state,action));
+        }
+        if("employment-resign".equals(action)){
+            var copy=town.copy();
+            return apply(copy,5,EmploymentContractLife.resign(copy,state.day));
         }
         if("registry-consult".equals(action)){
             var copy=town.copy();

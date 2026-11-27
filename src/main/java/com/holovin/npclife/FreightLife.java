@@ -144,7 +144,10 @@ final class FreightLife {
         if(company) {
             LogisticsLife.receive(t,wage);LogisticsLife.record(t,LogisticsLife.REVENUE,wage);
             LogisticsLife.record(t,LogisticsLife.DELIVERIES,1);
-        } else p.money=Math.addExact(p.money,wage);
+        } else {
+            p.money=Math.addExact(p.money,wage);
+            EmploymentContractLife.recordPay(t,day,wage);
+        }
         if(employee!=null) {
             employee.money=Math.addExact(employee.money,stock(t,DRIVER_ESCROW));
             LogisticsLife.record(t,LogisticsLife.WAGE_COST,stock(t,DRIVER_ESCROW));
