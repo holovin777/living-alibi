@@ -34,6 +34,17 @@ final class NpcJusticeLife {
         ArchiveLife.record(t,"npc-vehicle-court:"+incident,s.day,s.minute,"Public safety",
                 "A fictional court imposed a custodial sentence in a confirmed vehicle theft case.");
     }
+    static void propertyConviction(TownLife.Town t,WorldState s,TownLife.Citizen offender,int incident){
+        if(!eligible(t,offender))return;
+        String key=PREFIX+"property-case:"+incident;
+        if(t.industryStocks.putIfAbsent(key,1)!=null)return;
+        int now=time(s);
+        t.industryStocks.put(until(offender),Math.addExact(Math.max(now,t.industryStocks.getOrDefault(until(offender),0)),2880));
+        t.industryStocks.merge(count(offender),1,Math::addExact);
+        custody(offender);
+        ArchiveLife.record(t,"npc-property-court:"+incident,s.day,s.minute,"Public safety",
+                "A fictional court imposed a custodial sentence in a confirmed property crime.");
+    }
     static void tick(TownLife.Town t,WorldState s){
         int now=time(s);
         for(var c:t.people.values()){
