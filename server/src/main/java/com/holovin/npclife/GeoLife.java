@@ -52,6 +52,12 @@ final class GeoLife {
                         add(result,"rebirth-travel-"+id,"Travel / Vai → "+p.label);
                 }
             }
+            var cafe=RebirthLife.cafe(t,s.day,s.minute);
+            if(cafe!=null&&cafe.open()){
+                for(var order:cafe.orders())if(order.available())add(result,"rebirth-cafe-"+order.id(),"Bar Centrale · "+order.label()+" · €"+order.price());
+                if(cafe.canRest())add(result,"rebirth-cafe-rest","Coffee break / Pausa · 20 min");
+                for(var guest:cafe.guests())add(result,"rebirth-cafe-chat-"+guest.id(),"Chat at cafe / Conversa: "+guest.name());
+            }
             if(home!=null){
                 for(String action:home.actions())add(result,"rebirth-home-"+action,"Home / Casa: "+action);
                 if(home.atHome())add(result,"rebirth-home-exit","Leave home / Esci");

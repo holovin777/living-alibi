@@ -18,6 +18,10 @@ signal interior_changed(room: Dictionary)
 var room: Dictionary={}
 var first:=true
 var life_key:=""
+var office_remark: Dictionary={}
+var remark_seen:=""
+var remark_time:=0.0
+var remark_label: Label3D
 var action_pending:=false
 var driving: Dictionary={}
 var driving_request:=false
@@ -39,6 +43,7 @@ func configure(source: Node3D, use_server: bool) -> void:
 func update_residents(pos: Vector2,delta: float) -> void:
     if not enabled:return
     elapsed+=delta
+    _update_remark(pos,delta)
     if elapsed>=1.0 and not action_pending and http.get_http_client_status()==HTTPClient.STATUS_DISCONNECTED:
         elapsed=0
         http.request("http://127.0.0.1:8091/geo/nearby?x=%.3f&z=%.3f" % [pos.x,pos.y])
@@ -86,6 +91,12 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
     connected=true
     traffic.set_java_population(true)
     world=parsed
+    for remark in parsed.get("officeRemarks",[]):
+        var key:=str(remark.get("id",""))
+        if not key.is_empty() and key!=remark_seen:
+            remark_seen=key
+            office_remark=remark
+            remark_time=6.0
     var next_room: Dictionary=parsed["interior"] if parsed.get("interior") is Dictionary else {}
     if str(next_room.get("id",""))!=str(room.get("id","")) or next_room.get("x")!=room.get("x") or next_room.get("z")!=room.get("z"):
         room=next_room
@@ -125,6 +136,24 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
         if not seen.has(id):
             people[id]["node"].queue_free()
             people.erase(id)
+
+func _update_remark(pos: Vector2,delta: float) -> void:
+    remark_time=maxf(0.0,remark_time-delta)
+    var id:=str(office_remark.get("speakerId",""))
+    if remark_time<=0 or str(room.get("id",""))!="OFFICE" or not people.has(id):
+        if is_instance_valid(remark_label):remark_label.hide()
+        return
+    var actor: Node3D=people[id]["node"]
+    if not is_instance_valid(remark_label):
+        remark_label=Label3D.new()
+        remark_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+        remark_label.font_size=36
+        remark_label.pixel_size=0.0045
+        remark_label.outline_size=8
+        add_child(remark_label)
+    remark_label.visible=pos.distance_to(Vector2(actor.position.x,actor.position.z))<=7
+    remark_label.position=actor.position+Vector3.UP*2.05
+    remark_label.text=str(office_remark.get("italian",""))
 
 func _appearance(record: Dictionary,person: Dictionary) -> void:
     var node: Node3D=record["node"]
@@ -214,6 +243,8 @@ func _action_received(result: int,code: int,_headers: PackedStringArray,body: Pa
 
 func _offline() -> void:
     connected=false
+    remark_time=0
+    if is_instance_valid(remark_label):remark_label.hide()
     world.clear()
     traffic.set_java_population(enabled)
     for record in people.values():record["node"].queue_free()
