@@ -532,7 +532,14 @@ public final class GameSession implements AutoCloseable {
         }
         if(reply==null&&understood){
             reply=FamilyDialogueLife.reply(copy,resident,message,language);
-            if(reply!=null)rendered=language!=null;
+            if(reply!=null){
+                rendered=language!=null;
+                var self=RebirthLife.child(copy);
+                if(language!=null&&self!=null&&self.age>=3&&LocalDialogue.conversational(message,prior==null?null:prior.lastHeard,reply)){
+                    String generated=LocalDialogue.grounded(copy,resident,prior,prior==null?null:prior.lastHeard,message,region,language,state);
+                    if(generated!=null){reply=generated;rendered=true;}
+                }
+            }
         }
         if(reply==null&&understood){
             reply=StreetAidLife.dialogue(copy,resident,message,state.day,state.minute);
@@ -561,8 +568,8 @@ public final class GameSession implements AutoCloseable {
             } else if(recall){
                 reply=ConversationMemory.recall(prior,language);
                 rendered=language!=null;
-            } else if(language!=null&&reply.equals("I'm not sure I understood. Could you ask me in a different way?")){
-                String generated=LocalDialogue.smallTalk(resident,prior,previous,message,region,language,false);
+            } else if(language!=null&&LocalDialogue.conversational(message,previous,reply)){
+                String generated=LocalDialogue.grounded(copy,resident,copy.player.contacts.get(resident.id),previous,message,region,language,state);
                 if(generated!=null){reply=generated;rendered=true;}
             }
         }
