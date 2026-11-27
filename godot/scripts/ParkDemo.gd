@@ -6990,6 +6990,12 @@ func _render_actions() -> void:
         if int(contract.get("endDay",0))>0:
             contract_label.text+="\n"+tr("Expires on day %s") % contract.get("endDay",0)
         contract_label.text+="\n"+tr("Paid shifts: %s · Total earnings: %s EUR") % [contract.get("paidShifts",0),contract.get("totalPaid",0)]
+        if bool(contract.get("fiscalPayroll",false)):
+            contract_label.text+="\n"+tr("Payslip · gross %s / net %s EUR") % [contract.get("lastPay",0),contract.get("lastNet",0)]
+            contract_label.text+="\n"+tr("Tax %s · Pension %s · TFR %s EUR") % [contract.get("lastTax",0),contract.get("lastPension",0),contract.get("lastTfr",0)]
+            contract_label.text+="\n"+tr("TFR reserve %s · Pension contributions %s EUR") % [contract.get("tfrBalance",0),contract.get("pensionTotal",0)]
+        else:
+            contract_label.text+="\n"+tr("Register a fiscal code to activate payroll deductions.")
         _action_choices.add_child(contract_label)
         if bool(contract.get("canResign",false)):
             _action_choices.add_child(_button(tr("Resign from job"),_garden_action.bind("employment-resign")))

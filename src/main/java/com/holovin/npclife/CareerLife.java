@@ -44,6 +44,7 @@ final class CareerLife {
         for(var offer:OFFERS)
             town.employerFunds.putIfAbsent(offer.id,offer.startingPayroll);
         town.employerFunds.putIfAbsent(PostalLife.ACCOUNT,360);
+        town.employerFunds.putIfAbsent(EmploymentContractLife.PENSION_ACCOUNT,0);
         town.employerFunds.putIfAbsent("barber",900);
         town.employerFunds.putIfAbsent("pizzeria",1200);
         town.employerFunds.putIfAbsent("gelateria",1200);
@@ -165,12 +166,11 @@ final class CareerLife {
         String industrialOutput=vacancy.id.equals("farm-worker")?FarmLife.playerShift(town):IndustryLife.playerShift(town,vacancy.id);
         // One conserved transfer: employer cash -> player cash.
         town.employerFunds.put(vacancy.id,funds-vacancy.wage);
-        p.money=Math.addExact(p.money,vacancy.wage);
+        int net=EmploymentContractLife.recordPay(town,day,vacancy.wage);
         p.lastWorkDay=day;
-        EmploymentContractLife.recordPay(town,day,vacancy.wage);
         p.fatigue=Math.min(100,p.fatigue+8);
         return "Worked two hours as "+vacancy.title+
-                ". Earned "+vacancy.wage+" EUR from employer funds."+
+                ". Earned "+net+" EUR net from "+vacancy.wage+" EUR gross."+
                 (industrialOutput.isEmpty()?"":" "+industrialOutput);
     }
 

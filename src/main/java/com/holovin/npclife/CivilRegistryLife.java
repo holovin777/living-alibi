@@ -39,6 +39,7 @@ final class CivilRegistryLife {
         return t.industryStocks.keySet().stream().filter(k->k.startsWith(prefix))
                 .map(k->k.substring(prefix.length())).findFirst().orElse(null);
     }
+    static boolean fiscalRegistered(TownLife.Town t){return get(t,visitor(t,"issued"))>0;}
     private static boolean valid(TownLife.Town t,WorldState s){return get(t,visitor(t,"expires"))>s.day;}
     private static boolean registered(TownLife.Town t){return t.player.ownsHouse&&get(t,visitor(t,"residence"))>0;}
     private static boolean healthValid(TownLife.Town t,WorldState s){

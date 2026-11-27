@@ -141,12 +141,12 @@ final class FreightLife {
         }
         t.employerFunds.merge(r.source,stock(t,PAYMENT),Math::addExact);
         boolean company=stock(t,COMPANY_RUN)>0;
+        int received=wage;
         if(company) {
             LogisticsLife.receive(t,wage);LogisticsLife.record(t,LogisticsLife.REVENUE,wage);
             LogisticsLife.record(t,LogisticsLife.DELIVERIES,1);
         } else {
-            p.money=Math.addExact(p.money,wage);
-            EmploymentContractLife.recordPay(t,day,wage);
+            received=EmploymentContractLife.recordPay(t,day,wage);
         }
         if(employee!=null) {
             employee.money=Math.addExact(employee.money,stock(t,DRIVER_ESCROW));
@@ -157,7 +157,7 @@ final class FreightLife {
             p.fatigue=Math.min(100,p.fatigue+8);
         }
         clear(t);
-        return "Delivered "+(first+second)+" units of "+r.name+". "+(company?"Company received ":"Earned ")+wage+" EUR.";
+        return "Delivered "+(first+second)+" units of "+r.name+". "+(company?"Company received ":"Earned ")+received+" EUR.";
     }
     static void clear(TownLife.Town t) {
         for(String key:new String[]{STAGE,KIND,IRON,COPPER,WAGES,PAYMENT,COMPANY_RUN,DRIVER_ESCROW})set(t,key,0);
