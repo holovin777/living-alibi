@@ -749,7 +749,11 @@ func _near_gate() -> bool:
 func _near_sport_counter() -> bool:
     return _current_place in ["MARKET","WORKSHOP"] and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(SPORT_COUNTER)<1.8
 
+func _near_charity() -> bool:
+    return _current_place=="LIBRARY" and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(Vector3(8,0,7.4))<1.8
+
 func _near_kiosk() -> bool:
+    if _near_charity():return true
     if _near_sport_counter():return true
     if _current_place=="PORTICI":return _avatar.position.distance_to(GROCERY_COUNTER)<1.5
     if _near_public_counter():return true
@@ -1462,6 +1466,7 @@ func _generate_chunk(place_id: String) -> void:
             _build_dojo()
         "LIBRARY":
             _build_library()
+            _build_caritas()
         "WORKSHOP":
             _building("Mechanical workshop", Color(0.41, 0.51, 0.59))
             _build_motor_court()
@@ -3112,6 +3117,31 @@ func _build_library() -> void:
     light.light_energy=1.8
     library.add_child(light)
 
+func _build_caritas() -> void:
+    var hall := Node3D.new()
+    hall.name="Caritas"
+    _scenery.add_child(hall)
+    var plaster := Color("#e6dfcf")
+    for part in [[Vector3(4,0,8),Vector2(0.24,6)],
+            [Vector3(12,0,8),Vector2(0.24,6)],
+            [Vector3(8,0,11),Vector2(8,0.24)],
+            [Vector3(5.5,0,5),Vector2(3,0.24)],
+            [Vector3(10.5,0,5),Vector2(3,0.24)]]:
+        _room_wall(hall,part[0],part[1],plaster)
+    _box(hall,Vector3(8,0.08,6),Color("#bdb4a0"),Vector3(8,0.025,8))
+    _box(hall,Vector3(8.3,0.30,6.3),Color("#856d59"),Vector3(8,3.16,8))
+    _physical_sign(hall,"CARITAS · Mensa solidale",Vector3(8,2.65,4.82),PI,4.2)
+    _room_furniture(hall,Vector3(8,0,8.5),Vector3(3.2,0.9,0.7),Color("#967957"))
+    _physical_sign(hall,"Pasti gratuiti · 12–14 · F",Vector3(8,1.3,8.06),PI,2.6)
+    for x in [5.3,10.7]:
+        _room_furniture(hall,Vector3(x,0,9.2),Vector3(1.1,0.74,1.4),Color("#9f8768"))
+        _room_furniture(hall,Vector3(x,0,7.95),Vector3(0.42,0.45,0.42),Color("#718478"))
+    var light := OmniLight3D.new()
+    light.position=Vector3(8,2.7,8)
+    light.omni_range=8
+    light.light_energy=1.5
+    hall.add_child(light)
+
 # The market has real walkable counters, with separate vendor and customer sides.
 func _build_market_counters() -> void:
     var stalls := Node3D.new()
@@ -3935,6 +3965,7 @@ func _render_residents() -> void:
     _assign_work_stations()
     _assign_market_queues()
     _assign_street_aid_spots()
+    _assign_caritas_spots()
     _sync_office_joker()
     _sync_hosted_guest()
 
@@ -4278,6 +4309,25 @@ func _assign_street_aid_spots() -> void:
         elif person.has_meta("pre_aid_anchor"):
             person.set_meta("anchor",person.get_meta("pre_aid_anchor"))
             person.remove_meta("pre_aid_anchor")
+
+func _assign_caritas_spots() -> void:
+    if _current_place!="LIBRARY" or _apartment_active:return
+    var spots: Array[Vector3]=[Vector3(7.2,0,7.35),Vector3(8.6,0,6.65),Vector3(6.3,0,6.25)]
+    for child in _residents_root.get_children():
+        var person := child as Node3D
+        var activity := str(person.get_meta("activity",""))
+        var at := Vector3(8,0,9.5)
+        if activity=="SEEKING_MEAL" and not spots.is_empty():at=spots.pop_front()
+        elif activity!="VOLUNTEERING":
+            if person.has_meta("pre_caritas_anchor"):
+                person.set_meta("anchor",person.get_meta("pre_caritas_anchor"))
+                person.remove_meta("pre_caritas_anchor")
+            continue
+        if not _can_stand(at,WALKER_RADIUS):continue
+        if not person.has_meta("pre_caritas_anchor"):person.set_meta("pre_caritas_anchor",person.get_meta("anchor",person.position))
+        if not (_dialog_panel.visible and _dialog_target==str(person.get_meta("resident_id",""))):
+            person.position=at
+            person.set_meta("anchor",at)
 
 func _sync_office_joker() -> void:
     if _current_place!="OFFICE" or _apartment_active:return
@@ -6659,6 +6709,22 @@ func _render_barber() -> void:
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _custody_active:return
+    if _near_charity() and not _rebirth_active():
+        _action_title.text=tr("Caritas · Community kitchen")
+        var charity: Dictionary=_last_snapshot.get("caritas",{})
+        var summary := Label.new()
+        summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        summary.text=tr("Open 12:00–14:00 when a volunteer is present.")
+        summary.text+="\n"+tr("Bread %s · Water %s · Parcels served %s") % [charity.get("bread",0),charity.get("water",0),charity.get("served",0)]
+        _action_choices.add_child(summary)
+        var receive := _button(tr("Receive free food and water"),_garden_action.bind("caritas-receive"))
+        receive.disabled=not bool(charity.get("canReceive",false))
+        _action_choices.add_child(receive)
+        for item in ["bread","water"]:
+            var donation := _button(tr("Donate bread") if item=="bread" else tr("Donate water"),_garden_action.bind("caritas-donate-"+item))
+            donation.disabled=not bool(charity.get("canDonateBread" if item=="bread" else "canDonateWater",false))
+            _action_choices.add_child(donation)
+        return
     if _near_kiosk() and not _near_sport_counter() and not _near_car() and not _rebirth_active():
         _render_bus()
     var justice: Dictionary = _last_snapshot.get("player",{}).get("justice",{})
@@ -7696,6 +7762,9 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("caritas-"):
+        if _near_charity() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action=="employment-resign":
         if _near_kiosk() and _connected and not _api.is_busy():
             _api.garden_action(action)

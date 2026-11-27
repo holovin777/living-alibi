@@ -732,6 +732,7 @@ final class TownLife {
         EmploymentContractLife.tick(town,marco);
         SocialProtectionLife.tick(town,marco);
         NpcJusticeLife.tick(town,marco);
+        CaritasLife.prepare(town,marco);
         PopulationLife.tick(town,marco,truth,observations);
         EmergencyLife.tick(town,marco);
         DojoCommunityLife.tick(town,marco);
@@ -775,6 +776,7 @@ final class TownLife {
         PeerAidLife.tick(town,marco,truth,observations);
         StreetAidLife.tick(town,marco);
         FamilyCareLife.tick(town,marco);
+        CaritasLife.tick(town,marco);
         for(int i=before;i<interactions.size();i++) {
             var conversation=interactions.get(i);
             KnowledgeLife.exchange(town,marco,conversation.firstId(),conversation.secondId());

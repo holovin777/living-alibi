@@ -71,6 +71,8 @@ final class PopulationLife {
         boolean condominiumCleaning=CondominiumLife.cleaningAssigned(town,c,clock);
         boolean postalRound=PostalLife.assigned(town,c,clock);
         TownLife.Place askingPlace=StreetAidLife.destination(town,c,clock.day,minute);
+        boolean volunteering=CaritasLife.assigned(town,c,clock);
+        boolean seekingMeal=CaritasLife.seekingMeal(town,c,clock);
         TownLife.Place desired;
         TownLife.Place manual=child?RebirthLife.childOuting(town,c,clock.day,minute):RebirthLife.manualDestination(town,c);
         if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
@@ -83,6 +85,7 @@ final class PopulationLife {
         else if(!publicSafety&&!child&&!carrier&&!RebirthLife.linkedAdult(town,c)&&PublicSafetyLife.alarmed(town,c,clock.day,minute))desired=c.home;
         else if(sleeping)desired=c.home;
         else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:c.home;
+        else if(volunteering||seekingMeal&&!working)desired=CaritasLife.PLACE;
         else if(itEmployee && working)desired=TownLife.Place.OFFICE;
         else if(carrier && working)desired=c.workplace;
         else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
@@ -166,6 +169,8 @@ final class PopulationLife {
         else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":c.place==c.home?"AT_HOME":"FREE_TIME";
         else if(RebirthLife.outsideHome(town,c))c.activity="OUTSIDE_HOME";
         else if(RebirthLife.stayingHome(town,c)&&c.place==c.home)c.activity="AT_HOME";
+        else if(volunteering&&c.place==CaritasLife.PLACE&&desired==CaritasLife.PLACE)c.activity="VOLUNTEERING";
+        else if(seekingMeal&&!working&&c.place==CaritasLife.PLACE&&desired==CaritasLife.PLACE)c.activity="SEEKING_MEAL";
         else if(askingPlace!=null&&c.place==askingPlace&&desired==askingPlace&&
                 c.currentSpace().equals(TownLife.publicSpace(c.place)))c.activity="ASKING_FOR_HELP";
         else if(retired)c.activity="RETIRED";
