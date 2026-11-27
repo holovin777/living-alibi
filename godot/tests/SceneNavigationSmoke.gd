@@ -596,6 +596,28 @@ func _exercise() -> void:
             "car yields to pedestrian ahead and has a collision footprint"):
         return
     world._avatar.position = Vector3.ZERO
+    # The same vehicle stays visible while turning into the opposite lane.
+    var outbound: Dictionary=traffic["cars"][0]
+    outbound["delay"]=100.0
+    sample_car.visible=false
+    inbound["distance"]=33.7
+    inbound["speed"]=2.0
+    inbound["turn"]=-1.0
+    inbound["reverse"]=true
+    world._traffic_seconds=0.0
+    world._position_traffic_edge(traffic,"WORKSHOP")
+    var previous_car_position: Vector3=inbound_car.position
+    for frame in range(30):
+        world._advance_traffic(0.1)
+        if not _check(inbound_car.visible and inbound_car.position.distance_to(previous_car_position)<0.5,
+                "moving traffic remains visible and continuous at road ends"):
+            return
+        previous_car_position=inbound_car.position
+    if not _check(not bool(inbound["reverse"]) and float(inbound["turn"])<0.0
+            and float(inbound["distance"])>=14.2,
+            "vehicle completes its turn without respawning"):
+        return
+    outbound["delay"]=0.0
     var garage_entry: Vector3 = world._move_on_ground(Vector3(7.5,0,5),Vector3(0,0,7),world.WALKER_RADIUS)
     if not _check(garage_entry.z > 11.9
             and not world._can_stand(Vector3(10,0,12),world.WALKER_RADIUS)

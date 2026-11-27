@@ -1656,7 +1656,18 @@ func _sync_traffic_edges(origin_id: String) -> void:
                     var palette_index := absi((key+str(i)).hash())%colors.size()
                     var car := _make_city_car(_traffic_root,colors[palette_index],palette_index%2)
                     car.visible = false
-                    cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0})
+                    var brakes := Node3D.new()
+                    brakes.name="BrakeLights"
+                    car.add_child(brakes)
+                    for side in [-1.0,1.0]:
+                        _box(brakes,Vector3(0.29,0.19,0.04),Color("#ff4438"),Vector3(side*0.65,0.7,1.85))
+                        var lamp := brakes.get_child(brakes.get_child_count()-1) as MeshInstance3D
+                        var mat := lamp.material_override as StandardMaterial3D
+                        mat.emission_enabled=true
+                        mat.emission=Color("#ff3025")
+                    brakes.visible=false
+                    cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0,
+                        "reverse":i==1,"turn":-1.0,"speed":4.0,"brakes":brakes})
                 _traffic_edges[key] = {"first":str(first),"second":str(second),"cars":cars}
     for key in _traffic_edges.keys():
         if not wanted.has(key):
@@ -1672,17 +1683,29 @@ func _position_traffic_edge(edge: Dictionary,origin_id: String) -> void:
     var origin := TownLayout.world_center(origin_id)
     var first := TownLayout.world_center(edge["first"])-origin
     var second := TownLayout.world_center(edge["second"])-origin
-    for i in range(2):
-        var record: Dictionary = edge["cars"][i]
-        var start := first if i==0 else second
-        var direction := (second-first).normalized() if i==0 else (first-second).normalized()
-        var right := Vector3(-direction.z,0,direction.x)
-        var car: Node3D = record["node"]
-        car.position = start+direction*float(record["distance"])+right*1.6
-        car.rotation.y = atan2(-direction.x,-direction.z)
+    for record in edge["cars"]:
+        _position_traffic_car(record,first,second)
+
+func _position_traffic_car(record: Dictionary,first: Vector3,second: Vector3) -> void:
+    var reverse := bool(record.get("reverse",false))
+    var start := second if reverse else first
+    var direction := (first-second).normalized() if reverse else (second-first).normalized()
+    var right := Vector3(-direction.z,0,direction.x)
+    var car: Node3D = record["node"]
+    var angle := float(record.get("turn",-1.0))
+    if angle>=0.0:
+        # Continuous semicircle on the existing six-metre roadway. At PI
+        # the pose exactly matches the start of the opposite lane.
+        car.position=start+direction*(33.8+sin(angle)*1.6)+right*(cos(angle)*1.6)
+        direction=direction*cos(angle)-right*sin(angle)
+    else:
+        car.position=start+direction*float(record["distance"])+right*1.6
+    car.rotation.y=atan2(-direction.x,-direction.z)
 
 func _car_footprint(car: Node3D) -> Rect2:
-    var dimensions := Vector2(1.88,3.62) if absf(cos(car.rotation.y))>0.5 else Vector2(3.62,1.88)
+    var c := absf(cos(car.rotation.y))
+    var s := absf(sin(car.rotation.y))
+    var dimensions := Vector2(1.88*c+3.62*s,3.62*c+1.88*s)
     return Rect2(Vector2(car.position.x,car.position.z)-dimensions*0.5,dimensions)
 
 func _traffic_people() -> Array[Vector3]:
@@ -1704,44 +1727,78 @@ func _advance_traffic(delta: float) -> void:
     for edge in _traffic_edges.values():
         var first := TownLayout.world_center(edge["first"])-origin
         var second := TownLayout.world_center(edge["second"])-origin
-        for i in range(2):
-            var record: Dictionary = edge["cars"][i]
+        for record in edge["cars"]:
             var car: Node3D = record["node"]
-            var start := first if i==0 else second
-            var direction := (second-first).normalized() if i==0 else (first-second).normalized()
+            var reverse := bool(record.get("reverse",false))
+            var start := second if reverse else first
+            var direction := (first-second).normalized() if reverse else (second-first).normalized()
             var right := Vector3(-direction.z,0,direction.x)
             var distance := float(record["distance"])
+            var angle := float(record.get("turn",-1.0))
+            if angle>=0.0:
+                direction=direction*cos(angle)-right*sin(angle)
+                right=Vector3(-direction.z,0,direction.x)
             var blocked := false
-            # Yield to pedestrians anywhere immediately ahead, including
-            # a pedestrian already on either crossing.
             for person in people:
-                var relative := person-(start+direction*distance+right*1.6)
+                var relative := person-car.position
                 var ahead := relative.dot(direction)
                 if ahead>=-2.2 and ahead<=4.3 and absf(relative.dot(right))<1.45:
-                    blocked = true
+                    blocked=true
                     break
+            # Never overtake on these narrow streets. Wait for another car
+            # in the lane or for the receiving lane before starting a turn.
+            for other in edge["cars"]:
+                var other_car: Node3D=other["node"]
+                if other_car==car or not other_car.visible:continue
+                var offset := other_car.position-car.position
+                var ahead := offset.dot(direction)
+                if ahead>0.0 and ahead<5.2 and absf(offset.dot(right))<2.0:
+                    blocked=true
+                if angle<0.0 and distance>=33.0 and bool(other.get("reverse",false))!=reverse:
+                    var exit_at := start+direction*33.8-right*1.6
+                    if other_car.position.distance_to(exit_at)<5.2:blocked=true
+                if angle>=0.0 and offset.length()<3.2 and ahead>0.0:blocked=true
+            var brakes: Node3D=record["brakes"]
             if float(record["delay"])>0.0:
-                record["delay"] = maxf(0.0,float(record["delay"])-dt)
-                car.visible = false
+                record["delay"]=maxf(0.0,float(record["delay"])-dt)
+                car.visible=false
                 continue
             if not car.visible and (blocked or (not _drive_target.is_empty() and direction.dot(_drive_direction)>0.9 and start.distance_to(Vector3.ZERO)<0.1 and (edge["second"]==_drive_target or edge["first"]==_drive_target))):
                 continue
-            car.visible = true
+            car.visible=true
             if blocked:
+                record["speed"]=0.0
+                brakes.visible=true
                 continue
-            var next := distance+dt*(2.0 if phase==-1 else 4.0)
-            if phase in [0,1]:
-                for stop in [15.0,27.0]:
-                    if distance<=stop and next>stop:
-                        next = stop
-                        break
-            if next>=33.8:
-                record["distance"] = 14.2
-                record["delay"] = 4.0
-                car.visible = false
+            var limit := 2.0 if phase==-1 else 4.0
+            if angle>=0.0 or distance>=32.0:limit=minf(limit,2.0)
+            var speed := move_toward(float(record.get("speed",4.0)),limit,dt*5.0)
+            if angle>=0.0:
+                angle+=speed*dt/1.6
+                if angle>=PI:
+                    record["turn"]=-1.0
+                    record["reverse"]=not reverse
+                    record["distance"]=14.2+maxf(0.0,(angle-PI)*1.6)
+                else:
+                    record["turn"]=angle
+                record["speed"]=speed
+                brakes.visible=false
             else:
-                record["distance"] = next
-        _position_traffic_edge(edge,_current_place)
+                var next := distance+dt*speed
+                if phase in [0,1]:
+                    for stop in [15.0,27.0]:
+                        if distance<=stop and next>stop:
+                            next=stop
+                            speed=0.0
+                            break
+                if next>=33.8:
+                    record["distance"]=33.8
+                    record["turn"]=minf(PI,(next-33.8)/1.6)
+                else:
+                    record["distance"]=next
+                record["speed"]=speed
+                brakes.visible=speed<0.1 or speed<limit-0.1
+            _position_traffic_car(record,first,second)
     for chunk in _chunks.values():
         var root: Node3D = chunk["root"]
         var roads := root.get_node_or_null("DistrictRoads")
