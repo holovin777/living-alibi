@@ -704,6 +704,7 @@ final class TownLife {
         JusticeLife.tick(town,marco,truth,observations);
         ContactTimeLife.tick(town,marco.day,marco.minute);
         HousingLife.expire(town.player,marco.day,marco.minute);
+        ServiceCompanyLife.tick(town,marco);
         HomeApplianceLife.tick(town,marco);
         GardenLife.tick(town,marco.day,marco.minute);
         HenLife.tick(town,marco.day,marco.minute);

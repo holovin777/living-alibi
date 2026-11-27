@@ -73,7 +73,7 @@ final class HomeServiceLife {
     static void clear(TownLife.Town t){for(String k:List.of("appointment-day","mechanic","device","minutes","covered"))set(t,k,0);}
     static String cancel(TownLife.Town t,WorldState s){
         HomeApplianceLife.home(t,s);if(!pending(t))throw new IllegalArgumentException("No appointment to cancel.");
-        clear(t);return "Home service appointment cancelled.";
+        ServiceCompanyLife.count(t,"cancelled",1);clear(t);return "Home service appointment cancelled.";
     }
     static void tick(TownLife.Town t,WorldState s){
         if(!t.player.alive||RebirthLife.active(t)||!t.player.ownsHouse)return;
@@ -94,13 +94,13 @@ final class HomeServiceLife {
         }
         if(!pending(t))return;
         int day=get(t,"appointment-day");
-        if(s.day>day||s.day==day&&s.minute>=900){clear(t);set(t,"last-result",2);return;}
+        if(s.day>day||s.day==day&&s.minute>=900){ServiceCompanyLife.count(t,"missed",1);clear(t);set(t,"last-result",2);return;}
         if(s.day!=day)return;
         var c=NpcVehicleCrimeLife.person(t,get(t,"mechanic"));
         String id=device(t);boolean covered=get(t,"covered")==1;
         boolean attending=c!=null&&assigned(t,c,s)&&c.presentAt(SOUTH_RESIDENCES)
             &&t.player.place==SOUTH_RESIDENCES&&t.player.travelRemaining==0&&DEVICES.contains(id)
-            &&HomeGoodsLife.installed(t,id)&&funded(t,id,covered)&&t.technicalMaterials.getOrDefault("spare-parts",0)>0;
+            &&HomeGoodsLife.installed(t,id)&&funded(t,id,covered)&&ServiceCompanyLife.available(t);
         if(!attending){set(t,"minutes",0);return;}
         int elapsed=get(t,"minutes")+1;set(t,"minutes",elapsed);
         if(elapsed<30)return;
@@ -108,18 +108,16 @@ final class HomeServiceLife {
             t.employerFunds.merge(merchant(id),-REPAIR_PRICE,Math::addExact);
             set(t,"warranty-used:"+id,1);
         }else t.player.money-=REPAIR_PRICE;
-        t.employerFunds.merge("technician",REPAIR_PRICE-8-PART_PRICE,Math::addExact);
-        t.employerFunds.merge("city-maintenance",PART_PRICE,Math::addExact);
-        t.technicalMaterials.merge("spare-parts",-1,Math::addExact);
-        c.money=Math.addExact(c.money,8);set(t,"wear:"+id,0);set(t,"last-result",1);clear(t);
+        ServiceCompanyLife.complete(t,c);
+        set(t,"wear:"+id,0);set(t,"last-result",1);clear(t);
     }
     record Device(String id,int condition,boolean canRequest,int repairPrice,boolean warrantyCovered){}
     record View(int indoorTemperature,int thermostat,boolean heating,boolean gasConnected,int gasBill,int repairPrice,
-                int appointmentDay,String appointmentDevice,int lastResult,List<Device> devices){}
+                int appointmentDay,String appointmentDevice,int lastResult,List<Device> devices,ServiceCompanyLife.View company){}
     static View view(TownLife.Town t,WorldState s){
         boolean atHome=t.player.ownsHouse&&t.player.place==SOUTH_RESIDENCES&&t.player.travelRemaining==0&&t.player.alive&&!RebirthLife.active(t);
         return new View(indoor(t,s),target(t),heating(t),gas(t),get(t,"gas-bill"),REPAIR_PRICE,get(t,"appointment-day"),device(t),
             get(t,"last-result"),DEVICES.stream().filter(id->HomeGoodsLife.installed(t,id))
-                .map(id->new Device(id,condition(t,id),atHome&&!pending(t)&&condition(t,id)<100&&funded(t,id,warranty(t,id,s.day)),quote(t,id,s.day),warranty(t,id,s.day))).toList());
+                .map(id->new Device(id,condition(t,id),atHome&&!pending(t)&&condition(t,id)<100&&funded(t,id,warranty(t,id,s.day)),quote(t,id,s.day),warranty(t,id,s.day))).toList(),ServiceCompanyLife.view(t));
     }
 }

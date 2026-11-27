@@ -55,6 +55,7 @@ final class CareerLife {
         town.employerFunds.putIfAbsent("library",200);
         // Enterprise workers share real company funds with player industrial wages.
         town.employerFunds.putIfAbsent("city-maintenance",500);
+        town.employerFunds.putIfAbsent(ServiceCompanyLife.ACCOUNT,0);
         town.employerFunds.putIfAbsent("survey-office",0);
         town.employerFunds.putIfAbsent("guesthouse",0);
         town.employerFunds.putIfAbsent("farm-contractors",0);
