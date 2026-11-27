@@ -20,10 +20,10 @@ final class GeoProjection {
     record Choice(String id,String label){}
     record PhoneJob(String id,String title,District workplace,String subject,int requiredSkill,int currentSkill,int wage,boolean funded){}
     record PhoneView(PhoneLife.Report report,List<AddressLife.Entry> contacts,BankLife.Report bank,
-                     List<PhoneJob> jobs,District bankLocation,List<Choice> actions){}
+                     List<PhoneJob> jobs,District bankLocation,List<Choice> actions,Map<String,District> contactEntrances){}
     PhoneView phone(TownLife.Town t,WorldState s){
         var report=PhoneLife.report(t,s.day,s.minute);
-        if(!report.available())return new PhoneView(report,List.of(),null,List.of(),null,List.of());
+        if(!report.available())return new PhoneView(report,List.of(),null,List.of(),null,List.of(),Map.of());
         var jobs=CareerLife.offers().stream().map(j->new PhoneJob(j.id(),j.title(),district(j.workplace()),j.subject(),
             j.requiredSkill(),CareerLife.skill(t.player,j.subject()),j.wage(),t.employerFunds.getOrDefault(j.id(),0)>=j.wage())).toList();
         var actions=new ArrayList<Choice>();
@@ -47,7 +47,13 @@ final class GeoProjection {
                 actions.add(new Choice("phone-reply:2:"+m.residentId(),"Not today / Non oggi"));
             }
         }
-        return new PhoneView(report,AddressLife.contacts(t),BankLife.report(t),jobs,district(TownLife.Place.OFFICE),List.copyOf(actions));
+        var contacts=AddressLife.contacts(t);
+        var locations=new LinkedHashMap<String,District>();
+        for(var contact:contacts){
+            int building=AddressLife.sharedBuilding(t,contact.residentId());
+            if(building>=1&&building<=3)locations.put(contact.residentId(),entrance(building));
+        }
+        return new PhoneView(report,contacts,BankLife.report(t),jobs,district(TownLife.Place.OFFICE),List.copyOf(actions),Map.copyOf(locations));
     }
     record Interior(String id,String label,double x,double z,int occupants){}
     record Weather(String season,String sky,int temperatureC,boolean raining,boolean snowing){}
@@ -63,7 +69,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -81,6 +87,7 @@ final class GeoProjection {
     final Map<String,Point> motorNodes=new TreeMap<>();
     final Map<String,List<String>> motorEdges=new TreeMap<>();
     final EnumMap<TownLife.Place,String> anchors=new EnumMap<>(TownLife.Place.class);
+    private final Map<Integer,District> residentialEntrances=new LinkedHashMap<>();
     final Map<String,Route> routes=new LinkedHashMap<>(128,.75f,true){
         @Override protected boolean removeEldestEntry(Map.Entry<String,Route> e){return size()>512;}
     };
@@ -121,6 +128,20 @@ final class GeoProjection {
         }
         anchors.put(TownLife.Place.MARCO_HOME,anchors.get(TownLife.Place.NORTH_RESIDENCES));
         anchors.put(TownLife.Place.ELENA_HOME,anchors.get(TownLife.Place.SOUTH_RESIDENCES));
+        var north=point(TownLife.Place.NORTH_RESIDENCES);
+        var south=point(TownLife.Place.SOUTH_RESIDENCES);
+        // The walking graph contains no cadastral doors. Use deterministic public
+        // approach points along its connected edges, not private home coordinates.
+        var second=north;
+        for(String id:new TreeSet<>(edges.get(anchors.get(TownLife.Place.NORTH_RESIDENCES)))){
+            var next=nodes.get(id);
+            double length=north.distance(next);
+            if(length>=10){second=north.lerp(next,Math.min(12,length)/length);break;}
+            if(length>north.distance(second))second=next;
+        }
+        residentialEntrances.put(1,new District("1",AddressLife.label(1),north.x,north.z));
+        residentialEntrances.put(2,new District("2",AddressLife.label(2),second.x,second.z));
+        residentialEntrances.put(3,new District("3",AddressLife.label(3),south.x,south.z));
     }
     Set<String> largest(){
         Set<String> seen=new HashSet<>(),largest=Set.of();
@@ -137,6 +158,15 @@ final class GeoProjection {
     }
     Point point(TownLife.Place p){return nodes.get(anchors.get(p));}
     District district(TownLife.Place p){Point at=point(p);return new District(p.name(),p.label,at.x,at.z);}
+    District entrance(int building){return residentialEntrances.get(building);}
+    boolean nearEntrance(int building,Point at){
+        var door=entrance(building);
+        return door!=null&&new Point(door.x(),door.z()).distance(at)<=4;
+    }
+    List<District> nearbyEntrances(Point at){
+        return residentialEntrances.values().stream()
+            .filter(d->new Point(d.x(),d.z()).distance(at)<=80).toList();
+    }
     TownLife.Place nearest(Point at){
         return PlayerLife.publicPlaces().stream().min(Comparator.comparingDouble((TownLife.Place p)->point(p).distance(at))).orElseThrow();
     }
@@ -216,13 +246,13 @@ final class GeoProjection {
         if(ownHome(t,s))result.add(new Choice("home-enter","Enter your home / Entra in casa"));
         for(var entry:AddressLife.contacts(t)){
             int building=AddressLife.sharedBuilding(t,entry.residentId());
-            if(building==0||!t.player.place.name().equals(entry.district()))continue;
+            if(building==0||!t.player.place.name().equals(entry.district())||!nearEntrance(building,player))continue;
             String name=entry.name();
             result.add(new Choice("intercom:ring:"+building+":"+entry.residentId(),"Ring / Citofona "+name+" · "+entry.address()));
             result.add(new Choice("intercom:visit:"+building+":"+entry.residentId(),"Doorstep chat / Parla alla porta · "+name));
             if(building==1)result.add(new Choice("intercom:invite:1:"+entry.residentId(),"Ask to come inside / Chiedi di entrare · "+name));
         }
-        if(visit!=null&&"INVITED".equals(visit.status()))result.add(new Choice("intercom:enter:1:"+visit.residentId(),"Accept invitation / Entra su invito"));
+        if(visit!=null&&"INVITED".equals(visit.status())&&nearEntrance(1,player))result.add(new Choice("intercom:enter:1:"+visit.residentId(),"Accept invitation / Entra su invito"));
         return List.copyOf(result);
     }
     static boolean hasInterior(TownLife.Place p){
@@ -469,6 +499,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,room==null?List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))):inside,
             district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room));
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
     }
 }
