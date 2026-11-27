@@ -355,6 +355,10 @@ func _process(delta: float) -> void:
             _stairwell_hint.text=tr("Apartment %s · locked") % unit
         else:
             _stairwell_hint.text = tr("G: leave stairwell") if _stairwell.near_exit(_avatar.position) else tr("Stairwell · floor %s · apartment doors locked") % _stairwell.floor_number(_avatar.position)
+        if _stairwell.near_exit(_avatar.position):
+            var condo: Dictionary = _last_snapshot.get("condominium",{})
+            if not condo.is_empty():
+                _stairwell_hint.text+="\n"+(tr("Building reserve: %s EUR · unpaid contributions: %s EUR") % [condo.get("reserve",0),condo.get("arrears",0)])
         if not _nearest_resident().is_empty():
             _stairwell_hint.text+="\n"+tr("T or click: talk to a person")
         _tick_live_clock(delta)

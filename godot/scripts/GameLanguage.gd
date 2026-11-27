@@ -175,6 +175,7 @@ const IT := {
     "G: enter stairwell · E: intercom": "G: entra nel vano scale · E: citofono",
     "Elevator · floor %s · E: up · R: down": "Ascensore · piano %s · E: sali · R: scendi",
     "Elevator out of service · use stairs": "Ascensore fuori servizio · usa le scale",
+    "Building reserve: %s EUR · unpaid contributions: %s EUR": "Fondo condominiale: %s EUR · quote insolute: %s EUR",
     "G: leave stairwell": "G: esci dal vano scale",
     "Stairwell · floor %s · apartment doors locked": "Vano scale · piano %s · porte chiuse",
     "E: stand up · R: relax": "E: alzati · R: rilassati",

@@ -45,7 +45,8 @@ final class EconomyLife {
                 if(!person.alive || person.generationIndex<=0||DemographyLife.child(person))continue;
                 if(Math.floorMod(clock.day+person.generationIndex*3,7)==0&&!RentalLife.housed(town,person,clock.day)) {
                     int rent=155 + Math.floorMod((int)person.personalSeed,5)*9;
-                    addBill(town,clock,person,rent,"housing and utilities",truth,observations);
+                    int common=CondominiumLife.allocate(town,clock,person,rent);
+                    addBill(town,clock,person,rent-common,"housing and utilities",truth,observations);
                 }
                 if(Math.floorMod(clock.day+person.generationIndex*11,21)==0) {
                     int repair=45+Math.floorMod((int)(person.personalSeed>>>8),6)*19;
@@ -54,6 +55,7 @@ final class EconomyLife {
                 // Allow overdue bills to be settled after income arrives. Avoid draining
                 // the last EUR 20 required for food and water.
                 payBills(town,clock,person,truth,observations);
+                CondominiumLife.collect(town,clock,person);
             }
             for(var loan:new ArrayList<>(town.loans.values())) {
                 if(loan.status==Status.PAID)continue;
