@@ -16,7 +16,22 @@ func configure(map: Dictionary) -> void:
 static func point(raw: Array) -> Vector2:
     return Vector2(float(raw[0]),float(raw[1]))
 
+static func inside_map(map: Dictionary,center: Vector2,radius: float) -> bool:
+    # Importer bounds are [south, west, north, east] in degrees.
+    # Use the same local metre projection as tools/import_vigevano.py.
+    var bounds: Array=map.get("bounds",[])
+    var origin: Array=map.get("origin",[])
+    if bounds.is_empty() and origin.is_empty():return true # synthetic test maps
+    if bounds.size()!=4 or origin.size()!=2:return false
+    var scale_x:=111320.0*cos(deg_to_rad(float(origin[0])))
+    var west: float=(float(bounds[1])-float(origin[1]))*scale_x
+    var east: float=(float(bounds[3])-float(origin[1]))*scale_x
+    var north: float=(float(origin[0])-float(bounds[2]))*111132.0
+    var south: float=(float(origin[0])-float(bounds[0]))*111132.0
+    return center.x-radius>=west and center.x+radius<=east and center.y-radius>=north and center.y+radius<=south
+
 static func clear_at(map: Dictionary,center: Vector2,radius: float) -> bool:
+    if not inside_map(map,center,radius):return false
     # Conservative building bounding rectangles (including their interiors)
     # and distance from known roads/rail. Scan every chunk because features
     # are assigned to the chunk containing their centroid, not their bounds.
@@ -40,19 +55,21 @@ func _anchor(id: String,record: Dictionary,radius: float,distances: Array) -> Va
     var origin:=Vector2(float(record["x"]),float(record["z"]))
     var key:=id+":"+str(origin)
     if anchors.has(key):return anchors[key]
-    # Require candidate to remain in the imported graph's approximate envelope.
+    # Reserve both plots even when one is temporarily outside the view.
     var result: Variant=null
     for distance in distances:
         for step in range(16):
             var theta:=step*TAU/16.0
             var candidate:=origin+Vector2(cos(theta),sin(theta))*float(distance)
             if clear_at(city,candidate,radius):
-                if id=="site" and anchors.has("yard_reserved") and candidate.distance_to(anchors["yard_reserved"])<radius+6.5:continue
+                var other: String="yard" if id=="site" else "site"
+                var other_radius: float=6.5 if other=="yard" else 4.5
+                if anchors.has(other+"_reserved") and candidate.distance_to(anchors[other+"_reserved"])<radius+other_radius:continue
                 result=candidate
                 break
         if result!=null:break
     anchors[key]=result
-    if id=="yard" and result!=null:anchors["yard_reserved"]=result
+    if result!=null:anchors[id+"_reserved"]=result
     return result
 
 func _mat(color: Color) -> StandardMaterial3D:
