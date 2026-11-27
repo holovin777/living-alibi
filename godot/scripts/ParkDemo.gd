@@ -2889,6 +2889,12 @@ func _build_home_goods_display(house: Node3D) -> void:
     var washer_door := _cylinder(washer,0.22,0.06,Color("#50616b"),Vector3(-5.39,1.32,13.05))
     washer_door.rotation.z=PI/2.0
     _box(washer,Vector3(0.06,0.08,0.43),Color("#9aa6a8"),Vector3(-5.39,1.60,13.05))
+    var boiler := Node3D.new()
+    boiler.name="boiler"
+    display.add_child(boiler)
+    _box(boiler,Vector3(0.35,0.65,0.55),Color("#e4e0d9"),Vector3(-4.34,2.30,12.9))
+    _box(boiler,Vector3(0.03,0.12,0.22),Color("#5a7477"),Vector3(-4.53,2.1,12.9))
+    _box(boiler,Vector3(0.10,0.48,0.10),Color("#9d927d"),Vector3(-4.34,1.74,12.9))
     var shelf := Node3D.new()
     shelf.name="shelf"
     display.add_child(shelf)
@@ -8327,9 +8333,44 @@ func _render_personal_goods() -> void:
             elif str(item.get("borrowerId",""))==who:
                 _action_choices.add_child(_button(tr("Request %s back from %s") % [label,name_text],_garden_action.bind("personal-good:return:"+id+":"+who)))
 
+func _render_home_services() -> void:
+    var services: Dictionary=_last_snapshot.get("homeServices",{})
+    if services.is_empty():return
+    var temp := Label.new()
+    temp.text=tr("Indoor temperature: %s °C · Gas bill: %s EUR") % [services.get("indoorTemperature",0),services.get("gasBill",0)]
+    _action_choices.add_child(temp)
+    if int(services.get("gasBill",0))>0:
+        _action_choices.add_child(_button(tr("Pay gas bill"),_garden_action.bind("home-service:pay-gas")))
+    var names := {"fridge":"Compact refrigerator","television":"Television","washer":"Washing machine","boiler":"Heating boiler"}
+    for device in services.get("devices",[]):
+        var id := str(device.get("id",""))
+        var label := tr(str(names.get(id,id)))
+        var status := Label.new()
+        status.text=tr("%s · Condition %s%%") % [label,device.get("condition",100)]
+        _action_choices.add_child(status)
+        if bool(device.get("canRequest",false)):
+            _action_choices.add_child(_button(tr("Schedule repair: %s · 15 EUR") % label,_garden_action.bind("home-service:repair:"+id)))
+        if id=="boiler":
+            var settings := HBoxContainer.new()
+            _action_choices.add_child(settings)
+            for setting in [0,16,20,22]:
+                var control := _button(tr("Off") if setting==0 else str(setting)+" °C",_garden_action.bind("home-service:thermostat:"+str(setting)))
+                control.disabled=int(services.get("thermostat",0))==setting
+                settings.add_child(control)
+    if int(services.get("appointmentDay",0))>0:
+        var appointment := Label.new()
+        appointment.text=tr("Repair appointment: day %s · 09:00–15:00") % services.get("appointmentDay",0)
+        _action_choices.add_child(appointment)
+        _action_choices.add_child(_button(tr("Cancel repair appointment"),_garden_action.bind("home-service:cancel")))
+    elif int(services.get("lastResult",0))>0:
+        var result := Label.new()
+        result.text=tr("Repair completed.") if int(services.get("lastResult",0))==1 else tr("Repair appointment missed.")
+        _action_choices.add_child(result)
+
 func _render_home_appliances() -> void:
     var appliances: Dictionary=_last_snapshot.get("homeAppliances",{})
     if appliances.is_empty():return
+    _render_home_services()
     var installed: Array=_last_snapshot.get("homeGoods",{}).get("installed",[])
     var meter := Label.new()
     meter.text=tr("Electricity: %s · Bill: %s EUR") % [tr("Connected") if bool(appliances.get("power",false)) else tr("Disconnected"),appliances.get("bill",0)]
@@ -8379,6 +8420,9 @@ func _render_home_goods() -> void:
         _action_choices.add_child(info)
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("home-service:"):
+        if _current_place=="SOUTH_RESIDENCES" and _owns_house() and _near_kitchen() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("home-appliance:"):
         if _current_place=="SOUTH_RESIDENCES" and _owns_house() and _near_kitchen() and _connected and not _api.is_busy():_api.garden_action(action)
         return

@@ -10,6 +10,7 @@ final class HomeGoodsLife {
         new Product("television","Television",65,PORTICI),
         new Product("fridge","Compact refrigerator",80,PORTICI),
         new Product("washer","Washing machine",95,PORTICI),
+        new Product("boiler","Heating boiler",110,WORKSHOP),
         new Product("shelf","Wall bookshelf",25,WORKSHOP));
     static String key(TownLife.Town t,String field){return "home-goods:"+t.player.incarnation+":"+field;}
     static int get(TownLife.Town t,String field){return t.industryStocks.getOrDefault(key(t,field),0);}

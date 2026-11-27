@@ -21,6 +21,7 @@ final class HomeApplianceLife {
         home(t,s);
         if(!HomeGoodsLife.installed(t,appliance))throw new IllegalArgumentException("Purchase the appliance first.");
         if(!power(t))throw new IllegalArgumentException("Electricity disconnected. Pay your bill.");
+        if(!HomeServiceLife.working(t,appliance))throw new IllegalArgumentException("The appliance needs repair.");
     }
     static void consume(TownLife.Town t){set(t,"bill",Math.addExact(get(t,"bill"),1));}
     static String pay(TownLife.Town t,WorldState s){
@@ -34,7 +35,7 @@ final class HomeApplianceLife {
         home(t,s);
         if(!HomeGoodsLife.installed(t,"fridge")||!CHILLED.contains(id))throw new IllegalArgumentException("No compatible refrigerator storage.");
         if(store){
-            if(!power(t)||total(t)>=CAPACITY||FoodLife.quantity(t.player,id,false)<1)
+            if(!power(t)||!HomeServiceLife.working(t,"fridge")||total(t)>=CAPACITY||FoodLife.quantity(t.player,id,false)<1)
                 throw new IllegalArgumentException("Refrigerator unavailable, full, or no food to store.");
             FoodLife.change(t.player,id,false,-1);set(t,"cold:"+id,quantity(t,id)+1);
         }else{
@@ -48,7 +49,7 @@ final class HomeApplianceLife {
         if(get(t,"tv-day")==s.day)throw new IllegalArgumentException("You already watched today's bulletin.");
         var editions=NewspaperLife.report(t,s.day).editions();
         if(editions.isEmpty())throw new IllegalArgumentException("No local news bulletin is available yet.");
-        set(t,"tv-day",s.day);consume(t);t.player.fatigue=Math.max(0,t.player.fatigue-4);
+        set(t,"tv-day",s.day);consume(t);HomeServiceLife.wear(t,"television",2);t.player.fatigue=Math.max(0,t.player.fatigue-4);
         return editions.getFirst().text();
     }
     static int cleanliness(TownLife.Town t){return Math.max(0,100-get(t,"laundry-dirt"));}
@@ -56,14 +57,14 @@ final class HomeApplianceLife {
         require(t,s,"washer");
         if(get(t,"laundry-dirt")==0)throw new IllegalArgumentException("Your clothes are already clean.");
         if(FoodLife.quantity(t.player,"water",false)<1)throw new IllegalArgumentException("Need one water unit for laundry.");
-        FoodLife.change(t.player,"water",false,-1);consume(t);set(t,"laundry-dirt",0);
+        FoodLife.change(t.player,"water",false,-1);consume(t);HomeServiceLife.wear(t,"washer",4);set(t,"laundry-dirt",0);
         return "Laundry completed. Clothes are clean.";
     }
     static void tick(TownLife.Town t,WorldState s){
         if(!t.player.alive||RebirthLife.active(t)||!t.player.ownsHouse||s.minute!=0||get(t,"daily")>=s.day)return;
         set(t,"daily",s.day);set(t,"laundry-dirt",Math.min(100,get(t,"laundry-dirt")+12));
         if(HomeGoodsLife.installed(t,"fridge")){
-            if(power(t))consume(t);
+            if(power(t)&&HomeServiceLife.working(t,"fridge")){consume(t);HomeServiceLife.wear(t,"fridge",1);}
             else for(String id:CHILLED)if(quantity(t,id)>0){
                 set(t,"cold:"+id,quantity(t,id)-1);set(t,"spoiled",Math.addExact(get(t,"spoiled"),1));break;
             }
@@ -76,8 +77,8 @@ final class HomeApplianceLife {
         var editions=NewspaperLife.report(t,s.day).editions();
         boolean atHome=t.player.alive&&t.player.travelRemaining==0&&t.player.ownsHouse&&t.player.place==SOUTH_RESIDENCES&&!RebirthLife.active(t);
         return new View(power(t),get(t,"bill"),CREDIT_LIMIT,cold,CAPACITY,get(t,"spoiled"),cleanliness(t),
-            atHome&&power(t)&&HomeGoodsLife.installed(t,"television")&&get(t,"tv-day")!=s.day&&!editions.isEmpty(),
-            atHome&&power(t)&&HomeGoodsLife.installed(t,"washer")&&get(t,"laundry-dirt")>0&&FoodLife.quantity(t.player,"water",false)>0,
+            atHome&&power(t)&&HomeServiceLife.working(t,"television")&&get(t,"tv-day")!=s.day&&!editions.isEmpty(),
+            atHome&&power(t)&&HomeServiceLife.working(t,"washer")&&get(t,"laundry-dirt")>0&&FoodLife.quantity(t.player,"water",false)>0,
             HomeGoodsLife.installed(t,"television")&&get(t,"tv-day")==s.day&&!editions.isEmpty()?editions.getFirst().text():"");
     }
 }
