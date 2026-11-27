@@ -55,8 +55,12 @@ final class FactoryNetworkLife {
         if(!FactoryMaintenance.operational(t,p)||!GridDistributionLife.power(t,p.site()))return false;
         if(stock(t,p.output())+p.units()>12||p.inputs().entrySet().stream().anyMatch(e->stock(t,e.getKey())<e.getValue()))return false;
         int cost=p.inputs().entrySet().stream().filter(e->!supplier(e.getKey()).equals(SUPPLIER)).mapToInt(e->2*e.getValue()).sum();
-        if(t.employerFunds.getOrDefault(account(p),0)<cost||!EnergyLife.canBuy(t,account(p),cost))return false;
+        boolean gas=GasNetworkLife.active(t)&&GasNetworkLife.heatPlant(p);
+        int gasCost=gas?GasNetworkLife.PRICE:0;
+        if(t.employerFunds.getOrDefault(account(p),0)<cost+gasCost||!EnergyLife.canBuy(t,account(p),cost+gasCost)
+            ||gas&&!GasNetworkLife.canBuy(t,account(p),cost+(EnergyLife.enabled(t)?EnergyLife.PRICE:0)))return false;
         if(!EnergyLife.buy(t,account(p)))return false;
+        if(gas&&!GasNetworkLife.buy(t,account(p)))throw new IllegalStateException("Gas purchase failed after validation.");
         for(var e:p.inputs().entrySet()){
             if(!supplier(e.getKey()).equals(SUPPLIER))SupplyChainLife.pay(t,account(p),supplier(e.getKey()),2*e.getValue());
             change(t,e.getKey(),-e.getValue());

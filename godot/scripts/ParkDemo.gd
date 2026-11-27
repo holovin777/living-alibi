@@ -7684,6 +7684,7 @@ func _render_actions() -> void:
     _render_personal_repair()
     if _current_place in ["FARM","RIVER","FACTORY","OFFICE"]:_render_energy()
     if _current_place in ["RIVER","FACTORY","OFFICE"]:_render_water_network()
+    if _current_place in ["FUEL_STATION","FACTORY","OFFICE"]:_render_gas_network()
     var logistics: Dictionary = _last_snapshot.get("logistics",{})
     if _current_place in ["FARM","QUARRY","FACTORY"] and bool(logistics.get("yours",false)) and bool(logistics.get("truck",false)) and not bool(_last_snapshot.get("freight",{}).get("active",false)):
         var relocation := " · relocation 8 EUR + fuel" if str(logistics.get("truckPlace",""))!=_current_place else ""
@@ -8443,6 +8444,14 @@ func _render_factory_report() -> void:
         line.text+=" · "+tr("Condition")+": "+str(plant.get("condition",100))+"% · "+tr("Lost batches")+": "+str(plant.get("lostBatches",0))
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
+
+func _render_gas_network() -> void:
+    var gas: Dictionary = _last_snapshot.get("gasNetwork",{})
+    if not bool(gas.get("active",false)):return
+    var line := Label.new()
+    line.text=tr("Gas network")+" · "+str(gas.get("stock",0))+"/"+str(gas.get("capacity",32))+" · "+tr("Condition")+": "+str(gas.get("condition",100))+"% · "+(tr("Available") if bool(gas.get("available",false)) else tr("Outage"))
+    line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _action_choices.add_child(line)
 
 func _render_water_network() -> void:
     var w: Dictionary = _last_snapshot.get("waterNetwork",{})

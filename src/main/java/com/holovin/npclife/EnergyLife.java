@@ -55,10 +55,12 @@ final class EnergyLife {
         if(condition(t,p)<=25)return;
         boolean thermal=p.id().equals("thermal");
         // Thermal backup only runs if renewable output and stored energy are insufficient.
-        if(thermal&&(get(t,"battery")>=PRIORITY+FactoryNetworkLife.PLANTS.size()||FuelLife.stock(t)<1))return;
+        boolean gas=thermal&&GasNetworkLife.active(t)&&GasNetworkLife.available(t);
+        if(thermal&&(get(t,"battery")>=PRIORITY+FactoryNetworkLife.PLANTS.size()||!gas&&FuelLife.stock(t)<1))return;
         int units=Math.min(CAPACITY-get(t,"battery"),potential(t,s,p));
-        if(units<=0||cash(t)<WAGE+(thermal?FuelLife.PRICE:0))return;
-        if(thermal){
+        if(units<=0||cash(t)<WAGE+(thermal?(gas?GasNetworkLife.PRICE:FuelLife.PRICE):0))return;
+        if(gas){if(!GasNetworkLife.buy(t,ACCOUNT))return;}
+        else if(thermal){
             SupplyChainLife.pay(t,ACCOUNT,FuelLife.ACCOUNT,FuelLife.PRICE);
             t.industryStocks.merge(FuelLife.STOCK,-1,Math::addExact);
         }

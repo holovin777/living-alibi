@@ -58,6 +58,8 @@ final class CareerLife {
         town.employerFunds.putIfAbsent(ServiceCompanyLife.ACCOUNT,0);
         town.employerFunds.putIfAbsent(EnergyLife.ACCOUNT,0);
         town.employerFunds.putIfAbsent(WaterNetworkLife.ACCOUNT,0);
+        town.employerFunds.putIfAbsent(GasNetworkLife.ACCOUNT,0);
+        town.employerFunds.putIfAbsent(GasNetworkLife.SUPPLIER,0);
         town.employerFunds.putIfAbsent("survey-office",0);
         town.employerFunds.putIfAbsent("guesthouse",0);
         town.employerFunds.putIfAbsent("farm-contractors",0);

@@ -14,8 +14,8 @@ final class HomeServiceLife {
     static boolean working(TownLife.Town t,String id){return HomeGoodsLife.installed(t,id)&&condition(t,id)>0;}
     static void wear(TownLife.Town t,String id,int n){if(HomeGoodsLife.installed(t,id))set(t,"wear:"+id,Math.min(100,get(t,"wear:"+id)+n));}
     static int target(TownLife.Town t){return get(t,"target");}
-    static boolean gas(TownLife.Town t){return t.player.ownsHouse&&get(t,"gas-bill")<GAS_LIMIT;}
-    static boolean heating(TownLife.Town t){return working(t,"boiler")&&gas(t)&&target(t)>0;}
+    static boolean gas(TownLife.Town t){return t.player.ownsHouse&&get(t,"gas-bill")<GAS_LIMIT&&GasNetworkLife.available(t);}
+    static boolean heating(TownLife.Town t){return working(t,"boiler")&&gas(t)&&target(t)>0&&GridDistributionLife.power(t,SOUTH_RESIDENCES);}
     static int indoor(TownLife.Town t,WorldState s){
         return get(t,"temp-set")==1?get(t,"temperature"):Math.max(5,Math.min(30,WeatherLife.at(s.day,s.minute).temperatureC()+4));
     }
@@ -28,7 +28,7 @@ final class HomeServiceLife {
     static String payGas(TownLife.Town t,WorldState s){
         HomeApplianceLife.home(t,s);int amount=Math.min(t.player.money,get(t,"gas-bill"));
         if(amount<1)throw new IllegalArgumentException("No gas bill to pay or insufficient cash.");
-        t.player.money-=amount;t.employerFunds.merge("city-maintenance",amount,Math::addExact);
+        t.player.money-=amount;t.employerFunds.merge(GasNetworkLife.active(t)?GasNetworkLife.ACCOUNT:"city-maintenance",amount,Math::addExact);
         set(t,"gas-bill",get(t,"gas-bill")-amount);return "Gas bill payment recorded.";
     }
     static boolean mechanic(TownLife.Town t,TownLife.Citizen c){
@@ -87,7 +87,7 @@ final class HomeServiceLife {
         }
         if(s.minute==0&&get(t,"daily")<s.day){
             set(t,"daily",s.day);
-            if(heating(t)){
+            if(heating(t)&&GasNetworkLife.homeUse(t)){
                 int tariff=target(t)>20?3:2;
                 set(t,"gas-bill",Math.min(GAS_LIMIT,get(t,"gas-bill")+tariff));wear(t,"boiler",1);
             }

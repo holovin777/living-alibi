@@ -751,6 +751,7 @@ final class TownLife {
         WardrobeLife.tick(town,marco);
         IndustryLife.tick(town,marco,truth,observations);
         SupplyChainLife.tick(town,marco);
+        GasNetworkLife.tick(town,marco);
         EnergyLife.tick(town,marco);
         WaterNetworkLife.tick(town,marco);
         FactoryNetworkLife.tick(town,marco);
