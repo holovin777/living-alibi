@@ -40,6 +40,7 @@ var district_sign: Label3D
 var actions_panel: PanelContainer
 const PhonePanel=preload("res://scripts/GeoPhone.gd")
 const WorkPanel=preload("res://scripts/GeoWorkPanel.gd")
+const PropertyPanel=preload("res://scripts/GeoPropertyPanel.gd")
 var phone_panel: PanelContainer
 var action_list: VBoxContainer
 var owned_car: Node3D
@@ -644,6 +645,7 @@ func _open_actions(work_only: bool=false) -> void:
         summary.text="Workshop / Officina\nCompany cash: €%s · machine: %s/100\nParts: %s · staff: %s\nPaid hours today: %s" % [enterprise.get("cash",0),enterprise.get("machineCondition",0),enterprise.get("spareParts",0),enterprise.get("employeeName","—"),enterprise.get("paidHoursToday",0)]
         action_list.add_child(summary)
     if not work_only:
+        PropertyPanel.build(action_list,residents.world.get("property",{}))
         var commerce: Dictionary=residents.world.get("commerce",{})
         var stall=commerce.get("stall")
         if stall is Dictionary and bool(stall.get("registered",false)):

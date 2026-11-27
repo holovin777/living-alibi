@@ -726,6 +726,10 @@ public final class GameSession implements AutoCloseable {
             if(action.startsWith("intercom:enter:")&&IntercomLife.insideVisit(town,state.day,state.minute))geoInterior=before;
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.startsWith("property:")){
+            var result=gardenAction(action.substring("property:".length()));
+            return new GeoProjection.ActionResult(result.message(),null);
+        }
         if(action.startsWith("stall-")){
             var result=gardenAction(action);
             return new GeoProjection.ActionResult(result.message(),null);
@@ -758,7 +762,7 @@ public final class GameSession implements AutoCloseable {
             case "home-rent" -> rentRoom();
             case "home-buy" -> buyHouse();
             case "home-wash" -> washInRoom();
-            case "home-cook" -> cookRoomMeal();
+            case "home-cook" -> cookRoomMeal(arg.isEmpty()?"bread-soup":arg);
             case "home-sleep" -> sleepInRoom(Integer.parseInt(arg));
             case "home-store" -> transferRoomItem(arg,true);
             case "home-take" -> transferRoomItem(arg,false);
