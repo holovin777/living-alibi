@@ -736,6 +736,7 @@ final class TownLife {
         NpcJusticeLife.tick(town,marco);
         CaritasLife.prepare(town,marco);
         PopulationLife.tick(town,marco,truth,observations);
+        WorkplaceManagement.tick(town,marco,truth,observations);
         HomeServiceLife.tick(town,marco);
         EmergencyLife.tick(town,marco);
         DojoCommunityLife.tick(town,marco);

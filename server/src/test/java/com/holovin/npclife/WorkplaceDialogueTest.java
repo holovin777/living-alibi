@@ -83,6 +83,39 @@ class WorkplaceDialogueTest {
         assertEquals("@work-rank",NaturalDialogue.canonical("Яка твоя посада в команді?",null));
     }
 
+    @Test void managementMentorsOnceAndRequiresActualAttendance() {
+        var town=new TownLife.Town();
+        var lead=worker(town,"lead","Programmer");
+        var novice=worker(town,"novice","Programmer");
+        var absent=worker(town,"absent","Programmer");
+        lead.home=TownLife.Place.NORTH_RESIDENCES;novice.home=lead.home;absent.home=lead.home;
+        lead.lastHiredDay=1;novice.lastHiredDay=38;absent.lastHiredDay=38;
+        absent.sickUntilDay=40;
+        EducationLife.set(town,lead,"technical",80);
+        EducationLife.set(town,novice,"technical",45);
+        EducationLife.set(town,absent,"technical",40);
+        var s=new WorldState();s.day=40;s.minute=540;
+        var events=new java.util.ArrayList<TownLife.Event>();
+        var seen=new java.util.ArrayList<TownLife.Observation>();
+        WorkplaceManagement.tick(town,s,events,seen);
+        WorkplaceManagement.tick(town,s,events,seen);
+        assertEquals(1,events.size());
+        s.minute=600;
+        WorkplaceManagement.tick(town,s,events,seen);
+        WorkplaceManagement.tick(town,s,events,seen);
+        assertEquals(46,EducationLife.get(town,novice,"technical"));
+        assertEquals(40,EducationLife.get(town,absent,"technical"));
+        assertEquals(2,events.size());
+        assertEquals(40,town.industryStocks.get(WorkplaceManagement.teamKey(lead,"mentoring")).intValue());
+        s.minute=840;
+        lead.activity="FREE_TIME";
+        WorkplaceManagement.tick(town,s,events,seen);
+        assertEquals(2,events.size());
+        lead.activity="WORKING";
+        WorkplaceManagement.tick(town,s,events,seen);
+        assertEquals(3,events.size());
+    }
+
     private static TownLife.Citizen worker(TownLife.Town town,String id,String role) {
         var person=new TownLife.Citizen(id,id,role,TownLife.Place.OFFICE);
         person.activity="WORKING";
