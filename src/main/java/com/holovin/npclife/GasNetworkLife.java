@@ -59,7 +59,7 @@ final class GasNetworkLife {
         add(t,"stock",-1);add(t,"home-used",1);return true;
     }
     static boolean heatPlant(FactoryNetworkLife.Plant p){
-        return p.id().equals("paper-mill")||p.id().equals("textile-mill");
+        return java.util.List.of("paper-mill","textile-mill","glassworks","chemical-works","cement-works").contains(p.id());
     }
     static void tick(TownLife.Town t,WorldState s){
         if(!StaffingLife.enabled(t)||s.minute!=680||get(t,"day")>=s.day)return;

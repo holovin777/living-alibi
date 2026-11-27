@@ -70,6 +70,8 @@ final class ConstructionLife {
         set(t,LAST,day);
         int stage=get(t,STAGE),parts=stage==0?0:1;
         if(stage>=STAGES||get(t,STEEL)<1||get(t,PARTS)<parts||get(t,RESERVE)<LABOR)return;
+        if(StaffingLife.enabled(t)&&FactoryNetworkLife.stock(t,"building-material")>0&&SupplyChainLife.pay(t,CONTRACTOR,FactoryNetworkLife.supplier("building-material"),2))
+            FactoryNetworkLife.change(t,"building-material",-1);
         int paid=Math.addExact(t.employerFunds.getOrDefault(CONTRACTOR,0),LABOR);
         set(t,STEEL,get(t,STEEL)-1);set(t,PARTS,get(t,PARTS)-parts);
         set(t,RESERVE,get(t,RESERVE)-LABOR);t.employerFunds.put(CONTRACTOR,paid);

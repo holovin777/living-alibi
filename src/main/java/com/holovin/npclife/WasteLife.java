@@ -31,6 +31,8 @@ final class WasteLife {
         String type=switch(p.output()){
             case "paper","book" -> "paper";
             case "board","phone","watch" -> "metal";
+            case "plastic","polymer","packaging" -> "plastic";
+            case "glass" -> "glass";
             case "planks","shelf","fabric","clothing" -> "residual";
             default -> "residual";
         };
@@ -90,7 +92,7 @@ final class WasteLife {
             add(t,"recovered:biogas",-1);GasNetworkLife.add(t,"stock",1);GasNetworkLife.add(t,"biogas",1);add(t,"biogas-sold",1);
         }
         // Pay existing suppliers' accounts for finite recycled input stock.
-        for(String item:List.of("paper","steel")){
+        for(String item:List.of("paper","steel","plastic","glass")){
             if(get(t,"recovered:"+item)<=0||FactoryNetworkLife.stock(t,item)>=12)continue;
             String buyer=FactoryNetworkLife.supplier(item);
             if(!SupplyChainLife.pay(t,buyer,ACCOUNT,1))continue;

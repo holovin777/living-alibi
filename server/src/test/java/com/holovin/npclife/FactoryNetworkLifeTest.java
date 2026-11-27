@@ -128,4 +128,23 @@ class FactoryNetworkLifeTest {
   assertEquals(0,IndustrialRepairLife.get(t,"plant"));assertEquals(80,FactoryMaintenance.condition(t.copy(),p));
   FactoryNetworkLife.change(t,"logs",2);assertTrue(FactoryNetworkLife.produce(t,p,s.day));
  }
+ @Test void glassPlasticPackagingAndCementShareRecoveredStocksAndRealInputs(){
+  var s=new WorldState();s.day=8;var t=TownLife.create(s);t.industryStocks.put(StaffingLife.ENABLED,1);
+  FactoryNetworkLife.ensure(t);WasteLife.ensure(t);
+  WasteLife.set(t,"recovered:glass",1);WasteLife.set(t,"recovered:plastic",1);
+  WasteLife.sell(t);
+  assertEquals(1,FactoryNetworkLife.stock(t,"glass"));assertEquals(1,FactoryNetworkLife.stock(t,"plastic"));
+  var packaging=FactoryNetworkLife.PLANTS.stream().filter(p->p.id().equals("packaging-factory")).findFirst().orElseThrow();
+  assertTrue(FactoryNetworkLife.produce(t,packaging,s.day));assertEquals(2,FactoryNetworkLife.stock(t,"packaging"));
+  assertEquals(0,FactoryNetworkLife.stock(t,"glass"));assertEquals(0,FactoryNetworkLife.stock(t,"plastic"));
+  var cement=FactoryNetworkLife.PLANTS.stream().filter(p->p.id().equals("cement-works")).findFirst().orElseThrow();
+  assertFalse(FactoryNetworkLife.produce(t,cement,s.day));
+  assertTrue(FactoryNetworkLife.procure(t,"limestone",cement));
+  assertTrue(FactoryNetworkLife.produce(t,cement,s.day));assertEquals(2,FactoryNetworkLife.stock(t,"cement"));
+  var building=FactoryNetworkLife.PLANTS.stream().filter(p->p.id().equals("building-materials")).findFirst().orElseThrow();
+  FactoryNetworkLife.change(t,"sand",1);assertTrue(FactoryNetworkLife.produce(t,building,s.day));
+  assertEquals(2,FactoryNetworkLife.stock(t.copy(),"building-material"));
+  t.employerFunds.remove(FactoryNetworkLife.account(building));assertFalse(FactoryNetworkLife.ensure(t));
+  assertTrue(t.employerFunds.containsKey(FactoryNetworkLife.account(building)));
+ }
 }

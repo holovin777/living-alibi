@@ -15,7 +15,13 @@ final class FactoryNetworkLife {
         new Plant("furniture-factory","Carpenter",WORKSHOP,"shelf",1,Map.of("planks",2)),
         new Plant("electronics-factory","Electronics assembler",FACTORY,"board",2,Map.of("components",1,"copper",1)),
         new Plant("phone-assembly","Device assembler",FACTORY,"phone",1,Map.of("board",1)),
-        new Plant("watch-assembly","Watch assembler",FACTORY,"watch",1,Map.of("board",1,"steel",1)));
+        new Plant("watch-assembly","Watch assembler",FACTORY,"watch",1,Map.of("board",1,"steel",1)),
+        new Plant("glassworks","Glass worker",FACTORY,"glass",2,Map.of("sand",2)),
+        new Plant("chemical-works","Chemical plant operator",FACTORY,"polymer",2,Map.of("feedstock",2)),
+        new Plant("plastics-factory","Plastics worker",FACTORY,"plastic",2,Map.of("polymer",2)),
+        new Plant("packaging-factory","Packaging worker",FACTORY,"packaging",2,Map.of("glass",1,"plastic",1)),
+        new Plant("cement-works","Cement worker",FACTORY,"cement",2,Map.of("limestone",2)),
+        new Plant("building-materials","Building materials worker",FACTORY,"building-material",2,Map.of("cement",1,"sand",1)));
     static final String LUMBER="lumber-company", SUPPLIER="regional-materials";
     static String account(Plant p){return "factory-network:"+p.id();}
     static String key(String item){return switch(item){
@@ -28,17 +34,19 @@ final class FactoryNetworkLife {
     static String supplier(String item){
         if(item.equals("logs"))return LUMBER;
         if(item.equals("steel")||item.equals("copper"))return "machinist";
-        if(item.equals("cotton")||item.equals("components"))return SUPPLIER;
+        if(imported(item))return SUPPLIER;
         return PLANTS.stream().filter(p->p.output().equals(item)).map(FactoryNetworkLife::account).findFirst().orElseThrow();
     }
+    static boolean imported(String item){return List.of("cotton","components","sand","feedstock","limestone").contains(item);}
     static boolean ensure(TownLife.Town t){
-        if(!StaffingLife.enabled(t)||t.industryStocks.containsKey("factory-network:initialized"))return false;
+        if(!StaffingLife.enabled(t))return false;
+        boolean first=!t.industryStocks.containsKey("factory-network:initialized");
         t.industryStocks.put("factory-network:initialized",1);
         t.industryStocks.putIfAbsent("factory-network:forest",80);
         t.employerFunds.putIfAbsent(LUMBER,160);
         t.employerFunds.putIfAbsent(SUPPLIER,0);
         for(var p:PLANTS)t.employerFunds.putIfAbsent(account(p),160);
-        return true;
+        return first;
     }
     static String employer(String occupation){
         if("Forestry worker".equals(occupation))return LUMBER;
@@ -69,7 +77,7 @@ final class FactoryNetworkLife {
         change(t,p.output(),accepted);FactoryMaintenance.wear(t,p);return true;
     }
     static boolean procure(TownLife.Town t,String item,Plant p){
-        if(!List.of("cotton","components").contains(item)||stock(t,item)>=8||FuelLife.stock(t)<1
+        if(!imported(item)||stock(t,item)>=8||FuelLife.stock(t)<1
             ||t.employerFunds.getOrDefault(account(p),0)<4+FuelLife.PRICE)return false;
         SupplyChainLife.pay(t,account(p),SUPPLIER,4);SupplyChainLife.pay(t,account(p),FuelLife.ACCOUNT,FuelLife.PRICE);
         SupplyChainLife.set(t,FuelLife.STOCK,FuelLife.stock(t)-1);change(t,item,2);return true;
@@ -102,7 +110,7 @@ final class FactoryNetworkLife {
         }
         boolean freight=SupplyChainLife.attending(t,LOGISTICS_DEPOT,"Warehouse worker")&&SupplyChainLife.attending(t,QUARRY,"Transport driver");
         if(s.minute==600&&SupplyChainLife.once(t,"materials-import",s.day)&&freight){
-            for(var p:PLANTS)for(String item:p.inputs().keySet())if(List.of("cotton","components").contains(item))procure(t,item,p);
+            for(var p:PLANTS)for(String item:p.inputs().keySet())if(imported(item))procure(t,item,p);
         }
         if(s.minute==660&&SupplyChainLife.once(t,"logging",s.day)&&freight&&SupplyChainLife.attending(t,WOODS,"Forestry worker"))harvest(t);
         if(s.minute==720){

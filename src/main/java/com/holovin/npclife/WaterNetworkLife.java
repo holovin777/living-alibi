@@ -64,7 +64,15 @@ final class WaterNetworkLife {
     static int sell(TownLife.Town t){
         int n=Math.min(8,Math.min(get(t,"treated"),FoodSupplyLife.capacity(t,"water")-FoodSupplyLife.stock(t,"water")));
         n=Math.min(n,t.employerFunds.getOrDefault(FoodSupplyLife.SHOP,0));
-        if(n<=0||!SupplyChainLife.pay(t,FoodSupplyLife.SHOP,ACCOUNT,n))return 0;
+        if(n<=0)return 0;
+        if(FactoryNetworkLife.stock(t,"packaging")>0){
+            int packed=Math.min(n,FactoryNetworkLife.stock(t,"packaging")*4);
+            int packs=(packed+3)/4;
+            if(t.employerFunds.getOrDefault(ACCOUNT,0)>=packs&&SupplyChainLife.pay(t,ACCOUNT,FactoryNetworkLife.supplier("packaging"),packs)){
+                FactoryNetworkLife.change(t,"packaging",-packs);
+            }
+        }
+        if(!SupplyChainLife.pay(t,FoodSupplyLife.SHOP,ACCOUNT,n))return 0;
         add(t,"treated",-n);t.retailStock.merge("water",n,Math::addExact);add(t,"sold",n);return n;
     }
     static void tick(TownLife.Town t,WorldState s){
