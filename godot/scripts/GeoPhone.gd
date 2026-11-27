@@ -114,6 +114,10 @@ func _render() -> void:
             for contact in data.get("contacts",[]):
                 var address:=str(contact.get("address",""))
                 _label(str(contact.get("name",""))+"\n"+(address if not address.is_empty() else "Address not shared"))
+                var entrances: Dictionary=data.get("contactEntrances",{})
+                var entrance: Dictionary=entrances.get(str(contact.get("residentId","")),{})
+                if not address.is_empty() and not entrance.is_empty():
+                    _button("Directions to intercom / Indicazioni citofono",_route.bind(entrance))
         "Jobs":
             for job in data.get("jobs",[]):
                 var place: Dictionary=job.get("workplace",{})
