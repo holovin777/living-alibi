@@ -7371,6 +7371,21 @@ func _render_actions() -> void:
             budget_info.text += "\nEducation %s | Healthcare %s | Maintenance %s EUR" % [comune.get("education",0),comune.get("healthcare",0),comune.get("maintenance",0)]
             budget_info.text += "\nClinic reserve %s EUR | Medical aid %s EUR" % [comune.get("clinicFunds",0),comune.get("medicalAid",0)]
             _action_choices.add_child(budget_info)
+            var registry: Dictionary = _last_snapshot.get("registry",{})
+            if not registry.is_empty():
+                var identity := Label.new()
+                identity.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                identity.text=tr("Civil registry · your documents")
+                if bool(registry.get("identityValid",false)):
+                    identity.text+="\n"+str(registry.get("legalName",""))+" · "+str(registry.get("identityNumber",""))
+                    identity.text+="\n"+(tr("Valid until day %s") % registry.get("expiresDay",0))
+                else:
+                    identity.text+="\n"+tr("No valid identity card")
+                    _action_choices.add_child(_button(tr("Request identity card · 5 EUR"),_garden_action.bind("registry-identity")))
+                identity.text+="\n"+(tr("Registered residence: %s") % (tr("Owned home") if bool(registry.get("residenceRegistered",false)) else tr("Not registered")))
+                _action_choices.add_child(identity)
+                if bool(registry.get("canRegisterResidence",false)):
+                    _action_choices.add_child(_button(tr("Register residence · free"),_garden_action.bind("registry-residence")))
             var construction: Dictionary = _last_snapshot.get("construction",{})
             var stage := int(construction.get("stage",0))
             var construction_info := Label.new()
@@ -7626,7 +7641,7 @@ func _garden_action(action: String) -> void:
         if _connected and not _api.is_busy():
             _api.garden_action(action)
         return
-    if ((action.begins_with("archive-year-") and _current_place=="LIBRARY" and _near_kiosk()) or ((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-") or action.begins_with("election-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
+    if ((action.begins_with("archive-year-") and _current_place=="LIBRARY" and _near_kiosk()) or ((action.begins_with("bank-") or action.begins_with("rental-") or action.begins_with("construction-") or action.begins_with("election-") or action.begins_with("registry-")) and _current_place=="OFFICE" and _near_kiosk()) or _near_garden() or _near_coop() or _near_orchard() or ((action in ["sell-vegetables","sell-eggs","sell-honey","sell-grape-juice","sell-wine"] or action.begins_with("sell-fruit-") or action.begins_with("stall-")) and _current_place=="MARKET" and _near_kiosk())) and _connected and not _api.is_busy():
         _api.garden_action(action)
 
 func _buy_house() -> void:
