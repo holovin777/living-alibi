@@ -766,6 +766,7 @@ final class TownLife {
         MutualAidLife.tick(town,marco);
         PersonalLoanLife.tick(town,marco);
         PhoneLife.tick(town,marco);
+        IntercomLife.tick(town,marco);
         PeerAidLife.tick(town,marco,truth,observations);
         for(int i=before;i<interactions.size();i++) {
             var conversation=interactions.get(i);

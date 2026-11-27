@@ -32,6 +32,28 @@ final class IntercomLife {
                 c.currentSpace().equals(c.homeUnit)&&minute>=480&&minute<1260&&
                 !Set.of("SLEEPING","WORKING","SICK_LEAVE","RESTING_WHILE_SICK","TRAVELING").contains(c.activity);
     }
+    // Revoke invitations permanently when the host or visitor becomes unavailable.
+    // A later return home must require a fresh invitation, not resurrect an old one.
+    static void tick(TownLife.Town t,WorldState clock){
+        int time=now(clock.day,clock.minute);
+        for(var contact:t.player.contacts.values()){
+            String id=contact.residentId;
+            int doorstep=get(t,id,"until"), inside=get(t,id,"inside-until");
+            if(doorstep==0&&inside==0)continue;
+            var c=t.people.get(id);
+            int building=AddressLife.sharedBuilding(t,id);
+            boolean local=PhoneLife.available(t)&&t.player.travelRemaining==0&&!t.player.cycling&&
+                    building!=0&&AddressLife.district(building).equals(t.player.place.name());
+            boolean hostAvailable=local&&c!=null&&PlayerLife.knowsResident(t,id)&&
+                    AddressLife.building(c)==building&&available(c,clock.minute);
+            if(doorstep>0&&(!hostAvailable||doorstep<=time||contact.trust<75||contact.affinity<25))
+                put(t,id,"until",0);
+            if(inside>0&&(!hostAvailable||inside<=time||building!=1||contact.trust<80||contact.affinity<35)){
+                put(t,id,"inside-until",0);
+                put(t,id,"inside",0);
+            }
+        }
+    }
     static String ring(TownLife.Town t,String id,int building,int day,int minute){
         var c=validate(t,id,building);
         int time=now(day,minute);

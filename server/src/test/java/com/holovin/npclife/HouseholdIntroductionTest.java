@@ -55,7 +55,25 @@ class HouseholdIntroductionTest {
             assertEquals("Luca",contact.knownName);
             IntercomLife.leave(town,host.id,1,6,1086);
             assertThrows(IllegalArgumentException.class,()->PlayerLife.nearby(town,partner.id,6,1086));
-            clock.minute=1086;
+            // A host who becomes busy ends a visit permanently.
+            assertTrue(IntercomLife.ring(town,host.id,1,6,1096).contains("Hello"));
+            assertTrue(IntercomLife.invite(town,host.id,1,6,1097).contains("Come in"));
+            IntercomLife.enter(town,host.id,1,6,1098);
+            host.activity="WORKING";
+            clock.minute=1099;
+            IntercomLife.tick(town,clock);
+            assertNull(IntercomLife.apartment(town,6,1099));
+            host.activity="FREE_TIME";
+            assertNull(IntercomLife.apartment(town,6,1100));
+            assertThrows(IllegalArgumentException.class,()->IntercomLife.enter(town,host.id,1,6,1100));
+            // A pending doorstep invitation is also revoked when the visitor leaves.
+            assertTrue(IntercomLife.ring(town,host.id,1,6,1106).contains("Hello"));
+            town.player.travelRemaining=1;
+            clock.minute=1107;
+            IntercomLife.tick(town,clock);
+            town.player.travelRemaining=0;
+            assertThrows(IllegalArgumentException.class,()->IntercomLife.visit(town,host.id,1,6,1108));
+            clock.minute=1108;
             db.save(clock,List.of(),List.of(),town,List.of(),List.of(),List.of());
         }
         try(var db=new WorldDatabase(file)){
