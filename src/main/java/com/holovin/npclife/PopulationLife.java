@@ -92,6 +92,7 @@ final class PopulationLife {
         else if(carrier && working)desired=c.workplace;
         else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
         else if(stallEmployee && working)desired=TownLife.Place.MARKET;
+        else if(StaffingLife.enabled(town)&&working&&StaffingLife.role(c.occupation)!=null&&!publicSafety&&!journalist&&c.food>0&&c.water>0&&c.hunger<85&&c.thirst<85)desired=c.workplace;
         else if(marketOpen && needFood)desired=CityExpansionLife.outer(c.home)?c.home:TownLife.Place.MARKET;
         else if(marketOpen && publicWater&&!CityExpansionLife.outer(c.home))desired=TownLife.Place.PARK;
         else if(marketOpen && needWater && c.money>=3)desired=CityExpansionLife.outer(c.home)?c.home:TownLife.Place.MARKET;

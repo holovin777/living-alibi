@@ -26,7 +26,7 @@ public final class GameSession implements AutoCloseable {
 
     @Autowired
     public GameSession(@Value("${living-alibi.database:data/world.db}") String databasePath,
-                       @Value("${living-alibi.population:160}") int population)
+                       @Value("${living-alibi.population:224}") int population)
             throws Exception {
         this(Path.of(databasePath),population);
     }
@@ -47,9 +47,11 @@ public final class GameSession implements AutoCloseable {
         prunePeerEvents((long)(state.day-1)*1440L+state.minute);
         int previousTarget=town.industryStocks.getOrDefault(POPULATION_SEED_TARGET,12);
         boolean changed=false;
+        int firstNew=0;
         if(firstLaunch||population>previousTarget) {
             // One-time immigration, not an automatic respawn after deaths.
             int missing=Math.max(0,population-(int)DemographyLife.living(town));
+            if(missing>0)firstNew=town.people.values().stream().mapToInt(c->c.generationIndex).max().orElse(0)+1;
             while(missing>0){
                 int batch=Math.min(20,missing);
                 PopulationGenerator.add(town,batch);
@@ -59,6 +61,7 @@ public final class GameSession implements AutoCloseable {
             changed=true;
         }
         changed=PoliceLife.establish(town,state,population)||changed;
+        changed=StaffingLife.establish(town,state,population,firstNew)||changed;
         if(population>=24&&!NpcTransportLife.enabled(town)){town.industryStocks.put(NpcTransportLife.ENABLED,1);changed=true;}
         // Old save files might contain a deceased visitor.
         changed=RebirthLife.restoreIdentity(town)||changed;
@@ -265,7 +268,7 @@ public final class GameSession implements AutoCloseable {
     public record StairwellResident(String id,String name,String appearanceStage,String outfitVisual,String knownName,int conversations,String relationship,String mood) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber,PublicSafetyLife.View publicSafety,BusLife.View bus,List<StairwellResident> stairwellResidents,TechnicalWorkLife.MagnoliaServices magnoliaServices,CondominiumLife.Report condominium,PostalLife.Report postal,CivilRegistryLife.Report registry,EmploymentContractLife.Report employmentContract,PensionLife.Report pension,SocialProtectionLife.Report socialProtection,CaritasLife.Report caritas,ShelterLife.Report shelter,EmploymentCenterLife.Report jobCentre,List<InterviewLife.Application> jobApplications,LocalVehicleCrimeLife.View vehicleCrime,NpcVehicleCrimeLife.View residentVehicleCrime,NpcPropertyCrimeLife.View residentPropertyCrime,SecurityLife.View security,List<IntercomLife.Access> apartmentAccess,PersonalGoodsLife.View personalGoods,HomeGoodsLife.View homeGoods,HomeApplianceLife.View homeAppliances,HomeServiceLife.View homeServices) { }
+                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber,PublicSafetyLife.View publicSafety,BusLife.View bus,List<StairwellResident> stairwellResidents,TechnicalWorkLife.MagnoliaServices magnoliaServices,CondominiumLife.Report condominium,PostalLife.Report postal,CivilRegistryLife.Report registry,EmploymentContractLife.Report employmentContract,PensionLife.Report pension,SocialProtectionLife.Report socialProtection,CaritasLife.Report caritas,ShelterLife.Report shelter,EmploymentCenterLife.Report jobCentre,List<InterviewLife.Application> jobApplications,LocalVehicleCrimeLife.View vehicleCrime,NpcVehicleCrimeLife.View residentVehicleCrime,NpcPropertyCrimeLife.View residentPropertyCrime,SecurityLife.View security,List<IntercomLife.Access> apartmentAccess,PersonalGoodsLife.View personalGoods,HomeGoodsLife.View homeGoods,HomeApplianceLife.View homeAppliances,HomeServiceLife.View homeServices,StaffingLife.View staffing) { }
     public record ActionView(String message,WorldView world,String dialogueLanguage,boolean dialogueRendered,String dialogueLocale,String dialogueFarewell) {
         public ActionView(String message,WorldView world){this(message,world,null,false,null,null);}
         public ActionView(String message,WorldView world,String language,boolean rendered,String locale){this(message,world,language,rendered,locale,null);}
@@ -307,7 +310,7 @@ public final class GameSession implements AutoCloseable {
                             return new StairwellResident(c.id,PlayerLife.displayName(town,c),appearanceStage(c),outfitVisual(c),
                                     contact==null?null:contact.knownName,contact==null?0:contact.conversations,
                                     PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name());
-                        }).toList(),TechnicalWorkLife.magnolia(town),CondominiumLife.report(town),PostalLife.report(town),CivilRegistryLife.report(town,state),EmploymentContractLife.report(town,state.day),PensionLife.report(town),SocialProtectionLife.report(town,state.day),CaritasLife.report(town,state),ShelterLife.report(town,state),EmploymentCenterLife.report(town,state),InterviewLife.report(town,state),LocalVehicleCrimeLife.view(town,state),NpcVehicleCrimeLife.view(town),NpcPropertyCrimeLife.view(town),SecurityLife.view(town,state),IntercomLife.access(town,state.day,state.minute),PersonalGoodsLife.view(town,state),HomeGoodsLife.view(town,state),HomeApplianceLife.view(town,state),HomeServiceLife.view(town,state));
+                        }).toList(),TechnicalWorkLife.magnolia(town),CondominiumLife.report(town),PostalLife.report(town),CivilRegistryLife.report(town,state),EmploymentContractLife.report(town,state.day),PensionLife.report(town),SocialProtectionLife.report(town,state.day),CaritasLife.report(town,state),ShelterLife.report(town,state),EmploymentCenterLife.report(town,state),InterviewLife.report(town,state),LocalVehicleCrimeLife.view(town,state),NpcVehicleCrimeLife.view(town),NpcPropertyCrimeLife.view(town),SecurityLife.view(town,state),IntercomLife.access(town,state.day,state.minute),PersonalGoodsLife.view(town,state),HomeGoodsLife.view(town,state),HomeApplianceLife.view(town,state),HomeServiceLife.view(town,state),StaffingLife.view(town));
     }
 
     public synchronized BusinessView business() {
