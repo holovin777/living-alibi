@@ -98,4 +98,35 @@ class HomeServiceLifeTest {
         assertEquals(player,t.player.money);
         assertFalse(ResidentServiceLife.pending(t));
     }
+    @Test void dispatcherAssignsDistinctMechanicsAndRetriesUnservedCustomers(){
+        var s=new WorldState();s.day=8;s.minute=360;var t=TownLife.create(s);
+        t.industryStocks.put(StaffingLife.ENABLED,1);
+        for(int i=1;i<=3;i++){
+            var c=new TownLife.Citizen("customer-"+i,"Customer","Retired",NORTH_RESIDENCES);
+            c.generationIndex=400+i;c.age=70;c.money=300;
+            t.people.put(c.id,c);EducationLife.set(t,c,"interior-laundry",1);
+            ResidentServiceLife.set(t,c,"wear",80);
+        }
+        for(int i=1;i<=2;i++){
+            var tech=new TownLife.Citizen("tech-"+i,"Technician","Mechanic",WORKSHOP);
+            tech.generationIndex=500+i;tech.home=SOUTH_RESIDENCES;tech.money=20;
+            t.people.put(tech.id,tech);
+        }
+        ResidentServiceLife.prepare(t,s);
+        assertEquals(2,ResidentServiceLife.active(t));assertEquals(3,ResidentServiceLife.queued(t));
+        assertNotEquals(ResidentServiceLife.slot(t,0,"mechanic"),ResidentServiceLife.slot(t,1,"mechanic"));
+        assertNotEquals(ResidentServiceLife.slot(t,0,"customer"),ResidentServiceLife.slot(t,1,"customer"));
+        s.minute=1200;t.technicalMaterials.put("spare-parts",1);
+        for(int i=1;i<=2;i++){
+            var tech=t.people.get("tech-"+i);tech.place=NORTH_RESIDENCES;tech.activity="WORKING";tech.travelRemaining=0;
+        }
+        for(int i=0;i<30;i++){s.minute=1200+i;ResidentServiceLife.tick(t,s);ResidentServiceLife.tick(t,s);}
+        assertEquals(1,ServiceCompanyLife.get(t,"resident-completed"));
+        assertEquals(2,ResidentServiceLife.queued(t));
+        s.minute=1290;ResidentServiceLife.tick(t,s);
+        assertEquals(0,ResidentServiceLife.active(t));
+        s.day=9;s.minute=360;ResidentServiceLife.prepare(t,s);
+        assertEquals(2,ResidentServiceLife.active(t));
+        assertEquals(2,ResidentServiceLife.queued(t.copy()));
+    }
 }

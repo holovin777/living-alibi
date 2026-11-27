@@ -36,9 +36,9 @@ final class ServiceCompanyLife {
         count(t,"revenue",HomeServiceLife.REPAIR_PRICE);count(t,"labor-expense",LABOR);
         count(t,"completed",1);
     }
-    record View(int cash,int parts,int completed,int cancelled,int missed,int revenue,int laborExpense,int partsExpense){}
+    record View(int cash,int parts,int completed,int cancelled,int missed,int revenue,int laborExpense,int partsExpense,int queued,int active){}
     static View view(TownLife.Town t){
         return new View(cash(t),get(t,"parts"),get(t,"completed"),get(t,"cancelled"),
-            get(t,"missed"),get(t,"revenue"),get(t,"labor-expense"),get(t,"parts-expense"));
+            get(t,"missed"),get(t,"revenue"),get(t,"labor-expense"),get(t,"parts-expense"),ResidentServiceLife.queued(t),ResidentServiceLife.active(t));
     }
 }
