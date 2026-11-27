@@ -8,6 +8,10 @@ final class NaturalDialogue {
     private NaturalDialogue() {}
     private static final Pattern INTRO=Pattern.compile(
             "(?iu)^(?:(?:hello|hi|hey|ciao|salve|привіт|добрий день)[, !]+)?(?:my name is|mi chiamo|il mio nome è|мене звати|моє ім'я)\\s+([\\p{L}][\\p{L}\\p{M}'’\\-]*(?:\\s+[\\p{L}][\\p{L}\\p{M}'’\\-]*){0,3})[.!]?\\s*$");
+    // "Sono" also introduces moods and occupations. Restrict this form
+    // to capitalized proper names and reject common non-name predicates.
+    private static final Pattern IT_SHORT_INTRO=Pattern.compile(
+            "^(?:(?i:ciao|salve|buongiorno|buonasera)[, !]+)?(?i:sono|io sono)\\s+([\\p{Lu}][\\p{L}\\p{M}'’\\-]*(?:\\s+[\\p{Lu}][\\p{L}\\p{M}'’\\-]*){0,3})[.!]?\\s*$");
     static String normalize(String input) {
         if(input==null)return "";
         return input.toLowerCase(Locale.ROOT).replace('’','\'')
@@ -34,6 +38,12 @@ final class NaturalDialogue {
         if(intro.matches()) {
             String alias=intro.group(1);
             if(!has(normalize(alias),"and","but","how","what","e","ma","come","і","але","як"))
+                return "My name is "+alias+".";
+        }
+        var shortIntro=IT_SHORT_INTRO.matcher(raw.strip());
+        if(shortIntro.matches()){
+            String alias=shortIntro.group(1);
+            if(!has(normalize(alias),"triste","felice","stanco","stanca","solo","sola","malato","malata","affamato","affamata","qui","pronto","pronta","italiano","italiana","medico","studente","bambino","bambina"))
                 return "My name is "+alias+".";
         }
         // Preserve old explicit introductions, including validation in PlayerLife.

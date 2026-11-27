@@ -39,7 +39,8 @@ final class PopulationGenerator {
             int index=next+i;
             var rng=new SplittableRandom(0x5EEDCAFE3A12L+index*0x9E3779B97F4A7C15L);
             String name;
-            name=FIRST[rng.nextInt(FIRST.length)]+" "+LAST[rng.nextInt(LAST.length)];
+            int firstIndex=rng.nextInt(FIRST.length);
+            name=FIRST[firstIndex]+" "+LAST[rng.nextInt(LAST.length)];
             if(!names.add(name)){name=name+" "+index;names.add(name);}
             int job=rng.nextInt(JOBS.length);
             var home=rng.nextBoolean()?TownLife.Place.NORTH_RESIDENCES:TownLife.Place.SOUTH_RESIDENCES;
@@ -77,6 +78,7 @@ final class PopulationGenerator {
             c.food=3;c.water=3;c.activity="SETTLING_IN";
             c.generationIndex=index;
             town.people.put(id,c);
+            DemographyLife.set(town,c,"sex",firstIndex%2==0?ResidentSexLife.FEMALE:ResidentSexLife.MALE);
             EducationLife.ensureResident(town,c);
             generated.add(c);
         }

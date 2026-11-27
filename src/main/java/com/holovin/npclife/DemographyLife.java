@@ -10,7 +10,7 @@ final class DemographyLife {
     static final String LAST="demography:last-day", BIRTHS="demography:births", DEATHS="demography:deaths",
             PENSIONS="demography:pensions", INHERITED="demography:inherited";
     static final int CHILD_DAILY_CASH=18, WEEKLY_PENSION=35;
-    static final List<String> FIELDS=List.of("parent-a","parent-b","partner","union-day","born","last-birth","children","estate","played-incarnation");
+    static final List<String> FIELDS=List.of("parent-a","parent-b","partner","union-day","born","last-birth","children","estate","played-incarnation","sex");
     static String key(TownLife.Citizen c,String field){return "demography:"+c.id+":"+field;}
     static int get(TownLife.Town t,String k){return t.industryStocks.getOrDefault(k,0);}
     static void set(TownLife.Town t,String k,int n){t.industryStocks.put(k,n);}
@@ -55,7 +55,7 @@ final class DemographyLife {
         return canBirth(t,a,b,day,false);
     }
     private static boolean canBirth(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day,boolean initial){
-        if(a==null||b==null||a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=b.generationIndex||get(t,b,"partner")!=a.generationIndex||
+        if(a==null||b==null||a==b||!ResidentSexLife.biologicalPair(t,a,b)||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=b.generationIndex||get(t,b,"partner")!=a.generationIndex||
                 (!initial&&day-get(t,a,"union-day")<(RebirthLife.randomBirth(t)?30:270))||get(t,a,"children")>=2||get(t,b,"children")>=2||
                 (get(t,a,"last-birth")>0&&day-get(t,a,"last-birth")<1095)||
                 (get(t,b,"last-birth")>0&&day-get(t,b,"last-birth")<1095)||
@@ -91,6 +91,7 @@ final class DemographyLife {
         ensure(t);
         EducationLife.ensureResident(t,c);
         set(t,c,"parent-a",a.generationIndex);set(t,c,"parent-b",b.generationIndex);set(t,c,"born",day);
+        set(t,c,"sex",next%2==0?ResidentSexLife.FEMALE:ResidentSexLife.MALE);
         ConvictionLife.upbringing(t,c,a,b);
         ClinicalLife.inherit(t,c,a,b);
         for(var p:List.of(a,b)){set(t,p,"children",get(t,p,"children")+1);set(t,p,"last-birth",day);}

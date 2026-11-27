@@ -23,8 +23,13 @@ final class InitialFamilyLife {
         Collections.shuffle(candidates,new Random());
         var newborns=new ArrayList<TownLife.Citizen>();
         int limit=Math.min(4,PopulationGenerator.MAX_GENERATED-(int)DemographyLife.living(t));
-        for(int i=0;i+1<candidates.size()&&newborns.size()<limit;i+=2){
-            var a=candidates.get(i);var b=candidates.get(i+1);
+        for(int j=0;j<candidates.size()&&newborns.size()<limit;j++){
+            var a=candidates.get(j);
+            if(DemographyLife.get(t,a,"partner")!=0||ResidentSexLife.sex(t,a)!=ResidentSexLife.MALE)continue;
+            var b=candidates.stream().filter(x->ResidentSexLife.sex(t,x)==ResidentSexLife.FEMALE&&DemographyLife.get(t,x,"partner")==0
+                &&Collections.disjoint(DemographyLife.ancestors(t,a),DemographyLife.ancestors(t,x))
+                &&(!t.peerRelationships.containsKey(SocialNetwork.key(a.id,x.id))||DemographyLife.canPair(t,a,x))).findFirst().orElse(null);
+            if(b==null)continue;
             if(!Collections.disjoint(DemographyLife.ancestors(t,a),DemographyLife.ancestors(t,b)))continue;
             String key=SocialNetwork.key(a.id,b.id);
             if(t.peerRelationships.containsKey(key)&&!DemographyLife.canPair(t,a,b))continue;

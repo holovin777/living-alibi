@@ -39,7 +39,11 @@ final class GenealogyLife {
             if(id==self.generationIndex)continue;
             var cp=links.get(id);
             String role,it;
-            if(ownParents.contains(id)){role="Parent";it="Genitore";}
+            if(ownParents.contains(id)){
+                int sex=ResidentSexLife.sex(t,c);
+                role=sex==ResidentSexLife.FEMALE?"Mother":sex==ResidentSexLife.MALE?"Father":"Parent";
+                it=sex==ResidentSexLife.FEMALE?"Madre":sex==ResidentSexLife.MALE?"Padre":"Genitore";
+            }
             else if(grandparents.contains(id)){role="Grandparent";it="Nonno/a";}
             else if(children.contains(id)){role="Child";it="Figlio/a";}
             else if(intersects(cp,children)){role="Grandchild";it="Nipote (discendente)";}

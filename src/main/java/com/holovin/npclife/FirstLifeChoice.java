@@ -18,7 +18,7 @@ final class FirstLifeChoice {
     static int birthSex(TownLife.Citizen c){return Math.floorMod(c.generationIndex,2)==1?1:2;}
     static boolean matches(TownLife.Town t,TownLife.Citizen c){
         int sex=t.industryStocks.getOrDefault(PREFERENCE,0);
-        return t.player.incarnation!=1||sex==0||sex==birthSex(c);
+        return t.player.incarnation!=1||sex==0||sex==ResidentSexLife.sex(t,c);
     }
     private static String ownerKey(TownLife.Citizen c){return "identity:account-owner:"+c.id;}
     static boolean accountOwned(TownLife.Town t,TownLife.Citizen c){return t.industryStocks.getOrDefault(ownerKey(c),0)>0;}
