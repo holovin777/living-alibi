@@ -9,7 +9,7 @@ final class HomeApplianceLife {
     static final int CAPACITY=12, CREDIT_LIMIT=12;
     static int get(TownLife.Town t,String k){return HomeGoodsLife.get(t,"appliance:"+k);}
     static void set(TownLife.Town t,String k,int n){HomeGoodsLife.set(t,"appliance:"+k,n);}
-    static boolean power(TownLife.Town t){return t.player.ownsHouse&&get(t,"bill")<CREDIT_LIMIT;}
+    static boolean power(TownLife.Town t){return t.player.ownsHouse&&get(t,"bill")<CREDIT_LIMIT&&EnergyLife.publicPower(t);}
     static int quantity(TownLife.Town t,String id){return get(t,"cold:"+id);}
     static int total(TownLife.Town t){return CHILLED.stream().mapToInt(id->quantity(t,id)).sum();}
     static void home(TownLife.Town t,WorldState s){
@@ -20,6 +20,7 @@ final class HomeApplianceLife {
     static void require(TownLife.Town t,WorldState s,String appliance){
         home(t,s);
         if(!HomeGoodsLife.installed(t,appliance))throw new IllegalArgumentException("Purchase the appliance first.");
+        if(!EnergyLife.publicPower(t))throw new IllegalArgumentException("Municipal grid is currently unavailable.");
         if(!power(t))throw new IllegalArgumentException("Electricity disconnected. Pay your bill.");
         if(!HomeServiceLife.working(t,appliance))throw new IllegalArgumentException("The appliance needs repair.");
     }
@@ -27,7 +28,7 @@ final class HomeApplianceLife {
     static String pay(TownLife.Town t,WorldState s){
         home(t,s);int amount=Math.min(t.player.money,get(t,"bill"));
         if(amount<1)throw new IllegalArgumentException("No payable bill or insufficient cash.");
-        t.player.money-=amount;t.employerFunds.merge("city-maintenance",amount,Math::addExact);
+        t.player.money-=amount;t.employerFunds.merge(EnergyLife.enabled(t)?EnergyLife.ACCOUNT:"city-maintenance",amount,Math::addExact);
         set(t,"bill",get(t,"bill")-amount);
         return "Electricity payment: "+amount+" EUR.";
     }

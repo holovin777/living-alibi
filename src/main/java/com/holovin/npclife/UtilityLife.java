@@ -24,8 +24,8 @@ final class UtilityLife {
     static Services status(TownLife.Town town) {
         int pump=town.technicalOrders.get("water-pump").condition;
         int lights=town.technicalOrders.get("street-lights").condition;
-        return new Services(pump,pump>=FOUNTAIN_MIN_CONDITION,
-                town.cleanWater,TANK_CAPACITY,lights,lights>=LIGHTS_MIN_CONDITION);
+        return new Services(pump,pump>=FOUNTAIN_MIN_CONDITION&&EnergyLife.publicPower(town),
+                town.cleanWater,TANK_CAPACITY,lights,lights>=LIGHTS_MIN_CONDITION&&EnergyLife.publicPower(town));
     }
 
     private static int transferRiverWater(TownLife.Town town,int amount) {

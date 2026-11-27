@@ -7682,6 +7682,7 @@ func _render_actions() -> void:
             _action_choices.add_child(_button(tr("Service car · 15 EUR"),_car_action.bind("repair")))
         return
     _render_personal_repair()
+    if _current_place in ["FARM","RIVER","FACTORY","OFFICE"]:_render_energy()
     var logistics: Dictionary = _last_snapshot.get("logistics",{})
     if _current_place in ["FARM","QUARRY","FACTORY"] and bool(logistics.get("yours",false)) and bool(logistics.get("truck",false)) and not bool(_last_snapshot.get("freight",{}).get("active",false)):
         var relocation := " · relocation 8 EUR + fuel" if str(logistics.get("truckPlace",""))!=_current_place else ""
@@ -8439,6 +8440,22 @@ func _render_factory_report() -> void:
         var line := Label.new()
         line.text=tr("%s · Staff: %s · Stock: %s") % [tr(str(plant.get("id",""))),plant.get("employees",0),plant.get("stock",0)]
         line.text+=" · "+tr("Condition")+": "+str(plant.get("condition",100))+"% · "+tr("Lost batches")+": "+str(plant.get("lostBatches",0))
+        line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        _action_choices.add_child(line)
+
+func _render_energy() -> void:
+    var e: Dictionary = _last_snapshot.get("energy",{})
+    if not bool(e.get("active",false)):return
+    var heading := Label.new()
+    heading.text=tr("Electricity network")
+    _action_choices.add_child(heading)
+    var status := Label.new()
+    status.text=tr("Grid supply")+": "+(tr("Available") if bool(e.get("publicPower",false)) else tr("Outage"))+" · "+tr("Stored")+": "+str(e.get("stored",0))+"/"+str(e.get("capacity",32))
+    status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _action_choices.add_child(status)
+    for station in e.get("stations",[]):
+        var line := Label.new()
+        line.text=tr(str(station.get("id","")))+" · "+str(station.get("district",""))+" · "+tr("Generated")+": "+str(station.get("generated",0))+" · "+str(station.get("condition",100))+"%"
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
 

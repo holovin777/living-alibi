@@ -18,7 +18,7 @@ final class EducationLife {
     }
     static String subject(String job){
         return switch(job){
-            case "Engineer","Programmer","Mechanic","Miner","Factory machinist","Transport driver","Independent fabricator","Company freight driver" -> "technical";
+            case "Solar plant operator","Hydropower operator","Thermal plant operator","Service technician","Electrician","Engineer","Programmer","Mechanic","Miner","Factory machinist","Transport driver","Independent fabricator","Company freight driver" -> "technical";
             case "Nurse","Barista" -> "social";
             case "Teacher","Librarian","Doctor","Detective" -> "academic";
             case "Market vendor","Private stall seller","Office clerk","Baker","Pizzaiolo","Gelataio",PostalLife.OCCUPATION -> "commerce";
