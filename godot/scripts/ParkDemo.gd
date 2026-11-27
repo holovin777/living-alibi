@@ -8000,6 +8000,7 @@ func _render_actions() -> void:
         "LOGISTICS_DEPOT":
             _render_logistics(logistics)
         "WORKSHOP":
+            _render_repair_business()
             _render_home_goods()
             _render_logistics(logistics)
             if _car_place().is_empty():
@@ -8435,6 +8436,27 @@ func _render_factory_report() -> void:
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
 
+func _render_repair_business() -> void:
+    var b: Dictionary = _last_snapshot.get("repairBusiness",{})
+    if b.is_empty():return
+    var heading := Label.new()
+    heading.text=tr("Repair business")
+    _action_choices.add_child(heading)
+    if bool(b.get("canRegister",false)):
+        _action_choices.add_child(_button(tr("Register company")+" · 15 EUR",_garden_action.bind("repair-business:register")))
+    if not bool(b.get("yours",false)):return
+    var status := Label.new()
+    status.text=tr("Company cash")+": "+str(b.get("cash",0))+" EUR · "+tr("Lease until day")+" "+str(b.get("rentUntil",0))
+    _action_choices.add_child(status)
+    var worker := Label.new()
+    worker.text=tr("Employee")+": "+str(b.get("employee",""))+" · "+tr("Completed repairs")+": "+str(b.get("jobs",0))
+    _action_choices.add_child(worker)
+    for choice in [["canInvest","invest","Invest","20"],["canWithdraw","withdraw","Withdraw","20"],["canRent","rent","Rent workshop","10"],["canTools","tools","Buy tools","20"]]:
+        if bool(b.get(choice[0],false)):
+            _action_choices.add_child(_button(tr(str(choice[2]))+" · "+str(choice[3])+" EUR",_garden_action.bind("repair-business:"+str(choice[1]))))
+    for candidate in b.get("candidates",[]):
+        _action_choices.add_child(_button(tr("Hire")+" "+str(candidate.get("name",""))+" · 5 EUR",_garden_action.bind("repair-business:hire:"+str(candidate.get("id","")))))
+
 func _render_home_services() -> void:
     var services: Dictionary=_last_snapshot.get("homeServices",{})
     if services.is_empty():return
@@ -8526,6 +8548,9 @@ func _render_home_goods() -> void:
         _action_choices.add_child(info)
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("repair-business:"):
+        if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("home-service:"):
         if _current_place=="SOUTH_RESIDENCES" and _owns_house() and _near_kitchen() and _connected and not _api.is_busy():_api.garden_action(action)
         return

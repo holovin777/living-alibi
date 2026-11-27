@@ -33,7 +33,7 @@ final class ResidentServiceLife {
         return (int)t.people.values().stream().filter(c->eligible(t,c)&&get(t,c,"queued-day")>0).count();
     }
     static boolean availableTech(TownLife.Town t,TownLife.Citizen c,WorldState s){
-        return HomeServiceLife.mechanic(t,c)&&!EmploymentLife.sick(c,s.day)
+        return (HomeServiceLife.mechanic(t,c)||PlayerServiceBusiness.employee(t,c)&&PlayerServiceBusiness.operating(t,s.day))&&!EmploymentLife.sick(c,s.day)
             &&!NpcJusticeLife.confined(t,c,s)&&c.fatigue<85;
     }
     static TownLife.Place destination(TownLife.Town t,TownLife.Citizen c,WorldState s){
@@ -134,16 +134,16 @@ final class ResidentServiceLife {
             var tech=NpcVehicleCrimeLife.person(t,slot(t,i,"mechanic"));
             boolean ready=needsService(t,c)&&tech!=null&&destination(t,tech,s)==c.home
                 &&HomeRoutineLife.atHome(c)&&tech.presentAt(c.home)&&"WORKING".equals(tech.activity)
-                &&c.money>=RESERVE+HomeServiceLife.REPAIR_PRICE&&ServiceCompanyLife.available(t);
+                &&c.money>=RESERVE+HomeServiceLife.REPAIR_PRICE&&(PlayerServiceBusiness.employee(t,tech)?PlayerServiceBusiness.available(t):ServiceCompanyLife.available(t));
             if(!ready){slot(t,i,"minutes",0);continue;}
             if(slot(t,i,"last-minute")==s.minute)continue;
             slot(t,i,"last-minute",s.minute);
             slot(t,i,"minutes",slot(t,i,"minutes")+1);
             if(slot(t,i,"minutes")<30)continue;
             c.money-=HomeServiceLife.REPAIR_PRICE;
-            ServiceCompanyLife.complete(t,tech);
-            set(t,c,"wear",0);set(t,c,"queued-day",0);
-            ServiceCompanyLife.count(t,"resident-completed",1);clear(t,i);
+            if(PlayerServiceBusiness.employee(t,tech))PlayerServiceBusiness.complete(t,tech);
+            else {ServiceCompanyLife.complete(t,tech);ServiceCompanyLife.count(t,"resident-completed",1);}
+            set(t,c,"wear",0);set(t,c,"queued-day",0);clear(t,i);
         }
     }
 }

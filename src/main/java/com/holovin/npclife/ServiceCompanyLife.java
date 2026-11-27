@@ -24,6 +24,7 @@ final class ServiceCompanyLife {
     }
     static void tick(TownLife.Town t,WorldState s){
         ServiceFleetLife.tick(t,s);
+        if(s.minute==0)PlayerServiceBusiness.tick(t,s);
         if(s.minute!=480||get(t,"restock-day")>=s.day)return;
         set(t,"restock-day",s.day);
         if(get(t,"parts")<2)purchasePart(t);

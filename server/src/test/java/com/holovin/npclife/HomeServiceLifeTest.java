@@ -158,4 +158,27 @@ class HomeServiceLifeTest {
         assertEquals(station-fuel,FuelLife.stock(t));
         assertEquals(ServiceFleetLife.view(t),ServiceFleetLife.view(t.copy()));
     }
+    @Test void independentRepairCompanyHasSeparateCashAndPaidOrders(){
+        var s=new WorldState();s.day=8;s.minute=600;var t=TownLife.create(s);
+        t.player.place=WORKSHOP;t.player.money=100;
+        var tech=new TownLife.Citizen("service-hire","Technician","Mechanic",WORKSHOP);
+        tech.age=35;tech.generationIndex=501;tech.employed=false;tech.money=20;t.people.put(tech.id,tech);
+        EducationLife.set(t,tech,"technical",70);
+        PlayerServiceBusiness.act(t,s,"register");
+        PlayerServiceBusiness.act(t,s,"invest");PlayerServiceBusiness.act(t,s,"invest");
+        PlayerServiceBusiness.act(t,s,"rent");PlayerServiceBusiness.act(t,s,"tools");
+        PlayerServiceBusiness.act(t,s,"hire:"+tech.id);
+        assertEquals(45,t.player.money);assertEquals(5,PlayerServiceBusiness.get(t,"cash"));
+        assertTrue(PlayerServiceBusiness.employee(t,tech));assertEquals(25,tech.money);
+        var customer=new TownLife.Citizen("service-client","Customer","Retired",NORTH_RESIDENCES);
+        customer.age=70;customer.generationIndex=401;customer.money=200;t.people.put(customer.id,customer);
+        EducationLife.set(t,customer,"interior-laundry",1);ResidentServiceLife.set(t,customer,"wear",80);
+        ResidentServiceLife.assign(t,0,customer,tech,s.day);
+        tech.place=NORTH_RESIDENCES;tech.activity="WORKING";t.technicalMaterials.put("spare-parts",1);
+        for(int i=0;i<30;i++){s.minute=1200+i;ResidentServiceLife.tick(t,s);}
+        assertEquals(185,customer.money);assertEquals(33,tech.money);
+        assertEquals(6,PlayerServiceBusiness.get(t,"cash"));assertEquals(1,PlayerServiceBusiness.get(t,"jobs"));
+        assertEquals(1,PlayerServiceBusiness.get(t,"tax"));assertEquals(0,ServiceCompanyLife.cash(t));
+        assertEquals(6,PlayerServiceBusiness.get(t.copy(),"cash"));
+    }
 }

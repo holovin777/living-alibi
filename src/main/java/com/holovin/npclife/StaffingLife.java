@@ -33,7 +33,7 @@ final class StaffingLife {
     static boolean eligible(TownLife.Town t,TownLife.Citizen c,WorldState s){
         return c.alive&&c.generationIndex>0&&c.age>=25&&c.age<65&&!RebirthLife.linkedAdult(t,c)
             &&!EmploymentLife.sick(c,s.day)&&!NpcJusticeLife.confined(t,c,s)
-            &&!BusinessLife.isEmployee(t,c)&&!ITStaffLife.isEmployee(t,c)&&!MarketStallLife.isEmployee(t,c)&&!LogisticsLife.isDriver(t,c);
+            &&!PlayerServiceBusiness.employee(t,c)&&!BusinessLife.isEmployee(t,c)&&!ITStaffLife.isEmployee(t,c)&&!MarketStallLife.isEmployee(t,c)&&!LogisticsLife.isDriver(t,c);
     }
     static void assign(TownLife.Town t,WorldState s,TownLife.Citizen c,Role r,boolean immigrant){
         c.occupation=r.name();c.workplace=r.workplace();c.employed=true;c.unemploymentDays=0;c.lastHiredDay=s.day;c.jobChanges++;

@@ -57,7 +57,7 @@ final class PopulationLife {
         boolean journalist=NewspaperLife.reporter(c);
         boolean foodWorker=RetailLife.foodRole(c.occupation);
         boolean publicSafety=PoliceLife.staff(c);
-        boolean working=!child&&!retired&&c.employed && !sick && (publicSafety?PoliceLife.scheduled(c,clock.day,minute):(foodWorker?(clock.day-1)%7!=0:workday)) &&
+        boolean working=!child&&!retired&&c.employed && !PlayerServiceBusiness.ROLE.equals(c.occupation) && !sick && (publicSafety?PoliceLife.scheduled(c,clock.day,minute):(foodWorker?(clock.day-1)%7!=0:workday)) &&
                 (publicSafety?true:itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):foodWorker?(minute>=660&&minute<1140):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
