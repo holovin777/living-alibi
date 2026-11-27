@@ -242,7 +242,7 @@ class GeoRebirthTest {
         a.activity="SLEEPING";b.activity="SLEEPING";
         assertFalse(EarlyChildhoodLife.view(t).actions().contains("play"));
         child.age=6;
-        assertNull(EarlyChildhoodLife.view(t));
+        assertNotNull(EarlyChildhoodLife.view(t)); // The prologue now lasts until adulthood.
     }
     @Test void acceleratedProloguePreservesResidentAndFinishesAtFamilyHome(){
         var s=new WorldState();var t=TownLife.create(s);
@@ -351,6 +351,29 @@ class GeoRebirthTest {
         assertEquals(money,c.money);
         assertEquals(0,ChildhoodPrologue.view(t).elapsedSeconds());
         assertNull(RebirthLife.childOuting(t,c,s.day,s.minute));
+    }
+    @Test void establishedPlayerHouseholdCanHaveNaturalBirthWithoutManualAction(){
+        var s=new WorldState();var t=TownLife.create(s);
+        PopulationGenerator.add(t,20);
+        RebirthLife.enableRandomBirth(t,true);
+        assertTrue(InitialFamilyLife.start(t,s));
+        var c=RebirthLife.child(t);
+        for(int i=0;i<180;i++)ChildhoodPrologue.step(t);
+        c.age=25;c.money=500;
+        var p=PopulationGenerator.add(t,1).getFirst();
+        p.age=25;p.money=500;p.home=c.home;p.homeUnit=c.homeUnit;
+        var r=ParentingLife.relation(t,c,p);r.affinity=90;r.trust=90;r.tension=0;
+        assertTrue(DemographyLife.pair(t,c,p,1));
+        assertTrue(DemographyLife.automaticBirthAllowed(t,c,p));
+        assertFalse(RebirthLife.canHaveChild(t,c,p,31));
+        s.day=31;s.minute=360;
+        DemographyLife.tick(t,s,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+        var children=t.people.values().stream().filter(x->DemographyLife.get(t,x,"parent-a")==c.generationIndex||DemographyLife.get(t,x,"parent-b")==c.generationIndex).toList();
+        assertEquals(1,children.size());
+        assertEquals(0,children.getFirst().age);
+        assertEquals(c.homeUnit,children.getFirst().homeUnit);
+        assertEquals(0,DemographyLife.get(t,children.getFirst(),"played-incarnation"));
+        assertSame(c,RebirthLife.child(t));
     }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");

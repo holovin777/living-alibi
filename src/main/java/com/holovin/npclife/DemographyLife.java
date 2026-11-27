@@ -56,7 +56,7 @@ final class DemographyLife {
     }
     private static boolean canBirth(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day,boolean initial){
         if(a==null||b==null||a==b||!parentAge(a)||!parentAge(b)||get(t,a,"partner")!=b.generationIndex||get(t,b,"partner")!=a.generationIndex||
-                (!initial&&day-get(t,a,"union-day")<270)||get(t,a,"children")>=2||get(t,b,"children")>=2||
+                (!initial&&day-get(t,a,"union-day")<(RebirthLife.randomBirth(t)?30:270))||get(t,a,"children")>=2||get(t,b,"children")>=2||
                 (get(t,a,"last-birth")>0&&day-get(t,a,"last-birth")<1095)||
                 (get(t,b,"last-birth")>0&&day-get(t,b,"last-birth")<1095)||
                 a.money<(initial?20:100)||b.money<(initial?20:100)||living(t)>=PopulationGenerator.MAX_GENERATED)return false;
@@ -138,6 +138,11 @@ final class DemographyLife {
         }
         set(t,DEATHS,Math.addExact(get(t,DEATHS),1));
     }
+    static boolean automaticBirthAllowed(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b){
+        if(a==null||b==null)return false;
+        if(!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,b))return true;
+        return RebirthLife.randomBirth(t)&&RebirthLife.together(a,b)&&RebirthLife.willing(t,a,b);
+    }
     static void tick(TownLife.Town t,WorldState clock,List<TownLife.Event> events,List<TownLife.Observation> observations){
         int day=clock.day;
         if(clock.minute!=360||get(t,LAST)>=day)return;
@@ -185,7 +190,7 @@ final class DemographyLife {
                 if(!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,candidate))pair(t,a,candidate,day);
             }
             var b=byIndex(t,get(t,a,"partner"));
-            if(b!=null&&a.generationIndex<b.generationIndex&&!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,b)){
+            if(b!=null&&a.generationIndex<b.generationIndex&&automaticBirthAllowed(t,a,b)){
                 var newborn=birth(t,a,b,day);
                 if(newborn!=null){
                     newborns.add(newborn);

@@ -262,6 +262,7 @@ var _dialog_end_remaining := 0.0
 var _dialog_farewell := ""
 var _show_childhood_details := false
 var _prologue_seconds := 0.0
+var _remote_heartbeat:=0.0
 var _action_title: Label
 var _action_choices: VBoxContainer
 
@@ -290,6 +291,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     if _custody_active:
         return
+    if OS.get_environment("LIVING_ALIBI_REMOTE")=="1" and _api!=null:
+        _remote_heartbeat+=delta
+        if _remote_heartbeat>=10.0 and not _api.is_busy() and not _dialog_pending:
+            _remote_heartbeat=0.0
+            _api.refresh_world()
     _tick_childhood_prologue(delta)
     if _bus_preview_active():
         _tick_bus_preview(delta)

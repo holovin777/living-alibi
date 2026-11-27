@@ -550,7 +550,7 @@ final class RebirthLife {
                 &&TownLife.privateUnit(c.id).equals(c.homeUnit)&&TownLife.privateUnit(p.id).equals(p.homeUnit);
     }
     static boolean canHaveChild(TownLife.Town t,TownLife.Citizen c,TownLife.Citizen p,int day){
-        return p!=null&&together(c,p)&&meeting(c,p)&&willing(t,c,p)&&DemographyLife.canBirth(t,c,p,day);
+        return !randomBirth(t)&&p!=null&&together(c,p)&&meeting(c,p)&&willing(t,c,p)&&DemographyLife.canBirth(t,c,p,day);
     }
     static HouseholdMember householdMember(TownLife.Citizen c,String role){
         return new HouseholdMember(c.id,c.name,c.age,c.alive,role,c.money);

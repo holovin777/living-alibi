@@ -705,6 +705,14 @@ public final class GameSession implements AutoCloseable {
         if(geoInterior!=null&&GeoProjection.residential(geoInterior)&&!GeoProjection.ownHome(town,state)&&!IntercomLife.insideVisit(town,state.day,state.minute))geoInterior=null;
         return map.view(town,state,target,geoResponse==null?null:geoResponse.view(map),geoInterior);
     }
+    synchronized void persistentIdleTick(int minutes,boolean justWentOffline)throws SQLException{
+        if(closed||minutes<1||minutes>15)return;
+        var copy=town.copy();
+        if(justWentOffline)OfflineRoutineLife.prepare(copy);
+        boolean confined=JusticeLife.confined(copy);
+        if(confined)minutes=Math.min(minutes,JusticeLife.waitDuration(copy,state,minutes));
+        if(minutes>0)applyInternal(copy,minutes,"Persistent world routine.",RebirthLife.active(copy),state.copy(),new ArrayList<>(),new ArrayList<>(),confined);
+    }
     synchronized void geoTick(int minutes) throws SQLException {
         if(!NpcTransportLife.enabled(town)&&!JusticeLife.confined(town)&&!RebirthLife.active(town)){
             var copy=town.copy();copy.industryStocks.put(NpcTransportLife.ENABLED,1);apply(copy,0,"Resident transport enabled.");

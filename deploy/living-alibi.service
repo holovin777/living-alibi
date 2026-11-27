@@ -1,0 +1,20 @@
+[Unit]
+Description=Living Alibi private persistent world
+After=network.target
+
+[Service]
+Type=simple
+User=living-alibi
+Group=living-alibi
+WorkingDirectory=/opt/living-alibi
+StateDirectory=living-alibi
+ExecStart=/usr/bin/java -Xms256m -Xmx768m -jar /opt/living-alibi/server/target/living-alibi-server-1.16.0.jar --server.address=127.0.0.1 --living-alibi.database=/var/lib/living-alibi/world.db --living-alibi.persistent-world=true
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

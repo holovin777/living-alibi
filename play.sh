@@ -12,7 +12,8 @@ Living Alibi — local Godot preview
 Usage:
   bash play.sh                 Build Java + Spring, start server, open Godot.
   bash play.sh --check         Check required installed programs.
-  bash play.sh --server-only   Build and run only the local Spring server.
+  bash play.sh --server-only   Build and run the persistent private Spring server.
+  bash play.sh --client-only   Open Godot against an existing server or SSH tunnel.
   bash play.sh --help          Show this help.
 
 Requires: JDK 21+, Maven 3.9+, curl and (for the game window) Godot 4.
@@ -22,7 +23,7 @@ EOF
 }
 
 case "$MODE" in
-    play|--check|--server-only|--help) ;;
+    play|--check|--server-only|--client-only|--help) ;;
     *) usage >&2; echo "Unknown option: $MODE" >&2; exit 2 ;;
 esac
 if [[ $# -gt 1 ]]; then
@@ -38,8 +39,10 @@ require() {
     fi
 }
 
-require java
-require mvn
+if [[ "$MODE" != "--client-only" ]]; then
+    require java
+    require mvn
+fi
 require curl
 
 GODOT=""
@@ -68,6 +71,18 @@ if [[ ! -f "$ROOT/godot/project.godot" || ! -f "$ROOT/server/pom.xml" ]]; then
     exit 1
 fi
 
+if [[ "$MODE" == "--client-only" ]]; then
+    if ! curl -fsS --max-time 5 http://127.0.0.1:8080/api/v1/world >/dev/null; then
+        echo "No game server. Start it or open the SSH tunnel." >&2
+        exit 1
+    fi
+    export LIVING_ALIBI_REMOTE=1
+    if [[ ! -d "$ROOT/godot/.godot" ]]; then
+        "$GODOT" --headless --path "$ROOT/godot" --editor --quit
+    fi
+    exec "$GODOT" --path "$ROOT/godot"
+fi
+
 if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/world >/dev/null 2>&1 || curl -fsS --max-time 2 http://127.0.0.1:8091/geo/nearby >/dev/null 2>&1; then
     echo "A Living Alibi server already answers on port 8080." >&2
     echo "Close the other server before launching another instance." >&2
@@ -91,7 +106,7 @@ SAVE="$ROOT/data/world.db"
 if [[ "$MODE" == "--server-only" ]]; then
     echo "Game API: http://127.0.0.1:8080/api/v1/world"
     echo "Save: $SAVE"
-    exec java -jar "$JAR" --living-alibi.database="$SAVE"
+    exec java -jar "$JAR" --living-alibi.database="$SAVE" --living-alibi.persistent-world=true
 fi
 
 SERVER_PID=""
