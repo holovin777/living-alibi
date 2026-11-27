@@ -18,12 +18,16 @@ final class PersonalGoodsLife {
     static Product product(String id){return PRODUCTS.stream().filter(p->p.id().equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("Unknown personal good."));}
     static Product product(PropertyLife.Item item){return PRODUCTS.stream().filter(p->p.type()==item.type).findFirst().orElseThrow(()->new IllegalArgumentException("This item is not tradeable."));}
     static void ready(TownLife.Town t){TransportLife.ready(t.player);JusticeLife.requireFree(t);if(RebirthLife.active(t))throw new IllegalArgumentException("Personal goods are currently available to adult visitors.");}
-    static void market(TownLife.Town t,WorldState s){ready(t);if(t.player.place!=MARKET||!RetailLife.open(MARKET,s.minute)||IntercomLife.insideVisit(t,s.day,s.minute))throw new IllegalArgumentException("Visit the market during opening hours.");}
+    static boolean shopFor(TownLife.Place place,Product p){return p.type()==PropertyLife.Type.BOOK?place==MARKET:place==PORTICI;}
+    static void market(TownLife.Town t,WorldState s,Product p){
+        ready(t);if(!shopFor(t.player.place,p)||!RetailLife.open(t.player.place,s.minute)||IntercomLife.insideVisit(t,s.day,s.minute))
+            throw new IllegalArgumentException("Visit the appropriate open shop.");
+    }
     static void journal(TownLife.Town t,WorldState s,PropertyLife.Action action,PropertyLife.Item item,String from,String to,String detail){
         t.pendingProperty.add(new PropertyLife.Change(s.day,s.minute,action,item.id,from,to,detail));
     }
     static String buy(TownLife.Town t,WorldState s,String id){
-        market(t,s);var p=product(id);int stock=stock(t,p);
+        var p=product(id);market(t,s,p);int stock=stock(t,p);
         if(stock<1||t.player.money<p.price())throw new IllegalArgumentException("Insufficient money or stock.");
         if(t.items.values().stream().filter(i->visitor(t).equals(i.ownerId)||visitor(t).equals(i.holderId)).count()>=12)throw new IllegalArgumentException("Personal inventory is full.");
         var item=t.items.values().stream().filter(i->MERCHANT.equals(i.ownerId)&&i.type==p.type()).findFirst().orElse(null);
@@ -45,7 +49,7 @@ final class PersonalGoodsLife {
         return item;
     }
     static String sell(TownLife.Town t,WorldState s,String id){
-        market(t,s);var item=held(t,id);var p=product(item);int price=p.price()/2;
+        var item=held(t,id);var p=product(item);market(t,s,p);int price=p.price()/2;
         if(t.employerFunds.getOrDefault("shop-assistant",0)<price)throw new IllegalArgumentException("The merchant cannot afford this item.");
         t.employerFunds.merge("shop-assistant",-price,Math::addExact);t.player.money=Math.addExact(t.player.money,price);
         item.ownerId=MERCHANT;item.holderId=null;item.storedSpace="merchant-stock";
@@ -78,15 +82,15 @@ final class PersonalGoodsLife {
         return "gift".equals(action)?"Gift accepted.":"Item lent to resident.";
     }
     record Offer(String id,String label,int price,int stock){}
-    record Possession(String id,String label,boolean carried,boolean lent,String borrowerId,int resalePrice){}
+    record Possession(String id,String label,boolean carried,boolean lent,String borrowerId,int resalePrice,boolean canSell){}
     record Contact(String id,String name,boolean canBorrow){}
     record View(List<Offer> offers,List<Possession> items,List<Contact> contacts){}
     static View view(TownLife.Town t,WorldState s){
         if(RebirthLife.active(t)||!t.player.alive)return new View(List.of(),List.of(),List.of());
-        var offers=t.player.place==MARKET?PRODUCTS.stream().map(p->new Offer(p.id(),p.label(),p.price(),stock(t,p))).toList():List.<Offer>of();
+        var offers=PRODUCTS.stream().filter(p->shopFor(t.player.place,p)).map(p->new Offer(p.id(),p.label(),p.price(),stock(t,p))).toList();
         var items=t.items.values().stream().filter(i->visitor(t).equals(i.ownerId)&&!i.stolen)
             .map(i->new Possession(i.id,product(i).label(),visitor(t).equals(i.holderId),i.holderId!=null&&!visitor(t).equals(i.holderId),
-                    i.holderId!=null&&!visitor(t).equals(i.holderId)?i.holderId:null,product(i).price()/2)).toList();
+                    i.holderId!=null&&!visitor(t).equals(i.holderId)?i.holderId:null,product(i).price()/2,shopFor(t.player.place,product(i)))).toList();
         var contacts=PlayerLife.visible(t).stream().filter(c->c.age>=18&&PlayerLife.knowsResident(t,c.id)&&t.player.contacts.containsKey(c.id))
             .filter(c->t.player.contacts.get(c.id).knownName!=null&&t.player.contacts.get(c.id).trust>=70)
             .map(c->new Contact(c.id,c.name,t.player.contacts.get(c.id).trust>=85)).toList();

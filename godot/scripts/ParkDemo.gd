@@ -2865,6 +2865,42 @@ func _build_guesthouse(owned: bool = false) -> void:
         light.omni_range = 5.5
         house.add_child(light)
     _lamp(house,Vector3(-2.8,0,12))
+    if owned:_build_home_goods_display(house)
+
+func _build_home_goods_display(house: Node3D) -> void:
+    var display := Node3D.new()
+    display.name="PurchasedFurnishings"
+    house.add_child(display)
+    var tv := Node3D.new()
+    tv.name="television"
+    display.add_child(tv)
+    _box(tv,Vector3(0.11,0.75,1.25),Color("#242a30"),Vector3(-4.24,1.68,10.8))
+    _box(tv,Vector3(0.025,0.64,1.12),Color("#465964"),Vector3(-4.31,1.68,10.8))
+    var fridge := Node3D.new()
+    fridge.name="fridge"
+    display.add_child(fridge)
+    _box(fridge,Vector3(0.70,0.65,0.68),Color("#e3e6e4"),Vector3(-5.05,1.36,11.55))
+    _box(fridge,Vector3(0.04,0.53,0.62),Color("#c7d2d2"),Vector3(-5.42,1.36,11.55))
+    _box(fridge,Vector3(0.06,0.26,0.05),Color("#52616a"),Vector3(-5.46,1.39,11.31))
+    var shelf := Node3D.new()
+    shelf.name="shelf"
+    display.add_child(shelf)
+    for y in [1.7,2.1]:
+        _box(shelf,Vector3(1.55,0.08,0.27),Color("#8e694c"),Vector3(-6.25,y,4.22))
+        for i in range(5):
+            _box(shelf,Vector3(0.15,0.27,0.18),[Color("#8a4c3d"),Color("#567164"),Color("#44617e")][i%3],Vector3(-6.8+i*0.22,y+0.175,4.22))
+    var installed: Array=_last_snapshot.get("homeGoods",{}).get("installed",[])
+    for child in display.get_children():child.visible=str(child.name) in installed
+
+func _sync_home_goods() -> void:
+    if _chunks.has("SOUTH_RESIDENCES"):
+        var root: Node3D=_chunks["SOUTH_RESIDENCES"]["root"]
+        var display := root.get_node_or_null("CasaDelGlicine/PurchasedFurnishings")
+        if display!=null:
+            var installed: Array=_last_snapshot.get("homeGoods",{}).get("installed",[])
+            for child in display.get_children():child.visible=str(child.name) in installed
+    if is_instance_valid(_hands):
+        _hands.set_outfit(bool(_last_snapshot.get("homeGoods",{}).get("changedOutfit",false)))
 
 func _build_home_garden() -> void:
     var garden := Node3D.new()
@@ -3663,6 +3699,7 @@ func _build_portici() -> void:
     _portici_house(street,1.0,-10.0,12.0,9.0,Color("#d5c09c"),"Casa 15")
     _portici_house(street,1.0,12.6,8.0,7.2,Color("#c29b73"),"Casa 17")
     _portici_grocery(street)
+    _physical_sign(street,"Abbigliamento · Elettronica",Vector3(4.16,3.5,5.0),-PI/2.0,3.6)
     for at in [Vector3(-3,0,-8),Vector3(3,0,-4),Vector3(-3,0,9),Vector3(3,0,12)]:
         _lamp(street,at)
     _box(street,Vector3(0.10,2.0,0.10),Color("#6a6c67"),Vector3(4,1,-8))
@@ -7693,6 +7730,14 @@ func _render_actions() -> void:
                     if int(garden.get("rainwater",0))>0:
                         _action_choices.add_child(_button("Water from rain barrel · 1 unit",_garden_action.bind("water-rain")))
             elif _near_room_bed():
+                var clothing: Dictionary=_last_snapshot.get("homeGoods",{})
+                if bool(clothing.get("canChange",false)):
+                    var change := _button(tr("Wear purchased outfit"),_garden_action.bind("home-outfit:new"))
+                    change.disabled=not bool(clothing.get("hasClothing",false)) or bool(clothing.get("changedOutfit",false))
+                    _action_choices.add_child(change)
+                    var original := _button(tr("Wear original outfit"),_garden_action.bind("home-outfit:original"))
+                    original.disabled=not bool(clothing.get("changedOutfit",false))
+                    _action_choices.add_child(original)
                 _action_choices.add_child(_button("Sleep in your house · 2h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in your house · 8h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 8h",_sleep_room.bind(8)))
             elif _near_kitchen():
@@ -7760,8 +7805,11 @@ func _render_actions() -> void:
                 choice.disabled = stock <= 0 or not shop_open or int(player.get("money",0))<int(item.get("price",0))
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
-            if _current_place == "MARKET":
+            if _current_place in ["MARKET","PORTICI"]:
                 _render_personal_goods()
+            if _current_place=="PORTICI":
+                _render_home_goods()
+            if _current_place == "MARKET":
                 var stall: Dictionary = _last_snapshot.get("stall",{})
                 if not bool(stall.get("registered",false)):
                     _action_choices.add_child(_button("Register private stall · 20 EUR",_garden_action.bind("stall-register")))
@@ -7848,6 +7896,7 @@ func _render_actions() -> void:
         "LOGISTICS_DEPOT":
             _render_logistics(logistics)
         "WORKSHOP":
+            _render_home_goods()
             _render_logistics(logistics)
             if _car_place().is_empty():
                 _action_choices.add_child(_button("Buy used car · 180 EUR",_car_action.bind("buy")))
@@ -8258,7 +8307,7 @@ func _render_personal_goods() -> void:
         var status := Label.new()
         status.text=label+" · "+tr("Lent") if bool(item.get("lent",false)) else label
         _action_choices.add_child(status)
-        if bool(item.get("carried",false)):
+        if bool(item.get("carried",false)) and bool(item.get("canSell",true)):
             _action_choices.add_child(_button(tr("Sell %s · %s EUR") % [label,item.get("resalePrice",0)],_garden_action.bind("personal-good:sell:"+id)))
         for contact in goods.get("contacts",[]):
             var who := str(contact.get("id",""))
@@ -8270,9 +8319,27 @@ func _render_personal_goods() -> void:
             elif str(item.get("borrowerId",""))==who:
                 _action_choices.add_child(_button(tr("Request %s back from %s") % [label,name_text],_garden_action.bind("personal-good:return:"+id+":"+who)))
 
+func _render_home_goods() -> void:
+    var goods: Dictionary=_last_snapshot.get("homeGoods",{})
+    for offer in goods.get("offers",[]):
+        var label := tr(str(offer.get("label","")))
+        var button := _button(tr("Installed: %s") % label if bool(offer.get("installed",false)) else tr("Deliver %s · %s EUR") % [label,offer.get("price",0)],_garden_action.bind("home-good:"+str(offer.get("id",""))))
+        button.disabled=not bool(offer.get("canBuy",false))
+        _action_choices.add_child(button)
+    if not goods.get("offers",[]).is_empty() and not _owns_house():
+        var info := Label.new()
+        info.text=tr("Delivery requires an owned house.")
+        _action_choices.add_child(info)
+
 func _garden_action(action: String) -> void:
+    if action.begins_with("home-good:"):
+        if _current_place in ["PORTICI","WORKSHOP"] and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
+    if action.begins_with("home-outfit:"):
+        if _near_room_bed() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("personal-good:"):
-        if _current_place=="MARKET" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        if _current_place in ["MARKET","PORTICI"] and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
         return
     if action.begins_with("security-"):
         if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
@@ -9384,6 +9451,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _reset_locomotion()
         _avatar.position=_home_entrance.position
     _sync_guest_room()
+    _sync_home_goods()
     _sync_garden()
     _sync_coop()
     _sync_orchard()

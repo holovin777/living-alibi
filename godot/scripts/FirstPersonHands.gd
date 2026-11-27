@@ -66,6 +66,13 @@ func _arm(side: float,sleeve: Color,skin: Color) -> Node3D:
     _shape(arm,Vector3(0.035,0.055,0.055),skin,Vector3(-side*0.045,0.015,-0.012),true)
     return arm
 
+func set_outfit(changed: bool) -> void:
+    if not is_instance_valid(_left) or not is_instance_valid(_right):return
+    for arm in [_left,_right]:
+        var sleeve := arm.get_child(0) as MeshInstance3D
+        var material := sleeve.material_override as StandardMaterial3D
+        material.albedo_color=Color("#806148") if changed else Color("#536570")
+
 func set_item(id: String) -> void:
     held_item = id if _props.has(id) else ""
     for key in _props:
