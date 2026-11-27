@@ -10,7 +10,7 @@ import java.util.SplittableRandom;
 final class PopulationGenerator {
     private PopulationGenerator() { }
 
-    static final int MAX_GENERATED = 64; // Bounded population; larger worlds need performance profiling.
+    static final int MAX_GENERATED = 256; // Experimental upper bound; performance still needs profiling.
     private static final String[] FIRST = {"Amelia","Luca","Giulia","Pietro","Sofia","Davide",
             "Chiara","Matteo","Aurora","Nico","Beatrice","Alessandro","Marta","Andrea",
             "Valentina","Filippo","Elisa","Riccardo","Irene","Samuele","Sara","Leonardo",
@@ -43,6 +43,7 @@ final class PopulationGenerator {
             if(!names.add(name)){name=name+" "+index;names.add(name);}
             int job=rng.nextInt(JOBS.length);
             var home=rng.nextBoolean()?TownLife.Place.NORTH_RESIDENCES:TownLife.Place.SOUTH_RESIDENCES;
+            if(index>64)home=CityExpansionLife.newHome(index);
             String id="resident-%04d".formatted(index);
             var c=new TownLife.Citizen(id,name,JOBS[job],home);
             c.home=home;c.workplace=WORKPLACES[job];

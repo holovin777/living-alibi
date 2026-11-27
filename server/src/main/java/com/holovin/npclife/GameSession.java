@@ -26,7 +26,7 @@ public final class GameSession implements AutoCloseable {
 
     @Autowired
     public GameSession(@Value("${living-alibi.database:data/world.db}") String databasePath,
-                       @Value("${living-alibi.population:56}") int population)
+                       @Value("${living-alibi.population:160}") int population)
             throws Exception {
         this(Path.of(databasePath),population);
     }

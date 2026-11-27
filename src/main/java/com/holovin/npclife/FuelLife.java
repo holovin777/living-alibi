@@ -23,7 +23,7 @@ final class FuelLife {
     static String refuel(TownLife.Town t,int minute) {
         var p=t.player;
         MotorLife.present(p);
-        boolean station=p.place==TownLife.Place.FUEL_STATION;
+        boolean station=p.place==TownLife.Place.FUEL_STATION||CityExpansionLife.serviceHub(p.place);
         if(!station && p.place!=TownLife.Place.WORKSHOP)
             throw new IllegalArgumentException("Visit the fuel station or workshop.");
         if(minute<(station?360:480) || minute>=(station?1320:1080))

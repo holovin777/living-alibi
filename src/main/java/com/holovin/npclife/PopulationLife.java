@@ -82,9 +82,9 @@ final class PopulationLife {
         else if(carrier && working)desired=c.workplace;
         else if(shopEmployee && working)desired=TownLife.Place.WORKSHOP;
         else if(stallEmployee && working)desired=TownLife.Place.MARKET;
-        else if(marketOpen && needFood)desired=TownLife.Place.MARKET;
-        else if(marketOpen && publicWater)desired=TownLife.Place.PARK;
-        else if(marketOpen && needWater && c.money>=3)desired=TownLife.Place.MARKET;
+        else if(marketOpen && needFood)desired=CityExpansionLife.outer(c.home)?c.home:TownLife.Place.MARKET;
+        else if(marketOpen && publicWater&&!CityExpansionLife.outer(c.home))desired=TownLife.Place.PARK;
+        else if(marketOpen && needWater && c.money>=3)desired=CityExpansionLife.outer(c.home)?c.home:TownLife.Place.MARKET;
         else if(publicSafety&&working)desired=PoliceLife.assignment(town,c,clock.day,minute);
         else if(journalist&&working)desired=NewspaperLife.assignment(clock.day,minute);
         else if(working)desired=c.workplace;
@@ -120,6 +120,10 @@ final class PopulationLife {
                 if(child||RebirthLife.stayingHome(town,c))town.employerFunds.merge("shop-assistant",6,Math::addExact);
                 TownLife.publish(town,clock,c.id,c.place,c.name+" received drinking water at home.",events,observations);
             }
+        }
+        if(CityExpansionLife.outer(c.home)&&c.place==c.home&&marketOpen&&!child){
+            if(c.food<2&&c.money>=9){c.money-=9;c.food+=3;town.employerFunds.merge("shop-assistant",9,Math::addExact);}
+            if(c.water<2&&c.money>=3){c.money-=3;c.water+=3;town.employerFunds.merge("shop-assistant",3,Math::addExact);}
         }
         if(c.place==TownLife.Place.MARKET && marketOpen) {
             if(stallEmployee && working)MarketStallLife.pay(town,c,clock,events,observations);

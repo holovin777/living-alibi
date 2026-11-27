@@ -22,7 +22,7 @@ final class TransportLife {
         return "Bought a used bicycle for 45 EUR. Select cycling to ride.";
     }
     static boolean hasRack(TownLife.Place place) {
-        return place==TownLife.Place.PARK || place==TownLife.Place.WORKSHOP ||
+        return CityExpansionLife.outer(place)||place==TownLife.Place.PARK || place==TownLife.Place.WORKSHOP ||
                 place==TownLife.Place.NORTH_RESIDENCES;
     }
     static String mode(PlayerLife.Player p,String mode) {

@@ -863,10 +863,10 @@ func _car_place() -> String:
     return "" if value==null else str(value)
 
 func _near_car() -> bool:
-    return _car_place()==_current_place and _current_place in TownLayout.MOTOR_DISTRICTS and _avatar.position.distance_to(CAR_PARK)<3.3
+    return _car_place()==_current_place and TownLayout.motor_district(_current_place) and _avatar.position.distance_to(CAR_PARK)<3.3
 
 func _car_action(action: String) -> void:
-    if (_current_place=="WORKSHOP" or (_current_place=="FUEL_STATION" and action=="refuel")) and _near_kiosk() and _connected and not _api.is_busy():
+    if (_current_place=="WORKSHOP" or (_current_place=="FUEL_STATION" and action=="refuel") or (TownLayout.service_hub(_current_place) and action in ["refuel","repair"])) and (_near_kiosk() or _near_car()) and _connected and not _api.is_busy():
         _api.car_action(action)
 
 func _drive_active() -> bool:
@@ -1029,8 +1029,8 @@ func _sync_owned_car() -> void:
             var model := depot.get_node_or_null("DepositoLogistico/Garage/Truck"+str(n+1)) as Node3D
             if model!=null:
                 model.visible = _depot_truck_present(n)
-    for id in TownLayout.MOTOR_DISTRICTS:
-        if not _chunks.has(id):
+    for id in _chunks:
+        if not TownLayout.motor_district(str(id)):
             continue
         var root: Node3D = _chunks[id]["root"]
         var car := root.get_node_or_null("PublicCarPark/OwnedCar") as Node3D
@@ -1049,7 +1049,7 @@ func _parked_district() -> String:
     return "" if value == null else str(value)
 
 func _near_rack() -> bool:
-    return _current_place in RACK_DISTRICTS and _avatar.position.distance_to(RACK_POSITION)<2.8
+    return (_current_place in RACK_DISTRICTS or TownLayout.outer(_current_place)) and _avatar.position.distance_to(RACK_POSITION)<2.8
 
 func _toggle_parking() -> void:
     if not _connected or _api.is_busy() or not _near_rack():
@@ -1073,8 +1073,8 @@ func _sync_bicycle() -> void:
     for wheel in _bike_model.get_children():
         if wheel.has_meta("wheel"):
             wheel.rotation.x = _bike_wheel_angle
-    for id in RACK_DISTRICTS:
-        if not _chunks.has(id):
+    for id in _chunks:
+        if not (id in RACK_DISTRICTS or TownLayout.outer(str(id))):
             continue
         var root: Node3D = _chunks[id]["root"]
         var parked := root.get_node_or_null("BicycleRack/ParkedBicycle") as Node3D
@@ -1486,9 +1486,9 @@ func _generate_chunk(place_id: String) -> void:
                 _building("Neighborhood", Color(0.57, 0.61, 0.57))
                 _tree(Vector3(11.0, 0.0, 7.0))
 
-    if place_id in RACK_DISTRICTS:
+    if place_id in RACK_DISTRICTS or TownLayout.outer(place_id):
         _build_bicycle_rack()
-    if place_id in TownLayout.MOTOR_DISTRICTS:
+    if TownLayout.motor_district(place_id):
         _build_public_car_park()
     if place_id in FREIGHT_DISTRICTS:
         _build_freight_parking(place_id)
@@ -1783,7 +1783,7 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         var truck_at := _truck_parking(_current_place)
         if Rect2(Vector2(truck_at.x-1.1,truck_at.z-2.4),Vector2(2.2,4.8)).grow(radius).has_point(p):
             return false
-    if _car_place()==_current_place and _current_place in TownLayout.MOTOR_DISTRICTS:
+    if _car_place()==_current_place and TownLayout.motor_district(_current_place):
         if Rect2(Vector2(CAR_PARK.x-0.94,CAR_PARK.z-1.81),Vector2(1.88,3.62)).grow(radius).has_point(p):
             return false
     for edge in _traffic_edges.values():
@@ -2250,7 +2250,7 @@ func _build_outer_block(id: String) -> void:
     var rural := label.begins_with("Campagna")
     var green := label.begins_with("Giardino")
     var square := label.begins_with("Piazzetta")
-    var positions := [Vector3(-10,0,-8),Vector3(10,0,-8),Vector3(-10,0,9),Vector3(10,0,10)]
+    var positions := [Vector3(-10,0,-8),Vector3(-10,0,9),Vector3(10,0,10),Vector3(14,0,5)]
     _box(block,Vector3(34,0.04,3.4),Color("#777c78"),Vector3(0,0.025,0),"paving")
     for z in [-2.8,2.8]:
         _box(block,Vector3(34,0.07,1.2),Color("#beb7a6"),Vector3(0,0.035,z),"paving")
@@ -2279,6 +2279,9 @@ func _build_outer_block(id: String) -> void:
         _tree(positions[3])
     _lamp(block,Vector3(-5,0,-4))
     _lamp(block,Vector3(5,0,4))
+    if TownLayout.service_hub(id):
+        _sign(block,"Servizi auto · 06:00–22:00",CAR_PARK+Vector3(0,2.4,2.5))
+        _box(block,Vector3(2.6,0.15,1.5),Color("#d2bd82"),CAR_PARK+Vector3(0,2.7,0))
 
 func _build_southern_district(id: String) -> void:
     var district := Node3D.new()
@@ -6916,7 +6919,11 @@ func _render_actions() -> void:
     if _near_car():
         _action_title.text = "Your car · choose adjacent destination"
         for id in player.get("carDestinations",[]):
-            _action_choices.add_child(_button("Drive to %s · 3m / 1 fuel" % str(id).capitalize(),_drive_to.bind(str(id))))
+            var name := TownLayout.label_for(str(id)) if TownLayout.outer(str(id)) else str(id).capitalize()
+            _action_choices.add_child(_button("Drive to %s · 3m / 1 fuel" % name,_drive_to.bind(str(id))))
+        if TownLayout.service_hub(_current_place):
+            _action_choices.add_child(_button(tr("Refuel · up to 3 units / 2 EUR each"),_car_action.bind("refuel")))
+            _action_choices.add_child(_button(tr("Service car · 15 EUR"),_car_action.bind("repair")))
         return
     var logistics: Dictionary = _last_snapshot.get("logistics",{})
     if _current_place in ["FARM","QUARRY","FACTORY"] and bool(logistics.get("yours",false)) and bool(logistics.get("truck",false)) and not bool(_last_snapshot.get("freight",{}).get("active",false)):

@@ -8,7 +8,7 @@ final class MotorLife {
     private MotorLife() { }
     static final int PRICE=180,CAPACITY=12;
     static List<TownLife.Place> neighbors(TownLife.Place place) {
-        return switch(place) {
+        var core=switch(place) {
             case OFFICE -> List.of(FACTORY,LIBRARY);
             case LIBRARY -> List.of(OFFICE,WORKSHOP);
             case WORKSHOP -> List.of(LIBRARY,FACTORY,QUARRY);
@@ -16,8 +16,12 @@ final class MotorLife {
             case QUARRY -> List.of(WORKSHOP,FUEL_STATION);
             case FUEL_STATION -> List.of(QUARRY,LOGISTICS_DEPOT);
             case LOGISTICS_DEPOT -> List.of(FUEL_STATION);
-            default -> List.of();
+            default -> List.<TownLife.Place>of();
         };
+        var neighbors=new java.util.ArrayList<TownLife.Place>(core);
+        if(CityExpansionLife.motorDistrict(place))for(var candidate:PlayerLife.publicPlaces())
+            if(CityExpansionLife.outerMotorRoad(place,candidate))neighbors.add(candidate);
+        return List.copyOf(neighbors);
     }
     static void workshop(PlayerLife.Player p,int minute) {
         TransportLife.ready(p);
@@ -44,7 +48,11 @@ final class MotorLife {
         return FuelLife.refuel(t,minute);
     }
     static String repair(TownLife.Town t,int minute) {
-        var p=t.player;workshop(p,minute);present(p);
+        var p=t.player;
+        if(CityExpansionLife.serviceHub(p.place)){
+            if(minute<360||minute>=1320)throw new IllegalArgumentException("Service hub opens 06:00–22:00.");
+        }else workshop(p,minute);
+        present(p);
         if(p.carCondition==100)throw new IllegalArgumentException("Car already in good condition.");
         pay(t,15);p.carCondition=Math.min(100,p.carCondition+30);
         return "Serviced the car (+up to 30 condition).";

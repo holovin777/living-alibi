@@ -107,7 +107,10 @@ func _exercise() -> void:
     world._follow_player()
 
     var layout = world._town_map
-    if not _check(layout.DISTRICTS.size() == 121
+    if not _check(layout.DISTRICTS.size() == 441
+            and layout.motor_road("WORKSHOP","OUTER_05_01")
+            and layout.motor_road("OUTER_19_20","OUTER_20_20")
+            and layout.service_hub("OUTER_20_20")
             and layout.adjacent("WORKSHOP","OUTER_05_01")
             and layout.adjacent("OUTER_09_10","OUTER_10_10")
             and layout.adjacent("CAFE","BORGO_SUD")
@@ -1423,8 +1426,8 @@ func _exercise() -> void:
             "map follows committed arrival and clears stale travel estimates"):
         return
     # Generate a distant tile and return without retaining its neighbors.
-    world._on_world_updated(_world("OUTER_10_10","Campagna 96"))
-    if not _check(world._chunks.size()==4 and world._scenery.has_node("ProceduralBlock") and world._road_links.size()==2 and not world._chunks.has("PARK"),"distant procedural district streams only nearby blocks"):
+    world._on_world_updated(_world("OUTER_20_20","Campagna 416"))
+    if not _check(world._chunks.size()==4 and world._scenery.has_node("ProceduralBlock") and world._scenery.has_node("PublicCarPark") and world._scenery.has_node("BicycleRack") and world._can_stand(world.CAR_ARRIVAL,world.WALKER_RADIUS) and world._road_links.size()==2 and not world._chunks.has("PARK"),"distant procedural district streams only nearby blocks"):
         return
     world._on_world_updated(_world("MARKET","Market"))
     var wall_stop: Vector3 = world._move_on_ground(Vector3(-11.5,0,0),
