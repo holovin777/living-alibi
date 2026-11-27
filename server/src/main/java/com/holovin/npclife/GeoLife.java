@@ -4,14 +4,14 @@ import java.util.*;
 /** An adapter for the original linked life, not a second playable identity. */
 final class GeoLife {
     record View(String phase,String name,int age,String activity,int savings,int maxWaitDays,
-                int schoolDays,boolean graduated,String parentA,String parentB,boolean canWalk,int radius,List<GenealogyLife.Relative> familyTree,ChildhoodLife.View upbringing,ChildSearchLife.View childSearch,PassportLife.View passport,ConvictionLife.View conviction,PsychologyLife.View psychology,SubstanceLife.View substance,ClinicalLife.View clinical){}
+                int schoolDays,boolean graduated,String parentA,String parentB,boolean canWalk,int radius,List<GenealogyLife.Relative> familyTree,ChildhoodLife.View upbringing,ChildSearchLife.View childSearch,PassportLife.View passport,ConvictionLife.View conviction,PsychologyLife.View psychology,SubstanceLife.View substance,ClinicalLife.View clinical,AthleticsLife.View athletics){}
     static View view(TownLife.Town t,WorldState s){
         int phase=RebirthLife.phase(t);var c=RebirthLife.child(t);
         var a=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-a"));
         var b=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-b"));
         return new View(switch(phase){case RebirthLife.CHOICE->"CHOICE";case RebirthLife.CHILDHOOD->"CHILDHOOD";case RebirthLife.LINKED_ADULT->"LINKED_ADULT";default->"ADULT";},
             c==null?null:c.name,c==null?0:c.age,c==null?"":c.activity,c==null?t.player.money:c.money,RebirthLife.maxWaitDays(t),
-            c==null?0:EducationLife.get(t,c,"school-days"),c!=null&&EducationLife.get(t,c,"graduate")>0,a==null?null:a.name,b==null?null:b.name,canWalk(t,s),24,GenealogyLife.relatives(t,c),ChildhoodLife.view(t,c),ChildSearchLife.view(t,c,s),PassportLife.view(t,s),ConvictionLife.view(t,c),PsychologyLife.view(t,c),SubstanceLife.view(t,c,s),ClinicalLife.view(t,c,s));
+            c==null?0:EducationLife.get(t,c,"school-days"),c!=null&&EducationLife.get(t,c,"graduate")>0,a==null?null:a.name,b==null?null:b.name,canWalk(t,s),24,GenealogyLife.relatives(t,c),ChildhoodLife.view(t,c),ChildSearchLife.view(t,c,s),PassportLife.view(t,s),ConvictionLife.view(t,c),PsychologyLife.view(t,c),SubstanceLife.view(t,c,s),ClinicalLife.view(t,c,s),AthleticsLife.view(t,c,s));
     }
     static List<GeoProjection.Choice> choices(TownLife.Town t,WorldState s,GeoProjection map){
         var result=new ArrayList<GeoProjection.Choice>();
@@ -40,6 +40,16 @@ final class GeoLife {
         if(c==null||!c.alive)return List.of();
         if(NpcJusticeLife.confined(t,c,s))return List.of();
         if(RebirthLife.awakePresent(c)){
+            if(c.age>=6){
+                if(AthleticsLife.club(t,c)==null)for(var sport:AthleticsLife.Sport.values()){
+                    if(AthleticsLife.canJoin(t,c,s,sport))add(result,"rebirth-athletics-join-"+sport.name(),"Join club / Iscriviti: "+sport.label);
+                }else{
+                    add(result,"rebirth-athletics-leave","Leave sports club / Lascia il club");
+                    if(AthleticsLife.canTrain(t,c,s))add(result,"rebirth-athletics-train","Club training / Allenamento");
+                    if(AthleticsLife.canEnter(t,c,s))add(result,"rebirth-athletics-enter","Enter competition / Iscriviti alla gara");
+                    if(AthleticsLife.canCoach(t,c,s))add(result,"rebirth-athletics-coach","Qualify as coach / Qualifica allenatore");
+                }
+            }
             if(c.age>=18&&ClinicalLife.canRequest(t,c,s))for(var specialty:ClinicalLife.Specialty.values())
                 add(result,"rebirth-clinical-request-"+specialty.name(),"Medical appointment / Visita: "+specialty.label);
             if(c.age>=18&&c.place==TownLife.Place.CLINIC&&SubstanceLife.canSupport(t,c,s))

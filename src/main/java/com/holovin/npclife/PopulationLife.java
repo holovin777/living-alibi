@@ -94,6 +94,7 @@ final class PopulationLife {
         else if(freightRun)desired=freightDestination;
         else if(!publicSafety&&!child&&!carrier&&!RebirthLife.linkedAdult(town,c)&&PublicSafetyLife.alarmed(town,c,clock.day,minute))desired=c.home;
         else if(sleeping)desired=c.home;
+        else if(child&&!(workday&&minute>=480&&minute<780)&&AthleticsLife.destination(town,c,clock)!=null)desired=AthleticsLife.destination(town,c,clock);
         else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:
                 RebirthLife.linkedChild(town,c)?c.home:ChildSearchLife.leisure(c,clock);
         else if(volunteering||seekingMeal&&!working)desired=CaritasLife.PLACE;
@@ -110,6 +111,7 @@ final class PopulationLife {
         else if(journalist&&working)desired=NewspaperLife.assignment(clock.day,minute);
         else if(working)desired=c.workplace;
         else if(ClinicalLife.seekingCare(town,c,clock))desired=TownLife.Place.CLINIC;
+        else if(AthleticsLife.destination(town,c,clock)!=null)desired=AthleticsLife.destination(town,c,clock);
         else if(PhoneLife.playerHomeWindow(town,c,clock))desired=HousingLife.HOUSE_DISTRICT;
         else if(PhoneLife.homeVisitWindow(town,c,clock))desired=c.home;
         else if(PhoneLife.meetingWindow(town,c,clock))desired=TownLife.Place.CAFE;

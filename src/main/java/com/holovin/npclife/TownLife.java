@@ -753,6 +753,7 @@ final class TownLife {
         HomeServiceLife.tick(town,marco);
         EmergencyLife.tick(town,marco);
         DojoCommunityLife.tick(town,marco);
+        AthleticsLife.tick(town,marco);
         DomesticLife.tick(town,marco);
         HouseholdLife.tick(town,marco);
         ChildhoodLife.tick(town,marco);

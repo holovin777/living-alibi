@@ -1162,6 +1162,10 @@ public final class GameSession implements AutoCloseable {
                 return applyInternal(copy,0,action.endsWith("-lock")?"Family door temporarily locked.":"Family door unlocked.",true);
             }
             if(NpcJusticeLife.confined(copy,RebirthLife.child(copy),state))throw new IllegalArgumentException("You are in custody.");
+            if(action.startsWith("rebirth-athletics-")){
+                String message=AthleticsLife.act(copy,state,action.substring("rebirth-athletics-".length()));
+                return applyInternal(copy,0,message,true);
+            }
             if(action.startsWith("rebirth-clinical-request-")){
                 var person=RebirthLife.requireAdult(copy);
                 ClinicalLife.request(copy,person,state,ClinicalLife.Specialty.valueOf(action.substring("rebirth-clinical-request-".length())));
