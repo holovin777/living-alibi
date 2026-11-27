@@ -49,9 +49,9 @@ func _box(parent: Node3D,dimensions: Vector3,at: Vector3,color: Color) -> MeshIn
     parent.add_child(part)
     return part
 
-func _car() -> Node3D:
+func _car(paint: Color=Color.TRANSPARENT) -> Node3D:
     var root:=Node3D.new()
-    var color: Color=car_colors[rng.randi_range(0,car_colors.size()-1)]
+    var color: Color=car_colors[rng.randi_range(0,car_colors.size()-1)] if paint.a==0 else paint
     _box(root,Vector3(1.65,0.62,3.55),Vector3(0,0.65,0),color)
     _box(root,Vector3(1.42,0.53,1.83),Vector3(0,1.16,0.15),Color("#394e59"))
     _box(root,Vector3(1.43,0.10,1.83),Vector3(0,1.47,0.15),color)

@@ -13,12 +13,14 @@ final class GeoProjection {
     record District(String id,String label,double x,double z){}
     record Actor(String id,double x,double z,String activity,boolean talkable){}
     record Choice(String id,String label){}
+    record CivilianCar(String id,String district,int ownerIndex,double x,double z,double heading){}
+    record Patrol(String id,double x,double z,double heading,boolean responding){}
     record ActionResult(String message,District arrival){}
     record View(int day,int minute,int population,int commuting,List<Actor> residents,
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,District civilianCar,JusticeLife.View justice,int vehicleThefts){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -131,13 +133,35 @@ final class GeoProjection {
         return motorNodes.keySet().stream().filter(n->!motorEdges.get(n).isEmpty())
             .min(Comparator.comparingDouble((String n)->motorNodes.get(n).distance(p)).thenComparing(n->n)).orElse(null);
     }
-    District civilian(TownLife.Town t,Point player){
+    CivilianCar civilian(TownLife.Town t,Point player){
         if(VehicleTheftLife.active(t))return null;
-        var district=nearest(player);
-        if(!CityExpansionLife.motorDistrict(district)||district.ordinal()%3!=0)return null;
-        Point at=point(district);String node=motorNode(at);
+        var district=t.player.place;
+        var at=point(district);
+        if(at.distance(player)>40)return null;
+        String node=motorNode(at);
         if(node==null||at.distance(motorNodes.get(node))>25)return null;
-        return new District(district.name(),"Civilian car",at.x-2.5,at.z);
+        var resident=t.people.values().stream().filter(c->VehicleTheftLife.owner(c)&&c.presentAt(district)
+            &&!VehicleTheftLife.missing(t,c)).min(Comparator.comparingInt(c->c.generationIndex)).orElse(null);
+        if(resident==null)return null;
+        Point road=motorNodes.get(node),next=motorNodes.get(motorEdges.get(node).get(0));
+        double heading=Math.atan2(-(next.x-road.x),-(next.z-road.z));
+        // Render on the side of the mapped road. Exact parking bays are not available yet.
+        return new CivilianCar("npc-car-"+resident.generationIndex,district.name(),resident.generationIndex,road.x-2.5,road.z,heading);
+    }
+    List<Patrol> patrols(TownLife.Town t,WorldState s,Point player){
+        boolean responding="REPORTED".equals(JusticeLife.view(t,s).status());
+        var result=new ArrayList<Patrol>();
+        for(var c:t.people.values()){
+            if(!c.alive||!PoliceLife.officer(c)||!PoliceLife.scheduled(c,s.day,s.minute))continue;
+            Point at=position(c);
+            if(at.distance(player)>180)continue;
+            String node=motorNode(at);
+            if(node==null||at.distance(motorNodes.get(node))>35)continue;
+            Point road=motorNodes.get(node),next=motorNodes.get(motorEdges.get(node).get(0));
+            result.add(new Patrol("patrol-"+c.id,road.x,road.z,Math.atan2(-(next.x-road.x),-(next.z-road.z)),responding));
+        }
+        result.sort(Comparator.comparingDouble(p->new Point(p.x,p.z).distance(player)));
+        return List.copyOf(result.subList(0,Math.min(6,result.size())));
     }
     boolean carNear(TownLife.Town t,Point player){
         var p=t.player;
@@ -208,6 +232,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))),
             district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player),civilian(t,player),JusticeLife.view(t,s),JusticeLife.thefts(t));
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player),civilian(t,player),JusticeLife.view(t,s),JusticeLife.thefts(t),patrols(t,s,player));
     }
 }

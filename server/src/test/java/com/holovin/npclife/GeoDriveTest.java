@@ -18,7 +18,11 @@ class GeoDriveTest {
         assertEquals(0,drive.advance(map,0,10),.01);
         var s=new WorldState();var t=TownLife.create(s);
         t.player.carPlace=TownLife.Place.WORKSHOP;t.player.carFuel=4;t.player.carCondition=80;
-        VehicleTheftLife.take(t,s,new ArrayList<>(),new ArrayList<>());
+        var owner=new TownLife.Citizen("resident-test","Test Resident","Mechanic",t.player.place);
+        owner.generationIndex=3;t.people.put(owner.id,owner);
+        VehicleTheftLife.take(t,s,owner,new ArrayList<>(),new ArrayList<>());
+        assertTrue(VehicleTheftLife.missing(t,owner));
+        assertEquals(3,VehicleTheftLife.get(t,"owner"));
         assertTrue(VehicleTheftLife.active(t));
         assertEquals(1,JusticeLife.thefts(t));
         assertEquals(4,t.player.carFuel);

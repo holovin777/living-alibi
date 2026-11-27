@@ -546,14 +546,15 @@ public final class GameSession implements AutoCloseable {
             boolean stolen=command.equals("steal");
             var civilian=map.civilian(town,point);
             if(stolen){
-                if(civilian==null||!civilian.id().equals(p.place.name())||Math.hypot(civilian.x()-x,civilian.z()-z)>5)
+                if(civilian==null||!civilian.district().equals(p.place.name())||Math.hypot(civilian.x()-x,civilian.z()-z)>5)
                     throw new IllegalArgumentException("Approach a civilian car in your current district.");
             }else if(!map.carNear(town,point))throw new IllegalArgumentException("Approach your own parked car.");
             String node=map.motorNode(point);
             if(node==null||map.motorNodes.get(node).distance(point)>30)throw new IllegalArgumentException("No motor road nearby.");
             if(stolen){
                 var copy=town.copy();var clock=state.copy();var truth=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
-                VehicleTheftLife.take(copy,clock,truth,observations);
+                var owner=copy.people.values().stream().filter(c->c.generationIndex==civilian.ownerIndex()).findFirst().orElseThrow();
+                VehicleTheftLife.take(copy,clock,owner,truth,observations);
                 applyInternal(copy,1,"Civilian car reported stolen.",false,clock,truth,observations);
                 if(JusticeLife.confined(town))return drivePose(map,"Police detained you.");
             }else if(p.carFuel<1||p.carCondition<3)throw new IllegalArgumentException("Car needs fuel or service.");

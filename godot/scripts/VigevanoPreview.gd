@@ -34,6 +34,9 @@ var action_list: VBoxContainer
 var owned_car: Node3D
 var parked_bike: Node3D
 var civilian_car: Node3D
+var civilian_id:=""
+var patrol_models: Dictionary={}
+var patrol_goals: Dictionary={}
 var driving_body: Node3D
 var drive_goal:=Vector3.ZERO
 var driving:=false
@@ -238,6 +241,7 @@ func _physics_process(delta: float) -> void:
     if not ready_to_walk:return
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
+    _animate_patrols(delta)
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
     if driving:
         _drive_frame(delta)
@@ -320,7 +324,8 @@ func _update_navigation() -> void:
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         _sync_parked_vehicle(owned_car,world.get("parkedCar"),pos,Vector3(2.5,0.05,0))
         if driving:owned_car.hide()
-        _sync_parked_vehicle(civilian_car,world.get("civilianCar"),pos,Vector3(0,0.05,0))
+        _sync_civilian(world.get("civilianCar"),pos)
+        _sync_patrols(world.get("patrols",[]))
         if driving:civilian_car.hide()
         hud.text+="\nG: enter own car / steal nearby civilian car"
         if driving:hud.text+="\nW: accelerate · A/D: choose turn · G: exit | Fuel %s · Condition %s" % [residents.driving.get("fuel",0),residents.driving.get("condition",0)]
@@ -335,6 +340,7 @@ func _update_navigation() -> void:
         district_sign.hide()
         owned_car.hide()
         civilian_car.hide()
+        _sync_patrols([])
         parked_bike.hide()
         hud.text+="\nConnecting to shared Java world..."
     else:
@@ -379,6 +385,49 @@ func _drive_frame(delta: float) -> void:
             elif Input.is_physical_key_pressed(KEY_D):turn=1
             residents.drive_command("step",Vector2(walker.position.x,walker.position.z),turn)
         _update_navigation()
+
+func _sync_civilian(record,pos: Vector2) -> void:
+    if not record is Dictionary:
+        civilian_car.hide()
+        return
+    var id:=str(record.get("id",""))
+    if id!=civilian_id:
+        civilian_id=id
+        civilian_car.queue_free()
+        var palette: Array[Color]=[Color("#9b403d"),Color("#456b89"),Color("#d0ccc0"),Color("#64696b"),Color("#73805a")]
+        civilian_car=traffic._car(palette[posmod(id.hash(),palette.size())])
+        add_child(civilian_car)
+    _sync_parked_vehicle(civilian_car,record,pos,Vector3(0,0.05,0))
+    civilian_car.rotation.y=float(record.get("heading",0))
+
+func _sync_patrols(records: Array) -> void:
+    var seen: Dictionary={}
+    for record in records:
+        var id:=str(record.get("id",""))
+        var goal:=Vector3(float(record["x"]),0.05,float(record["z"]))
+        seen[id]=true
+        if not patrol_models.has(id):
+            var car: Node3D=traffic._car(Color("#254a84"))
+            add_child(car)
+            traffic._box(car,Vector3(1.60,0.13,2.6),Vector3(0,0.96,0),Color("#d9e3ec"))
+            var lamp: MeshInstance3D=traffic._box(car,Vector3(0.9,0.17,0.26),Vector3(0,1.61,0),Color("#3688ee"))
+            lamp.name="Beacon"
+            car.position=goal
+            patrol_models[id]=car
+        patrol_goals[id]={"point":goal,"heading":float(record.get("heading",0)),"responding":bool(record.get("responding",false))}
+    for id in patrol_models.keys():
+        if not seen.has(id):
+            patrol_models[id].queue_free()
+            patrol_models.erase(id)
+            patrol_goals.erase(id)
+
+func _animate_patrols(delta: float) -> void:
+    for id in patrol_models:
+        var car: Node3D=patrol_models[id]
+        var goal: Dictionary=patrol_goals[id]
+        car.position=car.position.move_toward(goal["point"],delta*9.0)
+        car.rotation.y=lerp_angle(car.rotation.y,float(goal["heading"]),minf(1.0,delta*5.0))
+        car.get_node("Beacon").visible=not bool(goal["responding"]) or (Time.get_ticks_msec()/250)%2==0
 
 func _build_bicycle_marker(node: Node3D) -> void:
     # Lightweight parked bicycle silhouette, not a physics vehicle.
