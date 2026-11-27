@@ -928,7 +928,7 @@ func _movement_speed() -> float:
             speed = CROUCH_SPEED
         elif Input.is_key_pressed(KEY_SHIFT):
             speed = RUN_SPEED
-    if child and int(_last_snapshot.get("rebirth",{}).get("age",0))<3:return speed*0.18
+    if child and int(_last_snapshot.get("rebirth",{}).get("age",0))<3:return speed*0.55
     return speed * (0.65 if child else 1.0)
 
 func _truck_place() -> String:
@@ -6803,7 +6803,7 @@ func _rebirth_active() -> bool:
 func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     var age:=int(r.get("age",0))
-    var min_age:=1 if r.get("prologue") is Dictionary and _apartment_active else 3
+    var min_age:=0 if r.get("prologue") is Dictionary and _apartment_active else 3
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and age >= min_age and age < 18)
 
 func _office_station() -> String:
@@ -7243,6 +7243,20 @@ func _render_barber() -> void:
         btn.disabled=not bool(barber.get("open",false)) or money<price or minute+duration>1140
         _action_choices.add_child(btn)
 
+func _render_parent_requests(rebirth: Dictionary) -> void:
+    for request in rebirth.get("parenting",[]):
+        var line:=Label.new()
+        line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        var message:=str(request.get("messageIt","")) if TranslationServer.get_locale().begins_with("it") else str(request.get("message",""))
+        line.text=str(request.get("parentName",""))+": "+message
+        _action_choices.add_child(line)
+        var id:=str(request.get("parentId",""))
+        if bool(request.get("canAccept",false)):
+            var euros:=int(request.get("euros",0))
+            var label_text:=("Contribuisci / Contribute €"+str(euros)) if euros>0 else "Aiuta / Help"
+            _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-parent:accept:"+id)))
+        _action_choices.add_child(_button("No, grazie / Not now",_garden_action.bind("rebirth-parent:decline:"+id)))
+
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _custody_active:return
@@ -7408,6 +7422,7 @@ func _render_actions() -> void:
             family.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
             family.text=tr("With you: %s") % (tr("No parent in the room") if present.is_empty() else ", ".join(PackedStringArray(present)))
             _action_choices.add_child(family)
+            _render_parent_requests(rebirth)
             for activity in early.get("actions",[]):
                 var labels: Dictionary={"rest":"Rest","call":"Call a parent","play":"Play"}
                 _action_choices.add_child(_button(tr(str(labels.get(activity,activity))),_garden_action.bind("rebirth-early-"+str(activity))))
@@ -7431,6 +7446,7 @@ func _render_actions() -> void:
             info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nF: choices / local first-person exploration from age 3. School and home routines continue; afternoon outings unlock at age 6." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
             _action_choices.add_child(info)
             var age := int(rebirth.get("age",0))
+            _render_parent_requests(rebirth)
             var identity = rebirth.get("identity")
             if identity is Dictionary:
                 var personal := Label.new()

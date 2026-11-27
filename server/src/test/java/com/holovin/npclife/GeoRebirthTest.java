@@ -263,6 +263,33 @@ class GeoRebirthTest {
         assertNull(ChildhoodPrologue.view(t));
         assertEquals(0,EducationLife.get(t,child,"school-days"));
     }
+    @Test void parentsHaveDifferentExpectationsAndRealHouseholdContributions(){
+        var s=new WorldState();var t=TownLife.create(s);
+        var people=PopulationGenerator.add(t,3);
+        var p=people.get(0);var c=people.get(1);var other=people.get(2);
+        p.age=40;c.age=18;other.age=40;
+        p.personalSeed=20;p.sociability=70;p.carefulness=90;p.curiosity=50;
+        other.personalSeed=20;other.sociability=70;other.carefulness=40;other.curiosity=40;
+        c.home=p.home;c.homeUnit=p.homeUnit;
+        for(var person:java.util.List.of(c,p)){person.place=person.home;person.destination=person.home;person.activity="AT_HOME";person.travelRemaining=0;}
+        DemographyLife.set(t,c,"parent-a",p.generationIndex);
+        c.employed=false;c.money=100;p.money=100;
+        assertEquals(ParentingLife.Style.STRICT,ParentingLife.style(p));
+        assertEquals(ParentingLife.Style.WARM,ParentingLife.style(other));
+        ParentingLife.prompt(t,c,1);
+        assertEquals("FIND_WORK",ParentingLife.view(t,c).getFirst().request());
+        assertFalse(ParentingLife.view(t,c).getFirst().canAccept());
+        ParentingLife.respond(t,c,p,false);
+        assertTrue(ParentingLife.relation(t,c,p).tension>8);
+        ParentingLife.prompt(t,c,1);
+        assertTrue(ParentingLife.view(t,c).isEmpty());
+        c.employed=true;ParentingLife.prompt(t,c,2);
+        assertEquals("CONTRIBUTE",ParentingLife.view(t,c).getFirst().request());
+        ParentingLife.respond(t,c,p,true);
+        assertEquals(90,c.money);assertEquals(110,p.money);
+        assertEquals(c.homeUnit,p.homeUnit);
+        assertTrue(ParentingLife.view(t,c).isEmpty());
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

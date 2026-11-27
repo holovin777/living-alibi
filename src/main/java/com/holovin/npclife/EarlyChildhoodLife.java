@@ -46,11 +46,18 @@ final class EarlyChildhoodLife {
         if(!present.isEmpty()){
             var parent=present.getFirst();
             var relation=t.peerRelationships.computeIfAbsent(SocialNetwork.key(c.id,parent.id),k->new SocialLife.Relationship(c.id,parent.id));
-            relation.affinity=Math.min(100,relation.affinity+1);
+            var style=ParentingLife.style(parent);
+            relation.affinity=Math.min(100,relation.affinity+(style==ParentingLife.Style.WARM?2:1));
             if("call".equals(action)){
                 if(c.food<2&&parent.food>1){parent.food--;c.food++;}
                 if(c.water<2&&parent.water>1){parent.water--;c.water++;}
-                return new RebirthLife.HomeAction(10,parent.name+" came to comfort you.");
+                String reply=switch(style){
+                    case WARM -> " came to comfort you.";
+                    case STRICT -> " checked on you and reminded you to behave.";
+                    case INDEPENDENCE -> " encouraged you to try for yourself.";
+                    case DISTANT -> " briefly checked on you.";
+                };
+                return new RebirthLife.HomeAction(10,parent.name+reply);
             }
             return new RebirthLife.HomeAction(20,"Played with "+parent.name+".");
         }
