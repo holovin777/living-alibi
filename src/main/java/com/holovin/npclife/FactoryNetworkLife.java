@@ -52,7 +52,7 @@ final class FactoryNetworkLife {
     }
     static boolean produce(TownLife.Town t,Plant p){return produce(t,p,0);}
     static boolean produce(TownLife.Town t,Plant p,int day){
-        if(!FactoryMaintenance.operational(t,p))return false;
+        if(!FactoryMaintenance.operational(t,p)||!GridDistributionLife.power(t,p.site()))return false;
         if(stock(t,p.output())+p.units()>12||p.inputs().entrySet().stream().anyMatch(e->stock(t,e.getKey())<e.getValue()))return false;
         int cost=p.inputs().entrySet().stream().filter(e->!supplier(e.getKey()).equals(SUPPLIER)).mapToInt(e->2*e.getValue()).sum();
         if(t.employerFunds.getOrDefault(account(p),0)<cost||!EnergyLife.canBuy(t,account(p),cost))return false;

@@ -20,7 +20,7 @@ final class EnergyLife {
     static boolean publicPower(TownLife.Town t){return !enabled(t)||get(t,"public-power")==1;}
     static int cash(TownLife.Town t){return t.employerFunds.getOrDefault(ACCOUNT,0);}
     static int condition(TownLife.Town t,Station p){return t.industryStocks.getOrDefault("energy:"+p.id()+":condition",100);}
-    static boolean role(String occupation){return STATIONS.stream().anyMatch(p->p.role().equals(occupation));}
+    static boolean role(String occupation){return GridDistributionLife.role(occupation)||STATIONS.stream().anyMatch(p->p.role().equals(occupation));}
     static TownLife.Citizen operator(TownLife.Town t,WorldState s,Station p){
         return t.people.values().stream().filter(c->p.role().equals(c.occupation)&&c.workplace==p.site()
             &&WorkplaceHierarchy.onDuty(c,s.day)&&c.fatigue<85&&!RebirthLife.linkedAdult(t,c)
@@ -75,6 +75,7 @@ final class EnergyLife {
         if(supply)add(t,"battery",-PRIORITY);
         set(t,"public-power",supply?1:0);
         if(!supply)add(t,"outage-days",1);
+        GridDistributionLife.tick(t,s);
     }
     static boolean canBuy(TownLife.Town t,String account,int materialCost){
         return !enabled(t)||get(t,"battery")>0&&t.employerFunds.getOrDefault(account,0)>=materialCost+PRICE;
@@ -85,10 +86,10 @@ final class EnergyLife {
         add(t,"battery",-1);add(t,"industrial-used",1);return true;
     }
     record StationView(String id,String district,int capacity,int condition,int generated,int workers){}
-    record View(boolean active,int stored,int capacity,int generated,int industrialUsed,boolean publicPower,int outageDays,int funds,List<StationView> stations){}
+    record View(boolean active,int stored,int capacity,int generated,int industrialUsed,boolean publicPower,int outageDays,int funds,List<StationView> stations,List<GridDistributionLife.FeederView> feeders){}
     static View view(TownLife.Town t){
         return new View(enabled(t),get(t,"battery"),CAPACITY,get(t,"generated"),get(t,"industrial-used"),publicPower(t),get(t,"outage-days"),cash(t),
             STATIONS.stream().map(p->new StationView(p.id(),p.site().name(),p.capacity(),condition(t,p),get(t,p.id()+":generated"),
-                (int)t.people.values().stream().filter(c->c.alive&&c.employed&&p.role().equals(c.occupation)&&c.workplace==p.site()).count())).toList());
+                (int)t.people.values().stream().filter(c->c.alive&&c.employed&&p.role().equals(c.occupation)&&c.workplace==p.site()).count())).toList(),GridDistributionLife.view(t));
     }
 }

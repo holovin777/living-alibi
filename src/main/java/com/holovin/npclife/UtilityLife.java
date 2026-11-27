@@ -24,8 +24,8 @@ final class UtilityLife {
     static Services status(TownLife.Town town) {
         int pump=town.technicalOrders.get("water-pump").condition;
         int lights=town.technicalOrders.get("street-lights").condition;
-        return new Services(pump,pump>=FOUNTAIN_MIN_CONDITION&&EnergyLife.publicPower(town),
-                town.cleanWater,TANK_CAPACITY,lights,lights>=LIGHTS_MIN_CONDITION&&EnergyLife.publicPower(town));
+        return new Services(pump,pump>=FOUNTAIN_MIN_CONDITION&&GridDistributionLife.power(town,TownLife.Place.PARK),
+                town.cleanWater,TANK_CAPACITY,lights,lights>=LIGHTS_MIN_CONDITION&&GridDistributionLife.power(town,TownLife.Place.PARK));
     }
 
     private static int transferRiverWater(TownLife.Town town,int amount) {
@@ -80,7 +80,7 @@ final class UtilityLife {
 
     static boolean nightExposure(TownLife.Town town,TownLife.Place place,int minute) {
         if(minute>=360 && minute<1200)return false; // 20:00–06:00
-        if(status(town).lightsWorking())return false;
+        if(town.technicalOrders.get("street-lights").condition>=LIGHTS_MIN_CONDITION&&GridDistributionLife.power(town,place))return false;
         return switch(place) {
             case PARK, MARKET, OFFICE, WORKSHOP, SCHOOL, LIBRARY,
                  NORTH_RESIDENCES, SOUTH_RESIDENCES -> true;

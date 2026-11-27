@@ -8459,6 +8459,12 @@ func _render_energy() -> void:
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
 
+    for feeder in e.get("feeders",[]):
+        var line := Label.new()
+        line.text=tr(str(feeder.get("id","")))+" · "+(tr("Available") if bool(feeder.get("powered",false)) else tr("Outage"))+" · "+str(feeder.get("condition",100))+"% · "+tr("Outage days")+": "+str(feeder.get("outageDays",0))
+        line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        _action_choices.add_child(line)
+
 func _render_industrial_repair() -> void:
     var report: Dictionary = _last_snapshot.get("industrialRepair",{})
     var phase := int(report.get("phase",0))

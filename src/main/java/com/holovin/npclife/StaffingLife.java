@@ -10,6 +10,7 @@ final class StaffingLife {
     record Role(String name,TownLife.Place workplace,int target,String fund,String diploma,int skill){}
     static Role job(String name,TownLife.Place place,int target){return new Role(name,place,target,null,null,20);}
     static final List<Role> ROLES=List.of(
+        job("Centre grid technician",OFFICE,1),job("North grid technician",NORTH_RESIDENCES,1),job("South grid technician",SOUTH_RESIDENCES,1),job("Industrial grid technician",FACTORY,1),
         job("Solar plant operator",FARM,1),job("Hydropower operator",RIVER,1),job("Thermal plant operator",FACTORY,1),
         job("Forestry worker",WOODS,2),job("Sawmill worker",FACTORY,2),job("Paper mill worker",FACTORY,1),
         job("Textile worker",FACTORY,1),job("Printer",FACTORY,1),job("Garment worker",FACTORY,1),
