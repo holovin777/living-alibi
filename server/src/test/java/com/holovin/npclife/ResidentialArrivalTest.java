@@ -18,6 +18,10 @@ class ResidentialArrivalTest {
         assertTrue(ResidentialArrivalLife.visible(t,clock,1).contains(c));
         assertTrue(ResidentialArrivalLife.visible(t,clock,2).isEmpty());
         assertFalse(PlayerLife.visible(t).contains(c));
+        assertThrows(IllegalArgumentException.class,()->PlayerLife.speak(t,c.id,"Hello",clock.day,clock.minute));
+        assertNotNull(PlayerLife.speak(t,c.id,"My name is Alex.",clock.day,clock.minute,true));
+        assertEquals("Alex",t.player.contacts.get(c.id).knownName);
+        assertEquals(1,t.player.contacts.get(c.id).conversations);
         assertTrue(ResidentialArrivalLife.visible(t.copy(),clock,1).stream().anyMatch(x->x.id.equals(c.id)));
         c.travelRemaining=1;
         assertTrue(ResidentialArrivalLife.visible(t,clock,1).isEmpty());
@@ -27,5 +31,6 @@ class ResidentialArrivalTest {
         t.player.place=TownLife.Place.NORTH_RESIDENCES;
         clock.minute+=ResidentialArrivalLife.WINDOW;
         assertTrue(ResidentialArrivalLife.visible(t,clock,1).isEmpty());
+        assertThrows(IllegalArgumentException.class,()->PlayerLife.speak(t,c.id,"Hello",clock.day,clock.minute,true));
     }
 }

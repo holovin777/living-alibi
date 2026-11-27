@@ -16,6 +16,14 @@ final class ResidentialArrivalLife {
         else t.industryStocks.remove(key(c));
     }
 
+    static TownLife.Citizen nearby(TownLife.Town t,String id,int day,int minute){
+        var clock=new WorldState();clock.day=day;clock.minute=minute;
+        if(IntercomLife.insideVisit(t,day,minute))
+            throw new IllegalArgumentException("Leave the apartment before talking to a neighbor.");
+        return visible(t,clock,1).stream().filter(c->c.id.equals(id))
+                .findFirst().orElseThrow(()->new IllegalArgumentException("This neighbor is no longer in the stairwell."));
+    }
+
     static List<TownLife.Citizen> visible(TownLife.Town t,WorldState s,int building){
         if(building==0||!PhoneLife.available(t)||t.player.travelRemaining>0||t.player.cycling||
                 !AddressLife.district(building).equals(t.player.place.name()))return List.of();

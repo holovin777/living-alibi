@@ -259,7 +259,7 @@ public final class GameSession implements AutoCloseable {
         }
         return service;
     }
-    public record StairwellResident(String id,String name,String appearanceStage,String outfitVisual) { }
+    public record StairwellResident(String id,String name,String appearanceStage,String outfitVisual,String knownName,int conversations,String relationship,String mood) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
                             List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber,PublicSafetyLife.View publicSafety,BusLife.View bus,List<StairwellResident> stairwellResidents) { }
@@ -300,7 +300,11 @@ public final class GameSession implements AutoCloseable {
                         ? RetailLife.PRODUCTS.stream().filter(item->RetailLife.availableAt(p.place,item)).map(item->new RetailView(item.id(),item.label(),item.price(),
                             town.retailStock.getOrDefault(item.id(),0))).toList() : List.of(),FarmLife.report(town),FuelLife.report(town),FreightLife.report(town),LogisticsLife.report(town,state.day),GardenLife.report(town,state.day,state.minute),HenLife.report(town,state.day),OrchardLife.report(town,state.day,state.minute),MarketStallLife.report(town,state.day,state.minute),BankLife.report(town),RentalLife.report(town),ConstructionLife.report(town),MunicipalLife.report(town),DemographyLife.report(town),EducationLife.report(town),p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?ArchiveLife.report(town,state.day,archiveYear,archivePage):null,p.alive&&p.travelRemaining==0&&p.place==TownLife.Place.LIBRARY?NewspaperLife.report(town,state.day):null,OpinionLife.report(town),ElectionLife.report(town,state.day),RebirthLife.report(town,state.day,state.minute),PhoneLife.report(town,state.day,state.minute),AddressLife.contacts(town),IntercomLife.apartment(town,state.day,state.minute),peerEncounters(town,visible,(long)(state.day-1)*1440L+state.minute,recentPeerEvents),barberView(town,state.minute),PublicSafetyLife.view(town,state),BusLife.view(town,state),
                 ResidentialArrivalLife.visible(town,state,1).stream()
-                        .map(c->new StairwellResident(c.id,PlayerLife.displayName(town,c),appearanceStage(c),outfitVisual(c))).toList());
+                        .map(c->{var contact=p.contacts.get(c.id);
+                            return new StairwellResident(c.id,PlayerLife.displayName(town,c),appearanceStage(c),outfitVisual(c),
+                                    contact==null?null:contact.knownName,contact==null?0:contact.conversations,
+                                    PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name());
+                        }).toList());
     }
 
     public synchronized BusinessView business() {
@@ -434,11 +438,14 @@ public final class GameSession implements AutoCloseable {
     }
     /** A declared spoken language is separate from the UI locale. Null preserves legacy clients. */
     public synchronized ActionView speak(String residentId,String message,String spokenLanguage) throws SQLException {
+        return speak(residentId,message,spokenLanguage,false);
+    }
+    public synchronized ActionView speak(String residentId,String message,String spokenLanguage,boolean stairwell) throws SQLException {
         JusticeLife.requireFree(town);
         if(residentId==null || message==null)
             throw new IllegalArgumentException("Resident and message are required.");
         var copy=town.copy();
-        var resident=PlayerLife.nearby(copy,residentId,state.day,state.minute);
+        var resident=stairwell?ResidentialArrivalLife.nearby(copy,residentId,state.day,state.minute):PlayerLife.nearby(copy,residentId,state.day,state.minute);
         var region=WorldSpeechRegion.CURRENT;
         String language=spokenLanguage==null?null:ResidentLanguages.normalize(spokenLanguage);
         if(message.isBlank()||message.strip().length()>1000)
@@ -483,7 +490,7 @@ public final class GameSession implements AutoCloseable {
             boolean recall=ConversationMemory.recallQuestion(message);
             reply=message.strip().equalsIgnoreCase("Any public news for the newspaper?")
                     ?NewspaperLife.interview(copy,resident,state.day,state.minute)
-                    :PlayerLife.speak(copy,residentId,message,state.day,state.minute);
+                    :PlayerLife.speak(copy,residentId,message,state.day,state.minute,stairwell);
             if(ConversationMemory.importantQuestion(message)){
                 reply=ConversationMemory.firstMeeting(prior,language);
                 rendered=language!=null;
@@ -514,7 +521,7 @@ public final class GameSession implements AutoCloseable {
         String farewell=ending?ConversationAvailability.farewell(resident,state.day,state.minute,language):null;
         // A brief reply never reserves a working or urgently occupied resident.
         // Only a willing leisure contact may pause for a single simulation minute.
-        if(!ending&&!ConversationAvailability.duty(resident,state.day,state.minute)
+        if(!stairwell&&!ending&&!ConversationAvailability.duty(resident,state.day,state.minute)
                 &&!ConversationAvailability.urgent(resident))
             copy.industryStocks.put(TownLife.conversationHoldKey(resident.id),1);
         // Conversation is valid in both a visitor life and a born/linked

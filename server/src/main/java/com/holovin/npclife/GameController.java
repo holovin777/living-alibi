@@ -32,8 +32,9 @@ public class GameController {
     public record OrderRequest(String orderId) { }
     public record AmountRequest(int amount) { }
     public record ResidentRequest(String residentId) { }
-    public record SpeakRequest(String residentId,String message,String language) {
-        public SpeakRequest(String residentId,String message){this(residentId,message,null);}
+    public record SpeakRequest(String residentId,String message,String language,boolean stairwell) {
+        public SpeakRequest(String residentId,String message){this(residentId,message,null,false);}
+        public SpeakRequest(String residentId,String message,String language){this(residentId,message,language,false);}
     }
     @GetMapping("/world")
     public GameSession.WorldView world() {
@@ -154,7 +155,7 @@ public class GameController {
 
     @PostMapping("/actions/speak")
     public GameSession.ActionView speak(@RequestBody SpeakRequest request) throws SQLException {
-        return session.speak(request.residentId(),request.message(),request.language());
+        return session.speak(request.residentId(),request.message(),request.language(),request.stairwell());
     }
 
     @PostMapping("/actions/wait")

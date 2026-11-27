@@ -354,6 +354,8 @@ func _process(delta: float) -> void:
             _stairwell_hint.text=tr("Apartment %s · locked") % unit
         else:
             _stairwell_hint.text = tr("G: leave stairwell") if _stairwell.near_exit(_avatar.position) else tr("Stairwell · floor %s · apartment doors locked") % _stairwell.floor_number(_avatar.position)
+        if not _nearest_resident().is_empty():
+            _stairwell_hint.text+="\n"+tr("T or click: talk to a person")
         _tick_live_clock(delta)
         return
 
@@ -486,6 +488,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
             return
         if _stairwell_active:
+            if event.keycode==KEY_T:
+                _open_dialog()
+                get_viewport().set_input_as_handled()
+                return
             if event.keycode in [KEY_E,KEY_R] and _stairwell.near_elevator(_avatar.position):
                 var destination: Vector3 = _stairwell.elevator_destination(_avatar.position,1 if event.keycode==KEY_E else -1)
                 if destination!=_avatar.position:
@@ -5764,7 +5770,10 @@ func _dialog_candidates() -> Array:
         if family!=null:
             people.append_array(family.get_children())
         return people
-    return _residents_root.get_children() if is_instance_valid(_residents_root) and not _stairwell_active else []
+    if _stairwell_active and is_instance_valid(_stairwell):
+        var neighbors := _stairwell.get_node_or_null("ArrivingNeighbors")
+        return neighbors.get_children() if neighbors!=null else []
+    return _residents_root.get_children() if is_instance_valid(_residents_root) else []
 
 func _dialog_person(id: String) -> Node3D:
     for child in _dialog_candidates():
@@ -5992,7 +6001,7 @@ func _send_dialog(message: String) -> void:
         return
     _dialog_pending = true
     _dialog_history.append_text(tr("You")+": "+message.strip_edges()+"\n")
-    _api.speak_to(_dialog_target,message,"en" if _dialog_language.selected==1 else "it")
+    _api.speak_to(_dialog_target,message,"en" if _dialog_language.selected==1 else "it",_stairwell_active and not _guest_active)
 
 func _toggle_map() -> void:
     _close_dialog()
@@ -8210,6 +8219,9 @@ func _sync_stairwell_arrivals() -> void:
         person.position=Vector3(-0.82 if i==0 else 0.82,0,0.18)
         person.rotation.y=PI if i==0 else 0.0
         person.set_meta("activity","ARRIVING_HOME")
+        _sync_guest_contact(person,entry)
+        person.set_meta("conversation_minutes",4)
+        person.set_meta("mood",str(entry.get("mood","CALM")))
         person.get_node("ResidentName").hide()
         _sync_resident_appearance(person,str(entry.get("appearanceStage","ADULT")))
         _sync_resident_uniform(person,str(entry.get("outfitVisual","")))
@@ -8224,6 +8236,7 @@ func _set_stairwell(active: bool) -> void:
     if active==_stairwell_active:return
     if not active and _guest_active:_close_guest()
     if active and not _near_stairwell():return
+    _close_dialog()
     _reset_jump()
     _reset_locomotion()
     _stairwell_active = active

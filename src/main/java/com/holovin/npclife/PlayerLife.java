@@ -350,7 +350,10 @@ final class PlayerLife {
     }
 
     static String speak(TownLife.Town town,String id,String message,int day,int minute) {
-        TownLife.Citizen resident=nearby(town,id,day,minute);
+        return speak(town,id,message,day,minute,false);
+    }
+    static String speak(TownLife.Town town,String id,String message,int day,int minute,boolean stairwell) {
+        TownLife.Citizen resident=stairwell?ResidentialArrivalLife.nearby(town,id,day,minute):nearby(town,id,day,minute);
         String spoken=message.strip();
         if(spoken.isEmpty()||spoken.length()>1000)
             throw new IllegalArgumentException("Speak 1–1000 characters.");
