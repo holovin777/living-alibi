@@ -7741,6 +7741,12 @@ func _render_actions() -> void:
             _action_choices.add_child(shop_status)
             if _current_place=="MARKET" and employed!="shop-assistant":
                 _action_choices.add_child(_job_button("shop-assistant","Apply: market assistant"))
+                _action_choices.add_child(_job_button("security-guard","Apply: security guard"))
+                var security: Dictionary=_last_snapshot.get("security",{})
+                if not security.is_empty():
+                    var guard_status := Label.new()
+                    guard_status.text=tr("Market protection active") if bool(security.get("marketProtected",false)) else tr("Market protection inactive")
+                    _action_choices.add_child(guard_status)
             for item in _last_snapshot.get("shop",[]):
                 var id := str(item.get("id",""))
                 var stock := int(item.get("stock",0))
@@ -7871,6 +7877,17 @@ func _render_actions() -> void:
                         _action_choices.add_child(_button("Hire " + name + " · 10 EUR bonus",
                                 _business_hire.bind(id)))
                 _action_choices.add_child(_button("Withdraw 10 EUR", _business_withdraw.bind(10)))
+                var security: Dictionary=_last_snapshot.get("security",{})
+                if bool(security.get("workshopOwned",false)):
+                    var protection := _button(tr("Workshop protection · 12 EUR / 7 days"),_garden_action.bind("security-protection"))
+                    protection.disabled=bool(security.get("workshopProtected",false)) or int(business.get("cash",0))<12
+                    _action_choices.add_child(protection)
+                    var insurance := _button(tr("Workshop insurance · 8 EUR / 7 days"),_garden_action.bind("security-insurance"))
+                    insurance.disabled=bool(security.get("workshopInsured",false)) or int(business.get("cash",0))<8
+                    _action_choices.add_child(insurance)
+                    var policy := Label.new()
+                    policy.text=tr("Protection: %s days · Insurance: %s days") % [security.get("protectionDays",0),security.get("insuranceDays",0)]
+                    _action_choices.add_child(policy)
         "OFFICE":
             var job_centre: Dictionary = _last_snapshot.get("jobCentre",{})
             if not job_centre.is_empty():
@@ -8220,6 +8237,9 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("security-"):
+        if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("shelter-"):
         if _near_shelter() and _connected and not _api.is_busy():_api.garden_action(action)
         return

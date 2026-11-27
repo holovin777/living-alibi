@@ -20,6 +20,7 @@ final class CareerLife {
     static final int SHIFT_MINUTES=120;
 
     private static final List<Offer> OFFERS=List.of(
+            new Offer(SecurityLife.JOB,"Security guard",TownLife.Place.MARKET,"none",0,24,240),
             new Offer("shop-assistant","Market assistant",TownLife.Place.MARKET,
                     "none",0,24,480),
             new Offer("technician","Workshop technician",TownLife.Place.WORKSHOP,
@@ -44,6 +45,7 @@ final class CareerLife {
         for(var offer:OFFERS)
             town.employerFunds.putIfAbsent(offer.id,offer.startingPayroll);
         town.employerFunds.putIfAbsent(PostalLife.ACCOUNT,360);
+        town.employerFunds.putIfAbsent(SecurityLife.INSURER,0);
         town.employerFunds.putIfAbsent(EmploymentContractLife.PENSION_ACCOUNT,0);
         town.employerFunds.putIfAbsent(SocialProtectionLife.ACCOUNT,0);
         town.employerFunds.putIfAbsent("barber",900);
@@ -169,6 +171,7 @@ final class CareerLife {
         town.employerFunds.put(vacancy.id,funds-vacancy.wage);
         int net=EmploymentContractLife.recordPay(town,day,vacancy.wage);
         p.lastWorkDay=day;
+        if(SecurityLife.JOB.equals(p.jobId))SecurityLife.visitorShift(town,day,minute);
         p.fatigue=Math.min(100,p.fatigue+8);
         return "Worked two hours as "+vacancy.title+
                 ". Earned "+net+" EUR net from "+vacancy.wage+" EUR gross."+

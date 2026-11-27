@@ -26,6 +26,7 @@ final class InterviewLife {
     }
     private static String occupation(String job){
         return switch(job){
+            case "security-guard" -> SecurityLife.OCCUPATION;
             case "shop-assistant" -> "Market vendor";
             case "technician" -> "Mechanic";
             case "engineer" -> "Engineer";

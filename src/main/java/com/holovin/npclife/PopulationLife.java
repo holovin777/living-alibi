@@ -182,7 +182,8 @@ final class PopulationLife {
         else if(working && (c.place==c.workplace||publicSafety&&c.place==PoliceLife.assignment(town,c,clock.day,minute))){
             c.activity="WORKING";
             if(minute%60==0){
-                if(PostalLife.postalWorker(c))PostalLife.pay(town,c);
+                if(SecurityLife.guard(c))SecurityLife.pay(town,c);
+                else if(PostalLife.postalWorker(c))PostalLife.pay(town,c);
                 else if(foodWorker)RetailLife.foodShift(town,c,clock,events,observations);
                 else if(!ITStaffLife.OCCUPATION.equals(c.occupation) && !TechnicalWorkLife.linkedEngineer(town,c) && !SoftwareLife.linkedProgrammer(town,c) && !journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
                         !IndustryLife.payHourly(town,c,clock,events,observations)) {

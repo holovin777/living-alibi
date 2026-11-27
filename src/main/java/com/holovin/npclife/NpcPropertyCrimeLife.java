@@ -62,6 +62,7 @@ final class NpcPropertyCrimeLife {
         set(t,"witness",witness==null?0:witness.generationIndex);set(t,"amount",amount);
         set(t,"private-workshop",privateWorkshop?1:0);set(t,"workshop-owner",privateWorkshop?t.business.ownerIncarnation:0);
         set(t,"reported",now(s));set(t,"examined",0);
+        set(t,"insured",privateWorkshop&&SecurityLife.workshopContract(t,s.day,"insurance-until")?1:0);
         set(t,"loss",Math.addExact(get(t,"loss"),amount));
         String message="A property loss was reported in "+actor.place.label+".";
         // Public reports disclose neither the suspect nor the private household.
@@ -85,11 +86,12 @@ final class NpcPropertyCrimeLife {
             }
             NpcJusticeLife.propertyConviction(t,s,actor,number);
         }
+        if(get(t,"insured")==1)SecurityLife.compensate(t,get(t,"workshop-owner"),get(t,"amount")-returned);
         ArchiveLife.record(t,"npc-property-closed:"+number,s.day,s.minute,"Public safety",
                 confirmed?"A property investigation was confirmed. Restitution recorded: "+returned+" EUR.":
                 "A property investigation closed without a confirmed offender.");
         set(t,"next",now(s)+4*1440);
-        for(String key:List.of("kind","scene","actor","victim","witness","amount","private-workshop","workshop-owner","reported","examined"))set(t,key,0);
+        for(String key:List.of("kind","scene","actor","victim","witness","amount","private-workshop","workshop-owner","reported","examined","insured"))set(t,key,0);
     }
     static void tick(TownLife.Town t,WorldState s,List<TownLife.Event> events,List<TownLife.Observation> observations){
         if(!NpcTransportLife.enabled(t)||s.minute%30!=0)return;
@@ -119,8 +121,10 @@ final class NpcPropertyCrimeLife {
         };
         if(!validScene(kind,actor.place,victim)||available(t,kind,victim)<1)return;
         var reference=victim!=null?victim:t.people.values().stream().filter(c->c!=actor&&c.alive).findFirst().orElse(null);
-        if(reference!=null&&MotiveLife.assess(t,s,actor,reference).strength()>=75)
-            record(t,s,kind,actor,victim,events,observations);
+        if(reference!=null&&MotiveLife.assess(t,s,actor,reference).strength()>=75){
+            if(SecurityLife.prevent(t,s,kind,actor.place))set(t,"next",now(s)+1440);
+            else record(t,s,kind,actor,victim,events,observations);
+        }
     }
     record View(int reports,int totalLoss,int restitution,boolean localInvestigation){}
     static View view(TownLife.Town t){return new View(get(t,"total"),get(t,"loss"),get(t,"recovered"),scene(t)==t.player.place);}

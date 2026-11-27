@@ -754,6 +754,7 @@ final class TownLife {
         MafiaLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);
         NpcVehicleCrimeLife.tick(town,marco,truth,observations);
+        SecurityLife.tick(town,marco);
         NpcPropertyCrimeLife.tick(town,marco,truth,observations);
         UtilityLife.tick(town,marco,truth,observations);
         DevOpsLife.tick(town,marco.day,marco.minute);
