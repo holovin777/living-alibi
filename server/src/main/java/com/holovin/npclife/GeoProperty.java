@@ -6,6 +6,21 @@ final class GeoProperty {
     record View(GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,
                 FarmLife.Report farm,RentalLife.Report rental,ConstructionLife.Report construction,
                 List<GeoProjection.Choice> actions){}
+    record Yard(GeoProjection.District anchor,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard){}
+    record Site(GeoProjection.District anchor,int stage,boolean active,boolean owned){}
+    record Scenery(Yard yard,Site site){}
+    static Scenery scenery(TownLife.Town t,WorldState s,GeoProjection map,GeoProjection.Point at,TownLife.Place room){
+        if(room!=null)return new Scenery(null,null);
+        Yard yard=null;Site site=null;
+        if(t.player.alive&&t.player.ownsHouse&&!RebirthLife.active(t)&&map.point(HousingLife.HOUSE_DISTRICT).distance(at)<=80)
+            yard=new Yard(map.district(HousingLife.HOUSE_DISTRICT),GardenLife.report(t,s.day,s.minute),HenLife.report(t,s.day),OrchardLife.report(t,s.day,s.minute));
+        if(map.point(TownLife.Place.OFFICE).distance(at)<=110){
+            var b=ConstructionLife.report(t);
+            // The original building stays after sale or owner death.
+            site=new Site(map.district(TownLife.Place.OFFICE),b.stage(),b.enabled(),b.owned());
+        }
+        return new Scenery(yard,site);
+    }
     static View view(TownLife.Town t,WorldState s,GeoProjection map,GeoProjection.Point at,TownLife.Place room){
         var p=t.player;var a=new ArrayList<GeoProjection.Choice>();
         if(!p.alive||RebirthLife.active(t)||JusticeLife.confined(t)||p.travelRemaining>0||p.cycling

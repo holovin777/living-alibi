@@ -23,5 +23,9 @@ class GeoPropertyTest {
         RentalLife.act(t,"rental-buy",s.minute);
         assertTrue(GeoProperty.view(t,s,map,at,t.player.place).rental().owned());
         assertEquals(295,t.player.money);
+        assertNotNull(GeoProperty.scenery(t,s,map,at,null).site());
+        assertNull(GeoProperty.scenery(t,s,map,at,t.player.place).site());
+        ConstructionLife.set(t,ConstructionLife.STAGE,3);
+        assertEquals(3,GeoProperty.scenery(t,s,map,at,null).site().stage());
     }
 }

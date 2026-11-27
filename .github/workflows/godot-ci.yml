@@ -134,3 +134,10 @@ jobs:
           target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoWorkSmoke.gd 2>&1 | tee target/godot-bin/geo-work.log
           grep -q 'GeoWorkSmoke: ALL CHECKS PASSED' target/godot-bin/geo-work.log
           if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geo-work.log; then exit 1; fi
+
+      - name: Verify geographic property scenery
+        run: |
+          set -euo pipefail
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoPropertyScenerySmoke.gd 2>&1 | tee target/godot-bin/geo-property-scenery.log
+          grep -q 'GeoPropertyScenerySmoke: ALL CHECKS PASSED' target/godot-bin/geo-property-scenery.log
+          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geo-property-scenery.log; then exit 1; fi

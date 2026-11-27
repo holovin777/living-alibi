@@ -41,6 +41,8 @@ var actions_panel: PanelContainer
 const PhonePanel=preload("res://scripts/GeoPhone.gd")
 const WorkPanel=preload("res://scripts/GeoWorkPanel.gd")
 const PropertyPanel=preload("res://scripts/GeoPropertyPanel.gd")
+const PropertyScenery=preload("res://scripts/GeoPropertyScenery.gd")
+var property_scenery: Node3D
 var phone_panel: PanelContainer
 var action_list: VBoxContainer
 var owned_car: Node3D
@@ -85,6 +87,9 @@ func _ready() -> void:
         hud.text="Invalid geographic map. Re-run the importer."
         return
     city=parsed
+    property_scenery=PropertyScenery.new()
+    add_child(property_scenery)
+    property_scenery.configure(city)
     roads.build(city.get("graph",{}))
     traffic=Traffic.new()
     add_child(traffic)
@@ -304,6 +309,7 @@ func _physics_process(delta: float) -> void:
     if not ready_to_walk:return
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
+    property_scenery.animate(delta)
     _animate_patrols(delta)
     _animate_commutes(delta)
     impact_flash=maxf(0.0,impact_flash-delta*2.0)
@@ -384,6 +390,7 @@ func _select_destination(point: Vector2) -> void:
 func _update_navigation() -> void:
     if not is_instance_valid(walker) or not is_instance_valid(city_map):return
     _update_daylight()
+    property_scenery.sync(residents.world.get("propertyScenery",{}) if room.is_empty() and residents.connected else {})
     var pos:=Vector2(walker.position.x,walker.position.z)
     if not room.is_empty():
         if is_instance_valid(interior_node):interior_node.update_work_board(residents.world.get("work",{}))
@@ -429,6 +436,7 @@ func _update_navigation() -> void:
         _sync_patrols(world.get("patrols",[]))
         _sync_commutes(world.get("traffic",[]))
         hud.text+="\nJava traffic: %s" % commute_models.size()
+        if property_scenery.missing_yard or property_scenery.missing_site:hud.text+="\nPlot visual unavailable: no clear mapped space. F actions still work."
         if driving:civilian_car.hide()
         hud.text+="\nG: enter own car / steal nearby civilian car"
         if driving:hud.text+="\nW: accelerate · A/D: choose turn · G: exit | Fuel %s · Condition %s" % [residents.driving.get("fuel",0),residents.driving.get("condition",0)]
