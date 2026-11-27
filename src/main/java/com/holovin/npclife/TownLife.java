@@ -744,6 +744,7 @@ final class TownLife {
         HomeRoutineLife.tick(town,marco);
         WardrobeLife.tick(town,marco);
         IndustryLife.tick(town,marco,truth,observations);
+        SupplyChainLife.tick(town,marco);
         ConstructionLife.tick(town,marco.day,marco.minute);
         BusinessLife.tick(town,marco,truth,observations);
         LogisticsLife.tick(town,marco,truth,observations);

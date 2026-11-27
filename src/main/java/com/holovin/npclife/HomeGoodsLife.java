@@ -23,11 +23,13 @@ final class HomeGoodsLife {
         if(t.player.place!=p.shop()||!open(s.minute)||!t.player.ownsHouse)
             throw new IllegalArgumentException("Visit the open showroom and own a house before ordering delivery.");
         if(installed(t,id)||t.player.money<p.price())throw new IllegalArgumentException("Already installed or insufficient funds.");
+        if(SupplyChainLife.RECIPES.stream().anyMatch(r->r.id().equals(id)))SupplyChainLife.take(t,id);
         t.player.money-=p.price();
         t.employerFunds.merge(p.shop()==WORKSHOP?"technician":"shop-assistant",p.price(),Math::addExact);
         set(t,id,1);
         return "Household item delivered and installed.";
     }
+    static int available(TownLife.Town t,String id){return SupplyChainLife.RECIPES.stream().anyMatch(r->r.id().equals(id))?SupplyChainLife.stock(t,id):Integer.MAX_VALUE;}
     static boolean home(TownLife.Town t,WorldState s){
         return t.player.ownsHouse&&t.player.place==SOUTH_RESIDENCES
             ||!t.player.ownsHouse&&t.player.place==NORTH_RESIDENCES&&HousingLife.active(t.player,s.day,s.minute);
@@ -43,14 +45,14 @@ final class HomeGoodsLife {
         set(t,"outfit",changed?1:0);
         return "Changed outfit.";
     }
-    record Offer(String id,String label,int price,boolean installed,boolean canBuy){}
+    record Offer(String id,String label,int price,boolean installed,boolean canBuy,int stock){}
     record View(List<Offer> offers,List<String> installed,boolean canChange,boolean hasClothing,boolean changedOutfit){}
     static View view(TownLife.Town t,WorldState s){
         if(RebirthLife.active(t)||!t.player.alive)return new View(List.of(),List.of(),false,false,false);
         boolean clothing=hasClothing(t);
         return new View(PRODUCTS.stream().filter(p->p.shop()==t.player.place)
             .map(p->new Offer(p.id(),p.label(),p.price(),installed(t,p.id()),t.player.ownsHouse&&open(s.minute)
-                &&!installed(t,p.id())&&t.player.money>=p.price()&&t.player.travelRemaining==0)).toList(),
+                &&!installed(t,p.id())&&t.player.money>=p.price()&&t.player.travelRemaining==0&&available(t,p.id())>0,available(t,p.id()))).toList(),
             PRODUCTS.stream().filter(p->installed(t,p.id())).map(Product::id).toList(),
             home(t,s)&&!IntercomLife.insideVisit(t,s.day,s.minute),clothing,clothing&&get(t,"outfit")==1);
     }
