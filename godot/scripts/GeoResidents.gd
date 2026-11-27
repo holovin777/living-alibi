@@ -223,7 +223,12 @@ func perform(id: String,pos: Vector2) -> void:
 
 func _action(endpoint: String,data: Dictionary) -> void:
     if not connected or action_pending or action_http.get_http_client_status()!=HTTPClient.STATUS_DISCONNECTED:return
+    # Long childhood batches still simulate every minute; do not abandon a
+    # running request after the ordinary interaction timeout.
+    action_http.timeout=0.0 if str(data.get("id",""))=="rebirth-wait-extended" else 30.0
     action_pending=action_http.request("http://127.0.0.1:8091/geo/"+endpoint,["Content-Type: application/json"],HTTPClient.METHOD_POST,JSON.stringify(data))==OK
+    if action_pending and str(data.get("id",""))=="rebirth-wait-extended":
+        last_message="Simulating childhood / Simulazione infanzia..."
 
 func _action_received(result: int,code: int,_headers: PackedStringArray,body: PackedByteArray) -> void:
     action_pending=false

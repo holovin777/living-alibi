@@ -27,6 +27,8 @@ final class GeoLife {
         if(life.phase().equals("CHILDHOOD")){
             if(life.maxWaitDays()>0)add(result,"rebirth-wait","Advance 1 day / Avanza un giorno");
             if(life.maxWaitDays()>1)add(result,"rebirth-wait-fast","Advance up to "+life.maxWaitDays()+" days / Avanza");
+            int extended=RebirthLife.extendedWaitDays(t);
+            if(extended>0)add(result,"rebirth-wait-extended","Grow up: up to "+extended+" days / Cresci: fino a "+extended+" giorni");
             if(c.age>=18&&life.graduated())add(result,"rebirth-continue","Continue adult life / Vita adulta");
             var child=RebirthLife.childOptions(t,s.day,s.minute);
             if(child!=null){

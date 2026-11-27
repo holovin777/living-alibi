@@ -7624,6 +7624,9 @@ func _render_actions() -> void:
             _action_choices.add_child(_button("Advance one shared day",_garden_action.bind("rebirth-wait")))
         if max_days > 1:
             _action_choices.add_child(_button("Advance up to %s shared days" % max_days,_garden_action.bind("rebirth-wait-fast")))
+        var extended_days := int(rebirth.get("extendedWaitDays",0))
+        if extended_days > 0:
+            _action_choices.add_child(_button("Grow up: %s days / Cresci: %s giorni" % [extended_days,extended_days],_garden_action.bind("rebirth-wait-extended")))
         return
     _action_title.text = "Local actions — " + _current_place.capitalize()
     var player: Dictionary = _last_snapshot.get("player", {})

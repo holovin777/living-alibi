@@ -1220,6 +1220,11 @@ public final class GameSession implements AutoCloseable {
                 int duration=RebirthLife.travel(copy,destination,state.day);
                 return applyInternal(copy,duration,"Travel to "+destination.label+".",true);
             }
+            if(action.equals("rebirth-wait-extended")){
+                int days=RebirthLife.extendedWaitDays(town);
+                if(days==0)throw new IllegalArgumentException("Extended waiting is only available during childhood.");
+                return applyInternal(copy,days*1440,"Advanced childhood in the shared world.",true);
+            }
             if(action.equals("rebirth-wait")||action.equals("rebirth-wait-fast")){
                 int maxDays=RebirthLife.maxWaitDays(town);
                 if(maxDays==0)throw new IllegalArgumentException("No childhood waiting is available.");

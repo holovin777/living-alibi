@@ -1839,6 +1839,7 @@ class GameSessionTest {
             assertEquals(0,view.player().money());
             assertEquals(1,view.rebirth().families().size());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-family-9999-9998"));
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait-extended"));
             assertThrows(IllegalArgumentException.class,()->game.waitMinutes(1));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait-fast"));
         }
@@ -1851,6 +1852,7 @@ class GameSessionTest {
             assertEquals(2,born.rebirth().identity().relationships().stream().filter(RebirthLife.KnownPerson::family).count());
             assertEquals(271,born.rebirth().identity().bornDay());
             assertEquals(7,born.rebirth().maxWaitDays());
+            assertEquals(28,born.rebirth().extendedWaitDays());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-focus-technical"));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-child-travel-PARK"));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-hobby-read"));
@@ -1895,6 +1897,7 @@ class GameSessionTest {
         try(var game=new GameSession(file)){
             var before=game.snapshot();
             assertEquals(3,before.rebirth().maxWaitDays());
+            assertEquals(14,before.rebirth().extendedWaitDays());
             var after=game.gardenAction("rebirth-focus-technical").world();
             assertEquals("technical",after.rebirth().schoolFocus());
             assertEquals(before.rebirth().skills(),after.rebirth().skills());
@@ -1982,8 +1985,10 @@ class GameSessionTest {
         try(var game=new GameSession(file)){
             assertEquals(1,game.snapshot().rebirth().maxWaitDays());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait-fast"));
+            assertEquals(7,game.snapshot().rebirth().extendedWaitDays());
             var previous=game.snapshot().rebirth().identity();
-            var adult=game.gardenAction("rebirth-wait").world();
+            // The seven-day request must stop at adulthood rather than overshoot it.
+            var adult=game.gardenAction("rebirth-wait-extended").world();
             assertEquals(18,adult.rebirth().age());
             assertEquals(previous.residentId(),adult.rebirth().identity().residentId());
             assertTrue(adult.rebirth().identity().graduated());
@@ -1998,6 +2003,8 @@ class GameSessionTest {
             assertEquals(2,adult.rebirth().identity().relationships().stream().filter(RebirthLife.KnownPerson::family).count());
             assertEquals(360,adult.minute());
             assertEquals(0,adult.rebirth().maxWaitDays());
+            assertEquals(0,adult.rebirth().extendedWaitDays());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait-extended"));
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-wait"));
         }
         try(var game=new GameSession(file)){
