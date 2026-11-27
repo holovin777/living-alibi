@@ -40,6 +40,11 @@ public final class GeoController {
         if(r.message==null||r.message.isBlank()||r.message.length()>400)throw new IllegalArgumentException("Enter a message up to 400 characters.");
         return Map.of("message",session.geoSpeak(map,r.id,r.message,r.language,r.x,r.z));
     }
+    public record Action(String id,double x,double z){}
+    @PostMapping("/action")
+    public GeoProjection.ActionResult action(@RequestBody Action r)throws SQLException{
+        validate(r.x,r.z);return session.geoAction(map,r.id,r.x,r.z);
+    }
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
     public Map<String,String> error(IllegalArgumentException e){return Map.of("message",e.getMessage());}

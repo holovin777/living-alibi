@@ -12,10 +12,13 @@ final class GeoProjection {
     }
     record District(String id,String label,double x,double z){}
     record Actor(String id,double x,double z,String activity,boolean talkable){}
+    record Choice(String id,String label){}
+    record ActionResult(String message,District arrival){}
     record View(int day,int minute,int population,int commuting,List<Actor> residents,
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
-                String carDistrict,boolean cycling){}
+                String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
+                int carFuel,int carCondition,String jobId,List<Choice> actions){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -120,6 +123,51 @@ final class GeoProjection {
         return c.currentSpace().equals(TownLife.publicSpace(c.place))&&!"SLEEPING".equals(c.activity)
             &&!"STUDYING".equals(c.activity)&&(!"WORKING".equals(c.activity)||PoliceLife.officer(c));
     }
+    List<Choice> choices(TownLife.Town t,WorldState s,Point player){
+        var p=t.player;var result=new ArrayList<Choice>();
+        if(!p.alive||p.travelRemaining>0||JusticeLife.confined(t)||RebirthLife.active(t)||IntercomLife.insideVisit(t,s.day,s.minute))return result;
+        result.add(new Choice("rest","Rest / Riposa · 15 min"));
+        for(String id:List.of("bread","water","pizza","gelato","grape-juice"))
+            if(FoodLife.quantity(p,id,false)>0)result.add(new Choice("consume:"+id,"Consume / Consuma "+RetailLife.product(id).label()));
+        if(point(p.place).distance(player)>18)return result;
+        if(p.place==TownLife.Place.PARK)result.add(new Choice("fountain","Drink at fountain / Fontana"));
+        if(RetailLife.open(p.place,s.minute))
+            for(var item:RetailLife.PRODUCTS)
+                if(RetailLife.availableAt(p.place,item)&&t.retailStock.getOrDefault(item.id(),0)>0)
+                    result.add(new Choice("buy:"+item.id(),"Buy / Compra "+item.label()+" · €"+item.price()));
+        for(var job:CareerLife.offers())if(job.workplace()==p.place){
+            if(job.id().equals(p.jobId))result.add(new Choice("work","Work / Lavora · "+job.title()));
+            else result.add(new Choice("apply:"+job.id(),"Apply / Candidati · "+job.title()+" (€"+job.wage()+"/shift)"));
+        }
+        if(p.place==TownLife.Place.SCHOOL)result.add(new Choice("study:engineering","Study engineering / Ingegneria"));
+        if(p.place==TownLife.Place.LIBRARY)result.add(new Choice("study:investigation","Study investigation / Investigazione"));
+        for(var order:TechnicalWorkLife.orders(t))if(order.place==p.place){
+            result.add(new Choice("diagnose:"+order.id,"Inspect / Ispeziona "+order.title));
+            result.add(new Choice("repair-order:"+order.id,"Repair / Ripara "+order.title));
+        }
+        if(p.place==TownLife.Place.WORKSHOP){
+            if(p.carPlace==null)result.add(new Choice("car:buy","Buy used car / Auto usata · €180"));
+            if(!p.ownsBicycle)result.add(new Choice("bike-buy","Buy bicycle / Bicicletta · €45"));
+        }
+        if(p.ownsBicycle){
+            if(p.bicycleParked==null){
+                result.add(new Choice(p.cycling?"bike:walk":"bike:cycle",p.cycling?"Walk / Cammina":"Cycle / Pedala"));
+                if(TransportLife.hasRack(p.place))result.add(new Choice("bike:park","Park bicycle / Parcheggia bici"));
+            }else if(p.bicycleParked==p.place)result.add(new Choice("bike:retrieve","Retrieve bicycle / Ritira bici"));
+        }
+        if(p.carPlace==p.place){
+            if(p.place==TownLife.Place.WORKSHOP||p.place==TownLife.Place.FUEL_STATION||CityExpansionLife.serviceHub(p.place))
+                result.add(new Choice("car:refuel","Refuel / Rifornisci"));
+            if(p.place==TownLife.Place.WORKSHOP||CityExpansionLife.serviceHub(p.place))
+                result.add(new Choice("car:repair","Service car / Ripara auto"));
+            for(var to:MotorLife.neighbors(p.place))
+                result.add(new Choice("drive:"+to.name(),"Car journey / Viaggio in auto → "+to.label));
+        }
+        var bus=BusLife.view(t,s);
+        if(bus.available())for(var route:bus.routes())
+            result.add(new Choice("bus:"+route.id(),"Bus → "+route.label()+" · "+route.minutes()+" min · €"+bus.fare()));
+        return List.copyOf(result);
+    }
     View view(TownLife.Town t,WorldState s,Point player){
         var p=t.player;
         boolean confined=JusticeLife.confined(t),rebirth=RebirthLife.active(t);
@@ -137,6 +185,7 @@ final class GeoProjection {
         boolean canEnter=p.alive&&!confined&&!rebirth&&p.travelRemaining==0&&point(nearest).distance(player)<=18;
         return new View(s.day,s.minute,population,commuting,List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))),
             district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
-            p.carPlace==null?null:p.carPlace.name(),p.cycling);
+            p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player));
     }
 }

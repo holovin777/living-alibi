@@ -15,6 +15,9 @@ class GeoProjectionTest {
             assertEquals(old.player().money(),geo.money());
             assertEquals(old.player().placeId(),geo.playerDistrict().id());
             assertEquals(14,geo.population());
+            assertTrue(geo.actions().stream().anyMatch(a->a.id().equals("rest")));
+            assertThrows(IllegalArgumentException.class,()->game.geoAction(map,"car:buy",9999,9999));
+            assertThrows(IllegalArgumentException.class,()->game.geoAction(map,"unknown",0,0));
             game.geoTick(1);
             assertEquals(old.minute()+1,game.geoNearby(map,0,0).minute());
         }

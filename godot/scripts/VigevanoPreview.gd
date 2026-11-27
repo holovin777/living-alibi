@@ -29,6 +29,10 @@ var chat: LineEdit
 var chat_target:=""
 var shared_mode:=false
 var district_sign: Label3D
+var actions_panel: PanelContainer
+var action_list: VBoxContainer
+var owned_car: Node3D
+var parked_bike: Node3D
 
 func _ready() -> void:
     var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
@@ -77,6 +81,24 @@ func _ready() -> void:
     chat.max_length=400
     chat.text_submitted.connect(_send_chat)
     chat.hide()
+    actions_panel=PanelContainer.new()
+    canvas.add_child(actions_panel)
+    actions_panel.position=Vector2(12,190)
+    actions_panel.custom_minimum_size=Vector2(410,0)
+    var action_scroll:=ScrollContainer.new()
+    action_scroll.custom_minimum_size=Vector2(410,320)
+    actions_panel.add_child(action_scroll)
+    action_list=VBoxContainer.new()
+    action_list.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    action_scroll.add_child(action_list)
+    actions_panel.hide()
+    owned_car=traffic._car()
+    add_child(owned_car)
+    owned_car.hide()
+    parked_bike=Node3D.new()
+    add_child(parked_bike)
+    _build_bicycle_marker(parked_bike)
+    parked_bike.hide()
     city_map=CityMap.new()
     canvas.add_child(city_map)
     city_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -146,6 +168,12 @@ func _material(color: Color) -> StandardMaterial3D:
 
 func _input(event: InputEvent) -> void:
     if not ready_to_walk:return
+    if actions_panel.visible:
+        if event is InputEventKey and event.pressed and event.keycode in [KEY_ESCAPE,KEY_F]:
+            actions_panel.hide()
+            Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+            get_viewport().set_input_as_handled()
+        return
     if chat.visible:
         if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
             chat.hide()
@@ -154,6 +182,10 @@ func _input(event: InputEvent) -> void:
         return
     if event is InputEventKey and event.pressed and not event.echo and not city_map.visible:
         var pos:=Vector2(walker.position.x,walker.position.z)
+        if event.keycode==KEY_F and residents.connected:
+            _open_actions()
+            get_viewport().set_input_as_handled()
+            return
         if event.keycode==KEY_E:
             residents.enter_district(pos)
         elif event.keycode==KEY_T:
@@ -185,7 +217,7 @@ func _physics_process(delta: float) -> void:
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
-    if city_map.visible or chat.visible or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)))):
+    if city_map.visible or chat.visible or actions_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)))):
         walker.velocity.x=0
         walker.velocity.z=0
         street_timer+=delta
@@ -198,11 +230,12 @@ func _physics_process(delta: float) -> void:
     if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):direction.x-=1
     if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):direction.x+=1
     direction=walker.basis*direction.normalized()
-    var speed := 7.0 if Input.is_physical_key_pressed(KEY_SHIFT) else 4.5
+    var cycling:=bool(residents.world.get("cycling",false))
+    var speed := 8.0 if cycling else (7.0 if Input.is_physical_key_pressed(KEY_SHIFT) else 4.5)
     walker.velocity.x=direction.x*speed
     walker.velocity.z=direction.z*speed
     if not walker.is_on_floor():walker.velocity.y-=9.8*delta
-    elif Input.is_physical_key_pressed(KEY_SPACE):walker.velocity.y=4.3
+    elif not cycling and Input.is_physical_key_pressed(KEY_SPACE):walker.velocity.y=4.3
     else:walker.velocity.y=0
     walker.move_and_slide()
     _stream()
@@ -255,19 +288,76 @@ func _update_navigation() -> void:
         var district: Dictionary=world.get("playerDistrict",{})
         var nearest: Dictionary=world.get("nearestDistrict",{})
         hud.text+="\nDay %s · %02d:%02d · residents %s · nearby %s · €%s · health %s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.population,residents.people.size(),world.get("money",0),world.get("health",0)]
-        hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk"
+        hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk · F: actions"
         if bool(world.get("confined",false)) or bool(world.get("rebirth",false)):hud.text+="\nOpen regular game to continue custody / rebirth."
+        hud.text+="\nHunger %s · Thirst %s · %s" % [world.get("hunger",0),world.get("thirst",0),"Cycling" if world.get("cycling",false) else "Walking"]
+        if residents.action_pending:hud.text+="\nJava is processing your action..."
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
+        _sync_parked_vehicle(owned_car,world.get("parkedCar"),pos,Vector3(2.5,0.05,0))
+        _sync_parked_vehicle(parked_bike,world.get("parkedBicycle"),pos,Vector3(-2,0.05,0))
         if not nearest.is_empty():
             district_sign.position=Vector3(float(nearest["x"]),2.5,float(nearest["z"]))
             district_sign.text=str(nearest.get("label",""))+" · E"
             district_sign.show()
     elif shared_mode:
         district_sign.hide()
+        owned_car.hide()
+        parked_bike.hide()
         hud.text+="\nConnecting to shared Java world..."
     else:
         hud.text+="\nLocal traffic: %s cars · %s pedestrians (preview)" % [traffic.count("drive"),traffic.count("walk")]
     if not route_status.is_empty():hud.text+="\n"+route_status
+
+func _build_bicycle_marker(node: Node3D) -> void:
+    # Lightweight parked bicycle silhouette, not a physics vehicle.
+    for z in [-0.55,0.55]:
+        var wheel:=MeshInstance3D.new()
+        var mesh:=TorusMesh.new()
+        mesh.inner_radius=0.25
+        mesh.outer_radius=0.32
+        wheel.mesh=mesh
+        wheel.rotation.z=PI/2
+        wheel.position=Vector3(0,0.33,z)
+        node.add_child(wheel)
+    traffic._box(node,Vector3(0.10,0.12,1.0),Vector3(0,0.63,0),Color("#50705e"))
+    traffic._box(node,Vector3(0.3,0.08,0.25),Vector3(0,0.90,0.25),Color("#353535"))
+
+func _sync_parked_vehicle(node: Node3D,record,pos: Vector2,offset: Vector3) -> void:
+    if not record is Dictionary:
+        node.hide()
+        return
+    var location:=Vector2(float(record["x"]),float(record["z"]))
+    node.visible=pos.distance_to(location)<=110
+    node.position=Vector3(location.x,0,location.y)+offset
+
+func _open_actions() -> void:
+    for child in action_list.get_children():
+        action_list.remove_child(child)
+        child.queue_free()
+    var title:=Label.new()
+    title.text="Actions / Azioni"
+    action_list.add_child(title)
+    var info:=Label.new()
+    info.text="Java validates availability, money and time."
+    action_list.add_child(info)
+    for action in residents.world.get("actions",[]):
+        var button:=Button.new()
+        button.text=str(action.get("label",""))
+        button.pressed.connect(_perform_action.bind(str(action.get("id",""))))
+        action_list.add_child(button)
+    var close:=Button.new()
+    close.text="Close / Chiudi"
+    close.pressed.connect(func():
+        actions_panel.hide()
+        Input.mouse_mode=Input.MOUSE_MODE_CAPTURED)
+    action_list.add_child(close)
+    actions_panel.show()
+    Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+
+func _perform_action(id: String) -> void:
+    actions_panel.hide()
+    Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+    residents.perform(id,Vector2(walker.position.x,walker.position.z))
 
 func _sync_spawn(point: Vector2) -> void:
     walker.position=Vector3(point.x,1.05,point.y)

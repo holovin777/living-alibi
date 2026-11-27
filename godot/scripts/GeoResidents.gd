@@ -15,6 +15,7 @@ var action_http: HTTPRequest
 var last_message:=""
 signal first_snapshot(point: Vector2)
 var first:=true
+var action_pending:=false
 
 func configure(source: Node3D, use_server: bool) -> void:
     traffic=source
@@ -32,7 +33,7 @@ func configure(source: Node3D, use_server: bool) -> void:
 func update_residents(pos: Vector2,delta: float) -> void:
     if not enabled:return
     elapsed+=delta
-    if elapsed>=1.0 and http.get_http_client_status()==HTTPClient.STATUS_DISCONNECTED:
+    if elapsed>=1.0 and not action_pending and http.get_http_client_status()==HTTPClient.STATUS_DISCONNECTED:
         elapsed=0
         http.request("http://127.0.0.1:8091/geo/nearby?x=%.3f&z=%.3f" % [pos.x,pos.y])
     for id in people:
@@ -105,12 +106,19 @@ func nearby_talker(pos: Vector2) -> String:
 func speak(id: String,message: String,pos: Vector2) -> void:
     _action("speak",{"id":id,"message":message,"language":"it","x":pos.x,"z":pos.y})
 
-func _action(endpoint: String,data: Dictionary) -> void:
-    if not connected or action_http.get_http_client_status()!=HTTPClient.STATUS_DISCONNECTED:return
-    action_http.request("http://127.0.0.1:8091/geo/"+endpoint,["Content-Type: application/json"],HTTPClient.METHOD_POST,JSON.stringify(data))
+func perform(id: String,pos: Vector2) -> void:
+    _action("action",{"id":id,"x":pos.x,"z":pos.y})
 
-func _action_received(result: int,_code: int,_headers: PackedStringArray,body: PackedByteArray) -> void:
+func _action(endpoint: String,data: Dictionary) -> void:
+    if not connected or action_pending or action_http.get_http_client_status()!=HTTPClient.STATUS_DISCONNECTED:return
+    action_pending=action_http.request("http://127.0.0.1:8091/geo/"+endpoint,["Content-Type: application/json"],HTTPClient.METHOD_POST,JSON.stringify(data))==OK
+
+func _action_received(result: int,code: int,_headers: PackedStringArray,body: PackedByteArray) -> void:
+    action_pending=false
     var parsed=JSON.parse_string(body.get_string_from_utf8())
+    if result==HTTPRequest.RESULT_SUCCESS and code==200 and parsed is Dictionary and parsed.get("arrival") is Dictionary:
+        var arrival: Dictionary=parsed["arrival"]
+        first_snapshot.emit(Vector2(float(arrival["x"]),float(arrival["z"])))
     last_message=str(parsed.get("message","Action failed")) if result==HTTPRequest.RESULT_SUCCESS and parsed is Dictionary else "Java action failed"
     elapsed=1.0
 

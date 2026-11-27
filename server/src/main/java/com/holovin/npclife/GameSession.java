@@ -559,6 +559,32 @@ public final class GameSession implements AutoCloseable {
         return speak(actor.id(),message,language).message();
     }
 
+    synchronized GeoProjection.ActionResult geoAction(GeoProjection map,String action,double x,double z)throws SQLException{
+        if(action==null||map.choices(town,state,new GeoProjection.Point(x,z)).stream().noneMatch(a->a.id().equals(action)))
+            throw new IllegalArgumentException("This action is not available here.");
+        var before=town.player.place;
+        String[] parts=action.split(":",2);
+        String arg=parts.length>1?parts[1]:"";
+        ActionView result=switch(parts[0]){
+            case "rest" -> rest(15);
+            case "consume" -> consume(arg);
+            case "fountain" -> drink("park-fountain");
+            case "buy" -> buy(arg);
+            case "apply" -> applyJob(arg);
+            case "work" -> work();
+            case "study" -> study(arg);
+            case "diagnose" -> diagnose(arg);
+            case "repair-order" -> repair(arg);
+            case "car" -> carAction(arg);
+            case "bike-buy" -> buyBicycle();
+            case "bike" -> transportMode(arg);
+            case "drive" -> drive(arg);
+            case "bus" -> gardenAction("bus-ride:"+arg);
+            default -> throw new IllegalArgumentException("Unknown geographic action.");
+        };
+        return new GeoProjection.ActionResult(result.message(),before!=town.player.place?map.district(town.player.place):null);
+    }
+
     public synchronized ActionView move(String destination) throws SQLException {
         var copy=town.copy();
         var place=PlayerLife.destination(destination);
