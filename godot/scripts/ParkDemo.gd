@@ -4632,11 +4632,17 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
             _box(prop,Vector3(0.29,0.17,0.23),Color("#99724a"),Vector3.ZERO)
             for x in [-0.08,0.08]:
                 _sphere(prop,0.055,Color("#b94c38"),Vector3(x,0.10,0))
+        "PHARMACY":
+            _box(prop,Vector3(0.16,0.09,0.11),Color("#f1eee4"),Vector3.ZERO)
+            _box(prop,Vector3(0.05,0.095,0.115),Color("#689982"),Vector3.ZERO)
+        "BARBER":
+            _box(prop,Vector3(0.06,0.16,0.035),Color("#41494d"),Vector3.ZERO)
+            _box(prop,Vector3(0.06,0.04,0.04),Color("#b5bfc0"),Vector3(0,-0.09,0))
         "MAIL_BAG":
             _box(prop,Vector3(0.25,0.30,0.13),Color("#525f72"),Vector3(0,-0.09,0))
             _box(prop,Vector3(0.24,0.055,0.14),Color("#d8b74f"),Vector3(0,0.06,0))
             _box(prop,Vector3(0.15,0.09,0.02),Color("#f0eee5"),Vector3(0,0.10,0))
-        "PAPERS","TEACHING":
+        "PAPERS","TEACHING","DOCTOR","NURSE","LIBRARY":
             _box(prop,Vector3(0.22,0.035,0.30),Color("#a17e53"),Vector3.ZERO)
             _box(prop,Vector3(0.19,0.012,0.26),Color("#f1eee4"),Vector3(0,0.025,0))
     prop.show()
@@ -4713,6 +4719,7 @@ func _sync_resident_uniform(person: Node3D,kind: String) -> void:
 
 func _resident_outdoors(person: Node3D) -> bool:
     if _apartment_active or _guest_active or _stairwell_active:return false
+    if bool(person.get_meta("indoor_work",false)):return false
     # Conservative outdoor districts only; avoid guessing shelter in mixed office/home scenes.
     if _current_place not in ["PARK","CENTRO","RIVER","WOODS","MARKET","QUARRY","BAKERY","CAFE","PORTICI"]:return false
     var door := _public_door()
@@ -4757,29 +4764,74 @@ func _sync_resident_weather(person: Node3D,talking: bool,seated: bool) -> bool:
     if umbrella!=null:umbrella.visible=use_umbrella
     return use_umbrella
 
-func _assign_food_staff() -> void:
-    var used: Dictionary={}
-    for person in _residents_root.get_children():
+# Shared placement for actual indoor staff. Each role has its own stations,
+# and only collision-free unoccupied points inside the modeled room are used.
+func _assign_indoor_staff(stations_by_role: Dictionary, yaw_by_role: Dictionary) -> void:
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b): return str(a.get_meta("resident_id","")) < str(b.get_meta("resident_id","")))
+    var used: Array[Vector3] = []
+    for child in people:
+        var person := child as Node3D
         var kind := str(person.get_meta("work_visual",""))
-        var working: bool = str(person.get_meta("activity",""))=="WORKING" and kind in ["PIZZA","GELATO"]
-        if working and not used.has(kind):
-            var at := Vector3(-6.0 if kind=="PIZZA" else 6.0,0,19.9)
-            if not _can_stand(at,WALKER_RADIUS):continue
-            used[kind]=true
-            if not person.has_meta("pre_work_anchor"):person.set_meta("pre_work_anchor",person.get_meta("anchor",person.position))
-            person.position=at
-            person.set_meta("anchor",at)
-            person.rotation.y=0.0
-        elif person.has_meta("pre_work_anchor"):
-            var previous: Vector3=person.get_meta("pre_work_anchor")
-            person.set_meta("anchor",previous)
-            person.position=_open_anchor(previous)
-            person.remove_meta("pre_work_anchor")
+        var eligible: bool = str(person.get_meta("activity",""))=="WORKING" and stations_by_role.has(kind)
+        var assigned := false
+        if eligible:
+            for candidate in stations_by_role[kind]:
+                var at: Vector3 = candidate
+                if not _can_stand(at,WALKER_RADIUS):continue
+                var occupied := false
+                for previous in used:
+                    if previous.distance_squared_to(at)<0.64:
+                        occupied=true
+                        break
+                if occupied:continue
+                if not person.has_meta("pre_work_anchor"):
+                    person.set_meta("pre_work_anchor",person.get_meta("anchor",person.position))
+                person.position=at
+                person.set_meta("anchor",at)
+                person.rotation.y=float(yaw_by_role.get(kind,0.0))
+                person.set_meta("indoor_work",true)
+                used.append(at)
+                assigned=true
+                break
+        if not assigned:
+            person.remove_meta("indoor_work")
+            if person.has_meta("pre_work_anchor"):
+                var previous: Vector3=person.get_meta("pre_work_anchor")
+                person.set_meta("anchor",previous)
+                if int(person.get_meta("seat_index",-1))<0:
+                    person.position=_open_anchor(previous)
+                person.remove_meta("pre_work_anchor")
+
+func _assign_food_staff() -> void:
+    _assign_indoor_staff({
+        "PIZZA":[Vector3(-6.8,0,19.95),Vector3(-5.2,0,19.95),Vector3(-6,0,17.8)],
+        "GELATO":[Vector3(5.2,0,19.95),Vector3(6.8,0,19.95),Vector3(6,0,17.8)],
+        "BARBER":[Vector3(-8.8,0,5.3),Vector3(-6.7,0,5.3),Vector3(-7.8,0,7.0)]
+    },{"PIZZA":0.0,"GELATO":0.0,"BARBER":PI})
+
+func _assign_medical_staff() -> void:
+    _assign_indoor_staff({
+        "DOCTOR":[Vector3(-9.3,0,7.0),Vector3(-9.3,0,5.4),Vector3(-10.4,0,7.0),Vector3(-7,0,5.2)],
+        "NURSE":[Vector3(-9.3,0,8.4),Vector3(-7.0,0,8.7),Vector3(-6.8,0,5.8),Vector3(-10.4,0,7.0),Vector3(-6.8,0,7.0),Vector3(-7.0,0,4.5),Vector3(-7.0,0,9.6)],
+        "PHARMACY":[Vector3(9.3,0,-7.7),Vector3(9.3,0,-6.3),Vector3(9.8,0,-8.8),Vector3(9.8,0,-5.2)]
+    },{"DOCTOR":-PI/2.0,"NURSE":-PI/2.0,"PHARMACY":PI/2.0})
+
+func _assign_library_staff() -> void:
+    _assign_indoor_staff({
+        "LIBRARY":[Vector3(-7.8,0,8.8),Vector3(-6.2,0,8.8),Vector3(-10.2,0,7.0),Vector3(-3.8,0,7.0)]
+    },{"LIBRARY":0.0})
 
 func _assign_work_stations() -> void:
     if _apartment_active:return
     if _current_place=="CENTRO":
         _assign_food_staff()
+        return
+    if _current_place=="CLINIC":
+        _assign_medical_staff()
+        return
+    if _current_place=="LIBRARY":
+        _assign_library_staff()
         return
     if _current_place=="SCHOOL":
         _assign_school_staff()

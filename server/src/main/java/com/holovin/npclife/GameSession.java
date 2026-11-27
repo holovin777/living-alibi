@@ -145,7 +145,7 @@ public final class GameSession implements AutoCloseable {
         if(PoliceLife.officer(c)||PoliceLife.detective(c))return "";
         if(PostalLife.postalWorker(c))return "MAIL_BAG";
         return switch(c.place){
-            case CENTRO -> role.equals("Pizzaiolo")?"PIZZA":role.equals("Gelataio")?"GELATO":"";
+            case CENTRO -> role.equals("Pizzaiolo")?"PIZZA":role.equals("Gelataio")?"GELATO":role.equals("Barber")?"BARBER":"";
             case BAKERY -> role.equals("Baker")?"BREAD":"";
             case CAFE -> role.equals("Barista")?"COFFEE":"";
             case MARKET -> role.contains("vendor")||role.contains("seller")||role.equals("Shopkeeper")?"CRATE":"";
@@ -153,7 +153,14 @@ public final class GameSession implements AutoCloseable {
             case WORKSHOP -> role.equals("Mechanic")||role.equals("Engineer")||role.equals("Independent fabricator")?"WRENCH":"";
             case FACTORY -> factoryStation(c).isEmpty()?"":"WRENCH";
             case SCHOOL -> role.equals("Teacher")?"TEACHING":"PAPERS";
-            case OFFICE, LIBRARY, CLINIC -> "PAPERS";
+            case CLINIC -> switch(role){
+                case "Doctor" -> "DOCTOR";
+                case "Nurse" -> "NURSE";
+                case "Pharmacist" -> "PHARMACY";
+                default -> "PAPERS";
+            };
+            case LIBRARY -> role.equals("Librarian")?"LIBRARY":"PAPERS";
+            case OFFICE -> "PAPERS";
             default -> "";
         };
     }
@@ -179,7 +186,7 @@ public final class GameSession implements AutoCloseable {
             case CENTRO -> role.equals("Pizzaiolo")?"BAKER_APRON":role.equals("Gelataio")?"CAFE_APRON":"";
             case BAKERY -> role.equals("Baker")?"BAKER_APRON":"";
             case CAFE -> role.equals("Barista")?"CAFE_APRON":"";
-            case CLINIC -> role.equals("Doctor")?"DOCTOR_COAT":role.equals("Nurse")?"SCRUBS":"";
+            case CLINIC -> role.equals("Doctor")||role.equals("Pharmacist")?"DOCTOR_COAT":role.equals("Nurse")?"SCRUBS":"";
             case QUARRY -> role.equals("Miner")?"HIGH_VIS":"";
             case FACTORY -> factoryStation(c).isEmpty()?"":"HIGH_VIS";
             case WORKSHOP -> switch(role){

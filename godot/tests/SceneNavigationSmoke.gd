@@ -1853,6 +1853,30 @@ func _exercise() -> void:
     if not _check(world._medical_station()=="first-aid" and _has_button(world._action_choices,"Basic pharmacy care · 5 EUR"),"pharmacy contextual menu"):
         return
     world._close_medical()
+    medical["residents"]=[
+        {"id":"clinic-doctor","activity":"WORKING","workVisual":"DOCTOR","outfitVisual":"DOCTOR_COAT"},
+        {"id":"clinic-nurse","activity":"WORKING","workVisual":"NURSE","outfitVisual":"SCRUBS"},
+        {"id":"clinic-pharmacist","activity":"WORKING","workVisual":"PHARMACY","outfitVisual":"DOCTOR_COAT"},
+        {"id":"clinic-pharmacist-two","activity":"WORKING","workVisual":"PHARMACY","outfitVisual":"DOCTOR_COAT"}]
+    world._on_world_updated(medical)
+    var doctor = world._residents_root.get_node("Resident_clinic-doctor")
+    var nurse = world._residents_root.get_node("Resident_clinic-nurse")
+    var pharmacist = world._residents_root.get_node("Resident_clinic-pharmacist")
+    var pharmacist_two = world._residents_root.get_node("Resident_clinic-pharmacist-two")
+    if not _check(doctor.position.x < -4 and doctor.position.z>3.5 and doctor.position.z<10.5
+            and nurse.position.x < -4 and nurse.position.z>3.5 and nurse.position.z<10.5
+            and pharmacist.position.x>4 and pharmacist.position.z < -3.5
+            and pharmacist_two.position.x>4 and pharmacist_two.position.z < -3.5
+            and pharmacist.position.distance_to(pharmacist_two.position)>0.7
+            and doctor.get_meta("indoor_work",false) and nurse.get_meta("indoor_work",false),
+            "on-duty medical staff work inside their correct buildings, not on the street"):
+        return
+    medical["residents"][0]["activity"]="FREE_TIME"
+    medical["residents"][0]["workVisual"]=""
+    world._on_world_updated(medical)
+    if not _check(not doctor.has_meta("pre_work_anchor") and not doctor.has_meta("indoor_work"),
+            "medical staff release their workstation after their shift"):
+        return
     var campus := _world("SCHOOL","School")
     campus["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","college":{"atCampus":true,"open":true,"enrolled":null,"courses":[{"id":"engineering","label":"Engineering","required":60,"completed":0,"canEnroll":true}]}}
     world._on_world_updated(campus)

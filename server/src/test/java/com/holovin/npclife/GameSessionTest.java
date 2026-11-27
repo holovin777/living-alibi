@@ -30,6 +30,24 @@ class GameSessionTest {
     }
 
     @Test
+    void indoorWorkersExposeOnlyTheirActualOnDutyWorkVisual() {
+        var c=new TownLife.Citizen("test-medical","Test Medical","Doctor",TownLife.Place.CLINIC);
+        c.activity="WORKING";
+        assertEquals("DOCTOR",GameSession.workVisual(c));
+        c.occupation="Nurse";
+        assertEquals("NURSE",GameSession.workVisual(c));
+        c.occupation="Pharmacist";
+        assertEquals("PHARMACY",GameSession.workVisual(c));
+        assertEquals("DOCTOR_COAT",GameSession.outfitVisual(c));
+        c.place=TownLife.Place.CENTRO;c.occupation="Barber";
+        assertEquals("BARBER",GameSession.workVisual(c));
+        c.place=TownLife.Place.LIBRARY;c.occupation="Librarian";
+        assertEquals("LIBRARY",GameSession.workVisual(c));
+        c.activity="FREE_TIME";
+        assertEquals("",GameSession.workVisual(c));
+    }
+
+    @Test
     void publicSafetyStaffUsesRealResidentsAndVisibleDutyClothes() {
         var clock=new WorldState();
         var town=TownLife.create(clock);
