@@ -40,3 +40,6 @@ Java remains the authoritative simulation, SQLite the only durable world, and Go
 5. Asset/detail and navigation parity, full real-map end-to-end tests, performance profiling.
 
 The audit does not claim each Java subsystem is complete or that the old client exposes every action. Test evidence is tracked separately in GitHub Actions; visual, linked-life and long-running economic scenarios still require playtesting.
+
+### Rebirth integration phase 1
+F now exposes existing life phase, linked identity, family choice, bounded childhood fast-forward, focus/hobbies/allowance/outings, graduation continuation and basic linked-adult jobs, travel, home and routine actions through the existing gardenAction dispatcher. The camera follows the authoritative district and home/public interior; no new save state or duplicated player is created. Free movement and automatic clock progression remain locked during linked life for now. Use menu actions to travel and advance time. Text dialogue, full adult services and family choices, IT editors and continuous movement remain pending. Prior visitor controls remain unchanged.

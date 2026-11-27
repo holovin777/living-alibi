@@ -365,6 +365,7 @@ func _update_navigation() -> void:
     var pos:=Vector2(walker.position.x,walker.position.z)
     if not room.is_empty():
         hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions · P phone\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
+        if bool(residents.world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions"
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         return
     city_map.player=pos
@@ -385,7 +386,8 @@ func _update_navigation() -> void:
         var nearest: Dictionary=world.get("nearestDistrict",{})
         hud.text+="\nDay %s · %02d:%02d · residents %s · nearby %s · €%s · health %s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.population,residents.people.size(),world.get("money",0),world.get("health",0)]
         hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk · F: actions · P: phone"
-        if bool(world.get("confined",false)) or bool(world.get("rebirth",false)):hud.text+="\nOpen regular game to continue custody / rebirth."
+        if bool(world.get("confined",false)):hud.text+="\nOpen regular game to continue custody."
+        if bool(world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions"
         var phone: Dictionary=world.get("phone",{})
         var report: Dictionary=phone.get("report",{})
         for call in report.get("calls",[]):
@@ -578,16 +580,28 @@ func _phone_route(point: Vector2) -> void:
         Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
         city_map.queue_redraw()
 
+func _life_summary() -> String:
+    var life: Dictionary=residents.world.get("life",{})
+    if str(life.get("phase",""))=="CHOICE":return "Choose your next family / Scegli la famiglia"
+    return "%s · age %s · %s · school days %s" % [life.get("name",""),life.get("age",0),life.get("activity",""),life.get("schoolDays",0)]
+
 func _open_actions() -> void:
     for child in action_list.get_children():
         action_list.remove_child(child)
         child.queue_free()
     var title:=Label.new()
-    title.text="Actions / Azioni"
+    title.text="Life / Vita" if bool(residents.world.get("rebirth",false)) else "Actions / Azioni"
     action_list.add_child(title)
     var info:=Label.new()
     info.text="Java validates availability, money and time."
     action_list.add_child(info)
+    if bool(residents.world.get("rebirth",false)):
+        var life: Dictionary=residents.world.get("life",{})
+        var biography:=Label.new()
+        biography.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        biography.text=_life_summary()+"\nSavings / Risparmi: €"+str(life.get("savings",0))
+        if life.get("parentA")!=null:biography.text+="\nParents / Genitori: "+str(life.get("parentA"))+" + "+str(life.get("parentB"))
+        action_list.add_child(biography)
     var enterprise=residents.world.get("enterprise")
     if enterprise is Dictionary and bool(enterprise.get("yours",false)):
         var summary:=Label.new()

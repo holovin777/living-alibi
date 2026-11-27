@@ -17,6 +17,7 @@ signal first_snapshot(point: Vector2)
 signal interior_changed(room: Dictionary)
 var room: Dictionary={}
 var first:=true
+var life_key:=""
 var action_pending:=false
 var driving: Dictionary={}
 var driving_request:=false
@@ -86,15 +87,19 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
     traffic.set_java_population(true)
     world=parsed
     var next_room: Dictionary=parsed["interior"] if parsed.get("interior") is Dictionary else {}
-    if str(next_room.get("id",""))!=str(room.get("id","")):
+    if str(next_room.get("id",""))!=str(room.get("id","")) or next_room.get("x")!=room.get("x") or next_room.get("z")!=room.get("z"):
         room=next_room
         for record in people.values():record["node"].queue_free()
         people.clear()
         interior_changed.emit(room)
-    if first and parsed.get("playerDistrict") is Dictionary:
-        first=false
+    if parsed.get("playerDistrict") is Dictionary:
         var place: Dictionary=parsed["playerDistrict"]
-        first_snapshot.emit(Vector2(float(place["x"]),float(place["z"])))
+        var life: Dictionary=parsed.get("life",{})
+        var next_key:=str(life.get("phase","ADULT"))+":"+str(life.get("name",""))+":"+str(place.get("id",""))
+        if room.is_empty() and (first or (next_key!=life_key and (bool(parsed.get("rebirth",false)) or not life_key.begins_with("ADULT:")))):
+            first_snapshot.emit(Vector2(float(place["x"]),float(place["z"])))
+        first=false
+        life_key=next_key
     population=int(parsed.get("population",0))
     commuting=int(parsed.get("commuting",0))
     day=int(parsed.get("day",1))

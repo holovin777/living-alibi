@@ -659,7 +659,7 @@ public final class GameSession implements AutoCloseable {
     synchronized void geoEnter(GeoProjection map,String destination,double x,double z) throws SQLException {
         JusticeLife.requireFree(town);
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
-        if(RebirthLife.active(town))throw new IllegalArgumentException("Use regular mode for rebirth.");
+        if(RebirthLife.active(town))throw new IllegalArgumentException("Use F for your current life and permitted travel.");
         PlayerLife.requireAlive(town.player);
         if(geoInterior!=null){
             var door=map.point(geoInterior);
@@ -689,6 +689,12 @@ public final class GameSession implements AutoCloseable {
 
     synchronized GeoProjection.ActionResult geoAction(GeoProjection map,String action,double x,double z)throws SQLException{
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
+        if(RebirthLife.active(town)){
+            if(action==null||GeoLife.choices(town,state,map).stream().noneMatch(a->a.id().equals(action)))throw new IllegalArgumentException("This life action is not available.");
+            var result=gardenAction(action);
+            geoInterior=null;geoDrive=null;
+            return new GeoProjection.ActionResult(result.message(),null);
+        }
         if(action!=null&&action.startsWith("phone-")){
             if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action)))
                 throw new IllegalArgumentException("Phone action unavailable.");

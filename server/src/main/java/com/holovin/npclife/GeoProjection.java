@@ -63,7 +63,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -434,10 +434,15 @@ final class GeoProjection {
     View view(TownLife.Town t,WorldState s,Point player,Patrol response,TownLife.Place room){
         var p=t.player;
         boolean confined=JusticeLife.confined(t),rebirth=RebirthLife.active(t);
+        var linked=RebirthLife.child(t);
+        boolean linkedHome=rebirth&&GeoLife.atHome(linked);
+        if(rebirth){room=linked!=null&&linked.alive&&linked.travelRemaining==0&&(linkedHome||hasInterior(linked.place))?linked.place:null;player=point(p.place);}
+        final Point viewer=player;
         var talking=new HashSet<>(PlayerLife.visible(t));
         var nearby=new ArrayList<Actor>();var traffic=new LinkedHashMap<String,TrafficCar>();int population=0,commuting=0;
         for(var c:t.people.values()){
             if(!c.alive)continue;population++;
+            if(c==linked)continue;
             if(c.travelRemaining>0)commuting++;
             var vehicle=movingVehicle(t,c);
             if(vehicle!=null){if(new Point(vehicle.x,vehicle.z).distance(player)<=160)traffic.putIfAbsent(vehicle.id,vehicle);continue;}
@@ -445,23 +450,24 @@ final class GeoProjection {
             Point at=position(c);
             if(at.distance(player)<=140)nearby.add(new Actor(c.id,at.x,at.z,c.activity,talking.contains(c)&&!rebirth,"STAND",0,GameSession.workVisual(c),GameSession.outfitVisual(c),GameSession.appearanceStage(c)));
         }
-        nearby.sort(Comparator.comparingDouble((Actor a)->new Point(a.x,a.z).distance(player)).thenComparing(Actor::id));
+        nearby.sort(Comparator.comparingDouble((Actor a)->new Point(a.x,a.z).distance(viewer)).thenComparing(Actor::id));
         var nearest=room==null?nearest(player):room;
         boolean canEnter=p.alive&&!confined&&!rebirth&&p.travelRemaining==0&&point(nearest).distance(player)<=18;
         var visiblePatrols=new ArrayList<>(patrols(t,s,player));
         if(response!=null){visiblePatrols.removeIf(patrol->patrol.id().equals(response.id()));visiblePatrols.add(0,response);}
         if(visiblePatrols.size()>6)visiblePatrols.subList(6,visiblePatrols.size()).clear();
-        var inside=room==null?List.<Actor>of():residential(room)?homeActors(t,s,room):interiorActors(t,room);
+        var inside=room==null?List.<Actor>of():linkedHome?GeoLife.household(t,s,this):residential(room)?homeActors(t,s,room):interiorActors(t,room).stream().filter(a->linked==null||!a.id().equals(linked.id)).map(a->rebirth?new Actor(a.id(),a.x(),a.z(),a.activity(),false,a.pose(),a.heading(),a.workVisual(),a.outfitVisual(),a.appearanceStage()):a).toList();
         var visit=IntercomLife.apartment(t,s.day,s.minute);
-        boolean privateRoom=room!=null&&residential(room);
+        boolean privateRoom=room!=null&&(residential(room)||linkedHome);
         var interior=room==null?null:new Interior(privateRoom?"HOME":room.name(),privateRoom?(visit!=null&&"VISITING".equals(visit.status())?"Apartment / Appartamento "+visit.unit():"Your home / Casa tua"):room.label,point(room).x,point(room).z,inside.size());
         var availableActions=new ArrayList<Choice>();
         if(!privateRoom)availableActions.addAll(choices(t,s,player).stream().filter(a->room==null||!outsideAction(a.id())).toList());
         availableActions.addAll(homeChoices(t,s,player,room));
         availableActions.addAll(enterpriseChoices(t,s,player,room));
+        if(rebirth){availableActions.clear();availableActions.addAll(GeoLife.choices(t,s,this));}
         return new View(s.day,s.minute,population,commuting,room==null?List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))):inside,
-            district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
+            district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(player))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null);
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t));
     }
 }
