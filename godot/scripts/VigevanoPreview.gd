@@ -39,6 +39,7 @@ var shared_mode:=false
 var district_sign: Label3D
 var actions_panel: PanelContainer
 const PhonePanel=preload("res://scripts/GeoPhone.gd")
+const WorkPanel=preload("res://scripts/GeoWorkPanel.gd")
 var phone_panel: PanelContainer
 var action_list: VBoxContainer
 var owned_car: Node3D
@@ -234,7 +235,7 @@ func _input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
         return
     if actions_panel.visible:
-        if event is InputEventKey and event.pressed and event.keycode in [KEY_ESCAPE,KEY_F]:
+        if event is InputEventKey and event.pressed and (event.keycode==KEY_ESCAPE or (event.keycode==KEY_F and not get_viewport().gui_get_focus_owner() is TextEdit)):
             actions_panel.hide()
             Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
             get_viewport().set_input_as_handled()
@@ -618,6 +619,8 @@ func _open_actions() -> void:
         biography.text=_life_summary()+"\nSavings / Risparmi: €"+str(life.get("savings",0))
         if life.get("parentA")!=null:biography.text+="\nParents / Genitori: "+str(life.get("parentA"))+" + "+str(life.get("parentB"))
         action_list.add_child(biography)
+    var work: Dictionary=residents.world.get("work",{})
+    if not work.is_empty():WorkPanel.build(action_list,work,_perform_action)
     var enterprise=residents.world.get("enterprise")
     if enterprise is Dictionary and bool(enterprise.get("yours",false)):
         var summary:=Label.new()

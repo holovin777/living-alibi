@@ -63,7 +63,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -472,6 +472,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,room==null?List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))):inside,
             district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s));
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s));
     }
 }
