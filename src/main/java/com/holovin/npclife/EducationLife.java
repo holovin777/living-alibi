@@ -21,7 +21,7 @@ final class EducationLife {
             case "Engineer","Programmer","Mechanic","Miner","Factory machinist","Transport driver","Independent fabricator","Company freight driver" -> "technical";
             case "Nurse","Barista" -> "social";
             case "Teacher","Librarian","Doctor","Detective" -> "academic";
-            case "Market vendor","Private stall seller","Office clerk","Baker","Pizzaiolo","Gelataio" -> "commerce";
+            case "Market vendor","Private stall seller","Office clerk","Baker","Pizzaiolo","Gelataio",PostalLife.OCCUPATION -> "commerce";
             default -> "academic";
         };
     }
@@ -76,6 +76,8 @@ final class EducationLife {
         if(PoliceLife.OFFICER.equals(job)&&c.age<21)return false;
         if("Doctor".equals(job)&&(c.age<25||get(t,c,"social")<35))return false;
         if(NewspaperLife.OCCUPATION.equals(job)&&(t.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY*30||c.money<200))return false;
+        if(PostalLife.OCCUPATION.equals(job))return PostalLife.funded(t)&&
+                t.people.values().stream().filter(x->x.alive&&x.employed&&PostalLife.postalWorker(x)).count()<2;
         if(RetailLife.foodRole(job))return t.employerFunds.getOrDefault(RetailLife.foodAccount(job),0)>=RetailLife.FOOD_WAGE && t.people.values().stream().noneMatch(x->x.alive&&x.employed&&job.equals(x.occupation));
         String employer=IndustryLife.companyFor(job);
         if(employer!=null&&t.employerFunds.getOrDefault(employer,0)<IndustryLife.HOURLY_WAGE)return false;

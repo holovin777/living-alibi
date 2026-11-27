@@ -189,6 +189,7 @@ const IT := {
     "CLEANING_NOT_DUE": "Pulizia non necessaria",
     "WAITING_CLEANER": "In attesa dell'addetto",
     "Mail service: %s": "Servizio postale: %s",
+    "Postal worker": "Portalettere",
     "POSTAL_IDLE": "Nessuna consegna in attesa",
     "POSTAL_QUEUED": "In attesa di consegna",
     "POSTAL_DISPATCHED": "Addetto in viaggio",

@@ -92,6 +92,7 @@ public final class GameSession implements AutoCloseable {
         if(!"WORKING".equals(c.activity)||c.travelRemaining>0)return "";
         String role=c.occupation==null?"":c.occupation;
         if(PoliceLife.officer(c)||PoliceLife.detective(c))return "";
+        if(PostalLife.postalWorker(c))return "MAIL_BAG";
         return switch(c.place){
             case CENTRO -> role.equals("Pizzaiolo")?"PIZZA":role.equals("Gelataio")?"GELATO":"";
             case BAKERY -> role.equals("Baker")?"BREAD":"";
@@ -122,6 +123,7 @@ public final class GameSession implements AutoCloseable {
         String role=c.occupation==null?"":c.occupation;
         if(PoliceLife.officer(c))return "POLICE";
         if(PoliceLife.detective(c))return "DETECTIVE";
+        if(PostalLife.postalWorker(c))return "POSTAL";
         return switch(c.place){
             case CENTRO -> role.equals("Pizzaiolo")?"BAKER_APRON":role.equals("Gelataio")?"CAFE_APRON":"";
             case BAKERY -> role.equals("Baker")?"BAKER_APRON":"";

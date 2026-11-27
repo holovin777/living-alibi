@@ -4,7 +4,16 @@ package com.holovin.npclife;
  * Private per-recipient counts are persisted but never projected to public UI. */
 final class PostalLife {
     private PostalLife(){}
-    static final int DELIVERY_MINUTES=15;
+    static final int DELIVERY_MINUTES=15, WAGE=8;
+    static final String OCCUPATION="Postal worker", ACCOUNT="postal-service";
+    static boolean postalWorker(TownLife.Citizen c){return OCCUPATION.equals(c.occupation);}
+    static boolean funded(TownLife.Town t){return t.employerFunds.getOrDefault(ACCOUNT,0)>=WAGE;}
+    static boolean pay(TownLife.Town t,TownLife.Citizen c){
+        if(!postalWorker(c)||!funded(t))return false;
+        int wallet=Math.addExact(c.money,WAGE);
+        t.employerFunds.merge(ACCOUNT,-WAGE,Integer::sum);c.money=wallet;
+        return true;
+    }
     private static final String PREFIX="postal:", PENDING=PREFIX+"pending",
             WORKER=PREFIX+"worker", PROGRESS=PREFIX+"progress",
             DELIVERED=PREFIX+"delivered", RETURNED=PREFIX+"returned";
@@ -21,7 +30,7 @@ final class PostalLife {
     private static boolean hours(WorldState s){return (s.day-1)%7<5&&s.minute>=540&&s.minute<960;}
     private static boolean available(TownLife.Town t,TownLife.Citizen c,WorldState s){
         return c!=null&&c.generationIndex>0&&c.alive&&c.age>=18&&c.age<65&&c.employed&&
-                "Office clerk".equals(c.occupation)&&c.workplace==TownLife.Place.OFFICE&&
+                (postalWorker(c)&&funded(t)||"Office clerk".equals(c.occupation))&&c.workplace==TownLife.Place.OFFICE&&
                 c.home!=TownLife.Place.NORTH_RESIDENCES&&!RebirthLife.linkedAdult(t,c)&&
                 !EmploymentLife.sick(c,s.day)&&!NpcJusticeLife.confined(t,c,s)&&
                 !PublicSafetyLife.alarmed(t,c,s.day,s.minute)&&
@@ -53,19 +62,22 @@ final class PostalLife {
                 set(t,queue(c),0);
                 set(t,PENDING,get(t,PENDING)-letters);
             }
+            if(postalWorker(worker))pay(t,worker);
             worker.fatigue=Math.min(100,worker.fatigue+2);
             clear(t);return;
         }
         if(get(t,PENDING)==0||!hours(s)||s.minute>840||s.minute%30!=0)return;
         var worker=t.people.values().stream().filter(c->available(t,c,s)&&c.travelRemaining==0&&
                 c.place==TownLife.Place.OFFICE&&"WORKING".equals(c.activity))
-                .sorted(java.util.Comparator.comparing(c->c.id)).findFirst().orElse(null);
+                .sorted(java.util.Comparator.comparing((TownLife.Citizen c)->!postalWorker(c))
+                        .thenComparing(c->c.id)).findFirst().orElse(null);
         if(worker!=null){set(t,WORKER,worker.generationIndex);set(t,PROGRESS,0);}
     }
-    record Report(String status,int pending,int delivered,int returned){}
+    record Report(String status,int pending,int delivered,int returned,int employees,int payroll){}
     static Report report(TownLife.Town t){
         String status=get(t,WORKER)>0?(get(t,PROGRESS)>0?"POSTAL_DELIVERING":"POSTAL_DISPATCHED"):
                 get(t,PENDING)>0?"POSTAL_QUEUED":"POSTAL_IDLE";
-        return new Report(status,get(t,PENDING),get(t,DELIVERED),get(t,RETURNED));
+        int employees=(int)t.people.values().stream().filter(c->c.alive&&c.employed&&postalWorker(c)).count();
+        return new Report(status,get(t,PENDING),get(t,DELIVERED),get(t,RETURNED),employees,t.employerFunds.getOrDefault(ACCOUNT,0));
     }
 }

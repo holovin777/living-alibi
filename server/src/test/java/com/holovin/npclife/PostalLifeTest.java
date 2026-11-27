@@ -19,12 +19,13 @@ class PostalLifeTest {
             assertEquals(12,CondominiumLife.allocate(t,s,recipient,155));
             assertEquals(0,CondominiumLife.allocate(t,s,recipient,155));
             assertEquals(1,PostalLife.report(t).pending());
-            var c=new TownLife.Citizen("postal-test","Test Clerk","Office clerk",TownLife.Place.OFFICE);
+            var c=new TownLife.Citizen("postal-test","Test Clerk",PostalLife.OCCUPATION,TownLife.Place.OFFICE);
             c.generationIndex=9000;c.age=35;c.alive=true;c.employed=true;c.workplace=TownLife.Place.OFFICE;
             c.home=TownLife.Place.SOUTH_RESIDENCES;c.activity="WORKING";c.health=90;
             c.hunger=20;c.thirst=20;c.fatigue=20;c.money=50;
             // Isolate the dispatch from any existing office workers.
-            for(var p:t.people.values())if("Office clerk".equals(p.occupation))p.employed=false;
+            for(var p:t.people.values())if("Office clerk".equals(p.occupation)||PostalLife.postalWorker(p))p.employed=false;
+            int payroll=t.employerFunds.get(PostalLife.ACCOUNT);
             t.people.put(c.id,c);
             PostalLife.tick(t,s);
             assertTrue(PostalLife.assigned(t,c,s));
@@ -38,7 +39,9 @@ class PostalLifeTest {
             assertEquals(0,PostalLife.report(t).pending());
             assertEquals(1,PostalLife.report(t).delivered());
             assertEquals(12,CondominiumLife.report(t).arrears());
-            assertEquals(50,c.money);
+            assertEquals(50+PostalLife.WAGE,c.money);
+            assertEquals(payroll-PostalLife.WAGE,t.employerFunds.get(PostalLife.ACCOUNT));
+            assertEquals(1,PostalLife.report(t).employees());
             db.save(s,List.of(),List.of(),t,List.of(),List.of(),List.of());
         }
         try(var db=new WorldDatabase(file)){

@@ -1470,6 +1470,7 @@ func _generate_chunk(place_id: String) -> void:
                     Vector3(-8.0, 0.7, 7.0))
         "OFFICE":
             _build_digital_office()
+            _build_postal_counter()
         "QUARRY":
             _add_obstacle(Vector3(-8.0, 0.0, 9.0), Vector2(11.0, 3.0))
             for x in [-11.0, -8.0, -5.0]:
@@ -2802,6 +2803,32 @@ func _build_digital_office() -> void:
     for station in [JAVA_DESK,DEVOPS_DESK,COMPANY_DESK]:
         _box(office,Vector3(1.45,0.025,1.45),Color("#6f8c85"),station+Vector3(0,0.07,0))
 
+# A small walk-in postal counter within the existing Offices district.
+func _build_postal_counter() -> void:
+    var post := Node3D.new()
+    post.name="UfficioPostale"
+    _scenery.add_child(post)
+    var wall := Color("#e8dfca")
+    for part in [[Vector3(8,0,11),Vector2(7,0.24)],
+            [Vector3(4.5,0,8),Vector2(0.24,6)],
+            [Vector3(11.5,0,8),Vector2(0.24,6)],
+            [Vector3(5.65,0,5),Vector2(2.3,0.24)],
+            [Vector3(10.35,0,5),Vector2(2.3,0.24)]]:
+        _room_wall(post,part[0],part[1],wall)
+    _box(post,Vector3(7,0.06,6),Color("#bdb5a5"),Vector3(8,0.03,8))
+    _box(post,Vector3(7.2,0.23,6.2),Color("#526876"),Vector3(8,3.12,8))
+    _box(post,Vector3(3.1,0.40,0.22),Color("#d6ae43"),Vector3(8,2.7,5))
+    _sign(post,"POSTE · Ufficio postale",Vector3(8,3.38,4.95))
+    _room_furniture(post,Vector3(8,0,9.25),Vector3(4.0,0.95,0.65),Color("#c9ae6e"))
+    for i in range(4):
+        _box(post,Vector3(0.50,0.24,0.35),Color("#af9c7b"),Vector3(6.5+float(i),1.10,9.2))
+    _room_furniture(post,Vector3(10.4,0,10.3),Vector3(1.0,1.8,0.6),Color("#687b83"))
+    var light := OmniLight3D.new()
+    light.position=Vector3(8,2.7,8)
+    light.omni_range=6
+    light.light_energy=1.4
+    post.add_child(light)
+
 func _build_college() -> void:
     var campus := Node3D.new()
     campus.name="IstitutoLeonardo"
@@ -3978,6 +4005,10 @@ func _sync_work_prop(person: Node3D, kind: String) -> void:
             _box(prop,Vector3(0.29,0.17,0.23),Color("#99724a"),Vector3.ZERO)
             for x in [-0.08,0.08]:
                 _sphere(prop,0.055,Color("#b94c38"),Vector3(x,0.10,0))
+        "MAIL_BAG":
+            _box(prop,Vector3(0.25,0.30,0.13),Color("#525f72"),Vector3(0,-0.09,0))
+            _box(prop,Vector3(0.24,0.055,0.14),Color("#d8b74f"),Vector3(0,0.06,0))
+            _box(prop,Vector3(0.15,0.09,0.02),Color("#f0eee5"),Vector3(0,0.10,0))
         "PAPERS","TEACHING":
             _box(prop,Vector3(0.22,0.035,0.30),Color("#a17e53"),Vector3.ZERO)
             _box(prop,Vector3(0.19,0.012,0.26),Color("#f1eee4"),Vector3(0,0.025,0))
@@ -4024,6 +4055,10 @@ func _sync_resident_uniform(person: Node3D,kind: String) -> void:
             else:
                 _box(uniform,Vector3(0.24,0.24,0.18),Color("#443a30"),Vector3(0.26,0.91,0.04))
                 _box(uniform,Vector3(0.055,0.14,0.06),Color("#b1b8b9"),Vector3(0.26,1.07,0.04))
+        "POSTAL":
+            var vest := _cylinder(uniform,0.255,0.54,Color("#405c78"),Vector3(0,1.15,0))
+            vest.scale.z=0.77
+            _box(uniform,Vector3(0.12,0.055,0.025),Color("#e0bb4a"),Vector3(0.12,1.30,-0.205))
         "POLICE","DETECTIVE":
             var uniform_color := Color("#233b5b") if kind=="POLICE" else Color("#4a4844")
             var jacket := _cylinder(uniform,0.27,0.63,uniform_color,Vector3(0,1.12,0))

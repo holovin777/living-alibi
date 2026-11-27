@@ -43,6 +43,7 @@ final class CareerLife {
     static void ensureEmployers(TownLife.Town town) {
         for(var offer:OFFERS)
             town.employerFunds.putIfAbsent(offer.id,offer.startingPayroll);
+        town.employerFunds.putIfAbsent(PostalLife.ACCOUNT,360);
         town.employerFunds.putIfAbsent("barber",900);
         town.employerFunds.putIfAbsent("pizzeria",1200);
         town.employerFunds.putIfAbsent("gelateria",1200);
