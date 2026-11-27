@@ -27,6 +27,9 @@ final class EmotionLife {
         }
         if(recentTension>=60)return Mood.IRRITATED;
         if(recentTension>=35 || c.fatigue>=65)return Mood.STRESSED;
+        if(PsychologyLife.get(town,c,"stress",20)>=80)return Mood.STRESSED;
+        if(PsychologyLife.get(town,c,"loneliness",20)>=80)return Mood.LONELY;
+        if(PsychologyLife.get(town,c,"satisfaction",60)<=20)return Mood.SAD;
         if(friendly)return Mood.HAPPY;
         if(c.sociability>=70 && now>=2880 && (lastContact<0||now-lastContact>=2880))return Mood.LONELY;
         if("WORKING".equals(c.activity)&&c.curiosity>=70&&c.fatigue<40&&c.hunger<55&&c.thirst<55)return Mood.ENTHUSIASTIC;

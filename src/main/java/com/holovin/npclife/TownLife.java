@@ -743,6 +743,8 @@ final class TownLife {
         ResidentServiceLife.prepare(town,marco);
         ChildSearchLife.tick(town,marco);
         PopulationLife.tick(town,marco,truth,observations);
+        PsychologyLife.tick(town,marco);
+        SubstanceLife.tick(town,marco);
         ApprenticeshipLife.tick(town,marco);
         ResidentServiceLife.tick(town,marco);
         WorkplaceManagement.tick(town,marco,truth,observations);
