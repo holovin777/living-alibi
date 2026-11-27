@@ -55,9 +55,26 @@ public final class EmploymentDatabaseSmokeTest {
                         c.workplace==TownLife.Place.OFFICE,"new occupation and workplace survive restart");
                 check(c.jobChanges==1,"career change count persisted");
                 check(db.residentLifeEvents(null,20).size()==4,"hiring recorded once");
+                workplaceRoundTrip(town,c,db);
+            }
+            try(var db=new WorldDatabase(path)) {
+                var town=db.loadTown(db.load());
+                var c=town.get("resident-0001");
+                check(WorkplacePerformance.report(town,c).samples()==1,"performance survives restart");
+                check(town.industryStocks.getOrDefault(WorkplaceManagement.teamKey(c,"briefing"),0)==10,
+                    "workplace daily management marker survives restart");
             }
             System.out.println("EmploymentDatabaseSmokeTest: ALL CHECKS PASSED");
         } finally {Files.deleteIfExists(path);}
+    }
+    private static void workplaceRoundTrip(TownLife.Town town,TownLife.Citizen c,WorldDatabase db) throws Exception {
+        var state=db.load();
+        state.day=10;state.minute=600;
+        c.place=c.workplace;c.destination=c.workplace;c.travelRemaining=0;c.activity="WORKING";c.sickUntilDay=0;
+        WorkplacePerformance.tick(town,state);
+        check(WorkplacePerformance.report(town,c).samples()==1,"workplace sample recorded");
+        town.industryStocks.put(WorkplaceManagement.teamKey(c,"briefing"),10);
+        db.save(state,List.of(),List.of(),town,List.of(),List.of());
     }
     private static void check(boolean condition,String message) {
         if(!condition)throw new AssertionError("Failed: "+message);

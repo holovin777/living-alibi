@@ -19,7 +19,7 @@ final class WorkplacePerformance {
     private static boolean sameEmployment(TownLife.Town t,TownLife.Citizen c){
         return get(t,c,"job-changes")==c.jobChanges
                 &&get(t,c,"hired")==c.lastHiredDay
-                &&get(t,c,"role")==c.occupation.hashCode()
+                &&get(t,c,"role")==(c.occupation.hashCode() & Integer.MAX_VALUE)
                 &&get(t,c,"site")==c.workplace.ordinal()+1;
     }
     static Report report(TownLife.Town t,TownLife.Citizen c){
@@ -34,7 +34,7 @@ final class WorkplacePerformance {
             if(!sameEmployment(t,c)){
                 for(String field:new String[]{"samples","quality","pace","review","day","minute"})set(t,c,field,0);
                 set(t,c,"job-changes",c.jobChanges);set(t,c,"hired",c.lastHiredDay);
-                set(t,c,"role",c.occupation.hashCode());set(t,c,"site",c.workplace.ordinal()+1);
+                set(t,c,"role",(c.occupation.hashCode() & Integer.MAX_VALUE));set(t,c,"site",c.workplace.ordinal()+1);
             }
             if(get(t,c,"day")==s.day&&get(t,c,"minute")==s.minute)continue;
             int skill=WorkplaceHierarchy.skill(t,c);
