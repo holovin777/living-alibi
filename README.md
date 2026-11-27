@@ -158,5 +158,10 @@ When playing a linked child aged 3–17, tell a nearby resident in Italian
 Safety requests bypass ordinary NPC conversation limits. Most adults,
 including police, help and report a missing child; a few may be unwilling or
 unable to assist and direct the child to someone else. Reports start the
-existing parent/police search, without revealing the child's precise position
-to distant NPCs, teleporting the player, or automatically returning them home.
+existing parent/police search. An actual sighting provides a last-known district,
+not a live position. After an officer finds a child, the case remains in
+`WAITING_FOR_FAMILY` until a parent physically arrives in the same simulated
+space. Available parents can interrupt work and travel to the reported district.
+The officer stays assigned during the reunion phase, and the arriving parent
+has a short reunion window. No character is teleported. A previous incorrectly
+closed report can be reopened by asking for help again.

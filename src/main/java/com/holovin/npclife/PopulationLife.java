@@ -81,8 +81,9 @@ final class PopulationLife {
         if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
             RebirthLife.resumeRoutine(town);manual=null;
         }
-        TownLife.Place search=child||sick||homeService||residentService!=null||freightRun||condominiumRepair||condominiumCleaning||postalRound
-                ?null:ChildSearchLife.destination(town,c,clock);
+        // A missing-child assignment takes priority over ordinary work and
+        // service destinations. Existing journeys still finish normally.
+        TownLife.Place search=child||sick?null:ChildSearchLife.destination(town,c,clock);
         if(ChildhoodPrologue.active(town,c)&&manual==null)desired=c.home;
         else if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;

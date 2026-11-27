@@ -9,6 +9,15 @@ final class ChildSearchLife {
     private static int get(TownLife.Town t,TownLife.Citizen c,String f){return t.industryStocks.getOrDefault(key(c,f),0);}
     private static void set(TownLife.Town t,TownLife.Citizen c,String f,int n){t.industryStocks.put(key(c,f),n);}
     private static int now(WorldState s){return Math.toIntExact((s.day-1L)*1440+s.minute);}
+    private static final int WAITING_FOR_FAMILY=4;
+    private static TownLife.Place lastSeen(TownLife.Town t,TownLife.Citizen c){
+        int place=get(t,c,"last-seen-place");
+        return place>0&&place<=TownLife.Place.values().length?TownLife.Place.values()[place-1]:null;
+    }
+    private static void sighting(TownLife.Town t,TownLife.Citizen c,WorldState s){
+        set(t,c,"last-seen-place",c.place.ordinal()+1);
+        set(t,c,"last-seen-at",now(s)+1);
+    }
     private static final List<TownLife.Place> ROUTE=List.of(TownLife.Place.PARK,TownLife.Place.LIBRARY,TownLife.Place.SCHOOL,TownLife.Place.CENTRO,TownLife.Place.PORTICI,TownLife.Place.MARKET);
     record View(String status,String searchingParent,int minutesOverdue,int incidents,int contactsNotified,boolean policeReported,String searchingOfficer){}
     static View view(TownLife.Town t,TownLife.Citizen c,int day,int minute){
@@ -18,7 +27,7 @@ final class ChildSearchLife {
         if(c==null||!DemographyLife.child(c))return null;
         int status=get(t,c,"status");
         var parent=DemographyLife.byIndex(t,get(t,c,"searcher"));
-        return new View(switch(status){case 1->"OVERDUE";case 2->"SEARCHING";case 3->"LOCATED";default->"NONE";},
+        return new View(switch(status){case 1->"OVERDUE";case 2->"SEARCHING";case 3->"LOCATED";case WAITING_FOR_FAMILY->"WAITING_FOR_FAMILY";default->"NONE";},
                 parent==null?null:parent.name,status==0?0:Math.max(0,now(s)-get(t,c,"start")),get(t,c,"incidents"),
                 get(t,c,"contacts"),get(t,c,"reported")>0,
                 officerName(t,c));
@@ -45,12 +54,28 @@ final class ChildSearchLife {
             ArchiveLife.record(t,"child-report:"+child.id+":"+get(t,child,"incidents"),s.day,s.minute,
                     "Family","An adult reported a lost child to police after meeting the child.");
         }
-        police(t,child,s);
+        // This information comes from a real face-to-face encounter.
+        sighting(t,child,s);
+        assignParent(t,child,s);
+        // Prefer the actual officer who heard the child, rather than an
+        // unrelated officer elsewhere on patrol.
+        if(PoliceLife.officer(helper)&&helper.generationIndex>0
+                &&(get(t,helper,"assigned")==0||get(t,helper,"assigned")==child.generationIndex)
+                &&!EmploymentLife.sick(helper,s.day)&&!NpcJusticeLife.confined(t,helper,s)){
+            var previous=DemographyLife.byIndex(t,get(t,child,"officer"));
+            if(previous!=helper){
+                releaseOfficer(t,child);
+                set(t,child,"officer",helper.generationIndex);
+                set(t,helper,"assigned",child.generationIndex);
+                set(t,child,"police-start",now(s));
+            }
+            foundByPolice(t,child,s);
+        }else police(t,child,s);
     }
     static void foundWithParent(TownLife.Town t,TownLife.Citizen child,TownLife.Citizen parent,WorldState s){
         if(FamilyDialogueLife.parentOf(t,parent,child)&&meet(parent,child)
                 &&get(t,child,"status")>0&&get(t,child,"status")!=3)
-            located(t,child,s,"a parent");
+            reunited(t,child,parent,s);
     }
 
     static void departed(TownLife.Town t,TownLife.Citizen c,WorldState s){
@@ -88,7 +113,9 @@ final class ChildSearchLife {
             ArchiveLife.record(t,"child-report:"+c.id+":"+get(t,c,"incidents"),s.day,s.minute,"Family","A family reported a missing child to police.");
         }
         var officer=DemographyLife.byIndex(t,get(t,c,"officer"));
-        if(officer!=null&&(!officer.alive||!PoliceLife.officer(officer)||!PoliceLife.scheduled(officer,s.day,s.minute)||EmploymentLife.sick(officer,s.day)||NpcJusticeLife.confined(t,officer,s))){
+        if(officer!=null&&(!officer.alive||!PoliceLife.officer(officer)
+                ||(get(t,c,"status")!=WAITING_FOR_FAMILY&&!PoliceLife.scheduled(officer,s.day,s.minute))
+                ||EmploymentLife.sick(officer,s.day)||NpcJusticeLife.confined(t,officer,s))){
             releaseOfficer(t,c);officer=null;
         }
         if(officer==null){
@@ -96,15 +123,44 @@ final class ChildSearchLife {
                     &&get(t,p,"assigned")==0&&!EmploymentLife.sick(p,s.day)&&!NpcJusticeLife.confined(t,p,s)&&!RebirthLife.linkedAdult(t,p)).findFirst().orElse(null);
             if(officer!=null){set(t,c,"officer",officer.generationIndex);set(t,officer,"assigned",c.generationIndex);set(t,c,"police-start",now(s));}
         }
-        if(meet(officer,c))located(t,c,s,"a police officer");
+        if(meet(officer,c))foundByPolice(t,c,s);
     }
-    private static void located(TownLife.Town t,TownLife.Citizen c,WorldState s,String who){
+    private static void foundByPolice(TownLife.Town t,TownLife.Citizen c,WorldState s){
+        sighting(t,c,s);
+        if(get(t,c,"status")!=WAITING_FOR_FAMILY){
+            set(t,c,"status",WAITING_FOR_FAMILY);
+            ArchiveLife.record(t,"child-police-found:"+c.id+":"+get(t,c,"incidents"),s.day,s.minute,
+                    "Family","A police officer found a missing child and notified the family of the meeting district.");
+        }
+        assignParent(t,c,s);
+    }
+    private static void reunited(TownLife.Town t,TownLife.Citizen c,TownLife.Citizen parent,WorldState s){
+        boolean policeCase=get(t,c,"reported")>0;
         release(t,c);releaseOfficer(t,c);set(t,c,"status",3);
-        ArchiveLife.record(t,"child-located:"+c.id+":"+get(t,c,"incidents"),s.day,s.minute,"Family",c.name+" was located by "+who+".");
+        if(policeCase&&!RebirthLife.linkedAdult(t,parent)&&get(t,parent,"assigned")==0){
+            // Give the family time to actually speak, rather than immediately
+            // sending the arriving parent back to their ordinary routine.
+            sighting(t,c,s);
+            set(t,c,"searcher",parent.generationIndex);
+            set(t,parent,"assigned",c.generationIndex);
+            set(t,c,"reunion-until",now(s)+15);
+        }
+        ArchiveLife.record(t,"child-located:"+c.id+":"+get(t,c,"incidents"),s.day,s.minute,
+                "Family",c.name+" was reunited with a parent.");
     }
-    private static boolean eligible(TownLife.Town t,TownLife.Citizen p,WorldState s){
+    private static void assignParent(TownLife.Town t,TownLife.Citizen c,WorldState s){
+        if(get(t,c,"searcher")!=0)return;
+        boolean reported=get(t,c,"reported")>0;
+        for(var p:ParentingLife.parents(t,c)){
+            if(!eligible(t,p,s,reported))continue;
+            set(t,c,"searcher",p.generationIndex);set(t,p,"assigned",c.generationIndex);
+            if(get(t,c,"status")!=WAITING_FOR_FAMILY)set(t,c,"status",2);
+            set(t,c,"route-start",now(s));return;
+        }
+    }
+    private static boolean eligible(TownLife.Town t,TownLife.Citizen p,WorldState s,boolean reported){
         return p!=null&&p.alive&&p.age>=18&&!RebirthLife.linkedAdult(t,p)&&!EmploymentLife.sick(p,s.day)
-                &&!NpcJusticeLife.confined(t,p,s)&&!"WORKING".equals(p.activity)
+                &&!NpcJusticeLife.confined(t,p,s)&&(reported||!"WORKING".equals(p.activity))
                 &&get(t,p,"assigned")==0;
     }
     private static void release(TownLife.Town t,TownLife.Citizen child){
@@ -119,6 +175,7 @@ final class ChildSearchLife {
             if(!c.alive||!DemographyLife.child(c)||HomeRoutineLife.atHome(c)){
                 if(status!=0){release(t,c);releaseOfficer(t,c);set(t,c,"status",0);}
                 set(t,c,"departed",0);set(t,c,"contacts",0);set(t,c,"reported",0);set(t,c,"contact-attempt",0);
+                set(t,c,"last-seen-place",0);set(t,c,"last-seen-at",0);set(t,c,"reunion-until",0);
                 continue;
             }
             boolean free=RebirthLife.freeChild(t,c);
@@ -135,33 +192,46 @@ final class ChildSearchLife {
                 set(t,c,"start",now(s));set(t,c,"status",1);
                 set(t,c,"incidents",Math.addExact(get(t,c,"incidents"),1));status=1;
             }
-            if(status==3)continue;
+            if(status==3){
+                if(now(s)>=get(t,c,"reunion-until"))release(t,c);
+                continue;
+            }
             var parent=DemographyLife.byIndex(t,get(t,c,"searcher"));
             if(parent!=null&&(!parent.alive||EmploymentLife.sick(parent,s.day)||NpcJusticeLife.confined(t,parent,s))){
-                release(t,c);set(t,c,"status",1);parent=null;
+                release(t,c);
+                if(status!=WAITING_FOR_FAMILY)set(t,c,"status",1);
+                parent=null;
             }
-            if(parent==null){
-                for(String field:List.of("parent-a","parent-b")){
-                    var p=DemographyLife.byIndex(t,DemographyLife.get(t,c,field));
-                    if(eligible(t,p,s)){
-                        parent=p;set(t,c,"searcher",p.generationIndex);set(t,p,"assigned",c.generationIndex);
-                        set(t,c,"status",2);set(t,c,"route-start",now(s));break;
-                    }
+            // The child's actual meeting with a parent completes the case.
+            var arrived=ParentingLife.parents(t,c).stream().filter(p->meet(p,c)).findFirst().orElse(null);
+            if(arrived!=null){reunited(t,c,arrived,s);continue;}
+            if(status==WAITING_FOR_FAMILY){
+                var officer=DemographyLife.byIndex(t,get(t,c,"officer"));
+                if(meet(officer,c))sighting(t,c,s);
+                else if(now(s)-(get(t,c,"last-seen-at")-1)>=30){
+                    // Lost contact: search the last reported area, not the
+                    // child's unknown live location.
+                    set(t,c,"status",get(t,c,"searcher")>0?2:1);
+                    releaseOfficer(t,c);
                 }
             }
-            if(meet(parent,c)){located(t,c,s,"a parent");continue;}
+            assignParent(t,c,s);
             int overdue=now(s)-get(t,c,"start");
             if(overdue>=15)notifyContacts(t,c,s);
-            if(overdue>=30&&!ParentingLife.parents(t,c).isEmpty())police(t,c,s);
+            if(get(t,c,"reported")>0||overdue>=30&&!ParentingLife.parents(t,c).isEmpty())police(t,c,s);
         }
     }
     static TownLife.Place destination(TownLife.Town t,TownLife.Citizen p,WorldState s){
         int assigned=get(t,p,"assigned");
         if(assigned==0)return null;
         var child=DemographyLife.byIndex(t,assigned);
-        if(child==null||!child.alive||child.age>=18||get(t,child,"status")==0||get(t,child,"status")==3||HomeRoutineLife.atHome(child))return null;
+        if(child==null||!child.alive||child.age>=18||get(t,child,"status")==0||HomeRoutineLife.atHome(child))return null;
         boolean officer=get(t,child,"officer")==p.generationIndex;
         if(!officer&&get(t,child,"searcher")!=p.generationIndex)return null;
+        int status=get(t,child,"status");
+        var seen=lastSeen(t,child);
+        if(status==3)return !officer&&now(s)<get(t,child,"reunion-until")?seen:null;
+        if(seen!=null&&(status==WAITING_FOR_FAMILY||now(s)-(get(t,child,"last-seen-at")-1)<60))return seen;
         int step=Math.max(0,(now(s)-get(t,child,officer?"police-start":"route-start"))/60);
         return ROUTE.get(Math.floorMod(step,ROUTE.size()));
     }

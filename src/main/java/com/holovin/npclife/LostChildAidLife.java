@@ -59,9 +59,14 @@ final class LostChildAidLife {
                     :"I'm sorry, I can't stay. Please ask a shop worker or a police officer to help.";
         boolean already=ChildSearchLife.view(town,child,clock).policeReported();
         ChildSearchLife.reportedBy(town,child,adult,clock);
-        if(PoliceLife.officer(adult))
-            return it?"Hai fatto bene a chiedere aiuto. Ho registrato la segnalazione: cercheremo i tuoi familiari. Puoi restare qui mentre parliamo."
-                    :"You did the right thing asking for help. I've recorded the report; we'll look for your family. You can stay here while we talk.";
+        if(PoliceLife.officer(adult)){
+            var search=ChildSearchLife.view(town,child,clock);
+            if("WAITING_FOR_FAMILY".equals(search.status())&&search.searchingParent()!=null)
+                return it?"Ti abbiamo trovato. Un tuo genitore è stato avvisato e verrà qui. Rimaniamo in un luogo visibile."
+                        :"We've found you. One of your parents has been notified and is coming here. Let's stay somewhere visible.";
+            return it?"Ho registrato la segnalazione. Cercheremo di contattare i tuoi familiari. Non sappiamo ancora quando arriveranno."
+                    :"I've recorded the report. We'll try to contact your family. We don't yet know when they will arrive.";
+        }
         if(already)
             return it?"La polizia è già stata avvisata. Puoi restare in un posto visibile mentre cerchiamo aiuto."
                     :"The police have already been notified. You can stay somewhere visible while we find help.";
