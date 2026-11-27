@@ -29,6 +29,8 @@ const COLLISION_STEP := 0.12
 const ROAD_EDGE := 24.0
 const ROAD_HALF_WIDTH := 2.0
 const ROAD_TRIGGER := 23.8
+# Pedestrian trigger must be INSIDE the collision limit (24 - 0.32).
+const FOOT_SEAM_TRIGGER := 23.45
 const TownLayout = preload("res://scripts/TownMap.gd")
 const MOUSE_SENSITIVITY := 0.0025
 const EYE_HEIGHT := 1.65
@@ -460,7 +462,7 @@ func _process(delta: float) -> void:
             _hint.text="E: "+str(_last_snapshot["rebirth"]["grocery"].get("name","Shop"))+" · F: life choices"
         elif _near_family_entrance():
             _hint.text="E: enter your home · F: life choices"
-        elif _can_walk_roads() and not _road_destination(_avatar.position,ROAD_TRIGGER).is_empty():
+        elif _can_walk_roads() and not _foot_seam_destination(_avatar.position).is_empty():
             _hint.text="Walk forward to the next district"
         else:
             _hint.text = "F: life choices · WASD: local exploration" if _child_can_walk() else "Childhood · follow the family schedule"
@@ -473,7 +475,7 @@ func _process(delta: float) -> void:
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
-    elif not _road_destination(_avatar.position, ROAD_TRIGGER).is_empty():
+    elif not _foot_seam_destination(_avatar.position).is_empty():
         _hint.text = "District crossing · walk forward to travel"
     elif _near_stairwell():
         _hint.text = tr("G: enter stairwell · E: intercom")
@@ -2139,20 +2141,42 @@ func _road_destination(at: Vector3, minimum: float) -> String:
             return str(_road_links[key])
     return ""
 
+# Pedestrians can cross the entire shared edge, including grass and
+# sidewalks. Road width continues to govern vehicles, not people.
+func _foot_seam_destination(at: Vector3, motion: Vector3 = Vector3.ZERO) -> String:
+    var chosen := ""
+    var best := -1.0
+    for key in _road_links:
+        var direction: Vector3 = key
+        var along := at.dot(direction)
+        var lateral := (at-direction*along).length()
+        if along<FOOT_SEAM_TRIGGER or lateral>ROAD_EDGE:
+            continue
+        var outward := motion.dot(direction)
+        if motion.length_squared()>0.000001 and outward<=0.0:
+            continue
+        var score := along + outward*0.25
+        if score>best:
+            best=score
+            chosen=str(_road_links[key])
+    return chosen
+
 func _try_road_crossing(motion: Vector3) -> void:
-    var destination := _road_destination(_avatar.position, ROAD_TRIGGER)
+    var destination := _foot_seam_destination(_avatar.position,motion)
     if destination.is_empty():
         _road_blocked = ""
         return
-    var direction := (TownLayout.world_center(destination) -
-            TownLayout.world_center(_current_place)).normalized()
-    if motion.dot(direction) <= 0.0 or destination == _road_blocked:
+    if destination == _road_blocked:
         return
     if not _connected or _api.is_busy() or not _road_pending.is_empty():
         return
+    var direction := (TownLayout.world_center(destination) -
+            TownLayout.world_center(_current_place)).normalized()
     _road_pending = destination
     var lateral := _avatar.position - direction * _avatar.position.dot(direction)
-    _road_arrival = lateral - direction * 23.0
+    # Rebase on the other side of the same edge without moving the player
+    # sideways into a road. Leave a small buffer against immediate reversal.
+    _road_arrival = lateral - direction * (FOOT_SEAM_TRIGGER-0.15)
     if _rebirth_active():
         _api.garden_action(("rebirth-child-road-" if str(_last_snapshot.get("rebirth",{}).get("phase",""))=="CHILDHOOD" else "rebirth-road-")+destination)
     else:
@@ -2173,7 +2197,9 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
     # The visible ground is 48 m wide. All unobstructed grass and
     # paving within that tile are walkable; only the actual seam is a boundary.
     if absf(at.x)>ROAD_EDGE-radius or absf(at.z)>ROAD_EDGE-radius:
-        if not allow_roads or _road_destination(at, ROAD_TRIGGER-1.0).is_empty():
+        # Keep cars on road corridors. Pedestrians initiate the server
+        # transition before reaching this limit, at every adjacent edge.
+        if radius<=WALKER_RADIUS or not allow_roads or _road_destination(at, ROAD_TRIGGER-1.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
     if _public_door_blocks(at,radius):return false
