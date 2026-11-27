@@ -136,21 +136,8 @@ final class RebirthLife {
         c.activity="TRAVELING";
         return c.travelRemaining;
     }
-    // Same public grid as Godot TownMap, validated independently of visual input.
-    private static final List<List<String>> ROAD_GRID=List.of(
-            List.of("NORTH_RESIDENCES","CLINIC","SCHOOL","OFFICE","FACTORY"),
-            List.of("MARKET","CENTRO","PARK","LIBRARY","WORKSHOP"),
-            List.of("SOUTH_RESIDENCES","PORTICI","RIVER","WOODS","QUARRY"),
-            List.of("CAFE","BAKERY","FARM","LOGISTICS_DEPOT","FUEL_STATION"),
-            List.of("BORGO_SUD","PIAZZA_FONTANA","GIARDINI","STAZIONE","VIA_TIGLI"));
-    static boolean adjacent(TownLife.Place a,TownLife.Place b){
-        int ax=-1,ay=-1,bx=-1,by=-1;
-        for(int y=0;y<ROAD_GRID.size();y++){
-            int x=ROAD_GRID.get(y).indexOf(a.name());if(x>=0){ax=x;ay=y;}
-            x=ROAD_GRID.get(y).indexOf(b.name());if(x>=0){bx=x;by=y;}
-        }
-        return ax>=0&&bx>=0&&Math.abs(ax-bx)+Math.abs(ay-by)==1;
-    }
+    // One authoritative coordinate registry for every public road.
+    static boolean adjacent(TownLife.Place a,TownLife.Place b){return CityExpansionLife.adjacent(a,b);}
     static int roadTravel(TownLife.Town t,TownLife.Place destination,int day){
         var c=requireAdult(t);
         if(atHome(c)||!adjacent(c.place,destination))throw new IllegalArgumentException("Leave your home and follow an adjacent road.");

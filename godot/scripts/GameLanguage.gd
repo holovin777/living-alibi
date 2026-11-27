@@ -24,6 +24,8 @@ const IT := {
     "Registered sporting weapon purchased.": "Arma sportiva registrata acquistata.",
     "A valid weapon license is required.": "Serve una licenza valida.",
     "Sport": "Arma sportiva",
+    "Whole city overview": "Panoramica della città",
+    "Search destinations": "Cerca destinazioni",
     "Public safety alert in this district.": "Allerta di sicurezza in questo quartiere.",
     "A registered sporting weapon is required.": "Serve un’arma sportiva registrata.",
     "Rounds: %s/%s": "Colpi: %s/%s",

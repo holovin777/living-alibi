@@ -211,6 +211,7 @@ var _map_panel: PanelContainer
 var _town_map
 var _travel_panel: PanelContainer
 var _travel_choices: GridContainer
+var _destination_filter: LineEdit
 var _action_panel: PanelContainer
 var _dialog_panel: PanelContainer
 var _dialog_title: Label
@@ -1479,8 +1480,11 @@ func _generate_chunk(place_id: String) -> void:
             ]:
                 _tree(Vector3(p.x, 0.0, p.y))
         _:
-            _building("Neighborhood", Color(0.57, 0.61, 0.57))
-            _tree(Vector3(11.0, 0.0, 7.0))
+            if TownLayout.outer(place_id):
+                _build_outer_block(place_id)
+            else:
+                _building("Neighborhood", Color(0.57, 0.61, 0.57))
+                _tree(Vector3(11.0, 0.0, 7.0))
 
     if place_id in RACK_DISTRICTS:
         _build_bicycle_rack()
@@ -2235,6 +2239,47 @@ func _sync_construction_site() -> void:
 
 # Fictional Lombard residential block, with a real street-facing home entrance.
 # Keep the established guesthouse, rental room, construction site and road lanes intact.
+# Deterministic scenery, generated only when the streaming window needs this block.
+func _build_outer_block(id: String) -> void:
+    var block := Node3D.new()
+    block.name="ProceduralBlock"
+    _scenery.add_child(block)
+    var cell: Vector2i = TownLayout.DISTRICTS[id]
+    var variant := posmod(cell.x*7+cell.y*3,5)
+    var label := TownLayout.label_for(id)
+    var rural := label.begins_with("Campagna")
+    var green := label.begins_with("Giardino")
+    var square := label.begins_with("Piazzetta")
+    var positions := [Vector3(-10,0,-8),Vector3(10,0,-8),Vector3(-10,0,9),Vector3(10,0,10)]
+    _box(block,Vector3(34,0.04,3.4),Color("#777c78"),Vector3(0,0.025,0),"paving")
+    for z in [-2.8,2.8]:
+        _box(block,Vector3(34,0.07,1.2),Color("#beb7a6"),Vector3(0,0.035,z),"paving")
+    if rural:
+        for x in [-10.0,10.0]:
+            _box(block,Vector3(9,0.04,9),Color("#8e9860"),Vector3(x,0.015,9))
+            for stripe in range(5):
+                _box(block,Vector3(0.13,0.035,8.5),Color("#77794c"),Vector3(x-3.6+stripe*1.7,0.04,9))
+        if variant%2==0:
+            _lombardy_facade(block,"Cascina",positions[0],Color("#c7b18c"),1)
+        _tree(positions[1])
+    elif green or square:
+        if square:
+            _box(block,Vector3(22,0.06,9),Color("#c5b9a6"),Vector3(0,0.04,7),"paving")
+            _lombardy_facade(block,"Palazzo",positions[0],Color("#d6bc98"),2)
+            _lombardy_facade(block,"Loggia",positions[1],Color("#cba08a"),3)
+        else:
+            for at in positions:
+                _tree(at)
+        _bench(block,Vector3(-6,0,5))
+        _bench(block,Vector3(6,0,-5))
+    else:
+        var walls := [Color("#d2b89a"),Color("#c38f80"),Color("#d6c9af"),Color("#bcb9a5"),Color("#ddc5a0")]
+        for i in range(3 if variant%2==0 else 2):
+            _lombardy_facade(block,"Casa"+str(i+1),positions[i],walls[(i+variant)%walls.size()],2+(i+variant)%2)
+        _tree(positions[3])
+    _lamp(block,Vector3(-5,0,-4))
+    _lamp(block,Vector3(5,0,4))
+
 func _build_southern_district(id: String) -> void:
     var district := Node3D.new()
     district.name = "SouthernDistrict_"+id
@@ -3722,10 +3767,12 @@ func _lamp(parent: Node3D, at: Vector3) -> void:
     _park_lamps.append(lamp)
 
 func _district_sign_name(id: String) -> String:
+    if TownLayout.outer(id):return TownLayout.label_for(id)
     return str({"PARK":"Parco","MARKET":"Mercato","CAFE":"Bar Centrale","BAKERY":"Panetteria","LIBRARY":"Biblioteca","OFFICE":"Uffici","CLINIC":"Ambulatorio","SCHOOL":"Scuola","WORKSHOP":"Officina","NORTH_RESIDENCES":"Quartiere Nord","SOUTH_RESIDENCES":"Quartiere Sud","RIVER":"Fiume","WOODS":"Bosco","QUARRY":"Cava","FACTORY":"Fabbrica","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Cascina","FUEL_STATION":"Stazione di servizio","LOGISTICS_DEPOT":"Deposito logistico","BORGO_SUD":"Borgo Sud","PIAZZA_FONTANA":"Piazza Fontana","GIARDINI":"Giardini Comunali","STAZIONE":"Piazza Stazione","VIA_TIGLI":"Via dei Tigli"}.get(id,id))
 
 func _street_marker(place_id: String) -> void:
     var street := str({"PARK":"Viale del Parco","MARKET":"Piazza del Mercato","CAFE":"Via del Caffè","BAKERY":"Via del Pane","LIBRARY":"Via dei Libri","OFFICE":"Via dell'Industria","CLINIC":"Via della Salute","SCHOOL":"Via Leonardo","WORKSHOP":"Via degli Artigiani","NORTH_RESIDENCES":"Via delle Magnolie","SOUTH_RESIDENCES":"Via del Glicine","RIVER":"Lungofiume","WOODS":"Via del Bosco","QUARRY":"Via della Cava","FACTORY":"Via delle Fabbriche","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Strada delle Risaie","FUEL_STATION":"Via della Stazione","LOGISTICS_DEPOT":"Via del Deposito","BORGO_SUD":"Via del Borgo Sud","PIAZZA_FONTANA":"Piazza Fontana","GIARDINI":"Viale dei Giardini","STAZIONE":"Piazza Stazione","VIA_TIGLI":"Via dei Tigli"}.get(place_id,"Via del Borgo"))
+    if TownLayout.outer(place_id):street=TownLayout.label_for(place_id)
     var marker := Node3D.new()
     marker.name = "StreetMarker"
     _scenery.add_child(marker)
@@ -5458,6 +5505,10 @@ func _create_interface() -> void:
     map_column.add_child(map_header)
     _town_map = preload("res://scripts/TownMap.gd").new()
     map_column.add_child(_town_map)
+    var overview_toggle := CheckButton.new()
+    overview_toggle.text = tr("Whole city overview")
+    overview_toggle.toggled.connect(_town_map.set_overview)
+    map_column.add_child(overview_toggle)
     var close_map := Button.new()
     close_map.text = "Close map (M)"
     close_map.pressed.connect(_toggle_map)
@@ -5475,6 +5526,10 @@ func _create_interface() -> void:
     var travel_label := Label.new()
     travel_label.text = "Choose a destination (Java decides travel time):"
     travel_col.add_child(travel_label)
+    _destination_filter=LineEdit.new()
+    _destination_filter.placeholder_text=tr("Search destinations")
+    _destination_filter.text_changed.connect(func(_value):_render_destinations())
+    travel_col.add_child(_destination_filter)
     _travel_choices = GridContainer.new()
     _travel_choices.columns = 2
     var travel_scroll := ScrollContainer.new()
@@ -5954,7 +6009,10 @@ func _render_destinations() -> void:
     for place in _locations:
         var id := str(place.get("id", ""))
         var minutes := int(place.get("travelMinutes", 0))
-        var caption := "%s (%sm)" % [str(place.get("label", id)), str(minutes)]
+        var destination_name := str(place.get("label",id))
+        var query := _destination_filter.text.strip_edges().to_lower()
+        if not query.is_empty() and not destination_name.to_lower().contains(query) and not id.to_lower().contains(query):continue
+        var caption := "%s (%sm)" % [destination_name, str(minutes)]
         var choice := _button(caption, _travel_to.bind(id))
         choice.set_meta("destination", id)
         choice.disabled = id == _current_place or _api.is_busy()

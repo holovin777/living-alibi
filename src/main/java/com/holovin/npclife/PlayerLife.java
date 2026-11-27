@@ -125,14 +125,14 @@ final class PlayerLife {
         }
     }
 
-    private static final List<TownLife.Place> PUBLIC_PLACES=List.of(
+    private static final List<TownLife.Place> PUBLIC_PLACES=java.util.stream.Stream.concat(List.of(
             TownLife.Place.PARK, TownLife.Place.CAFE, TownLife.Place.MARKET,
             TownLife.Place.BAKERY, TownLife.Place.LIBRARY, TownLife.Place.OFFICE,
             TownLife.Place.CLINIC, TownLife.Place.SCHOOL, TownLife.Place.WORKSHOP,
             TownLife.Place.NORTH_RESIDENCES, TownLife.Place.SOUTH_RESIDENCES,
             TownLife.Place.RIVER, TownLife.Place.WOODS,
             TownLife.Place.QUARRY, TownLife.Place.FACTORY, TownLife.Place.CENTRO, TownLife.Place.PORTICI, TownLife.Place.FARM, TownLife.Place.FUEL_STATION, TownLife.Place.LOGISTICS_DEPOT,
-             TownLife.Place.BORGO_SUD, TownLife.Place.PIAZZA_FONTANA, TownLife.Place.GIARDINI, TownLife.Place.STAZIONE, TownLife.Place.VIA_TIGLI);
+             TownLife.Place.BORGO_SUD, TownLife.Place.PIAZZA_FONTANA, TownLife.Place.GIARDINI, TownLife.Place.STAZIONE, TownLife.Place.VIA_TIGLI).stream(),CityExpansionLife.outerPlaces().stream()).toList();
 
     static List<TownLife.Place> publicPlaces() {return PUBLIC_PLACES;}
     static TownLife.Place destination(String input) {
