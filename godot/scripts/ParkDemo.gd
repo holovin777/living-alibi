@@ -254,6 +254,7 @@ var _dialog_started_at := 0
 var _dialog_end_remaining := 0.0
 var _dialog_farewell := ""
 var _show_childhood_details := false
+var _prologue_seconds := 0.0
 var _action_title: Label
 var _action_choices: VBoxContainer
 
@@ -282,6 +283,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     if _custody_active:
         return
+    _tick_childhood_prologue(delta)
     if _bus_preview_active():
         _tick_bus_preview(delta)
         return
@@ -317,6 +319,7 @@ func _process(delta: float) -> void:
             direction.x -= 1.0
         if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
             direction.x += 1.0
+    if _rebirth_active() and not _child_can_walk():direction=Vector3.ZERO
     if direction.length_squared() > 0.0:
         # The Java world controls district transitions; this is local preview walking.
         var relative_motion := Basis(Vector3.UP, _view_yaw) * direction.normalized()
@@ -410,6 +413,11 @@ func _process(delta: float) -> void:
     _weather_fx.set_sheltered(_stairwell_active or _apartment_active or _inside_guest_room(),_environment)
     if _rebirth_active():
         _update_first_steps()
+        var prologue = _last_snapshot.get("rebirth",{}).get("prologue")
+        if prologue is Dictionary:
+            var remaining:=maxi(0,int(prologue.get("totalSeconds",1800))-int(prologue.get("elapsedSeconds",0)))
+            _hint.text=tr("Childhood: %02d:%02d remaining · F: family activities") % [int(remaining/60),remaining%60]
+            return
         if not _nearest_resident().is_empty():
             _hint.text=tr("Talk: approach someone and press T or click on them.")
         elif _near_software():
@@ -920,6 +928,7 @@ func _movement_speed() -> float:
             speed = CROUCH_SPEED
         elif Input.is_key_pressed(KEY_SHIFT):
             speed = RUN_SPEED
+    if child and int(_last_snapshot.get("rebirth",{}).get("age",0))<3:return speed*0.18
     return speed * (0.65 if child else 1.0)
 
 func _truck_place() -> String:
@@ -1225,7 +1234,7 @@ func _crouch_requested() -> bool:
     return Input.is_key_pressed(KEY_CTRL) and _jump_elapsed < 0.0
 
 func _can_jump() -> bool:
-    return not _stairwell_active and _jump_elapsed < 0.0 and not _crouch_requested() and _crouch_amount < 0.1 and _foot_controls_available()
+    return not _stairwell_active and (not _rebirth_active() or int(_last_snapshot.get("rebirth",{}).get("age",0))>=3) and _jump_elapsed < 0.0 and not _crouch_requested() and _crouch_amount < 0.1 and _foot_controls_available()
 
 func _reset_locomotion() -> void:
     _crouch_amount = 0.0
@@ -6793,7 +6802,9 @@ func _rebirth_active() -> bool:
 
 func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
-    return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and int(r.get("age",0)) >= 3 and int(r.get("age",0)) < 18)
+    var age:=int(r.get("age",0))
+    var min_age:=1 if r.get("prologue") is Dictionary and _apartment_active else 3
+    return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and age >= min_age and age < 18)
 
 func _office_station() -> String:
     if _apartment_active or _current_place!="OFFICE" or _last_snapshot.get("rebirth",{}).get("softwareProjects",[]).is_empty():
@@ -7387,7 +7398,7 @@ func _render_actions() -> void:
                     var label_text := "%s (%s) + %s (%s) · %s" % [family.get("firstName",""),family.get("firstJob",""),family.get("secondName",""),family.get("secondJob",""),family.get("district","")]
                     _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-family-%s-%s" % [family.get("first",0),family.get("second",0)])))
                 _action_choices.add_child(_button("Start adult life instead",_garden_action.bind("rebirth-adult")))
-        elif int(rebirth.get("age",0))<6 and rebirth.get("earlyChildhood") is Dictionary and not _show_childhood_details:
+        elif rebirth.get("earlyChildhood") is Dictionary and not _show_childhood_details:
             _action_title.text=tr("My childhood")
             info.text="%s · %s" % [rebirth.get("childName",""),tr("Age %s") % int(rebirth.get("age",0))]
             _action_choices.add_child(info)
@@ -7400,9 +7411,10 @@ func _render_actions() -> void:
             for activity in early.get("actions",[]):
                 var labels: Dictionary={"rest":"Rest","call":"Call a parent","play":"Play"}
                 _action_choices.add_child(_button(tr(str(labels.get(activity,activity))),_garden_action.bind("rebirth-early-"+str(activity))))
-            var days:=int(rebirth.get("extendedWaitDays",0))
-            if days>0:_action_choices.add_child(_button(tr("Grow up: %s days") % days,_garden_action.bind("rebirth-wait-extended")))
-            _action_choices.add_child(_button(tr("Advance one shared day"),_garden_action.bind("rebirth-wait")))
+            if not rebirth.get("prologue") is Dictionary:
+                var days:=int(rebirth.get("extendedWaitDays",0))
+                if days>0:_action_choices.add_child(_button(tr("Grow up: %s days") % days,_garden_action.bind("rebirth-wait-extended")))
+                _action_choices.add_child(_button(tr("Advance one shared day"),_garden_action.bind("rebirth-wait")))
             _action_choices.add_child(_button(tr("Character details"),func():
                 _show_childhood_details=true
                 _render_actions()))
@@ -7412,7 +7424,7 @@ func _render_actions() -> void:
             return
         else:
             _action_title.text = "Childhood · family life"
-            if int(rebirth.get("age",0))<6:
+            if rebirth.get("earlyChildhood") is Dictionary:
                 _action_choices.add_child(_button(tr("Back to childhood"),func():
                     _show_childhood_details=false
                     _render_actions()))
@@ -9293,6 +9305,16 @@ func _view_business() -> void:
 func _on_clock_speed_selected(index: int) -> void:
     _clock.set_speed(_clock_selector.get_item_id(index))
 
+func _tick_childhood_prologue(delta: float) -> void:
+    if _api==null or not _connected:return
+    if not _last_snapshot.get("rebirth",{}).get("prologue") is Dictionary:
+        _prologue_seconds=0.0
+        return
+    _prologue_seconds+=delta
+    if _prologue_seconds>=10.0 and not _api.is_busy():
+        _prologue_seconds=0.0
+        _api.garden_action("rebirth-prologue-step")
+
 func _tick_live_clock(delta: float) -> void:
     if _api == null:
         return
@@ -9872,6 +9894,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     var walking_transition := _home_transition or not _road_pending.is_empty()
     _home_transition=false
     _clock_pending = false
+    var previous_phase:=str(_last_snapshot.get("rebirth",{}).get("phase",""))
     _connected = true
     var old_car_place := _car_place()
     var was_freight := _drive_freight
@@ -9936,8 +9959,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _render_hud_summary(snapshot)
     _sync_custody(player.get("justice",{}))
     var home = snapshot.get("rebirth",{}).get("homeOptions")
-    var early = snapshot.get("rebirth",{}).get("earlyChildhood")
-    if early is Dictionary and bool(early.get("atHome",false)):
+    var life: Dictionary=snapshot.get("rebirth",{})
+    if str(life.get("phase",""))=="CHILDHOOD" and bool(life.get("familyAtHome",false)):
         home={"atHome":true}
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
@@ -9985,7 +10008,15 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if _rebirth_active():
         _travel_panel.visible = false
         _map_panel.visible = false
-        if not _child_can_walk():
+        if str(life.get("phase",""))=="CHILDHOOD" and life.get("prologue") is Dictionary:
+            if previous_phase!="CHILDHOOD":
+                _show_childhood_details=false
+                _action_panel.hide()
+                Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+        elif previous_phase=="CHILDHOOD" and str(life.get("phase",""))=="LINKED_ADULT":
+            _action_panel.hide()
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+        elif not _child_can_walk():
             _close_dialog()
             _action_panel.visible = not walking_transition and not _phone.visible
             Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible or _phone.visible else Input.MOUSE_MODE_CAPTURED)

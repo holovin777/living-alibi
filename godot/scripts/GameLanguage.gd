@@ -526,6 +526,7 @@ const IT := {
     "Advance up to %s shared days": "Avanza fino a %s giorni condivisi",
     "Childhood · family life": "Infanzia · vita familiare",
     "My childhood": "La mia infanzia",
+    "Childhood: %02d:%02d remaining · F: family activities": "Infanzia: mancano %02d:%02d · F: attività familiari",
     "Age %s": "Età %s",
     "With you: %s": "Con te: %s",
     "No parent in the room": "Nessun genitore nella stanza",

@@ -1208,6 +1208,10 @@ public final class GameSession implements AutoCloseable {
                 var home=RebirthLife.homeAction(copy,state.day,action.substring("rebirth-home-".length()));
                 return applyInternal(copy,home.minutes(),home.message(),true);
             }
+            if(action.equals("rebirth-prologue-step")){
+                String message=ChildhoodPrologue.step(copy);
+                return applyInternal(copy,1,message,true);
+            }
             if(action.startsWith("rebirth-early-")){
                 var result=EarlyChildhoodLife.act(copy,action.substring("rebirth-early-".length()));
                 return applyInternal(copy,result.minutes(),result.message(),true);

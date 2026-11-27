@@ -83,7 +83,8 @@ final class PopulationLife {
         }
         TownLife.Place search=child||sick||homeService||residentService!=null||freightRun||condominiumRepair||condominiumCleaning||postalRound||publicSafety
                 ?null:ChildSearchLife.destination(town,c,clock);
-        if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
+        if(ChildhoodPrologue.active(town,c))desired=c.home;
+        else if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;
         else if(search!=null)desired=search;
         else if(homeService)desired=TownLife.Place.SOUTH_RESIDENCES;

@@ -244,6 +244,25 @@ class GeoRebirthTest {
         child.age=6;
         assertNull(EarlyChildhoodLife.view(t));
     }
+    @Test void acceleratedProloguePreservesResidentAndFinishesAtFamilyHome(){
+        var s=new WorldState();var t=TownLife.create(s);
+        PopulationGenerator.add(t,20);
+        RebirthLife.enableRandomBirth(t,true);
+        assertTrue(InitialFamilyLife.start(t,s));
+        var child=RebirthLife.child(t);String id=child.id;String home=child.homeUnit;
+        for(int i=0;i<179;i++)ChildhoodPrologue.step(t);
+        assertEquals(17,child.age);
+        assertEquals(1790,ChildhoodPrologue.view(t).elapsedSeconds());
+        assertEquals(1790,ChildhoodPrologue.view(t.copy()).elapsedSeconds());
+        ChildhoodPrologue.step(t);
+        assertEquals(18,child.age);
+        assertEquals(RebirthLife.LINKED_ADULT,RebirthLife.phase(t));
+        assertEquals(id,RebirthLife.child(t).id);
+        assertEquals(home,child.homeUnit);
+        assertTrue(RebirthLife.stayingHome(t,child));
+        assertNull(ChildhoodPrologue.view(t));
+        assertEquals(0,EducationLife.get(t,child,"school-days"));
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

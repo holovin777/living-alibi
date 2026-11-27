@@ -19,7 +19,7 @@ final class EarlyChildhoodLife {
     }
     static View view(TownLife.Town t){
         var c=RebirthLife.child(t);
-        if(!RebirthLife.linkedChild(t,c)||c.age>=6)return null;
+        if(!RebirthLife.linkedChild(t,c)||(c.age>=6&&!ChildhoodPrologue.active(t,c)))return null;
         boolean home=atHome(c);
         var present=home?parents(t,c):List.<TownLife.Citizen>of();
         var actions=new ArrayList<String>();
