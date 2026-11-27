@@ -7459,6 +7459,19 @@ func _render_actions() -> void:
         var info := Label.new()
         info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         if str(rebirth.get("phase",""))=="CHOICE":
+            if bool(rebirth.get("firstSexPending",false)):
+                _action_title.text=tr("Choose your character")
+                info.text=tr("Choose a boy or a girl. The world assigns your family.")
+                _action_choices.add_child(info)
+                _action_choices.add_child(_button(tr("Boy"),_garden_action.bind("rebirth-first-boy")))
+                _action_choices.add_child(_button(tr("Girl"),_garden_action.bind("rebirth-first-girl")))
+                return
+            if bool(rebirth.get("returnPending",false)):
+                _action_title.text=tr("Your previous life ended")
+                info.text=tr("The town continues. Continue when you are ready.")
+                _action_choices.add_child(info)
+                _action_choices.add_child(_button(tr("Continue next life"),_garden_action.bind("rebirth-return")))
+                return
             var automatic := bool(rebirth.get("randomBirth",true))
             _action_title.text = tr("Awaiting a new life") if automatic else tr("A new life · Choose your parents")
             var families: Array = rebirth.get("families",[])
@@ -9952,6 +9965,11 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
     if _rebirth_active():
         var child: Dictionary = snapshot.get("rebirth",{})
         _status.text = tr("Awaiting a new life" if bool(child.get("randomBirth",true)) else "Choose a new family") if str(child.get("phase","")) == "CHOICE" else tr("%s | Age %s | %s") % [child.get("childName",""),child.get("age",0),tr("Adult") if str(child.get("phase","")) == "LINKED_ADULT" else tr("Childhood")]
+        if bool(child.get("firstSexPending",false)):
+            _heading.text="Living Alibi"
+            _status.text=tr("Choose your character")
+        elif bool(child.get("returnPending",false)):
+            _status.text=tr("Your previous life ended")
     var climate: Dictionary = snapshot.get("weather", {})
     _weather.text = tr("Day %s  %s:%02d | %s | %s  %s °C") % [
         str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,
@@ -10128,7 +10146,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if _custody_active:
         _camera.global_position=Vector3(0,121.65,-1.9)
         _camera.global_rotation=Vector3(0,PI,0)
-    elif _api != null and not _api.is_busy() and not clock_update:
+    elif _api != null and not _api.is_busy() and not clock_update and str(life.get("phase",""))!="CHOICE":
         _api.list_locations()
 
 func _set_weather_visuals(enabled: bool) -> void:

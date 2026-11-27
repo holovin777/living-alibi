@@ -537,7 +537,7 @@ final class RebirthLife {
     record Conversation(String id,String name){}
     // Bound each request: early childhood is faster, adolescence is slower.
     static int maxWaitDays(TownLife.Town t){
-        if(returnPending(t))return 0;
+        if(returnPending(t)||FirstLifeChoice.pending(t))return 0;
         if(phase(t)==CHOICE)return randomBirth(t)?7:1;
         var c=child(t);
         if(phase(t)!=CHILDHOOD||c==null||!c.alive||c.age>=18)return 0;
@@ -804,7 +804,7 @@ final class RebirthLife {
         }
         throw new IllegalArgumentException("This medical service is unavailable.");
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,int extendedWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery,Cafe cafe,Medical medical,EducationLife.College college,List<TechnicalWorkLife.LinkedOrder> engineeringOrders,List<SoftwareLife.ProjectView> softwareProjects,JavaTicketLife.Workspace javaWorkspace,SportLife.View sports,DojoLife.View dojo,DojoCommunityLife.View dojoCommunity,KumiteLife.View kumite,boolean randomBirth,EarlyChildhoodLife.View earlyChildhood,ChildhoodPrologue.View prologue,boolean familyAtHome,List<ParentingLife.Notice> parenting,boolean childOutsideHome,ChildSearchLife.View childSearch){}
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,int extendedWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery,Cafe cafe,Medical medical,EducationLife.College college,List<TechnicalWorkLife.LinkedOrder> engineeringOrders,List<SoftwareLife.ProjectView> softwareProjects,JavaTicketLife.Workspace javaWorkspace,SportLife.View sports,DojoLife.View dojo,DojoCommunityLife.View dojoCommunity,KumiteLife.View kumite,boolean randomBirth,EarlyChildhoodLife.View earlyChildhood,ChildhoodPrologue.View prologue,boolean familyAtHome,List<ParentingLife.Notice> parenting,boolean childOutsideHome,ChildSearchLife.View childSearch,boolean firstSexPending,boolean returnPending){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
     static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
@@ -814,6 +814,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE&&!randomBirth(t)?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),extendedWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day,minute),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute),EducationLife.college(t,day,minute),TechnicalWorkLife.linkedOrders(t,day,minute),SoftwareLife.projects(t,day,minute),JavaTicketLife.workspace(t,day,minute),SportLife.view(t,c,day,minute),DojoLife.view(t,c,day,minute),DojoCommunityLife.view(t,day,minute),KumiteLife.view(t,c,day,minute),randomBirth(t),EarlyChildhoodLife.view(t),ChildhoodPrologue.view(t),EarlyChildhoodLife.atHome(c),ParentingLife.view(t,c),childOutsideHome(t,c),ChildSearchLife.view(t,c,day,minute));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),extendedWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day,minute),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute),EducationLife.college(t,day,minute),TechnicalWorkLife.linkedOrders(t,day,minute),SoftwareLife.projects(t,day,minute),JavaTicketLife.workspace(t,day,minute),SportLife.view(t,c,day,minute),DojoLife.view(t,c,day,minute),DojoCommunityLife.view(t,day,minute),KumiteLife.view(t,c,day,minute),randomBirth(t),EarlyChildhoodLife.view(t),ChildhoodPrologue.view(t),EarlyChildhoodLife.atHome(c),ParentingLife.view(t,c),childOutsideHome(t,c),ChildSearchLife.view(t,c,day,minute),FirstLifeChoice.pending(t),returnPending(t));
     }
 }
