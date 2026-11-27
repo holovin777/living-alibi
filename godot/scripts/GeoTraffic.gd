@@ -72,10 +72,26 @@ func _car(paint: Color=Color.TRANSPARENT) -> Node3D:
         _box(root,Vector3(0.35,0.15,0.06),Vector3(x*0.83,0.72,1.8),Color("#9b2726"))
     return root
 
-func _person() -> Node3D:
+func _person(profile: Dictionary={},identity: String="") -> Node3D:
     var root:=Node3D.new()
-    _box(root,Vector3(0.40,0.58,0.24),Vector3(0,1.06,0),shirts[rng.randi_range(0,shirts.size()-1)])
-    _box(root,Vector3(0.25,0.27,0.23),Vector3(0,1.49,0),Color("#bf9476"))
+    var skins := [Color("#8e5a41"),Color("#b9845f"),Color("#c69574"),Color("#d8aa87"),Color("#edc4a6")]
+    var hairs := [Color("#262322"),Color("#382b25"),Color("#594437"),Color("#79513a"),Color("#b58c54")]
+    var eyes := [Color("#413427"),Color("#50694c"),Color("#527387"),Color("#807154")]
+    var skin: Color=skins[clampi(int(profile.get("skin",2)),0,4)]
+    var hair: Color=hairs[clampi(int(profile.get("hair",1)),0,4)]
+    var eye: Color=eyes[clampi(int(profile.get("eye",0)),0,3)]
+    var face:=float(profile.get("face",100))/100.0
+    var nose:=float(profile.get("nose",100))/100.0
+    var shirt_index:=rng.randi_range(0,shirts.size()-1) if identity.is_empty() else posmod(identity.hash(),shirts.size())
+    _box(root,Vector3(0.40,0.58,0.24),Vector3(0,1.06,0),shirts[shirt_index])
+    _box(root,Vector3(0.25*face,0.27,0.23),Vector3(0,1.49,0),skin)
+    if not profile.is_empty():
+        var top:=_box(root,Vector3(0.26*face,0.075,0.24),Vector3(0,1.63,0),hair)
+        top.name="Hair"
+        top.set_meta("base_color",hair)
+        for side in [-1.0,1.0]:
+            _box(root,Vector3(0.027,0.021,0.012),Vector3(side*0.059*face,1.52,-0.119),eye)
+        _box(root,Vector3(0.034,0.048,0.035*nose),Vector3(0,1.478,-0.127),skin)
     for x in [-0.14,0.14]:
         var leg:=_box(root,Vector3(0.15,0.67,0.19),Vector3(x,0.43,0),Color("#3d454c"))
         leg.name="LegL" if x<0 else "LegR"
@@ -83,7 +99,7 @@ func _person() -> Node3D:
         arm.name="ArmL" if x<0 else "ArmR"
         arm.position=Vector3(x*2.0,1.29,0)
         root.add_child(arm)
-        _box(arm,Vector3(0.13,0.52,0.16),Vector3(0,-0.26,0),Color("#bf9476"))
+        _box(arm,Vector3(0.13,0.52,0.16),Vector3(0,-0.26,0),skin)
     return root
 
 func count(mode: String) -> int:

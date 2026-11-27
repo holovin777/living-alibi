@@ -12,7 +12,13 @@ final class GeoProjection {
     }
     record District(String id,String label,double x,double z){}
     record Actor(String id,double x,double z,String activity,boolean talkable,
-                 String pose,double heading,String workVisual,String outfitVisual,String appearanceStage){
+                 String pose,double heading,String workVisual,String outfitVisual,String appearanceStage,AppearanceLife.Profile appearance){
+        Actor(String id,double x,double z,String activity,boolean talkable,String pose,double heading,String workVisual,String outfitVisual,String appearanceStage){
+            this(id,x,z,activity,talkable,pose,heading,workVisual,outfitVisual,appearanceStage,null);
+        }
+        Actor withAppearance(TownLife.Town t){
+            return new Actor(id,x,z,activity,talkable,pose,heading,workVisual,outfitVisual,appearanceStage,AppearanceLife.profile(t,t.people.get(id)));
+        }
         Actor(String id,double x,double z,String activity,boolean talkable){
             this(id,x,z,activity,talkable,"STAND",0,"","","ADULT");
         }
@@ -496,7 +502,7 @@ final class GeoProjection {
         var property=GeoProperty.view(t,s,this,player,room);
         availableActions.addAll(property.actions());
         if(rebirth){availableActions.clear();availableActions.addAll(GeoLife.choices(t,s,this));}
-        return new View(s.day,s.minute,population,commuting,room==null?List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))):inside,
+        return new View(s.day,s.minute,population,commuting,(room==null?nearby.subList(0,Math.min(40,nearby.size())):inside).stream().map(a->a.withAppearance(t)).toList(),
             district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
             p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());

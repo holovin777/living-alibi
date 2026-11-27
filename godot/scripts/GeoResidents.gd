@@ -122,7 +122,8 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
         var goal:=Vector3(float(person["x"]),0.05 if room.is_empty() else (149.84 if pose=="STUDY" else 150.05),float(person["z"]))
         seen[id]=true
         if not people.has(id):
-            var node: Node3D=traffic._person()
+            var profile: Dictionary=person.get("appearance",{}) if person.get("appearance") is Dictionary else {}
+            var node: Node3D=traffic._person(profile,id)
             add_child(node)
             node.position=goal
             people[id]={"node":node,"goal":goal,"phase":0.0,"talkable":bool(person.get("talkable",false))}
@@ -162,7 +163,17 @@ func _appearance(record: Dictionary,person: Dictionary) -> void:
     if stage=="PRESCHOOL":height=0.57
     elif stage=="CHILD":height=0.72
     elif stage=="TEEN":height=0.9
-    node.scale=Vector3.ONE*height
+    var profile: Dictionary=person.get("appearance",{}) if person.get("appearance") is Dictionary else {}
+    var build:=float(profile.get("build",100))/100.0
+    var adult_height:=float(profile.get("height",100))/100.0
+    var width:=0.62 if stage=="PRESCHOOL" else (0.75 if stage=="CHILD" else (0.88 if stage=="TEEN" else 1.0))
+    if stage=="SENIOR":height=0.95
+    node.scale=Vector3(build*width,adult_height*height,build*width)
+    var hair:=node.get_node_or_null("Hair") as MeshInstance3D
+    if hair!=null:
+        var base: Color=hair.get_meta("base_color")
+        var shade:=base.lerp(Color("#d2d0c8"),0.75 if stage=="SENIOR" else (0.27 if stage=="MATURE" else 0.0))
+        hair.material_override=traffic._mat(shade)
     var outfit:=str(person.get("outfitVisual",""))
     var work:=str(person.get("workVisual",""))
     var signature:=outfit+":"+work
