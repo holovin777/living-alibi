@@ -17,7 +17,7 @@ final class CaritasLife {
     private static boolean available(TownLife.Town t,TownLife.Citizen c,WorldState s){
         return c!=null&&c.alive&&c.generationIndex>0&&c.age>=18&&!c.employed&&c.money>=40&&
                 c.sociability>=55&&c.home!=PLACE&&!CityExpansionLife.outer(c.home)&&
-                !RebirthLife.linkedAdult(t,c)&&!EmploymentLife.sick(c,s.day)&&
+                !RelationshipBoundaryLife.controlled(t,c)&&!EmploymentLife.sick(c,s.day)&&
                 !NpcJusticeLife.confined(t,c,s)&&!PublicSafetyLife.alarmed(t,c,s.day,s.minute)&&
                 !CondominiumLife.cleaningAssigned(t,c,s)&&
                 c.health>=50&&c.hunger<80&&c.thirst<80&&c.fatigue<80;
@@ -62,7 +62,7 @@ final class CaritasLife {
     static boolean seekingMeal(TownLife.Town t,TownLife.Citizen c,WorldState s){
         return s.minute>=660&&s.minute<END&&get(t,DAY)==s.day&&get(t,WORKER)>0&&stocked(t)&&
                 c.alive&&c.generationIndex>0&&c.age>=18&&c.money<25&&!c.employed&&c.home!=PLACE&&
-                (c.food<2||c.water<2)&&!RebirthLife.linkedAdult(t,c)&&!CityExpansionLife.outer(c.home)&&
+                (c.food<2||c.water<2)&&!CityExpansionLife.outer(c.home)&&
                 !EmploymentLife.sick(c,s.day)&&get(t,last(c))!=s.day;
     }
     private static void parcel(TownLife.Town t){

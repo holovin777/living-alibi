@@ -39,7 +39,7 @@ final class StaffingLife {
     static long count(TownLife.Town t,Role r){return t.people.values().stream().filter(c->staffed(c,r)).count();}
     static boolean funded(TownLife.Town t,Role r){return r.fund()==null||t.employerFunds.getOrDefault(r.fund(),0)>=(r.name().equals("Journalist")?NewspaperLife.REPORTER_PAY:r.name().equals("Postal worker")?PostalLife.WAGE:r.name().equals("Security guard")?5:IndustryLife.HOURLY_WAGE);}
     static boolean eligible(TownLife.Town t,TownLife.Citizen c,WorldState s){
-        return c.alive&&c.generationIndex>0&&c.age>=25&&c.age<65&&!RebirthLife.linkedAdult(t,c)
+        return c.alive&&c.generationIndex>0&&c.age>=25&&c.age<65&&!RelationshipBoundaryLife.controlled(t,c)
             &&!EmploymentLife.sick(c,s.day)&&!NpcJusticeLife.confined(t,c,s)
             &&!PlayerServiceBusiness.employee(t,c)&&!BusinessLife.isEmployee(t,c)&&!ITStaffLife.isEmployee(t,c)&&!MarketStallLife.isEmployee(t,c)&&!LogisticsLife.isDriver(t,c);
     }

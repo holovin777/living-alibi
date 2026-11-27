@@ -57,7 +57,7 @@ final class EmploymentLife {
             }
             if(!p.employed) {
                 p.unemploymentDays++;
-                if(RebirthLife.linkedAdult(town,p)) { /* employment is the player’s choice */ }
+                if(RelationshipBoundaryLife.controlled(town,p)) { /* employment is the player’s choice */ }
                 else if((industryAccount!=null || workshopEmployee) &&
                         p.unemploymentDays>=2) {
                     // Simplified emergency placement after a factory closure:
@@ -69,7 +69,7 @@ final class EmploymentLife {
                     if(p.unemploymentDays>=5 && roll(p,clock.day,0xB1L,1000)<threshold)
                         seekSuitableJob(town,clock,p);
                 }
-            } else if((p.lastHiredDay==0 || clock.day-p.lastHiredDay>=14) &&
+            } else if(!RelationshipBoundaryLife.controlled(town,p)&&(p.lastHiredDay==0 || clock.day-p.lastHiredDay>=14) &&
                     roll(p,clock.day,0xA3L,1000)<17) {
                 loseJob(town,clock,p);
             }

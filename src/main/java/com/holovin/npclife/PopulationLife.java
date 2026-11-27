@@ -199,7 +199,7 @@ final class PopulationLife {
                 c.currentSpace().equals(TownLife.publicSpace(c.place)))c.activity="ASKING_FOR_HELP";
         else if(retired)c.activity="RETIRED";
         else if(condominiumCleaning&&c.place==TownLife.Place.NORTH_RESIDENCES)c.activity="WORKING";
-        else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
+        else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":RelationshipBoundaryLife.controlled(town,c)?(c.place==c.home?"AT_HOME":"FREE_TIME"):"JOB_SEARCH";
         else if((condominiumRepair||postalRound)&&c.place==TownLife.Place.NORTH_RESIDENCES)c.activity="WORKING";
         else if(homeService&&c.place==TownLife.Place.SOUTH_RESIDENCES)c.activity="WORKING";
         else if(residentService!=null&&c.place==residentService)c.activity="WORKING";

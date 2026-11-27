@@ -3,7 +3,7 @@ package com.holovin.npclife;
 import java.util.List;
 
 /** Player-owned residents cannot acquire a new partner through autonomous simulation.
- * A sustained breakdown can end an existing partnership without taking over either identity.
+ * Autonomous separation is limited to NPC-only partnerships.
  */
 final class RelationshipBoundaryLife {
     private RelationshipBoundaryLife(){}
@@ -23,6 +23,10 @@ final class RelationshipBoundaryLife {
             if(!a.alive)continue;
             var b=RebirthLife.partner(t,a);
             if(b==null||a.generationIndex>=b.generationIndex)continue;
+            if(!canAutoPair(t,a,b)){
+                t.industryStocks.put(key(a,b,"strain"),0);
+                continue;
+            }
             var rel=t.existingRelationship(a.id,b.id);
             String strain=key(a,b,"strain"),last=key(a,b,"last");
             if(t.industryStocks.getOrDefault(last,0)>=s.day)continue;
@@ -32,8 +36,7 @@ final class RelationshipBoundaryLife {
             if(!serious){t.industryStocks.put(strain,0);continue;}
             int days=(previous==s.day-1?t.industryStocks.getOrDefault(strain,0):0)+1;
             t.industryStocks.put(strain,days);
-            // Two account-owned residents need their own explicit decisions, not NPC authority.
-            if(days>=STRAIN_DAYS&&!(controlled(t,a)&&controlled(t,b)))separate(t,a,b,s.day,s.minute);
+            if(days>=STRAIN_DAYS)separate(t,a,b,s.day,s.minute);
         }
     }
     static void separate(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b,int day,int minute){

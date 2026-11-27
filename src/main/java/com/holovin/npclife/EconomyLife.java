@@ -80,12 +80,12 @@ final class EconomyLife {
         // public place. Check at four times per day, never every simulation tick.
         if(minute==720 || minute==960 || minute==1050 || minute==1110) {
             for(var borrower:town.people.values()) {
-                if(!borrower.alive || borrower.generationIndex<=0 || DemographyLife.child(borrower) ||
+                if(!borrower.alive || borrower.generationIndex<=0 || DemographyLife.child(borrower) || RelationshipBoundaryLife.controlled(town,borrower) ||
                         (borrower.money>=50 && borrower.unpaidBills==0) || hasOpenLoan(town,borrower.id))continue;
                 TownLife.Citizen lender=null;
                 int score=-1;
                 for(var candidate:town.people.values()) {
-                    if(!candidate.alive || DemographyLife.child(candidate) || candidate.id.equals(borrower.id) || candidate.money<210 ||
+                    if(!candidate.alive || DemographyLife.child(candidate) || RelationshipBoundaryLife.controlled(town,candidate) || candidate.id.equals(borrower.id) || candidate.money<210 ||
                             candidate.travelRemaining>0 || borrower.travelRemaining>0 ||
                             candidate.place!=borrower.place ||
                             !borrower.currentSpace().equals(candidate.currentSpace()) ||

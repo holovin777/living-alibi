@@ -66,6 +66,8 @@ final class SocialNetwork {
                 var first=group.get(i);var second=group.get(j);
                 if((first.id.equals("marco")&&second.id.equals("elena")) ||
                    (first.id.equals("elena")&&second.id.equals("marco")))continue;
+                // Ambient dialogue must not autonomously change a player's romantic bond.
+                if(!RelationshipBoundaryLife.canAutoPair(town,first,second)&&RebirthLife.partner(town,first)==second)continue;
                 String k=key(first.id,second.id);
                 var relation=town.peerRelationships.get(k);
                 if(relation==null) {
