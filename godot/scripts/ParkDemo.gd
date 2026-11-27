@@ -8454,6 +8454,16 @@ func _render_agri_food() -> void:
     line.text=tr("Agricultural cooperative")+" · "+tr("Cattle")+": "+str(a.get("cattle",0))+" · "+tr("Feed")+": "+str(a.get("feed",0))+" · "+tr("Wheat")+": "+str(a.get("wheat",0))
     line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _action_choices.add_child(line)
+    var m: Dictionary = a.get("modernization",{})
+    if bool(m.get("active",false)):
+        var equipment := Label.new()
+        equipment.text=tr("Tractor")+": "+str(m.get("tractor",0))+"% · "+tr("Harvester")+": "+str(m.get("harvester",0))+"% · "+tr("Irrigation pump")+": "+str(m.get("pump",0))+"%"
+        equipment.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        _action_choices.add_child(equipment)
+        var health := Label.new()
+        health.text=tr("Irrigation water")+": "+str(m.get("water",0))+"/"+str(m.get("waterCapacity",12))+" · "+tr("Herd health")+": "+str(m.get("herdHealth",0))+"%"
+        health.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        _action_choices.add_child(health)
     for product in a.get("products",[]):
         var item := Label.new()
         item.text=tr(str(product.get("id","")))+" · "+tr("Stock")+": "+str(product.get("stock",0))

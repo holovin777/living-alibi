@@ -202,7 +202,7 @@ final class PopulationLife {
                 else if(PostalLife.postalWorker(c))PostalLife.pay(town,c);
                 else if(foodWorker)RetailLife.foodShift(town,c,clock,events,observations);
                 else if(!ITStaffLife.OCCUPATION.equals(c.occupation) && !TechnicalWorkLife.linkedEngineer(town,c) && !SoftwareLife.linkedProgrammer(town,c) && !journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&
-                        !AgriFoodLife.role(c.occupation) && !WasteLife.role(c.occupation) && !GasNetworkLife.ROLE.equals(c.occupation) && !WaterNetworkLife.role(c.occupation) && !EnergyLife.role(c.occupation) && !FactoryNetworkLife.payWorker(town,c) && !IndustryLife.payHourly(town,c,clock,events,observations)) {
+                        !FarmModernizationLife.role(c.occupation) && !AgriFoodLife.role(c.occupation) && !WasteLife.role(c.occupation) && !GasNetworkLife.ROLE.equals(c.occupation) && !WaterNetworkLife.role(c.occupation) && !EnergyLife.role(c.occupation) && !FactoryNetworkLife.payWorker(town,c) && !IndustryLife.payHourly(town,c,clock,events,observations)) {
                     // Existing unrelated occupations retain their original
                     // placeholder wage model until their companies are modeled.
                     c.money+=11;

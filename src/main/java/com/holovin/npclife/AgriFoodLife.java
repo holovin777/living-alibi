@@ -35,12 +35,16 @@ final class AgriFoodLife {
     }
     static void grow(TownLife.Town t,WorldState s){
         int growth=switch(WeatherLife.at(s.day,s.minute).season()){case SPRING,SUMMER -> 3;case AUTUMN -> 1;case WINTER -> 0;};
+        growth=FarmModernizationLife.cropGrowth(t,growth,false);
         for(String crop:List.of("wheat","oilseed"))set(t,"field:"+crop,Math.min(CAP,get(t,"field:"+crop)+growth));
     }
     static void harvest(TownLife.Town t,WorldState s){
-        int wheat=Math.min(6,Math.min(get(t,"field:wheat"),CAP-get(t,"wheat")));
-        int oil=Math.min(3,Math.min(get(t,"field:oilseed"),CAP-get(t,"oilseed")));
+        boolean machine=FarmModernizationLife.mechanized(t);
+        boolean manual=FarmModernizationLife.active(t)&&!machine;
+        int wheat=Math.min(manual?2:6,Math.min(get(t,"field:wheat"),CAP-get(t,"wheat")));
+        int oil=Math.min(manual?1:3,Math.min(get(t,"field:oilseed"),CAP-get(t,"oilseed")));
         if(wheat+oil==0||!paid(t,worker(t,s,FIELD,TownLife.Place.FARM),false))return;
+        if(machine)FarmModernizationLife.machineHarvest(t);
         add(t,"field:wheat",-wheat);add(t,"wheat",wheat);add(t,"field:oilseed",-oil);add(t,"oilseed",oil);
     }
     static void mill(TownLife.Town t,WorldState s){
@@ -49,10 +53,10 @@ final class AgriFoodLife {
     }
     static void herd(TownLife.Town t,WorldState s){
         int cattle=get(t,"cattle");if(cattle<=0)return;
-        int need=(cattle+3)/4,milk=Math.min(cattle,CAP-get(t,"milk"));
-        if(get(t,"feed")<need||!paid(t,worker(t,s,HERD,TownLife.Place.FARM),false)){add(t,"unfed-days",1);return;}
-        add(t,"feed",-need);add(t,"milk",milk);
-        if(s.day%28==0&&cattle<8)add(t,"cattle",1);
+        int need=(cattle+3)/4,milk=Math.min(FarmModernizationLife.milk(t,cattle),CAP-get(t,"milk"));
+        if(get(t,"feed")<need||!paid(t,worker(t,s,HERD,TownLife.Place.FARM),false)){add(t,"unfed-days",1);FarmModernizationLife.herdDay(t,s,false);return;}
+        add(t,"feed",-need);add(t,"milk",milk);FarmModernizationLife.herdDay(t,s,true);
+        if(s.day%28==0&&cattle<8&&(!FarmModernizationLife.active(t)||FarmModernizationLife.get(t,"herd-health")>=70))add(t,"cattle",1);
     }
     static void dairy(TownLife.Town t,WorldState s){
         if(get(t,"milk")<2||get(t,"cheese")>=CAP||!paid(t,worker(t,s,DAIRY,TownLife.Place.FACTORY),true))return;
@@ -86,9 +90,10 @@ final class AgriFoodLife {
     static void tick(TownLife.Town t,WorldState s){
         if(!StaffingLife.enabled(t))return;
         if(!active(t))ensure(t);
-        if(s.minute==360&&get(t,"growth-day")<s.day){set(t,"growth-day",s.day);grow(t,s);}
+        if(!FarmModernizationLife.active(t))FarmModernizationLife.ensure(t);
+        if(s.minute==360&&get(t,"growth-day")<s.day){set(t,"growth-day",s.day);FarmModernizationLife.dawn(t,s);grow(t,s);}
         if(s.minute==725&&get(t,"production-day")<s.day){
-            set(t,"production-day",s.day);harvest(t,s);mill(t,s);herd(t,s);dairy(t,s);food(t,s);
+            set(t,"production-day",s.day);FarmModernizationLife.prepare(t,s);harvest(t,s);mill(t,s);herd(t,s);dairy(t,s);food(t,s);
         }
         if(s.minute==910&&get(t,"delivery-day")<s.day){
             set(t,"delivery-day",s.day);deliver(t,s);
@@ -98,9 +103,9 @@ final class AgriFoodLife {
         }
     }
     record Product(String id,int stock){}
-    record View(boolean active,int wheatField,int oilseedField,int wheat,int oilseed,int cattle,int feed,int unfedDays,int sold,int spoiled,int funds,List<Product> products){}
+    record View(boolean active,int wheatField,int oilseedField,int wheat,int oilseed,int cattle,int feed,int unfedDays,int sold,int spoiled,int funds,List<Product> products,FarmModernizationLife.View modernization){}
     static View view(TownLife.Town t){
         return new View(active(t),get(t,"field:wheat"),get(t,"field:oilseed"),get(t,"wheat"),get(t,"oilseed"),get(t,"cattle"),get(t,"feed"),get(t,"unfed-days"),get(t,"sold"),get(t,"spoiled"),cash(t),
-            PRODUCTS.stream().map(id->new Product(id,get(t,id))).toList());
+            PRODUCTS.stream().map(id->new Product(id,get(t,id))).toList(),FarmModernizationLife.view(t));
     }
 }

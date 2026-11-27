@@ -71,6 +71,8 @@ final class FarmLife {
                 case AUTUMN -> 2;
                 case WINTER -> 0;
             };
+            veg=FarmModernizationLife.cropGrowth(t,veg,false);
+            rice=FarmModernizationLife.cropGrowth(t,rice,true);
             set(t,field("vegetables"),Math.min(24,stock(t,field("vegetables"))+veg));
             set(t,field("rice"),Math.min(24,stock(t,field("rice"))+rice));
         }
