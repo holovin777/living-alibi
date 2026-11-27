@@ -143,6 +143,22 @@ final class DemographyLife {
         if(!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,b))return true;
         return RebirthLife.randomBirth(t)&&RebirthLife.together(a,b)&&RebirthLife.willing(t,a,b);
     }
+    // Illustrative game balance, not a clinical mortality prediction.
+    static double dailyAgeRisk(TownLife.Citizen c){
+        if(c.age<60)return 0.0;
+        double frailty=1.0+2.0*(100-Math.max(0,Math.min(100,c.health)))/100.0;
+        return Math.min(0.25,0.000055*Math.pow(2.0,(c.age-65)/8.0)*frailty);
+    }
+    static boolean ageRelatedDeath(TownLife.Citizen c,int day){
+        double risk=dailyAgeRisk(c);
+        if(risk==0.0)return false;
+        // Stable per-resident, per-day draw: reloading a save cannot reroll it.
+        long z=c.personalSeed^((long)c.generationIndex*0x9E3779B97F4A7C15L)^((long)day*0xD1B54A32D192ED03L);
+        z=(z^(z>>>30))*0xBF58476D1CE4E5B9L;
+        z=(z^(z>>>27))*0x94D049BB133111EBL;
+        z^=z>>>31;
+        return (z>>>11)*0x1.0p-53<risk;
+    }
     static void tick(TownLife.Town t,WorldState clock,List<TownLife.Event> events,List<TownLife.Observation> observations){
         int day=clock.day;
         if(clock.minute!=360||get(t,LAST)>=day)return;
@@ -162,9 +178,10 @@ final class DemographyLife {
                     if(c.age>=67&&!"Retired".equals(c.occupation)){
                         c.occupation="Retired";c.employed=false;
                     }
-                    if(c.age>=82+Math.floorMod(c.personalSeed,19)){
-                        c.alive=false;c.activity="DECEASED";
-                    }
+                }
+                // Check mortality daily, not only on birthdays. No assigned death age.
+                if(ageRelatedDeath(c,day)){
+                    c.alive=false;c.activity="DECEASED";
                 }
                 if(c.alive&&child(c)){
                     var guardian=guardian(t,c);
