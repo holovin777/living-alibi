@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - 'godot/**'
+      - 'tools/**'
+      - 'play-vigevano.sh'
       - '.github/workflows/godot-ci.yml'
   pull_request:
     paths:
       - 'godot/**'
+      - 'tools/**'
+      - 'play-vigevano.sh'
       - '.github/workflows/godot-ci.yml'
 
 concurrency:
@@ -63,3 +67,14 @@ jobs:
             target/godot-bin/navigation.log; then
             exit 1
           fi
+
+      - name: Check offline OSM importer and geographic scene
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/tests
+          python3 tools/import_vigevano.py --input tools/tests/vigevano_fixture.osm --output data/vigevano-test.json
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 \
+            --headless --path godot res://scenes/vigevano.tscn --quit-after 8 -- "--city-map=$PWD/data/vigevano-test.json" \
+            2>&1 | tee target/godot-bin/geography.log
+          grep -q 'VigevanoPreview: loaded' target/godot-bin/geography.log
+          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geography.log; then exit 1; fi

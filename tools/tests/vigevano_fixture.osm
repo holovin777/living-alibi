@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic geometry for tests only. Not real OSM or Vigevano data. -->
+<osm version="0.6">
+<node id="1" lat="45.3174" lon="8.8580"/>
+<node id="2" lat="45.3174" lon="8.8582"/>
+<node id="3" lat="45.3175" lon="8.8582"/>
+<node id="4" lat="45.3175" lon="8.8580"/>
+<node id="5" lat="45.3173" lon="8.8575"/>
+<node id="6" lat="45.3173" lon="8.8588"/>
+<way id="10"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="1"/><tag k="building" v="yes"/><tag k="building:levels" v="3"/></way>
+<way id="20"><nd ref="5"/><nd ref="6"/><tag k="highway" v="residential"/><tag k="name" v="Test road"/></way>
+</osm>

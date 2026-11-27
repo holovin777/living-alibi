@@ -1,0 +1,197 @@
+extends Node3D
+## Independent geographic preview. Does not modify the Java save.
+var city: Dictionary = {}
+var chunks: Dictionary = {}
+var chunk_size := 128.0
+var loaded_cell := Vector2i(999999,999999)
+var walker: CharacterBody3D
+var head: Node3D
+var hud: Label
+var wall_material: StandardMaterial3D
+var roof_material: StandardMaterial3D
+var road_material: StandardMaterial3D
+var rail_material: StandardMaterial3D
+var ready_to_walk := false
+
+func _ready() -> void:
+    var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
+    for arg in OS.get_cmdline_user_args():
+        if arg.begins_with("--city-map="):map_path=arg.trim_prefix("--city-map=")
+    var canvas := CanvasLayer.new()
+    add_child(canvas)
+    hud=Label.new()
+    hud.position=Vector2(12,12)
+    canvas.add_child(hud)
+    var credit := Label.new()
+    credit.text="© OpenStreetMap contributors · openstreetmap.org/copyright"
+    credit.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+    credit.position.y=-30
+    canvas.add_child(credit)
+    if not FileAccess.file_exists(map_path):
+        hud.text="Map missing. Run bash play-vigevano.sh to import real OSM data."
+        return
+    var parsed = JSON.parse_string(FileAccess.get_file_as_string(map_path))
+    if not parsed is Dictionary or int(parsed.get("schema",0))!=1 or not parsed.get("chunks") is Dictionary:
+        hud.text="Invalid geographic map. Re-run the importer."
+        return
+    city=parsed
+    chunk_size=float(city.get("chunk_size",128))
+    wall_material=_material(Color("#cbb49b"))
+    roof_material=_material(Color("#925f4d"))
+    road_material=_material(Color("#64696a"))
+    rail_material=_material(Color("#8f8578"))
+    var world_environment := WorldEnvironment.new()
+    var environment := Environment.new()
+    environment.background_mode=Environment.BG_COLOR
+    environment.background_color=Color("#a7c7de")
+    environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
+    environment.ambient_light_color=Color("#ffffff")
+    environment.ambient_light_energy=0.65
+    world_environment.environment=environment
+    add_child(world_environment)
+    var sun := DirectionalLight3D.new()
+    sun.rotation_degrees=Vector3(-55,-35,0)
+    sun.light_energy=0.85
+    add_child(sun)
+    var ground := StaticBody3D.new()
+    add_child(ground)
+    var plane := CollisionShape3D.new()
+    plane.shape=WorldBoundaryShape3D.new()
+    ground.add_child(plane)
+    var ground_visual := MeshInstance3D.new()
+    var floor_mesh := PlaneMesh.new()
+    floor_mesh.size=Vector2(5000,5000)
+    ground_visual.mesh=floor_mesh
+    ground_visual.material_override=_material(Color("#a4a98c"))
+    add_child(ground_visual)
+    walker=CharacterBody3D.new()
+    var capsule := CapsuleShape3D.new()
+    capsule.radius=0.32
+    capsule.height=1.8
+    var collider := CollisionShape3D.new()
+    collider.shape=capsule
+    walker.add_child(collider)
+    head=Node3D.new()
+    head.position.y=0.65
+    walker.add_child(head)
+    var camera := Camera3D.new()
+    camera.far=500
+    head.add_child(camera)
+    camera.current=true
+    add_child(walker)
+    var spawn: Array=city.get("spawn",[0,0])
+    walker.position=Vector3(float(spawn[0]),1.05,float(spawn[1]))
+    _stream()
+    ready_to_walk=true
+    print("VigevanoPreview: loaded ",city.get("counts",{})," active chunks=",chunks.size())
+
+func _material(color: Color) -> StandardMaterial3D:
+    var mat := StandardMaterial3D.new()
+    mat.albedo_color=color
+    mat.cull_mode=BaseMaterial3D.CULL_DISABLED
+    mat.roughness=0.9
+    return mat
+
+func _input(event: InputEvent) -> void:
+    if not ready_to_walk:return
+    if event is InputEventMouseButton and event.pressed and event.button_index==MOUSE_BUTTON_LEFT:
+        Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+    if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
+        Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+    if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED:
+        walker.rotate_y(-event.relative.x*0.0025)
+        head.rotation.x=clampf(head.rotation.x-event.relative.y*0.0025,-1.45,1.45)
+
+func _physics_process(delta: float) -> void:
+    if not ready_to_walk:return
+    var direction := Vector3.ZERO
+    if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):direction.z-=1
+    if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):direction.z+=1
+    if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):direction.x-=1
+    if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):direction.x+=1
+    direction=walker.basis*direction.normalized()
+    var speed := 7.0 if Input.is_physical_key_pressed(KEY_SHIFT) else 4.5
+    walker.velocity.x=direction.x*speed
+    walker.velocity.z=direction.z*speed
+    if not walker.is_on_floor():walker.velocity.y-=9.8*delta
+    elif Input.is_physical_key_pressed(KEY_SPACE):walker.velocity.y=4.3
+    else:walker.velocity.y=0
+    walker.move_and_slide()
+    _stream()
+
+func _stream() -> void:
+    var cell := Vector2i(floori(walker.position.x/chunk_size),floori(walker.position.z/chunk_size))
+    if cell==loaded_cell:return
+    loaded_cell=cell
+    var wanted: Dictionary={}
+    for y in range(cell.y-1,cell.y+2):
+        for x in range(cell.x-1,cell.x+2):
+            var key := "%s,%s" % [x,y]
+            if city["chunks"].has(key):wanted[key]=true
+    for key in chunks.keys():
+        if not wanted.has(key):
+            var old: Node3D=chunks[key]
+            remove_child(old)
+            old.queue_free()
+            chunks.erase(key)
+    for key in wanted:
+        if not chunks.has(key):_build_chunk(key,city["chunks"][key])
+    hud.text="VIGEVANO · geographic preview\nWASD · click to look · Space jump · Esc cursor\nOSM buildings: %s | loaded chunks: %s/9\nNo NPC or Java connection in this preview." % [city.get("counts",{}).get("buildings",0),chunks.size()]
+
+func _point(value: Array,y: float) -> Vector3:
+    return Vector3(float(value[0]),y,float(value[1]))
+
+func _quad(out: PackedVector3Array,a: Vector3,b: Vector3,c: Vector3,d: Vector3) -> void:
+    out.append_array(PackedVector3Array([a,b,c,a,c,d]))
+
+func _strip(out: PackedVector3Array,record: Dictionary,y: float) -> void:
+    var a := _point(record["a"],y)
+    var b := _point(record["b"],y)
+    var v := (b-a).normalized()
+    var side := Vector3(-v.z,0,v.x)*float(record["width"])*0.5
+    _quad(out,a+side,b+side,b-side,a-side)
+
+func _build_chunk(key: String,data: Dictionary) -> void:
+    var node := Node3D.new()
+    add_child(node)
+    chunks[key]=node
+    var walls := PackedVector3Array()
+    var roofs := PackedVector3Array()
+    var roads := PackedVector3Array()
+    var rails := PackedVector3Array()
+    for feature in data.get("buildings",[]):
+        var points: Array=feature["points"]
+        var h := float(feature["height"])
+        var polygon := PackedVector2Array()
+        for p in points:polygon.append(Vector2(float(p[0]),float(p[1])))
+        var triangles := Geometry2D.triangulate_polygon(polygon)
+        if triangles.is_empty():continue
+        for i in range(points.size()):
+            var a := _point(points[i],0)
+            var b := _point(points[(i+1)%points.size()],0)
+            if a.distance_squared_to(b)<0.0001:continue
+            _quad(walls,a,b,b+Vector3.UP*h,a+Vector3.UP*h)
+            # Both faces are solid, including on the exterior irrespective of OSM winding.
+            _quad(walls,b,a,a+Vector3.UP*h,b+Vector3.UP*h)
+        for i in triangles:
+            roofs.append(_point(points[i],h))
+    for record in data.get("roads",[]):_strip(roads,record,0.025)
+    for record in data.get("rail",[]):_strip(rails,record,0.035)
+    _surface(node,walls,wall_material,true)
+    _surface(node,roofs,roof_material,false)
+    _surface(node,roads,road_material,false)
+    _surface(node,rails,rail_material,false)
+
+func _surface(parent: Node3D,vertices: PackedVector3Array,material: StandardMaterial3D,collision: bool) -> void:
+    if vertices.is_empty():return
+    var builder := SurfaceTool.new()
+    builder.begin(Mesh.PRIMITIVE_TRIANGLES)
+    for v in vertices:builder.add_vertex(v)
+    builder.generate_normals()
+    var mesh := builder.commit()
+    var instance := MeshInstance3D.new()
+    instance.mesh=mesh
+    instance.material_override=material
+    parent.add_child(instance)
+    if collision:
+        instance.create_trimesh_collision()

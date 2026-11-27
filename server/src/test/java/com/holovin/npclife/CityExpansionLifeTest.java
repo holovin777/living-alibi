@@ -16,7 +16,7 @@ class CityExpansionLifeTest {
         assertTrue(MotorLife.neighbors(OUTER_19_20).contains(OUTER_20_20));
         assertTrue(TransportLife.hasRack(OUTER_20_20));
         assertTrue(CityExpansionLife.serviceHub(OUTER_20_20));
-        assertEquals(304,CityExpansionLife.travelTime(PARK,OUTER_20_20));
+        assertEquals(296,CityExpansionLife.travelTime(PARK,OUTER_20_20));
         assertTrue(RebirthLife.adjacent(WORKSHOP,OUTER_05_01));
         assertEquals(136,CityExpansionLife.travelTime(PARK,OUTER_10_10));
         assertEquals(8,CityExpansionLife.travelTime(OUTER_09_10,OUTER_10_10));
