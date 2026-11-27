@@ -33,7 +33,7 @@ final class ChildhoodLife {
             if(minute==1260){finishDay(t,c,day);continue;}
             if(get(t,c,"sample-day")!=day){
                 put(t,c,"sample-day",day);put(t,c,"contact",0);put(t,c,"tension",0);
-                put(t,c,"last-sample",-1);
+                put(t,c,"last-sample",0);
             }
             if(get(t,c,"last-sample")>=minute)continue;
             put(t,c,"last-sample",minute);

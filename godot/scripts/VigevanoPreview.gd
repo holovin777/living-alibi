@@ -242,7 +242,7 @@ func _input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
         return
     if actions_panel.visible:
-        if event is InputEventKey and event.pressed and (event.keycode==KEY_ESCAPE or (event.keycode==KEY_F and not get_viewport().gui_get_focus_owner() is TextEdit)):
+        if event is InputEventKey and event.pressed and (event.keycode==KEY_ESCAPE or (event.keycode in [KEY_F,KEY_I] and not get_viewport().gui_get_focus_owner() is TextEdit)):
             actions_panel.hide()
             Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
             get_viewport().set_input_as_handled()
@@ -268,6 +268,10 @@ func _input(event: InputEvent) -> void:
         if event.keycode==KEY_P and residents.connected and not bool(residents.world.get("rebirth",false)):
             phone_panel.open_phone(residents.world)
             Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+            get_viewport().set_input_as_handled()
+            return
+        if event.keycode==KEY_I and residents.connected:
+            _open_identity()
             get_viewport().set_input_as_handled()
             return
         if event.keycode==KEY_F and residents.connected:
@@ -651,6 +655,42 @@ func _near_office_computer() -> bool:
     if str(room.get("id",""))!="OFFICE":return false
     var at:=Vector2(walker.position.x,walker.position.z)-room_exit
     return minf(at.distance_to(Vector2(-4,4.1)),at.distance_to(Vector2(4,4.1)))<=2.0
+
+func _open_identity() -> void:
+    for child in action_list.get_children():
+        action_list.remove_child(child)
+        child.queue_free()
+    var heading:=Label.new()
+    heading.text="CARTA D'IDENTITÀ / IDENTITY"
+    action_list.add_child(heading)
+    var passport=residents.world.get("life",{}).get("passport")
+    var info:=Label.new()
+    info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    if passport is Dictionary:
+        var birth:="Unknown / Sconosciuta"
+        if passport.get("birthYear")!=null:
+            birth="World year / Anno %s · day / giorno %s" % [passport.get("birthYear"),passport.get("birthDayOfYear")]
+        var age:=int(passport.get("age",-1))
+        info.text="Name / Nome: %s\nAge / Età: %s\nBirth / Nascita: %s\nBirthplace / Luogo: %s\nLife / Vita: #%s" % [passport.get("name",""),str(age) if age>=0 else "—",birth,passport.get("birthplace",""),passport.get("incarnation",0)]
+        var occupation=passport.get("occupation")
+        var residence=passport.get("residence")
+        info.text+="\nOccupation / Professione: "+("Unemployed / Disoccupato" if occupation==null else str(occupation))
+        info.text+="\nResidence / Residenza: "+("No fixed home / Senza dimora fissa" if residence==null else str(residence))
+        if passport.get("alias")!=null:info.text+="\nAlias: "+str(passport.get("alias"))
+        if passport.get("parentA")!=null:info.text+="\nParent / Genitore: "+str(passport.get("parentA"))
+        if passport.get("parentB")!=null:info.text+="\nParent / Genitore: "+str(passport.get("parentB"))
+        info.text+="\n\nPrivate identity / Identità privata"
+    else:
+        info.text="No current identity. Choose your next life. / Scegli la prossima vita."
+    action_list.add_child(info)
+    var close:=Button.new()
+    close.text="Close / Chiudi"
+    close.pressed.connect(func():
+        actions_panel.hide()
+        Input.mouse_mode=Input.MOUSE_MODE_CAPTURED)
+    action_list.add_child(close)
+    actions_panel.show()
+    Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
 
 func _open_actions(work_only: bool=false) -> void:
     for child in action_list.get_children():

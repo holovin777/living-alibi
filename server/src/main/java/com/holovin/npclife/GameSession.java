@@ -65,6 +65,7 @@ public final class GameSession implements AutoCloseable {
         changed=FactoryNetworkLife.ensure(town)||changed;
         if(population>=24&&!NpcTransportLife.enabled(town)){town.industryStocks.put(NpcTransportLife.ENABLED,1);changed=true;}
         // Old save files might contain a deceased visitor.
+        changed=PassportLife.ensure(town,state)||changed;
         changed=RebirthLife.restoreIdentity(town)||changed;
         if(!town.player.alive&&!RebirthLife.active(town)) {
             RebirthLife.prepare(town,state.day,state.minute);
@@ -79,7 +80,7 @@ public final class GameSession implements AutoCloseable {
                              int hunger,int thirst,int fatigue,int health,boolean alive,
                              int money,String jobId,int engineeringSkill,int investigationSkill,
                              int bread,int bottledWater,long roomUntil,boolean roomActive,int storedBread,int storedWater,int hygiene,
-                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse,boolean ownsBaton,int policeReports,JusticeLife.View justice,WeaponLicenseLife.View weaponLicense) { }
+                             java.util.Map<String,Integer> bag,java.util.Map<String,Integer> pantry,boolean ownsBicycle,boolean cycling,String bicycleParked,String carPlace,int carFuel,int carCondition,List<String> carDestinations,boolean ownsHouse,boolean ownsBaton,int policeReports,JusticeLife.View justice,WeaponLicenseLife.View weaponLicense,PassportLife.View passport) { }
     public record BusinessView(boolean registered,boolean yours,int ownerIncarnation,
                                boolean machine,int machineCondition,int cash,String employeeId,
                                String employeeName,int spareParts,int paidHoursToday,
@@ -293,7 +294,7 @@ public final class GameSession implements AutoCloseable {
                 HousingLife.active(p,state.day,state.minute),p.storedBread,p.storedWater,controlled?RebirthLife.hygiene(town,linked):p.hygiene,
                 FoodLife.inventory(p,false),FoodLife.inventory(p,true),p.ownsBicycle,p.cycling,p.bicycleParked==null?null:p.bicycleParked.name(),
                 p.carPlace==null?null:p.carPlace.name(),p.carFuel,p.carCondition,
-                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse,CombatLife.ownsBaton(town),CombatLife.reports(town),JusticeLife.view(town,state),WeaponLicenseLife.view(town,state));
+                p.carPlace==p.place?MotorLife.neighbors(p.place).stream().map(Enum::name).toList():List.of(),p.ownsHouse,CombatLife.ownsBaton(town),CombatLife.reports(town),JusticeLife.view(town,state),WeaponLicenseLife.view(town,state),PassportLife.view(town,state));
         var visible=RebirthLife.active(town)?RebirthLife.visible(town):PlayerLife.visible(town);
         var companions=walkingCompanions(town,visible,state.minute);
         var residents=visible.stream()
@@ -1354,6 +1355,7 @@ public final class GameSession implements AutoCloseable {
         if(RebirthLife.settleLinkedDeath(candidateTown,candidateState.day,candidateState.minute))
             message+=" Your life ended. Its history is preserved. Choose a new family.";
         RebirthLife.synchronize(candidateTown);
+        PassportLife.ensure(candidateTown,candidateState);
         db.save(candidateState,events,List.of(),candidateTown,truth,observations,interactions);
         state=candidateState;
         town=candidateTown;

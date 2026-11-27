@@ -128,6 +128,35 @@ class GeoRebirthTest {
         assertEquals("NONE",ChildSearchLife.view(t,c,s).status());
         assertEquals(1,ChildSearchLife.view(t,c,s).incidents());
     }
+    @Test void firstPassportIsPrivateAndSurvivesDatabaseRestart()throws Exception{
+        var file=folder.resolve("passport.db");
+        PassportLife.View initial;
+        try(var game=new GameSession(file)){
+            initial=game.snapshot().player().passport();
+            assertNotNull(initial);assertNotNull(initial.name());
+            assertTrue(initial.age()>=18&&initial.age()<=35);
+            assertNull(game.snapshot().player().privateName());
+        }
+        try(var game=new GameSession(file)){
+            assertEquals(initial,game.snapshot().player().passport());
+        }
+        try(var db=new WorldDatabase(file)){
+            var s=db.load();var t=db.loadTown(s);
+            assertEquals(initial,PassportLife.view(t,s));
+            assertEquals(initial.age()+1,PassportLife.visitorAge(t,1,s.day+365));
+            assertTrue(t.player.contacts.isEmpty());
+            var resident=t.people.values().stream().filter(c->c.generationIndex>0).findFirst().orElseThrow();
+            t.industryStocks.put("childhood:"+resident.id+":days",7);
+            t.industryStocks.put("child-search:"+resident.id+":incidents",2);
+            db.save(s,java.util.List.of(),java.util.List.of(),t,java.util.List.of(),java.util.List.of(),java.util.List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var t=db.loadTown(db.load());
+            var resident=t.people.values().stream().filter(c->c.generationIndex>0).findFirst().orElseThrow();
+            assertEquals(7,ChildhoodLife.view(t,resident).observedDays());
+            assertEquals(Integer.valueOf(2),t.industryStocks.get("child-search:"+resident.id+":incidents"));
+        }
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

@@ -4,14 +4,14 @@ import java.util.*;
 /** An adapter for the original linked life, not a second playable identity. */
 final class GeoLife {
     record View(String phase,String name,int age,String activity,int savings,int maxWaitDays,
-                int schoolDays,boolean graduated,String parentA,String parentB,boolean canWalk,int radius,List<GenealogyLife.Relative> familyTree,ChildhoodLife.View upbringing,ChildSearchLife.View childSearch){}
+                int schoolDays,boolean graduated,String parentA,String parentB,boolean canWalk,int radius,List<GenealogyLife.Relative> familyTree,ChildhoodLife.View upbringing,ChildSearchLife.View childSearch,PassportLife.View passport){}
     static View view(TownLife.Town t,WorldState s){
         int phase=RebirthLife.phase(t);var c=RebirthLife.child(t);
         var a=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-a"));
         var b=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-b"));
         return new View(switch(phase){case RebirthLife.CHOICE->"CHOICE";case RebirthLife.CHILDHOOD->"CHILDHOOD";case RebirthLife.LINKED_ADULT->"LINKED_ADULT";default->"ADULT";},
             c==null?null:c.name,c==null?0:c.age,c==null?"":c.activity,c==null?t.player.money:c.money,RebirthLife.maxWaitDays(t),
-            c==null?0:EducationLife.get(t,c,"school-days"),c!=null&&EducationLife.get(t,c,"graduate")>0,a==null?null:a.name,b==null?null:b.name,canWalk(t,s),24,GenealogyLife.relatives(t,c),ChildhoodLife.view(t,c),ChildSearchLife.view(t,c,s));
+            c==null?0:EducationLife.get(t,c,"school-days"),c!=null&&EducationLife.get(t,c,"graduate")>0,a==null?null:a.name,b==null?null:b.name,canWalk(t,s),24,GenealogyLife.relatives(t,c),ChildhoodLife.view(t,c),ChildSearchLife.view(t,c,s),PassportLife.view(t,s));
     }
     static List<GeoProjection.Choice> choices(TownLife.Town t,WorldState s,GeoProjection map){
         var result=new ArrayList<GeoProjection.Choice>();

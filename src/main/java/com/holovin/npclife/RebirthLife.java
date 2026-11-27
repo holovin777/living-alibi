@@ -122,8 +122,9 @@ final class RebirthLife {
         var result=new ArrayList<PastLife>();
         for(var record:t.pastLives.values()){
             var person=t.people.values().stream().filter(c->DemographyLife.get(t,c,"played-incarnation")==record.incarnation()).findFirst().orElse(null);
-            result.add(new PastLife(record.incarnation(),record.privateName(),person==null?null:person.id,
-                    record.day(),record.minute(),person==null?-1:person.age,record.place().label));
+            String name=person==null?PassportLife.visitorName(t,record.incarnation()):person.name;
+            result.add(new PastLife(record.incarnation(),name==null?record.privateName():name,person==null?null:person.id,
+                    record.day(),record.minute(),person==null?PassportLife.visitorAge(t,record.incarnation(),record.day()):person.age,record.place().label));
         }
         result.sort(java.util.Comparator.comparingInt(PastLife::incarnation).reversed());
         return List.copyOf(result);
