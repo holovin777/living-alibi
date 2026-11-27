@@ -51,6 +51,7 @@ final class FactoryNetworkLife {
         return true;
     }
     static boolean produce(TownLife.Town t,Plant p){
+        if(!FactoryMaintenance.operational(t,p))return false;
         if(stock(t,p.output())+p.units()>12||p.inputs().entrySet().stream().anyMatch(e->stock(t,e.getKey())<e.getValue()))return false;
         int cost=p.inputs().entrySet().stream().filter(e->!supplier(e.getKey()).equals(SUPPLIER)).mapToInt(e->2*e.getValue()).sum();
         if(t.employerFunds.getOrDefault(account(p),0)<cost)return false;
@@ -58,7 +59,7 @@ final class FactoryNetworkLife {
             if(!supplier(e.getKey()).equals(SUPPLIER))SupplyChainLife.pay(t,account(p),supplier(e.getKey()),2*e.getValue());
             change(t,e.getKey(),-e.getValue());
         }
-        change(t,p.output(),p.units());return true;
+        change(t,p.output(),p.units());FactoryMaintenance.wear(t,p);return true;
     }
     static boolean procure(TownLife.Town t,String item,Plant p){
         if(!List.of("cotton","components").contains(item)||stock(t,item)>=8||FuelLife.stock(t)<1
@@ -97,6 +98,9 @@ final class FactoryNetworkLife {
             for(var p:PLANTS)for(String item:p.inputs().keySet())if(List.of("cotton","components").contains(item))procure(t,item,p);
         }
         if(s.minute==660&&SupplyChainLife.once(t,"logging",s.day)&&freight&&SupplyChainLife.attending(t,WOODS,"Forestry worker"))harvest(t);
+        if(s.minute==720){
+            for(var p:PLANTS)FactoryMaintenance.service(t,s,p);
+        }
         if(s.minute==780&&SupplyChainLife.once(t,"network-production",s.day)){
             for(var p:PLANTS)if(SupplyChainLife.attending(t,p.site(),p.occupation()))produce(t,p);
         }
@@ -104,12 +108,12 @@ final class FactoryNetworkLife {
             for(var p:PLANTS)if(deliver(t,p))WorkplaceRewards.afterSale(t,s,p);
         }
     }
-    record PlantView(String id,String district,String output,int stock,int employees,int funds){}
+    record PlantView(String id,String district,String output,int stock,int employees,int funds,int condition,boolean operational){}
     record View(boolean active,int forest,List<PlantView> plants){}
     static View view(TownLife.Town t){
         return new View(StaffingLife.enabled(t),SupplyChainLife.get(t,"factory-network:forest"),
             PLANTS.stream().map(p->new PlantView(p.id(),p.site().name(),p.output(),stock(t,p.output()),
                 (int)t.people.values().stream().filter(c->c.alive&&c.employed&&p.occupation().equals(c.occupation)&&c.workplace==p.site()).count(),
-                t.employerFunds.getOrDefault(account(p),0))).toList());
+                t.employerFunds.getOrDefault(account(p),0),FactoryMaintenance.condition(t,p),FactoryMaintenance.operational(t,p))).toList());
     }
 }

@@ -47,4 +47,37 @@ class FactoryNetworkLifeTest {
   s.day=15;worker.sickUntilDay=15;
   assertFalse(WorkplaceRewards.afterSale(t,s,plant));
  }
+ @Test void wornMachinesStopProductionAndPaidRepairConsumesRealParts(){
+  var s=new WorldState();s.day=8;
+  var t=TownLife.create(s);t.industryStocks.put(StaffingLife.ENABLED,1);
+  FactoryNetworkLife.ensure(t);
+  var p=FactoryNetworkLife.PLANTS.stream().filter(x->x.id().equals("paper-mill")).findFirst().orElseThrow();
+  FactoryNetworkLife.change(t,"logs",3);
+  assertTrue(FactoryNetworkLife.produce(t,p));
+  assertEquals(93,FactoryMaintenance.condition(t,p));
+  t.industryStocks.put(FactoryMaintenance.key(p,"condition"),20);
+  int logs=FactoryNetworkLife.stock(t,"logs");
+  assertFalse(FactoryNetworkLife.produce(t,p));
+  assertEquals(logs,FactoryNetworkLife.stock(t,"logs"));
+  var tech=new TownLife.Citizen("repair-tech","Ada","Factory machinist",TownLife.Place.FACTORY);
+  tech.home=TownLife.Place.NORTH_RESIDENCES;tech.activity="WORKING";
+  t.people.put(tech.id,tech);
+  SupplyChainLife.set(t,IndustryLife.FACTORY_PARTS,0);
+  assertFalse(FactoryMaintenance.service(t,s,p));
+  SupplyChainLife.set(t,IndustryLife.FACTORY_PARTS,1);
+  tech.sickUntilDay=8;assertFalse(FactoryMaintenance.service(t,s,p));tech.sickUntilDay=0;
+  int cash=t.employerFunds.get(FactoryNetworkLife.account(p)),supplier=t.employerFunds.get("machinist"),wallet=tech.money;
+  t.employerFunds.put(FactoryNetworkLife.account(p),0);
+  assertFalse(FactoryMaintenance.service(t,s,p));
+  t.employerFunds.put(FactoryNetworkLife.account(p),cash);
+  assertTrue(FactoryMaintenance.service(t,s,p));
+  assertEquals(60,FactoryMaintenance.condition(t,p));
+  assertEquals(0,SupplyChainLife.get(t,IndustryLife.FACTORY_PARTS));
+  assertEquals(cash-9,t.employerFunds.get(FactoryNetworkLife.account(p)).intValue());
+  assertEquals(supplier+5,t.employerFunds.get("machinist").intValue());
+  assertEquals(wallet+4,tech.money);
+  assertFalse(FactoryMaintenance.service(t,s,p));
+  assertEquals(60,FactoryMaintenance.condition(t.copy(),p));
+  assertTrue(FactoryNetworkLife.produce(t,p));
+ }
 }
