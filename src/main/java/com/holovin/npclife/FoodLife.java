@@ -13,6 +13,8 @@ final class FoodLife {
             new Recipe("pasta-verdure","Pasta with vegetables",25,65,5,Map.of("pasta",1,"vegetables",1,"water",1)),
             new Recipe("frittata","Vegetable frittata",20,60,0,Map.of("eggs",1,"vegetables",1)),
             new Recipe("pancakes","Pancakes",25,60,5,Map.of("flour",1,"eggs",1,"milk",1)),
+            new Recipe("risotto-cheese","Cheese risotto",25,75,5,Map.of("rice",1,"cheese",1,"water",1)),
+            new Recipe("meat-vegetables","Meat with vegetables",30,80,0,Map.of("meat",1,"vegetables",1,"oil",1)),
             new Recipe("rice-verdure","Rice with vegetables",25,65,5,Map.of("rice",1,"vegetables",1,"water",1)),
             new Recipe("garden-soup","Garden vegetable soup",20,55,20,Map.of("bread",1,"vegetables",1,"water",1)),
             new Recipe("omelette","Milk omelette",15,50,0,Map.of("eggs",1,"milk",1)),

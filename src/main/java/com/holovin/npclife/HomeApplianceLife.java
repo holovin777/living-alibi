@@ -5,7 +5,7 @@ import static com.holovin.npclife.TownLife.Place.*;
 /** Small fictional household economy. All quantities and tariffs are game units. */
 final class HomeApplianceLife {
     private HomeApplianceLife(){}
-    static final List<String> CHILLED=List.of("milk","eggs","vegetables","apples","pears","plums","grapes");
+    static final List<String> CHILLED=List.of("milk","cheese","meat","eggs","vegetables","apples","pears","plums","grapes");
     static final int CAPACITY=12, CREDIT_LIMIT=12;
     static int get(TownLife.Town t,String k){return HomeGoodsLife.get(t,"appliance:"+k);}
     static void set(TownLife.Town t,String k,int n){HomeGoodsLife.set(t,"appliance:"+k,n);}

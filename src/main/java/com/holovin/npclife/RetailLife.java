@@ -15,6 +15,9 @@ final class RetailLife {
             new Product("vegetables","Vegetables",3,18,8),
             new Product("milk","Milk",2,16,6),
             new Product("rice","Rice",2,20,0),
+            new Product("cheese","Cheese",4,16,0),
+            new Product("oil","Cooking oil",3,12,0),
+            new Product("meat","Meat",5,12,0),
             new Product("apples","Apples",3,12,0),
             new Product("pears","Pears",3,12,0),
             new Product("plums","Plums",3,12,0),
@@ -25,7 +28,7 @@ final class RetailLife {
             new Product("pizza","Pizza Margherita",7,16,12),
             new Product("gelato","Gelato",3,18,14));
     static void ensure(TownLife.Town t) {
-        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),(OrchardLife.isFruit(p.id())||p.id().equals("honey")||p.id().equals("grape-juice")||p.id().equals("wine"))?0:p.capacity());
+        for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),(OrchardLife.isFruit(p.id())||p.id().equals("honey")||p.id().equals("grape-juice")||p.id().equals("wine")||java.util.Set.of("cheese","oil","meat").contains(p.id()))?0:p.capacity());
     }
     static void tick(TownLife.Town t,int minute) {
         if(minute!=360||StaffingLife.enabled(t))return;
