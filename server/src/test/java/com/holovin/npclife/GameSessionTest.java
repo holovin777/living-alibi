@@ -491,10 +491,11 @@ class GameSessionTest {
             c.place=TownLife.Place.BAKERY;c.activity="WORKING";c.travelRemaining=0;
             assertEquals("No answer at the intercom.",IntercomLife.ring(town,c.id,1,1,600));
             c.place=c.home;c.activity="FREE_TIME";
-            assertEquals("Please wait before ringing again.",IntercomLife.ring(town,c.id,1,1,601));
+            assertEquals("Please respect my privacy and wait before ringing again.",IntercomLife.ring(town,c.id,1,1,601));
+            assertEquals(78,contact.trust);
             assertEquals("Hello! We can chat at the entrance for a few minutes.",IntercomLife.ring(town,c.id,1,1,610));
             assertEquals("You chatted together at the entrance.",IntercomLife.visit(town,c.id,1,1,611));
-            assertEquals(82,contact.trust);assertEquals(33,contact.affinity);
+            assertEquals(80,contact.trust);assertEquals(33,contact.affinity);
             assertThrows(IllegalArgumentException.class,()->IntercomLife.visit(town,c.id,1,1,612));
             assertEquals("Hello! We can chat at the entrance for a few minutes.",IntercomLife.ring(town,c.id,1,1,620));
             assertThrows(IllegalArgumentException.class,()->IntercomLife.visit(town,c.id,1,1,631));
@@ -4194,7 +4195,7 @@ class GameSessionTest {
     void ordinaryVisitorCanBecomeMinerOrMachinistAndSurveyNewOre() throws Exception {
         Path mine=directory.resolve("visitor-miner.db");
         try(var game=new GameSession(mine)) {
-            assertEquals(10,game.jobs().size());
+            assertEquals(11,game.jobs().size());
             game.move("quarry");
             game.applyJob("miner");
             game.waitMinutes(30);
@@ -4275,7 +4276,7 @@ class GameSessionTest {
             assertEquals(50,visitor.money());
             assertNull(visitor.jobId());
             assertEquals(0,visitor.engineeringSkill());
-            assertEquals(10,game.jobs().size());
+            assertEquals(11,game.jobs().size());
 
             assertThrows(IllegalArgumentException.class,
                     ()->game.applyJob("shop-assistant"));
