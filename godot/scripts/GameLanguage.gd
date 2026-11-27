@@ -506,8 +506,6 @@ const IT := {
     "Apply: quarry miner": "Candidati come minatore",
     "Apply: factory machinist": "Candidati come operaio di fabbrica",
     "Apply: market assistant": "Candidati: addetto al mercato",
-    "Study engineering · 10 EUR": "Studia ingegneria · 10 EUR",
-    "Study investigation · 10 EUR": "Studia investigazione · 10 EUR",
     "Previous year": "Anno precedente",
     "Next year": "Anno successivo",
     "Current year": "Anno corrente",
