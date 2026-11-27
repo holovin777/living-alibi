@@ -38,6 +38,7 @@ final class GeoLife {
             return List.copyOf(result);
         }
         if(c==null||!c.alive)return List.of();
+        if(NpcJusticeLife.confined(t,c,s))return List.of();
         if(life.phase().equals("CHILDHOOD")){
             if(life.maxWaitDays()>0)add(result,"rebirth-wait","Advance 1 day / Avanza un giorno");
             if(life.maxWaitDays()>1)add(result,"rebirth-wait-fast","Advance up to "+life.maxWaitDays()+" days / Avanza");
@@ -59,6 +60,8 @@ final class GeoLife {
             add(result,"rebirth-wait-adult-day","Advance 1 day / Avanza un giorno");
             if(RebirthLife.partner(t,c)!=null)add(result,"rebirth-separate","End partnership / Termina la relazione");
             if(ElectionLife.atComune(c,s.minute)){
+                if(CorruptionLife.canMisconduct(t,c,s))add(result,"rebirth-corruption-offense","Abuse public office (crime) / Abuso d’ufficio (reato)");
+                if(CorruptionLife.canAudit(t,c,s))add(result,"rebirth-corruption-audit","Investigate budget discrepancy / Indaga sul bilancio");
                 if(ElectionLife.campaign(t,s.day)){
                     if(!ElectionLife.valid(t,4)&&!ElectionLife.registered(t))for(int plan=1;plan<=3;plan++)
                         add(result,"rebirth-election-register-"+plan,"Run for mayor / Candidati · "+ElectionLife.label(plan));
@@ -116,7 +119,7 @@ final class GeoLife {
     private static void add(List<GeoProjection.Choice> choices,String id,String label){choices.add(new GeoProjection.Choice(id,label));}
     static boolean canWalk(TownLife.Town t,WorldState s){
         var c=RebirthLife.child(t);
-        return RebirthLife.active(t)&&c!=null&&c.age>=6&&RebirthLife.awakePresent(c)&&!JusticeLife.confined(t)
+        return RebirthLife.active(t)&&c!=null&&c.age>=6&&RebirthLife.awakePresent(c)&&!JusticeLife.confined(t)&&!NpcJusticeLife.confined(t,c,s)
                 &&!EmploymentLife.sick(c,s.day)&&!"IN_CUSTODY".equals(c.activity)
                 &&(RebirthLife.linkedChild(t,c)||RebirthLife.linkedAdult(t,c));
     }

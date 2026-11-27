@@ -718,6 +718,7 @@ final class TownLife {
         TechnicalWorkLife.tick(town,marco.day,marco.minute);
         ElectionLife.tick(town,marco.day,marco.minute);
         MunicipalLife.tick(town,marco.day,marco.minute);
+        CorruptionLife.tick(town,marco);
         PropertyLife.ensureStarterItems(town,marco);
         Citizen m=town.get("marco"), e=town.get("elena");
         m.alive=marco.alive;

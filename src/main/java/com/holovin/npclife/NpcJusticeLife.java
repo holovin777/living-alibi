@@ -15,7 +15,7 @@ final class NpcJusticeLife {
         if(c.solved&&eligible(t,t.people.get(c.offenderId)))t.industryStocks.putIfAbsent(caseKey(c),1);
     }
     static boolean confined(TownLife.Town t,TownLife.Citizen c,WorldState s){
-        return eligible(t,c)&&t.industryStocks.getOrDefault(until(c),0)>time(s);
+        return c!=null&&c.alive&&c.age>=18&&t.industryStocks.getOrDefault(until(c),0)>time(s);
     }
     static void custody(TownLife.Citizen c){
         c.place=TownLife.Place.OFFICE;c.destination=c.place;c.travelRemaining=0;
@@ -33,6 +33,14 @@ final class NpcJusticeLife {
         custody(offender);
         ArchiveLife.record(t,"npc-vehicle-court:"+incident,s.day,s.minute,"Public safety",
                 "A fictional court imposed a custodial sentence in a confirmed vehicle theft case.");
+    }
+    static void corruptionConviction(TownLife.Town t,WorldState s,TownLife.Citizen offender,int incident){
+        if(offender==null||!offender.alive||offender.age<18)return;
+        String key=PREFIX+"corruption-case:"+incident;
+        if(t.industryStocks.putIfAbsent(key,1)!=null)return;
+        t.industryStocks.put(until(offender),Math.addExact(Math.max(time(s),t.industryStocks.getOrDefault(until(offender),0)),4320));
+        t.industryStocks.merge(count(offender),1,Math::addExact);
+        custody(offender);
     }
     static void propertyConviction(TownLife.Town t,WorldState s,TownLife.Citizen offender,int incident){
         if(!eligible(t,offender))return;
