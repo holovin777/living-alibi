@@ -38,6 +38,7 @@ final class FactoryQuality {
         set(t,p,"rejected",(int)Math.min(Integer.MAX_VALUE,(long)rejected(t,p)+bad));
         set(t,p,"accepted",(int)Math.min(Integer.MAX_VALUE,(long)accepted(t,p)+good));
         set(t,p,"reputation",Math.max(0,Math.min(100,reputation(t,p)+(bad==0?1:-8*bad))));
+        WasteLife.rejected(t,p,bad);
         return good;
     }
     static int wholesalePrice(TownLife.Town t,FactoryNetworkLife.Plant p,int base){

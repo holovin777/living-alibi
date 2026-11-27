@@ -67,7 +67,7 @@ final class HomeApplianceLife {
         if(HomeGoodsLife.installed(t,"fridge")){
             if(power(t)&&HomeServiceLife.working(t,"fridge")){consume(t);HomeServiceLife.wear(t,"fridge",1);}
             else for(String id:CHILLED)if(quantity(t,id)>0){
-                set(t,"cold:"+id,quantity(t,id)-1);set(t,"spoiled",Math.addExact(get(t,"spoiled"),1));break;
+                set(t,"cold:"+id,quantity(t,id)-1);set(t,"spoiled",Math.addExact(get(t,"spoiled"),1));WasteLife.discard(t,"organic",1);break;
             }
         }
     }

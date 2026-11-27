@@ -7685,6 +7685,7 @@ func _render_actions() -> void:
     if _current_place in ["FARM","RIVER","FACTORY","OFFICE"]:_render_energy()
     if _current_place in ["RIVER","FACTORY","OFFICE"]:_render_water_network()
     if _current_place in ["FUEL_STATION","FACTORY","OFFICE"]:_render_gas_network()
+    if _current_place in ["LOGISTICS_DEPOT","FACTORY","OFFICE"]:_render_waste()
     var logistics: Dictionary = _last_snapshot.get("logistics",{})
     if _current_place in ["FARM","QUARRY","FACTORY"] and bool(logistics.get("yours",false)) and bool(logistics.get("truck",false)) and not bool(_last_snapshot.get("freight",{}).get("active",false)):
         var relocation := " · relocation 8 EUR + fuel" if str(logistics.get("truckPlace",""))!=_current_place else ""
@@ -8444,6 +8445,22 @@ func _render_factory_report() -> void:
         line.text+=" · "+tr("Condition")+": "+str(plant.get("condition",100))+"% · "+tr("Lost batches")+": "+str(plant.get("lostBatches",0))
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
+
+func _render_waste() -> void:
+    var w: Dictionary = _last_snapshot.get("waste",{})
+    if not bool(w.get("active",false)):return
+    var line := Label.new()
+    line.text=tr("Waste and recycling")+" · "+tr("Condition")+": "+str(w.get("condition",100))+"% · "+tr("Litter")+": "+str(w.get("litter",0))
+    line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _action_choices.add_child(line)
+    for stream in w.get("streams",[]):
+        var item := Label.new()
+        item.text=tr(str(stream.get("type","")))+" · "+tr("Bins")+": "+str(stream.get("bin",0))+" · "+tr("Sorted")+": "+str(stream.get("sorted",0))
+        _action_choices.add_child(item)
+    for material in w.get("materials",[]):
+        var item := Label.new()
+        item.text=tr(str(material.get("item","")))+" · "+tr("Recovered")+": "+str(material.get("units",0))
+        _action_choices.add_child(item)
 
 func _render_gas_network() -> void:
     var gas: Dictionary = _last_snapshot.get("gasNetwork",{})

@@ -754,6 +754,7 @@ final class TownLife {
         GasNetworkLife.tick(town,marco);
         EnergyLife.tick(town,marco);
         WaterNetworkLife.tick(town,marco);
+        WasteLife.tick(town,marco);
         FactoryNetworkLife.tick(town,marco);
         FoodSupplyLife.tick(town,marco);
         ConstructionLife.tick(town,marco.day,marco.minute);
