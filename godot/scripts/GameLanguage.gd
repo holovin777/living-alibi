@@ -255,6 +255,8 @@ const IT := {
     "Resign from job": "Dimettiti dal lavoro",
     "F: municipal bus timetable and tickets.": "F: orari e biglietti dell'autobus.",
     "Municipal bus stop": "Fermata autobus",
+    "Bus to %s · look around · E: skip ride": "Autobus per %s · guarda intorno · E: salta viaggio",
+    "Waiting for confirmed bus arrival...": "In attesa della conferma di arrivo...",
     "Next bus: %s min": "Prossimo autobus: %s min",
     "Bus service closed": "Servizio autobus chiuso",
     "Local residents travelling by bus: %s": "Residenti in viaggio in autobus: %s",

@@ -643,11 +643,20 @@ func _exercise() -> void:
     bus_day["minute"]=620
     world._on_world_updated(bus_day)
     if not _check(not bus_stop.get_node("Bus").visible,"bus leaves the platform between departures"):return
-    world._bus_pending="WORKSHOP"
+    world._begin_bus_preview("WORKSHOP",6)
+    var start_money: int=int(world._last_snapshot["player"]["money"])
+    var original_pos: Vector3=world._avatar.position
+    world._tick_bus_preview(0.5)
+    if not _check(world._bus_preview_active() and world._bus_stage.has_node("PassengerCabin")
+            and world._bus_street.position.z>0.0 and not world._bus_sent
+            and world._camera.position.y>world.BUS_STAGE_HEIGHT
+            and world._avatar.position==original_pos and int(world._last_snapshot["player"]["money"])==start_money,
+            "first-person bus preview moves scenery without committing money or position"):return
     var bus_arrived := _world("WORKSHOP","Workshop")
     bus_arrived["minute"]=619
     world._on_world_updated(bus_arrived)
-    if not _check(world._bus_pending.is_empty() and world._avatar.position.is_equal_approx(world._bus_platform()),
+    if not _check(world._bus_pending.is_empty() and not world._bus_preview_active() and world._main_panel.visible
+            and world._avatar.position.is_equal_approx(world._bus_platform()),
             "confirmed bus trip arrives at destination platform"):return
     world._on_world_updated(_world("PARK","Park"))
 

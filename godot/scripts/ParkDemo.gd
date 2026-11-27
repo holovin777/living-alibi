@@ -169,6 +169,18 @@ var _traffic_edges: Dictionary = {}
 var _traffic_seconds := 0.0
 var _road_pending := ""
 var _bus_pending := ""
+var _bus_stage: Node3D
+var _bus_street: Node3D
+var _bus_elapsed := 0.0
+var _bus_duration := 0.0
+var _bus_sent := false
+var _bus_saved_yaw := 0.0
+var _bus_saved_pitch := 0.0
+var _bus_saved_hands := true
+var _bus_look := 0.0
+var _bus_pitch := 0.0
+const BUS_STAGE_HEIGHT := 220.0
+const BUS_EYE := Vector3(0.71,1.38,0.65)
 var _road_arrival := Vector3.ZERO
 var _road_blocked := ""
 var _last_snapshot: Dictionary = {}
@@ -268,6 +280,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
     if _custody_active:
+        return
+    if _bus_preview_active():
+        _tick_bus_preview(delta)
         return
     _tick_dialog_autonomy(delta)
     _music.update_mix(delta,_dialog_panel.visible and _spoken_dialog_enabled)
@@ -459,6 +474,15 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if _custody_active:return
+    if _bus_preview_active():
+        if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED:
+            _bus_look=clampf(_bus_look-event.relative.x*MOUSE_SENSITIVITY,-1.75,1.75)
+            _bus_pitch=clampf(_bus_pitch-event.relative.y*MOUSE_SENSITIVITY,-0.45,0.45)
+            _follow_player()
+        elif event is InputEventMouseButton and event.pressed:
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+        get_viewport().set_input_as_handled()
+        return
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         if _drive_active():
             _drive_look = clampf(_drive_look-event.relative.x*MOUSE_SENSITIVITY,-1.05,1.05)
@@ -484,6 +508,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
     if _custody_active:return
+    if _bus_preview_active():
+        if event is InputEventKey and event.pressed and not event.echo:
+            if event.keycode==KEY_E and not _bus_sent:_bus_elapsed=_bus_duration
+            elif event.keycode==KEY_ESCAPE:Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+        get_viewport().set_input_as_handled()
+        return
     if _dialog_panel.visible and event is InputEventKey and event.pressed and not event.echo:
         if event.keycode == KEY_ESCAPE:
             _close_dialog()
@@ -1195,6 +1225,10 @@ func _follow_player() -> void:
     # Fixed first-person presentation in every district and transport mode.
     _avatar.visible = false
     _avatar.rotation.y = _view_yaw
+    if _bus_preview_active():
+        _camera.position=_bus_stage.position+BUS_EYE+Vector3(0,sin(_bus_elapsed*8.0)*0.012,0)
+        _camera.rotation=Vector3(_bus_pitch,_bus_look,0)
+        return
     if _drive_active():
         _cockpit.position = _avatar.position
         _cockpit.rotation.y = _view_yaw
@@ -8256,10 +8290,125 @@ func _ride_bus(id: String) -> void:
     if not _connected or _api.is_busy() or not _bus_pending.is_empty() or not TownLayout.bus_stop(_current_place):return
     if not _near_bus_stop() and not (_bus_stop_node()==null and _near_kiosk()):return
     if not bool(_last_snapshot.get("bus",{}).get("available",false)):return
-    _bus_pending=id
-    _action_panel.visible=false
+    var minutes := 4
+    for route in _last_snapshot.get("bus",{}).get("routes",[]):
+        if str(route.get("id",""))==id:
+            minutes=int(route.get("minutes",4))
+            break
+    _begin_bus_preview(id,minutes)
+
+func _bus_preview_active() -> bool:
+    return is_instance_valid(_bus_stage)
+
+# A short, representative first-person journey. This visual stage never
+# advances simulation time or changes a wallet; only the existing Java
+# bus action can commit the trip and determine the actual arrival.
+func _begin_bus_preview(destination: String,minutes: int) -> void:
+    if _bus_preview_active():return
+    _bus_pending=destination
+    _bus_elapsed=0.0
+    _bus_duration=clampf(float(minutes)*0.45,4.0,12.0)
+    _bus_sent=false
+    _bus_saved_yaw=_view_yaw
+    _bus_saved_pitch=_view_pitch
+    _bus_saved_hands=_hands.visible
+    _bus_look=-0.65
+    _bus_pitch=0.0
+    _bus_stage=Node3D.new()
+    _bus_stage.name="PassengerBusJourney"
+    _bus_stage.position=Vector3(0,BUS_STAGE_HEIGHT,0)
+    add_child(_bus_stage)
+    var cabin := Node3D.new()
+    cabin.name="PassengerCabin"
+    _bus_stage.add_child(cabin)
+    var floor_color := Color("#545c61")
+    var trim := Color("#d7d9d4")
+    var upholstery := Color("#365c81")
+    _box(cabin,Vector3(2.5,0.13,7.4),floor_color,Vector3(0,-0.065,0))
+    _box(cabin,Vector3(2.5,0.15,7.4),trim,Vector3(0,2.35,0))
+    for side in [-1.0,1.0]:
+        _box(cabin,Vector3(0.12,0.82,7.4),trim,Vector3(side*1.25,0.41,0))
+        _box(cabin,Vector3(0.12,0.22,7.4),trim,Vector3(side*1.25,2.15,0))
+        for z in [-3.65,-2.1,-0.55,1.0,2.55,3.65]:
+            _box(cabin,Vector3(0.10,1.25,0.10),trim,Vector3(side*1.25,1.45,z))
+        for z in [-2.0,0.65,2.3]:
+            var x := side*0.75
+            _box(cabin,Vector3(0.54,0.13,0.55),upholstery,Vector3(x,0.52,z))
+            _box(cabin,Vector3(0.54,0.64,0.13),upholstery,Vector3(x,0.91,z+0.25))
+            _box(cabin,Vector3(0.12,0.46,0.12),floor_color,Vector3(x,0.23,z))
+    _box(cabin,Vector3(2.5,0.88,0.12),trim,Vector3(0,0.44,-3.7))
+    _box(cabin,Vector3(2.5,2.35,0.12),trim,Vector3(0,1.175,3.7))
+    for x in [-0.34,0.34]:
+        for z in [-2.7,-0.9,1.0]:
+            _cylinder(cabin,0.035,2.25,Color("#d1ae4b"),Vector3(x,1.125,z))
+    _physical_sign(cabin,"BUS URBANO",Vector3(0,2.02,-3.55),0.0,1.4)
+    # Anonymous figures represent reported local bus travellers, not
+    # fabricated NPC identities or guaranteed occupants of this vehicle.
+    var count := mini(3,int(_last_snapshot.get("bus",{}).get("localBusTravellers",0)))
+    for i in range(count):
+        var passenger := Node3D.new()
+        passenger.name="Passenger"+str(i)
+        cabin.add_child(passenger)
+        passenger.position=Vector3(-0.75,0,[-2.0,0.65,2.3][i])
+        _box(passenger,Vector3(0.40,0.52,0.26),[Color("#776b59"),Color("#5c756c"),Color("#7b6575")][i],Vector3(0,0.87,0))
+        _sphere(passenger,0.13,Color("#bb947b"),Vector3(0,1.28,0))
+        for x in [-0.11,0.11]:
+            _box(passenger,Vector3(0.15,0.15,0.43),Color("#41474d"),Vector3(x,0.55,-0.18))
+            _box(passenger,Vector3(0.15,0.40,0.17),Color("#41474d"),Vector3(x,0.30,-0.37))
+    _bus_street=Node3D.new()
+    _bus_street.name="PassingStreet"
+    _bus_stage.add_child(_bus_street)
+    # Repeating low-poly streetscape outside the cabin; no extra town chunks.
+    for i in range(5):
+        var section := Node3D.new()
+        section.position.z=float(i-2)*18.0
+        _bus_street.add_child(section)
+        _box(section,Vector3(14,0.10,18),Color("#555b5b"),Vector3(0,-0.45,0),"asphalt")
+        for side in [-1.0,1.0]:
+            _box(section,Vector3(2.0,0.16,18),Color("#c4bba7"),Vector3(side*5.6,-0.34,0),"paving")
+            var wall: Color=[Color("#d2b99a"),Color("#bd8d78"),Color("#d5cbb4")][i%3]
+            _box(section,Vector3(5.0,6.5,12.5),wall,Vector3(side*9.4,2.85,0))
+            _box(section,Vector3(5.4,0.30,12.9),Color("#815c4c"),Vector3(side*9.4,6.15,0))
+            for z in [-4.2,0.0,4.2]:
+                for y in [1.5,4.2]:
+                    _box(section,Vector3(0.10,1.25,0.95),Color("#465964"),Vector3(side*6.86,y,z))
+            _cylinder(section,0.14,3.2,Color("#655648"),Vector3(side*4.3,1.2,7.2))
+            _sphere(section,1.0,Color("#668258"),Vector3(side*4.3,3.0,7.2))
+    _action_panel.hide()
+    _travel_panel.hide()
+    _map_panel.hide()
+    _main_panel.hide()
+    _hands.hide()
+    _drive_hud.show()
+    _drive_hud.text=tr("Bus to %s · look around · E: skip ride") % TownLayout.label_for(destination)
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-    _api.garden_action("bus-ride:"+id)
+    _follow_player()
+
+func _tick_bus_preview(delta: float) -> void:
+    if not _bus_sent:
+        _bus_elapsed=minf(_bus_duration,_bus_elapsed+maxf(0.0,delta))
+        _bus_street.position.z=fposmod(_bus_elapsed*5.0,18.0)
+        _drive_hud.text=tr("Bus to %s · look around · E: skip ride") % TownLayout.label_for(_bus_pending)
+        if _bus_elapsed>=_bus_duration and _connected and not _api.is_busy():
+            _bus_sent=true
+            _api.garden_action("bus-ride:"+_bus_pending)
+    if _bus_sent:
+        _drive_hud.text=tr("Waiting for confirmed bus arrival...")
+    _follow_player()
+
+func _end_bus_preview() -> void:
+    if not _bus_preview_active():return
+    _bus_stage.hide()
+    _bus_stage.queue_free()
+    _bus_stage=null
+    _bus_street=null
+    _bus_sent=false
+    _view_yaw=_bus_saved_yaw
+    _view_pitch=_bus_saved_pitch
+    _hands.visible=_bus_saved_hands
+    _drive_hud.hide()
+    _main_panel.show()
+    _follow_player()
 
 func _render_armeria(permit: Dictionary) -> void:
     var player: Dictionary = _last_snapshot.get("player",{})
@@ -9074,6 +9223,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if _drive_active() and not continue_in_cabin and (_drive_pending or new_place!=_current_place or _car_place()!=_current_place):
         _end_driving(new_place==_current_place)
     var bus_arrival := not _bus_pending.is_empty() and new_place==_bus_pending
+    _end_bus_preview()
     _bus_pending=""
     var road_arrival := new_place == _road_pending and not _road_pending.is_empty()
     if not _road_pending.is_empty():
@@ -9472,6 +9622,7 @@ func _on_request_failed(message: String) -> void:
             _intercom_reply.text = tr(message)
     _home_transition=false
     if not _bus_pending.is_empty():
+        _end_bus_preview()
         _bus_pending=""
         _connected=false
         _message.text=tr("Bus response uncertain. Refresh world before retrying.")
