@@ -34,7 +34,7 @@ final class IndustryLife {
     static final String FACTORY_IRON="factory:iron-ore";
     static final String FACTORY_COPPER_ORE="factory:copper-ore";
     static final String FACTORY_STEEL="factory:steel";
-    private static final String FACTORY_COPPER="factory:copper";
+    static final String FACTORY_COPPER="factory:copper";
     static final String FACTORY_PARTS="factory:spare-parts";
     private static final String SALVAGE="factory:scrap-metal";
 

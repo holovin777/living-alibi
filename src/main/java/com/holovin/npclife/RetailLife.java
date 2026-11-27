@@ -28,7 +28,7 @@ final class RetailLife {
         for(var p:PRODUCTS)t.retailStock.putIfAbsent(p.id(),(OrchardLife.isFruit(p.id())||p.id().equals("honey")||p.id().equals("grape-juice")||p.id().equals("wine"))?0:p.capacity());
     }
     static void tick(TownLife.Town t,int minute) {
-        if(minute!=360)return;
+        if(minute!=360||StaffingLife.enabled(t))return;
         for(var p:PRODUCTS)if(!FarmLife.local(p.id()))t.retailStock.compute(p.id(),
                 (id,stock)->Math.min(p.capacity(),(stock==null?0:stock)+p.dailyDelivery()));
     }
@@ -80,6 +80,11 @@ final class RetailLife {
         c.money=Math.addExact(c.money,FOOD_WAGE);
         String id="Pizzaiolo".equals(c.occupation)?"pizza":"gelato";
         int count=Math.min(2,product(id).capacity()-t.retailStock.getOrDefault(id,0));
+        if(StaffingLife.enabled(t)){
+            int made=FoodSupplyLife.prepare(t,id,count);
+            if(made>0)TownLife.publish(t,clock,c.id,c.place,c.name+" prepared "+made+" portions from purchased ingredients.",events,observations);
+            return;
+        }
         int cost=count*(id.equals("pizza")?2:1);
         if(count>0&&funds-FOOD_WAGE>=cost){
             t.employerFunds.merge(account,-cost,Integer::sum);

@@ -128,7 +128,12 @@ final class PopulationLife {
             if(c.travelRemaining>0){c.activity="TRAVELING";return;}
         }
         // During a short illness, essential supplies may be delivered to the private unit.
-        if((sick||child||RebirthLife.stayingHome(town,c)) && c.place==c.home && marketOpen) {
+        boolean sharedFood=StaffingLife.enabled(town);
+        if(sharedFood&&c.place==c.home&&marketOpen&&(sick||child||RebirthLife.stayingHome(town,c)||CityExpansionLife.outer(c.home))){
+            if(c.food<2)FoodSupplyLife.buy(town,c,"bread",3);
+            if(c.water<2)FoodSupplyLife.buy(town,c,"water",3);
+        }
+        if(!sharedFood&&(sick||child||RebirthLife.stayingHome(town,c)) && c.place==c.home && marketOpen) {
             if(c.food<2 && c.money>=12) {
                 c.money-=12;c.food+=3;
                 if(child||RebirthLife.stayingHome(town,c))town.employerFunds.merge("shop-assistant",12,Math::addExact);
@@ -140,7 +145,7 @@ final class PopulationLife {
                 TownLife.publish(town,clock,c.id,c.place,c.name+" received drinking water at home.",events,observations);
             }
         }
-        if(CityExpansionLife.outer(c.home)&&c.place==c.home&&marketOpen&&!child){
+        if(!sharedFood&&CityExpansionLife.outer(c.home)&&c.place==c.home&&marketOpen&&!child){
             if(c.food<2&&c.money>=9){c.money-=9;c.food+=3;town.employerFunds.merge("shop-assistant",9,Math::addExact);}
             if(c.water<2&&c.money>=3){c.money-=3;c.water+=3;town.employerFunds.merge("shop-assistant",3,Math::addExact);}
         }
@@ -148,11 +153,13 @@ final class PopulationLife {
             if(stallEmployee && working)MarketStallLife.pay(town,c,clock,events,observations);
             String stallSale=MarketStallLife.purchase(town,c,clock.day,minute);
             if(stallSale!=null)TownLife.publish(town,clock,c.id,c.place,stallSale,events,observations);
-            else if(c.food<2 && c.money>=9) {
+            else if(sharedFood&&c.food<2){FoodSupplyLife.buy(town,c,"bread",3);}
+            else if(!sharedFood&&c.food<2 && c.money>=9) {
                 c.money-=9;c.food+=3;
                 TownLife.publish(town,clock,c.id,c.place,c.name+" purchased groceries.",events,observations);
             }
-            if(c.water<2 && c.money>=3) {
+            if(sharedFood&&c.water<2){FoodSupplyLife.buy(town,c,"water",3);}
+            else if(!sharedFood&&c.water<2 && c.money>=3) {
                 c.money-=3;c.water+=3;
                 TownLife.publish(town,clock,c.id,c.place,c.name+" purchased water.",events,observations);
             }
