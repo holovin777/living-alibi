@@ -13,6 +13,16 @@ var actors: Array[Dictionary]=[]
 var rng:=RandomNumberGenerator.new()
 var clock:=0.0
 var cursor:=0
+var java_population:=false
+
+func set_java_population(enabled: bool) -> void:
+    if java_population==enabled:return
+    java_population=enabled
+    if enabled:
+        for i in range(actors.size()-1,-1,-1):
+            if actors[i]["mode"]=="walk":
+                actors[i]["node"].queue_free()
+                actors.remove_at(i)
 var car_colors: Array[Color]=[Color("#a63938"),Color("#3e6580"),Color("#d0ccc0"),Color("#55585a"),Color("#777f59")]
 var shirts: Array[Color]=[Color("#9e6d50"),Color("#4e747d"),Color("#84708d"),Color("#576e51"),Color("#c8b89e")]
 var materials: Dictionary={}
@@ -185,4 +195,4 @@ func update_traffic(player: Vector2,delta: float) -> void:
     clock=0.0
     # Gradual spawn keeps the frame cost stable. Dead ends stop rather than reverse illegally.
     if count("drive")<MAX_CARS:_spawn("drive",player)
-    if count("walk")<MAX_PEOPLE:_spawn("walk",player)
+    if not java_population and count("walk")<MAX_PEOPLE:_spawn("walk",player)
