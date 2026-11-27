@@ -174,3 +174,11 @@ recovery kits and existing medical services can be requested in dialogue.
 Explicit confirmation (`confermo il kit`, `confermo assistenza`, or
 `confermo la visita`) uses the existing eligibility, cost and time rules.
 The game does not prescribe real medicine. No purchase follows a vague request.
+
+### More natural conversations
+
+Residents allow longer exchanges based on sociability, friendship, family,
+work and urgent needs. Public-facing staff can initiate a greeting and have
+longer service conversations. A willing resident may finish a brief reply
+before resuming their schedule, without erasing their work activity.
+Ollama is still optional and cannot change the authoritative world state.
