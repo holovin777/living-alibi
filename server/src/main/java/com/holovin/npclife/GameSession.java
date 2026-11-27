@@ -880,9 +880,13 @@ public final class GameSession implements AutoCloseable {
             var copy=town.copy();return apply(copy,1,JusticeLife.payFine(copy));
         }
         JusticeLife.requireFree(town);
-        if("registry-identity".equals(action)||"registry-residence".equals(action)){
+        if("registry-identity".equals(action)||"registry-residence".equals(action)||"registry-health".equals(action)){
             var copy=town.copy();
             return apply(copy,15,CivilRegistryLife.act(copy,state,action));
+        }
+        if("registry-consult".equals(action)){
+            var copy=town.copy();
+            return apply(copy,CivilRegistryLife.CONSULT_MINUTES,CivilRegistryLife.consult(copy,state));
         }
         if(action!=null&&action.startsWith("bus-ride:")){
             var copy=town.copy();var destination=PlayerLife.destination(action.substring("bus-ride:".length()));

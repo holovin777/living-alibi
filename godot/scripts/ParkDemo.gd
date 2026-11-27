@@ -7006,6 +7006,14 @@ func _render_actions() -> void:
         var relocation := " · relocation 8 EUR + fuel" if str(logistics.get("truckPlace",""))!=_current_place else ""
         _action_choices.add_child(_button("Company freight contract · 40 EUR"+relocation,_freight_action.bind("load-company")))
     match _current_place:
+        "CLINIC":
+            var registry: Dictionary = _last_snapshot.get("registry",{})
+            var consultation := Label.new()
+            consultation.text=tr("Medical consultation · %s EUR · 30 min") % registry.get("consultationPrice",15)
+            _action_choices.add_child(consultation)
+            var visit := _button(tr("Request consultation"),_garden_action.bind("registry-consult"))
+            visit.disabled=not bool(registry.get("canConsult",false))
+            _action_choices.add_child(visit)
         "FARM":
             if employed=="freight-driver" and not bool(_last_snapshot.get("freight",{}).get("active",false)):
                 _action_choices.add_child(_button("Load produce truck · paid delivery",_freight_action.bind("load")))
@@ -7383,7 +7391,16 @@ func _render_actions() -> void:
                     identity.text+="\n"+tr("No valid identity card")
                     _action_choices.add_child(_button(tr("Request identity card · 5 EUR"),_garden_action.bind("registry-identity")))
                 identity.text+="\n"+(tr("Registered residence: %s") % (tr("Owned home") if bool(registry.get("residenceRegistered",false)) else tr("Not registered")))
+                var fiscal = registry.get("fiscalCode")
+                if fiscal!=null:
+                    identity.text+="\n"+tr("Fiscal code: %s") % str(fiscal)
+                if bool(registry.get("healthCardValid",false)):
+                    identity.text+="\n"+tr("Health card valid until day %s") % registry.get("healthCardExpiresDay",0)
+                else:
+                    identity.text+="\n"+tr("No valid health card")
                 _action_choices.add_child(identity)
+                if bool(registry.get("canRequestHealthCard",false)):
+                    _action_choices.add_child(_button(tr("Request health card · free"),_garden_action.bind("registry-health")))
                 if bool(registry.get("canRegisterResidence",false)):
                     _action_choices.add_child(_button(tr("Register residence · free"),_garden_action.bind("registry-residence")))
             var construction: Dictionary = _last_snapshot.get("construction",{})
@@ -7616,6 +7633,10 @@ func _room_wash() -> void:
         _api.room_wash()
 
 func _garden_action(action: String) -> void:
+    if action=="registry-consult":
+        if _current_place=="CLINIC" and _near_kiosk() and _connected and not _api.is_busy():
+            _api.garden_action(action)
+        return
     if action.begins_with("barber-"):
         if _near_barber() and _connected and not _api.is_busy():_api.garden_action(action)
         return
