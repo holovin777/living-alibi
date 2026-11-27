@@ -81,6 +81,31 @@ func build(record: Dictionary) -> void:
         _:
             for x in [-4.5,0.0,4.5]:
                 _box(Vector3(x,0.55,-5.8),Vector3(2.7,1.1,1),Color("#9c7853"))
+    # Match the authoritative Java station grid: staff behind counters,
+    # and children seated at individual classroom desks.
+    for i in range(6):
+        var x: float=-5.0+i*2.0
+        var color:=Color("#b89b76")
+        if kind in ["WORKSHOP","FACTORY"]:color=Color("#536873")
+        elif kind=="CLINIC":color=Color("#dce5e2")
+        _box(Vector3(x,0.45,-3.65),Vector3(1.5,0.9,0.62),color)
+        _box(Vector3(x,0.94,-3.65),Vector3(1.58,0.08,0.7),Color("#d8c9ad"))
+        if kind in ["OFFICE","LIBRARY"]:
+            _box(Vector3(x,1.17,-3.65),Vector3(0.58,0.43,0.12),Color("#353f45"),false)
+        elif kind in ["WORKSHOP","FACTORY"]:
+            _box(Vector3(x,1.02,-3.65),Vector3(0.35,0.14,0.25),Color("#7b8387"),false)
+        elif kind in ["MARKET","BAKERY","CAFE"]:
+            _box(Vector3(x,1.08,-3.65),Vector3(0.4,0.25,0.28),Color("#5d676b"),false)
+    if kind=="SCHOOL":
+        for i in range(12):
+            var x: float=-4.5+(i%4)*3
+            var z: float=-1.2+floori(i/4.0)*2.2
+            _box(Vector3(x,0.55,z-0.65),Vector3(1.45,0.10,0.58),Color("#b99b76"))
+            for dx in [-0.58,0.58]:
+                _box(Vector3(x+dx,0.27,z-0.65),Vector3(0.10,0.54,0.45),Color("#59686a"))
+            _box(Vector3(x,0.34,z+0.05),Vector3(0.55,0.12,0.52),Color("#72887a"))
+            _box(Vector3(x,0.65,z+0.29),Vector3(0.55,0.52,0.10),Color("#72887a"))
+            _box(Vector3(x,0.62,z-0.65),Vector3(0.34,0.03,0.24),Color("#ebe0c7"),false)
     for x in [-3.5,3.5]:
         var lamp:=OmniLight3D.new()
         lamp.position=Vector3(x,2.9,0)

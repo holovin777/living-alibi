@@ -660,7 +660,11 @@ public final class GameSession implements AutoCloseable {
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
         if(RebirthLife.active(town))throw new IllegalArgumentException("Use regular mode for rebirth.");
         PlayerLife.requireAlive(town.player);
-        if(geoInterior!=null){geoInterior=null;return;}
+        if(geoInterior!=null){
+            var door=map.point(geoInterior);
+            if(Math.hypot(x-door.x(),z-(door.z()+5.6))>3)throw new IllegalArgumentException("Approach the exit door.");
+            geoInterior=null;return;
+        }
         var place=PlayerLife.destination(destination);
         var view=map.view(town,state,new GeoProjection.Point(x,z));
         if(!view.canEnter()||!view.nearestDistrict().id().equals(place.name()))

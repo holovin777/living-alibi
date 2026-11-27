@@ -15,7 +15,15 @@ class GeoInteriorTest {
         t.player.place=TownLife.Place.BAKERY;
         var room=map.view(t,s,map.point(t.player.place),null,t.player.place);
         assertNotNull(room.interior());
-        assertTrue(room.residents().stream().anyMatch(a->a.id().equals(worker.id)));
+        var baker=room.residents().stream().filter(a->a.id().equals(worker.id)).findFirst().orElseThrow();
+        assertEquals("SERVE",baker.pose());
+        assertEquals("BREAD",baker.workVisual());
+        assertEquals("BAKER_APRON",baker.outfitVisual());
+        var student=new TownLife.Citizen("test-student","Test Student","Student",TownLife.Place.PARK);
+        student.age=10;student.place=TownLife.Place.SCHOOL;student.destination=student.place;student.activity="STUDYING";
+        t.people.put(student.id,student);
+        var pupil=map.interiorActors(t,TownLife.Place.SCHOOL).stream().filter(a->a.id().equals(student.id)).findFirst().orElseThrow();
+        assertEquals("STUDY",pupil.pose());assertEquals("CHILD",pupil.appearanceStage());
         assertFalse(map.view(t,s,map.point(t.player.place)).residents().stream().anyMatch(a->a.id().equals(worker.id)));
         worker.travelRemaining=2;
         assertFalse(map.interiorActors(t,t.player.place).stream().anyMatch(a->a.id().equals(worker.id)));

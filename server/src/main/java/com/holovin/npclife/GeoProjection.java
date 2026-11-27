@@ -11,7 +11,12 @@ final class GeoProjection {
         Point lerp(Point p,double f){return new Point(x+(p.x-x)*f,z+(p.z-z)*f);}
     }
     record District(String id,String label,double x,double z){}
-    record Actor(String id,double x,double z,String activity,boolean talkable){}
+    record Actor(String id,double x,double z,String activity,boolean talkable,
+                 String pose,double heading,String workVisual,String outfitVisual,String appearanceStage){
+        Actor(String id,double x,double z,String activity,boolean talkable){
+            this(id,x,z,activity,talkable,"STAND",0,"","","ADULT");
+        }
+    }
     record Choice(String id,String label){}
     record Interior(String id,String label,double x,double z,int occupants){}
     record CivilianCar(String id,String district,int ownerIndex,double x,double z,double heading){}
@@ -139,11 +144,31 @@ final class GeoProjection {
     List<Actor> interiorActors(TownLife.Town t,TownLife.Place place){
         Point center=point(place);
         var people=t.people.values().stream().filter(c->c.place==place&&indoor(c))
-            .sorted(Comparator.comparing(c->c.id)).toList();
+            .sorted(Comparator.comparing((TownLife.Citizen c)->!"WORKING".equals(c.activity))
+                .thenComparing(c->!"STUDYING".equals(c.activity)).thenComparing(c->c.id)).toList();
         var result=new ArrayList<Actor>();
-        for(int i=0;i<Math.min(24,people.size());i++){
-            var c=people.get(i);
-            result.add(new Actor(c.id,center.x-5+(i%6)*2,center.z-3+(i/6)*2,c.activity,true));
+        int workers=0,students=0,visitors=0;
+        var talking=new HashSet<>(PlayerLife.visible(t));
+        for(var c:people){
+            if(result.size()>=24)break;
+            double x,z,heading=0;
+            String pose="STAND";
+            String work=GameSession.workVisual(c),outfit=GameSession.outfitVisual(c);
+            if("WORKING".equals(c.activity)&&workers<6){
+                x=-5+workers*2;z=-4.7;heading=Math.PI;workers++;
+                pose=place==TownLife.Place.SCHOOL&&"TEACHING".equals(work)?"TEACH":
+                     switch(place){case MARKET,BAKERY,CAFE->"SERVE";case WORKSHOP,FACTORY->"REPAIR";case CLINIC->"EXAM";default->"DESK";};
+            }else if(place==TownLife.Place.SCHOOL&&"STUDYING".equals(c.activity)&&students<12){
+                x=-4.5+(students%4)*3;z=-1.2+(students/4)*2.2;students++;pose="STUDY";
+            }else{
+                int capacity=place==TownLife.Place.SCHOOL?4:18;
+                if(visitors>=capacity)continue;
+                if(place==TownLife.Place.SCHOOL){x=-4.5+visitors*3;z=4.6;}
+                else{x=-5+(visitors%6)*2;z=-1.7+(visitors/6)*2.7;}
+                visitors++;
+            }
+            result.add(new Actor(c.id,center.x+x,center.z+z,c.activity,talking.contains(c),
+                pose,heading,work,outfit,GameSession.appearanceStage(c)));
         }
         return List.copyOf(result);
     }
@@ -285,7 +310,7 @@ final class GeoProjection {
             if(vehicle!=null){if(new Point(vehicle.x,vehicle.z).distance(player)<=160)traffic.putIfAbsent(vehicle.id,vehicle);continue;}
             if(!outdoor(c))continue;
             Point at=position(c);
-            if(at.distance(player)<=140)nearby.add(new Actor(c.id,at.x,at.z,c.activity,talking.contains(c)&&!rebirth));
+            if(at.distance(player)<=140)nearby.add(new Actor(c.id,at.x,at.z,c.activity,talking.contains(c)&&!rebirth,"STAND",0,GameSession.workVisual(c),GameSession.outfitVisual(c),GameSession.appearanceStage(c)));
         }
         nearby.sort(Comparator.comparingDouble((Actor a)->new Point(a.x,a.z).distance(player)).thenComparing(Actor::id));
         var nearest=room==null?nearest(player):room;

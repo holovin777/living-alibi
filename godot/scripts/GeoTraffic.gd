@@ -79,7 +79,11 @@ func _person() -> Node3D:
     for x in [-0.14,0.14]:
         var leg:=_box(root,Vector3(0.15,0.67,0.19),Vector3(x,0.43,0),Color("#3d454c"))
         leg.name="LegL" if x<0 else "LegR"
-        _box(root,Vector3(0.13,0.52,0.16),Vector3(x*2.0,1.0,0),Color("#bf9476"))
+        var arm:=Node3D.new()
+        arm.name="ArmL" if x<0 else "ArmR"
+        arm.position=Vector3(x*2.0,1.29,0)
+        root.add_child(arm)
+        _box(arm,Vector3(0.13,0.52,0.16),Vector3(0,-0.26,0),Color("#bf9476"))
     return root
 
 func count(mode: String) -> int:

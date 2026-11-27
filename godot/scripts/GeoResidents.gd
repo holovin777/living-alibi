@@ -46,12 +46,33 @@ func update_residents(pos: Vector2,delta: float) -> void:
         var node: Node3D=record["node"]
         var goal: Vector3=record["goal"]
         var direction:=goal-node.position
-        if direction.length()>0.03:
+        var pose:=str(record.get("pose","STAND"))
+        var left: Node3D=node.get_node("ArmL")
+        var right: Node3D=node.get_node("ArmR")
+        var leg_l: Node3D=node.get_node("LegL")
+        var leg_r: Node3D=node.get_node("LegR")
+        record["phase"]=float(record["phase"])+delta*3.0
+        var wave:=sin(float(record["phase"]))
+        if not room.is_empty() and pose!="STAND":
+            node.position=node.position.move_toward(goal,delta*5)
+            node.rotation.y=float(record.get("heading",0))
+            leg_l.rotation.x=-1.15 if pose=="STUDY" else 0.0
+            leg_r.rotation.x=-1.15 if pose=="STUDY" else 0.0
+            left.rotation.x=-0.8+wave*0.15
+            right.rotation.x=(-1.4+wave*0.45) if pose=="TEACH" else (-0.8-wave*0.28)
+        elif direction.length()>0.03:
             node.position=node.position.move_toward(goal,delta*12.0)
             node.rotation.y=atan2(-direction.x,-direction.z)
             record["phase"]=float(record["phase"])+delta*7
             node.get_node("LegL").rotation.x=sin(float(record["phase"]))*0.32
             node.get_node("LegR").rotation.x=-sin(float(record["phase"]))*0.32
+            left.rotation.x=-wave*0.25
+            right.rotation.x=wave*0.25
+        else:
+            leg_l.rotation.x=0
+            leg_r.rotation.x=0
+            left.rotation.x=0
+            right.rotation.x=0
 
 func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByteArray) -> void:
     if result!=HTTPRequest.RESULT_SUCCESS or code!=200:
@@ -81,7 +102,8 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
     var seen: Dictionary={}
     for person in parsed["residents"]:
         var id:=str(person["id"])
-        var goal:=Vector3(float(person["x"]),0.05 if room.is_empty() else 150.05,float(person["z"]))
+        var pose:=str(person.get("pose","STAND"))
+        var goal:=Vector3(float(person["x"]),0.05 if room.is_empty() else (149.84 if pose=="STUDY" else 150.05),float(person["z"]))
         seen[id]=true
         if not people.has(id):
             var node: Node3D=traffic._person()
@@ -91,10 +113,49 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
         else:
             people[id]["goal"]=goal
             people[id]["talkable"]=bool(person.get("talkable",false))
+        people[id]["pose"]=pose
+        people[id]["heading"]=float(person.get("heading",0))
+        _appearance(people[id],person)
     for id in people.keys():
         if not seen.has(id):
             people[id]["node"].queue_free()
             people.erase(id)
+
+func _appearance(record: Dictionary,person: Dictionary) -> void:
+    var node: Node3D=record["node"]
+    var stage:=str(person.get("appearanceStage","ADULT"))
+    var height:=1.0
+    if stage=="PRESCHOOL":height=0.57
+    elif stage=="CHILD":height=0.72
+    elif stage=="TEEN":height=0.9
+    node.scale=Vector3.ONE*height
+    var outfit:=str(person.get("outfitVisual",""))
+    var work:=str(person.get("workVisual",""))
+    var signature:=outfit+":"+work
+    if str(record.get("appearance",""))==signature:return
+    record["appearance"]=signature
+    var old:=node.get_node_or_null("Equipment")
+    if old!=null:
+        node.remove_child(old)
+        old.queue_free()
+    var equipment:=Node3D.new()
+    equipment.name="Equipment"
+    node.add_child(equipment)
+    var cloth:=Color.TRANSPARENT
+    match outfit:
+        "DOCTOR_COAT":cloth=Color("#eeeae0")
+        "SCRUBS":cloth=Color("#77b7ad")
+        "TECHNICIAN":cloth=Color("#4b6681")
+        "HIGH_VIS":cloth=Color("#e0ad42")
+        "BAKER_APRON","CAFE_APRON":cloth=Color("#b9aa91")
+        "POLICE":cloth=Color("#294569")
+    if cloth.a>0:traffic._box(equipment,Vector3(0.43,0.50,0.26),Vector3(0,1.04,0),cloth)
+    if outfit=="BACKPACK":traffic._box(equipment,Vector3(0.29,0.35,0.16),Vector3(0,1.03,0.19),Color("#5d727c"))
+    if work in ["PAPERS","TEACHING"]:traffic._box(equipment,Vector3(0.25,0.035,0.20),Vector3(0.23,0.88,-0.32),Color("#f4ead6"))
+    elif work=="WRENCH":traffic._box(equipment,Vector3(0.07,0.05,0.25),Vector3(0.27,0.91,-0.32),Color("#9ca5ac"))
+    elif work=="BREAD":traffic._box(equipment,Vector3(0.24,0.12,0.16),Vector3(0.22,0.92,-0.32),Color("#b58443"))
+    elif work=="COFFEE":traffic._box(equipment,Vector3(0.13,0.14,0.13),Vector3(0.22,0.94,-0.32),Color("#e3ded0"))
+    elif work=="CRATE":traffic._box(equipment,Vector3(0.36,0.22,0.25),Vector3(0,0.85,-0.32),Color("#ac875a"))
 
 func enter_district(pos: Vector2) -> void:
     if not connected or (room.is_empty() and not bool(world.get("canEnter",false))):return

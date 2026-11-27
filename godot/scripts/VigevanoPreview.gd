@@ -321,7 +321,7 @@ func _update_navigation() -> void:
     if not is_instance_valid(walker) or not is_instance_valid(city_map):return
     var pos:=Vector2(walker.position.x,walker.position.z)
     if not room.is_empty():
-        hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E exit · T talk · F actions\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
+        hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         return
     city_map.player=pos
