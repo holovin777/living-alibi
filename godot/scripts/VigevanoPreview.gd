@@ -324,6 +324,11 @@ func _physics_process(delta: float) -> void:
     if phone_panel.visible:phone_panel.refresh(residents.world,residents.last_message,residents.action_pending)
     var life: Dictionary=residents.world.get("life",{})
     var linked:=bool(residents.world.get("rebirth",false))
+    if not actions_panel.visible and not residents.action_pending and linked and str(life.get("phase",""))=="CHOICE":
+        for action in residents.world.get("actions",[]):
+            if str(action.get("id",""))=="rebirth-first-boy":
+                _open_actions()
+                break
     var age:=int(life.get("age",0)) if linked else -1
     if age!=linked_age:
         linked_age=age

@@ -33,7 +33,7 @@ public final class GameSession implements AutoCloseable {
                        @Value("${living-alibi.population:240}") int population,
                        @Value("${living-alibi.persistent-world:false}") boolean persistentWorld)
             throws Exception {
-        this(Path.of(databasePath),population,true,persistentWorld);
+        this(Path.of(databasePath),population,true,persistentWorld,true);
     }
 
     // Small deterministic fixtures remain available to existing regression tests.
@@ -48,6 +48,9 @@ public final class GameSession implements AutoCloseable {
         this(databasePath,population,randomBirth,false);
     }
     GameSession(Path databasePath,int population,boolean randomBirth,boolean persistentWorld) throws Exception {
+        this(databasePath,population,randomBirth,persistentWorld,false);
+    }
+    GameSession(Path databasePath,int population,boolean randomBirth,boolean persistentWorld,boolean chooseFirstSex) throws Exception {
         this.persistentWorld=persistentWorld;
         if(population<12||population>PopulationGenerator.MAX_GENERATED)
             throw new IllegalArgumentException("Initial generated population must be between 12 and "+PopulationGenerator.MAX_GENERATED);
@@ -83,7 +86,8 @@ public final class GameSession implements AutoCloseable {
         if(population>=24&&!NpcTransportLife.enabled(town)){town.industryStocks.put(NpcTransportLife.ENABLED,1);changed=true;}
         if(randomBirth){
             changed=RebirthLife.enableRandomBirth(town,firstLaunch)||changed;
-            changed=InitialFamilyLife.start(town,state)||changed;
+            if(firstLaunch&&chooseFirstSex){FirstLifeChoice.require(town);changed=true;}
+            if(!FirstLifeChoice.pending(town))changed=InitialFamilyLife.start(town,state)||changed;
         }
         // Old save files might contain a deceased visitor.
         changed=PassportLife.ensure(town,state)||changed;
@@ -1145,6 +1149,16 @@ public final class GameSession implements AutoCloseable {
         }
         if(action!=null&&action.startsWith("rebirth-")){
             var copy=town.copy();
+            if(action.equals("rebirth-first-boy")||action.equals("rebirth-first-girl")){
+                FirstLifeChoice.choose(copy,action.endsWith("boy")?1:2);
+                InitialFamilyLife.start(copy,state);
+                return applyInternal(copy,0,"Birth preference recorded. / Preferenza di nascita registrata.",true);
+            }
+            if(FirstLifeChoice.pending(copy))throw new IllegalArgumentException("Choose your first character first.");
+            if(action.equals("rebirth-door-lock")||action.equals("rebirth-door-unlock")){
+                FamilyDoorLife.act(copy,state,action.endsWith("-lock"));
+                return applyInternal(copy,0,action.endsWith("-lock")?"Family door temporarily locked.":"Family door unlocked.",true);
+            }
             if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);

@@ -131,6 +131,7 @@ final class PopulationLife {
             else desired=TownLife.Place.PARK;
         } else desired=c.home;
         NpcTransportLife.prepare(town,c,clock,events,observations);
+        if(child&&FamilyDoorLife.lockedFor(town,c,clock.day,minute)&&desired!=TownLife.Place.SCHOOL)desired=c.home;
         if(c.travelRemaining>0 || c.place!=desired) {
             NpcTransportLife.depart(town,c,desired,clock);
             TownLife.move(town,c,desired,clock,events,observations);

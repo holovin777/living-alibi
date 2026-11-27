@@ -29,10 +29,11 @@ final class RebirthLife {
         return changed;
     }
     static boolean acceptNaturalBirths(TownLife.Town t,WorldState clock,List<TownLife.Citizen> births){
-        if(!randomBirth(t)||phase(t)!=CHOICE)return false;
+        if(!randomBirth(t)||phase(t)!=CHOICE||FirstLifeChoice.pending(t))return false;
         var eligible=births.stream().filter(c->c.alive&&c.age==0
                 &&DemographyLife.get(t,c,"born")==clock.day
-                &&DemographyLife.get(t,c,"played-incarnation")==0)
+                &&DemographyLife.get(t,c,"played-incarnation")==0&&!FirstLifeChoice.accountOwned(t,c)
+                &&FirstLifeChoice.matches(t,c))
                 .sorted(java.util.Comparator.comparing(c->c.id)).toList();
         if(eligible.isEmpty())return false;
         var rng=new java.util.SplittableRandom(clock.rng^((long)clock.day<<32)^t.player.incarnation);
@@ -126,7 +127,7 @@ final class RebirthLife {
     static TownLife.Citizen eldestSuccessor(TownLife.Town t,TownLife.Citizen parent,int day,int incarnation){
         var eligible=t.people.values().stream()
                 .filter(c->c!=parent&&c.generationIndex>0&&c.alive&&childOf(t,c,parent.generationIndex)
-                        &&DemographyLife.get(t,c,"played-incarnation")==0)
+                        &&DemographyLife.get(t,c,"played-incarnation")==0&&!FirstLifeChoice.accountOwned(t,c))
                 .sorted(java.util.Comparator.comparingInt((TownLife.Citizen c)->c.age).reversed()
                         .thenComparingInt(c->DemographyLife.get(t,c,"born")).thenComparing(c->c.id))
                 .toList();
@@ -355,6 +356,7 @@ final class RebirthLife {
     static String childExit(TownLife.Town t,WorldState s){
         var c=child(t);
         if(!freeChild(t,c)||!EarlyChildhoodLife.atHome(c))throw new IllegalArgumentException("Approach your home exit.");
+        if(FamilyDoorLife.lockedFor(t,c,s.day,s.minute))throw new IllegalArgumentException("The family door is temporarily locked.");
         int index=PlayerLife.publicPlaces().indexOf(c.home);
         if(index<0)throw new IllegalArgumentException("No public street at this address.");
         t.industryStocks.put(TRAVEL,index+1);c.activity="OUTSIDE_HOME";
@@ -384,6 +386,7 @@ final class RebirthLife {
         if(!linkedChild(t,c)||c.travelRemaining>0||EmploymentLife.sick(c,day)||(!free&&(!awakePresent(c)||!outingHours(c,minute)
                 ||!childDestinations(c).contains(destination)))||!PlayerLife.publicPlaces().contains(destination))
             throw new IllegalArgumentException("This outing is not available at your age, time or condition.");
+        if(FamilyDoorLife.lockedFor(t,c,day,minute))throw new IllegalArgumentException("The family door is temporarily locked.");
         int duration=TownLife.travelTime(c.place,destination);
         if(!free&&minute+duration>=outingEnd(c))throw new IllegalArgumentException("It is time to return home.");
         t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(destination)+1);

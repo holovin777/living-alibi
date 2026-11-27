@@ -18,6 +18,11 @@ final class GeoLife {
         if(!RebirthLife.active(t)||JusticeLife.confined(t))return result;
         var life=view(t,s);var c=RebirthLife.child(t);
         if(life.phase().equals("CHOICE")){
+            if(FirstLifeChoice.pending(t)){
+                add(result,"rebirth-first-boy","Boy / Bambino");
+                add(result,"rebirth-first-girl","Girl / Bambina");
+                return List.copyOf(result);
+            }
             if(RebirthLife.randomBirth(t)){
                 add(result,"rebirth-wait","Await birth: 1 day / Attendi la nascita: 1 giorno");
                 add(result,"rebirth-wait-fast","Await birth: up to 7 days / Attendi la nascita: fino a 7 giorni");
@@ -67,7 +72,13 @@ final class GeoLife {
             }
             if(home!=null){
                 for(String action:home.actions())add(result,"rebirth-home-"+action,"Home / Casa: "+action);
-                if(home.atHome())add(result,"rebirth-home-exit","Leave home / Esci");
+                if(home.atHome()){
+                    add(result,"rebirth-home-exit","Leave home / Esci");
+                    if(FamilyDoorLife.canManage(t,c)){
+                        add(result,"rebirth-door-lock","Lock family door (1 hour) / Chiudi porta (1 ora)");
+                        add(result,"rebirth-door-unlock","Unlock family door / Apri porta");
+                    }
+                }
             }
         }
         for(var other:RebirthLife.conversationPartners(t,s.day))add(result,"rebirth-chat-"+other.id,"Talk / Parla: "+other.name);
