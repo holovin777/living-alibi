@@ -354,6 +354,7 @@ func _process(delta: float) -> void:
             hints += "\n"+tr("T or click: talk to a person")
         if is_instance_valid(_guest_host) and _avatar.position.distance_to(_guest_host.position)<2.5:
             hints += "\n"+tr("Ask the host to introduce their family.")
+            hints += "\n"+tr("K: ask for a temporary spare key")
         _guest_feedback_time = maxf(0.0,_guest_feedback_time-delta)
         if _guest_feedback_time>0.0:hints += "\n"+_guest_feedback
         _stairwell_hint.text = hints
@@ -529,6 +530,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 _toggle_guest_seat()
             elif event.keycode==KEY_T:
                 _open_dialog()
+            elif event.keycode==KEY_K:
+                _guest_action("request-key")
             elif event.keycode==KEY_C:
                 _guest_action("coffee")
             elif event.keycode==KEY_F:
@@ -6223,6 +6226,8 @@ func _create_interface() -> void:
     intercom_col.add_child(_button("Ring bell",_intercom_action.bind("ring")))
     intercom_col.add_child(_button("Chat at entrance",_intercom_action.bind("visit")))
     intercom_col.add_child(_button("Ask to come inside",_intercom_action.bind("invite")))
+    intercom_col.add_child(_button(tr("Use authorized spare key"),_intercom_action.bind("use-key")))
+    intercom_col.add_child(_button(tr("Return spare key"),_intercom_action.bind("return-key")))
     intercom_col.add_child(_button("Leave entrance",_close_intercom))
     _intercom.hide()
 
@@ -8601,7 +8606,11 @@ func _open_intercom() -> void:
     _intercom_contacts.clear()
     for contact in _last_snapshot.get("contacts",[]):
         if str(contact.get("address",""))==address:
-            _intercom_contacts.add_item(str(contact.get("name","")))
+            var label := str(contact.get("name",""))
+            for access in _last_snapshot.get("apartmentAccess",[]):
+                if access.get("residentId")==contact.get("residentId") and bool(access.get("sharedKey",false)):
+                    label+=" · "+tr("Spare key: %s days") % access.get("keyDays",0)
+            _intercom_contacts.add_item(label)
             _intercom_contacts.set_item_metadata(_intercom_contacts.item_count-1,str(contact.get("residentId","")))
     _intercom_reply.text = tr("Choose a contact who shared this address.") if _intercom_contacts.item_count>0 else tr("You do not know anyone at this address.")
     _intercom.show()
@@ -8745,7 +8754,8 @@ func _guest_action(action: String) -> void:
     if not invitation is Dictionary:return
     if action=="enter" and (_guest_active or not _stairwell_active or _stairwell.near_unit(_avatar.position)!=int(invitation.get("unit",0))):return
     if action=="leave" and (not _guest_active or not _guest.near_exit(_avatar.position)):return
-    if action in ["talk","coffee","snack","rest"] and not _guest_active:return
+    if action in ["talk","coffee","snack","rest","request-key"] and not _guest_active:return
+    if action=="request-key" and (not is_instance_valid(_guest_host) or _avatar.position.distance_to(_guest_host.position)>=2.5):return
     if action=="talk" and (not is_instance_valid(_guest_host) or _avatar.position.distance_to(_guest_host.position)>=2.5):return
     if action in ["coffee","snack","dinner"] and not _guest.near_table(_avatar.position):return
     if action=="rest" and not _guest_sitting:return

@@ -32,12 +32,52 @@ final class IntercomLife {
                 c.currentSpace().equals(c.homeUnit)&&minute>=480&&minute<1260&&
                 !Set.of("SLEEPING","WORKING","SICK_LEAVE","RESTING_WHILE_SICK","TRAVELING").contains(c.activity);
     }
+    // A shared key is a revocable invitation convenience, not unrestricted entry.
+    // Bind it to the same incarnation, host and actual home unit.
+    static boolean sharedKey(TownLife.Town t,String id,int day){
+        var c=t.people.get(id);var contact=t.player.contacts.get(id);
+        return c!=null&&c.alive&&contact!=null&&contact.trust>=85&&contact.affinity>=45
+                &&AddressLife.sharedBuilding(t,id)==1&&AddressLife.building(c)==1
+                &&get(t,id,"key-until")>day&&get(t,id,"key-unit-hash")==c.homeUnit.hashCode();
+    }
+    static String requestKey(TownLife.Town t,String id,int building,int day,int minute){
+        var c=validate(t,id,building);
+        var visit=apartment(t,day,minute);var contact=t.player.contacts.get(id);
+        if(building!=1||visit==null||!visit.residentId().equals(id)||!"VISITING".equals(visit.status()))
+            throw new IllegalArgumentException("Discuss a spare key during an active home visit.");
+        if(sharedKey(t,id,day))return "You already have a valid spare key.";
+        if(contact==null||contact.knownName==null||contact.trust<95||contact.affinity<65||contact.conversations<8
+                ||c.carefulness>=90)return "I prefer not to share my spare key.";
+        put(t,id,"key-unit-hash",c.homeUnit.hashCode());put(t,id,"key-until",day+7);
+        return "The host shared a temporary spare key for seven days.";
+    }
+    static String useKey(TownLife.Town t,String id,int building,int day,int minute){
+        var c=validate(t,id,building);
+        if(!sharedKey(t,id,day)||building!=1||!available(c,minute))
+            return "The door is locked. The host has not authorized a visit.";
+        if(apartment(t,day,minute)!=null)return "You already have an apartment invitation.";
+        put(t,id,"until",now(day,minute)+10);
+        return invite(t,id,building,day,minute);
+    }
+    static String returnKey(TownLife.Town t,String id,int building,int day,int minute){
+        validate(t,id,building);put(t,id,"key-until",0);put(t,id,"key-unit-hash",0);
+        return "You returned the spare key.";
+    }
+    record Access(String residentId,boolean sharedKey,int keyDays,boolean locked){}
+    static java.util.List<Access> access(TownLife.Town t,int day,int minute){
+        return t.player.contacts.values().stream().filter(c->AddressLife.sharedBuilding(t,c.residentId)>0)
+            .map(c->new Access(c.residentId,sharedKey(t,c.residentId,day),
+                sharedKey(t,c.residentId,day)?get(t,c.residentId,"key-until")-day:0,
+                apartment(t,day,minute)==null||!apartment(t,day,minute).residentId().equals(c.residentId)))
+            .toList();
+    }
     // Revoke invitations permanently when the host or visitor becomes unavailable.
     // A later return home must require a fresh invitation, not resurrect an old one.
     static void tick(TownLife.Town t,WorldState clock){
         int time=now(clock.day,clock.minute);
         for(var contact:t.player.contacts.values()){
             String id=contact.residentId;
+            if(get(t,id,"key-until")>0&&!sharedKey(t,id,clock.day)){put(t,id,"key-until",0);put(t,id,"key-unit-hash",0);}
             int doorstep=get(t,id,"until"), inside=get(t,id,"inside-until");
             if(doorstep==0&&inside==0)continue;
             var c=t.people.get(id);
@@ -57,8 +97,13 @@ final class IntercomLife {
     static String ring(TownLife.Town t,String id,int building,int day,int minute){
         var c=validate(t,id,building);
         int time=now(day,minute);
-        if(get(t,id,"last-ring")>0&&time-get(t,id,"last-ring")<10)
-            return "Please wait before ringing again.";
+        if(get(t,id,"last-ring")>0&&time-get(t,id,"last-ring")<10){
+            var contact=t.player.contacts.get(id);
+            if(contact!=null&&get(t,id,"last-warning")!=time){
+                contact.trust=Math.max(0,contact.trust-2);put(t,id,"last-warning",time);
+            }
+            return "Please respect my privacy and wait before ringing again.";
+        }
         put(t,id,"last-ring",time);
         put(t,id,"until",0);
         if(AddressLife.building(c)!=building||!available(c,minute))return "No answer at the intercom.";
