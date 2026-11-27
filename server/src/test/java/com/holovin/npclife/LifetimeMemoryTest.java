@@ -8,6 +8,45 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LifetimeMemoryTest {
     @TempDir Path folder;
+    @Test void successionPreservesChildKnowledgeWithoutInheritingParentsPrivateMemories()throws Exception{
+        var s=new WorldState();var t=TownLife.create(s);
+        var people=PopulationGenerator.add(t,3);
+        var parent=people.get(0);var child=people.get(1);var witness=people.get(2);
+        parent.age=65;child.age=35;
+        DemographyLife.set(t,child,"parent-a",parent.generationIndex);
+        t.industryStocks.put(RebirthLife.CHILD,parent.generationIndex);
+        t.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+        DemographyLife.set(t,parent,"played-incarnation",t.player.incarnation);
+        var privateContact=new PlayerLife.Contact(witness.id);
+        privateContact.knownName="Private alias";privateContact.conversations=1;
+        t.player.contacts.put(witness.id,privateContact);
+        ConversationMemory.remember(privateContact,1,600,"en","My private secret","Understood.");
+        SocialMemoryLife.remember(t,witness.id,SocialMemoryLife.Kind.SUPPORT,1);
+        var remembered=LifetimeMemoryLife.latest(t,witness,true);
+        assertNotNull(remembered);
+        var ownEvent=new TownLife.Event(2,600,witness.id,child.place,child.currentSpace(),"A tense exchange occurred.");
+        KnowledgeLife.witnessed(t,ownEvent,child.id);
+        var ownKey=KnowledgeLife.eventKey(ownEvent);
+        assertTrue(t.beliefs.get(child.id).containsKey(ownKey));
+        s.day=3;s.minute=600;parent.alive=false;
+        assertTrue(RebirthLife.settleLinkedDeath(t,s.day,s.minute));
+        assertSame(child,RebirthLife.child(t));
+        assertTrue(t.player.contacts.isEmpty());
+        assertEquals(0,SocialMemoryLife.last(t,witness.id,SocialMemoryLife.Kind.SUPPORT));
+        assertNull(LifetimeMemoryLife.latest(t,witness,true));
+        assertEquals(remembered,t.beliefs.get(witness.id).get(remembered.eventKey()));
+        assertTrue(t.beliefs.get(child.id).containsKey(ownKey));
+        Path db=folder.resolve("succession-memory.db");
+        try(var save=new WorldDatabase(db)){save.save(s,List.of(),List.of(),t,List.of(),List.of(),List.of());}
+        try(var save=new WorldDatabase(db)){
+            var restored=save.loadTown(save.load());
+            assertEquals(child.id,RebirthLife.child(restored).id);
+            assertTrue(restored.player.contacts.isEmpty());
+            assertTrue(restored.beliefs.get(child.id).containsKey(ownKey));
+            assertNull(LifetimeMemoryLife.latest(restored,restored.get(witness.id),true));
+            assertEquals(remembered,restored.beliefs.get(witness.id).get(remembered.eventKey()));
+        }
+    }
     @Test void longTermMemorySurvivesReloadAndRumorsAreNotFirsthand()throws Exception{
         var s=new WorldState();var t=TownLife.create(s);
         var people=PopulationGenerator.add(t,2);
