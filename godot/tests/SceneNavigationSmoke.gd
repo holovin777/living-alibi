@@ -653,9 +653,21 @@ func _exercise() -> void:
     driver["player"]["place"] = "Library"
     world._on_world_updated(driver)
     if not _check(world._avatar.position==world.CAR_ARRIVAL and world._near_car()
+            and world._can_stand(world.CAR_ARRIVAL,world.WALKER_RADIUS,true)
+            and not world._near_shelter()
             and world._camera.position.is_equal_approx(world.CAR_ARRIVAL+Vector3(0,world.EYE_HEIGHT,0)),
             "confirmed car trip arrives at destination parking"):
         return
+    # The shelter and parking both share the library district; keep their
+    # collision geometry separate and the shelter entrance genuinely walkable.
+    var shelter_path: Vector3 = world._move_on_ground(Vector3(-8,0,-3.5),Vector3(0,0,-3.2),world.WALKER_RADIUS)
+    world._avatar.position = shelter_path
+    if not _check(world._scenery.has_node("DormitorioSolidale")
+            and shelter_path.is_equal_approx(world.SHELTER_COUNTER)
+            and world._near_shelter() and not world._near_car(),
+            "shelter entrance is walkable without intercepting parking"):
+        return
+    world._avatar.position = world.CAR_ARRIVAL
     driver = driver.duplicate(true)
     driver["player"]["carDestinations"] = ["WORKSHOP","OFFICE"]
     world._on_world_updated(driver)

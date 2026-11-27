@@ -18,6 +18,7 @@ const CYCLE_SPEED := 8.0
 const RACK_POSITION := Vector3(6.0,0,-10.0)
 const CAR_PARK := Vector3(11.0,0,-10.0)
 const CAR_ARRIVAL := Vector3(11.0,0,-7.5)
+const SHELTER_COUNTER := Vector3(-8.0,0,-6.7)
 const TRUCK_PARK := Vector3(14.5,0,-10.0)
 const TRUCK_EXIT := Vector3(14.5,0,-7.0)
 const FREIGHT_DISTRICTS := ["QUARRY","WORKSHOP","FACTORY","FARM","BAKERY","CAFE","SOUTH_RESIDENCES","MARKET"]
@@ -750,7 +751,7 @@ func _near_sport_counter() -> bool:
     return _current_place in ["MARKET","WORKSHOP"] and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(SPORT_COUNTER)<1.8
 
 func _near_shelter() -> bool:
-    return _current_place=="LIBRARY" and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(Vector3(8,0,-6.7))<1.8
+    return _current_place=="LIBRARY" and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(SHELTER_COUNTER)<1.8
 
 func _near_charity() -> bool:
     return _current_place=="LIBRARY" and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(Vector3(8,0,7.4))<1.8
@@ -3151,25 +3152,26 @@ func _build_shelter() -> void:
     var room := Node3D.new()
     room.name="DormitorioSolidale"
     _scenery.add_child(room)
+    # Keep the east side clear for the owned car park and its pedestrian exit.
     var plaster := Color("#d9d5c5")
-    for part in [[Vector3(4.8,0,-7.5),Vector2(0.24,5.5)],
-            [Vector3(11.2,0,-7.5),Vector2(0.24,5.5)],
-            [Vector3(8,0,-10.25),Vector2(6.4,0.24)],
-            [Vector3(6,0,-4.75),Vector2(2.4,0.24)],
-            [Vector3(10,0,-4.75),Vector2(2.4,0.24)]]:
+    for part in [[Vector3(-11.2,0,-7.5),Vector2(0.24,5.5)],
+            [Vector3(-4.8,0,-7.5),Vector2(0.24,5.5)],
+            [Vector3(-8,0,-10.25),Vector2(6.4,0.24)],
+            [Vector3(-10,0,-4.75),Vector2(2.4,0.24)],
+            [Vector3(-6,0,-4.75),Vector2(2.4,0.24)]]:
         _room_wall(room,part[0],part[1],plaster)
-    _box(room,Vector3(6.4,0.06,5.5),Color("#b6b1a0"),Vector3(8,0.03,-7.5))
-    _box(room,Vector3(6.6,0.25,5.7),Color("#687278"),Vector3(8,3.15,-7.5))
-    _physical_sign(room,"DORMITORIO SOLIDALE",Vector3(8,2.65,-4.56),0.0,4.0)
-    _room_furniture(room,Vector3(6.05,0,-8.9),Vector3(0.95,0.45,2.0),Color("#867760"))
-    _box(room,Vector3(0.92,0.16,1.96),Color("#d8dbcf"),Vector3(6.05,0.53,-8.9))
-    _box(room,Vector3(0.89,0.06,1.3),Color("#567b80"),Vector3(6.05,0.64,-8.65))
-    _box(room,Vector3(0.75,0.10,0.40),Color("#f0ede3"),Vector3(6.05,0.68,-9.6))
-    _room_furniture(room,Vector3(10.3,0,-9.4),Vector3(0.8,0.83,0.55),Color("#e1e4e1"))
-    _room_wall(room,Vector3(9.7,0,-8.7),Vector2(0.15,1.7),Color("#b5c8c8"))
-    _box(room,Vector3(1.0,0.07,1.0),Color("#c4d1d1"),Vector3(10.4,0.08,-7.9))
+    _box(room,Vector3(6.4,0.06,5.5),Color("#b6b1a0"),Vector3(-8,0.03,-7.5))
+    _box(room,Vector3(6.6,0.25,5.7),Color("#687278"),Vector3(-8,3.15,-7.5))
+    _physical_sign(room,"DORMITORIO SOLIDALE",Vector3(-8,2.65,-4.56),0.0,4.0)
+    _room_furniture(room,Vector3(-9.95,0,-8.9),Vector3(0.95,0.45,2.0),Color("#867760"))
+    _box(room,Vector3(0.92,0.16,1.96),Color("#d8dbcf"),Vector3(-9.95,0.53,-8.9))
+    _box(room,Vector3(0.89,0.06,1.3),Color("#567b80"),Vector3(-9.95,0.64,-8.65))
+    _box(room,Vector3(0.75,0.10,0.40),Color("#f0ede3"),Vector3(-9.95,0.68,-9.6))
+    _room_furniture(room,Vector3(-5.7,0,-9.4),Vector3(0.8,0.83,0.55),Color("#e1e4e1"))
+    _room_wall(room,Vector3(-6.3,0,-8.7),Vector2(0.15,1.7),Color("#b5c8c8"))
+    _box(room,Vector3(1.0,0.07,1.0),Color("#c4d1d1"),Vector3(-5.6,0.08,-7.9))
     var light := OmniLight3D.new()
-    light.position=Vector3(8,2.7,-7.5)
+    light.position=Vector3(-8,2.7,-7.5)
     light.omni_range=7.0
     light.light_energy=1.4
     room.add_child(light)
