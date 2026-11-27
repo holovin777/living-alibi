@@ -16,6 +16,9 @@ var last_message:=""
 signal first_snapshot(point: Vector2)
 var first:=true
 var action_pending:=false
+var driving: Dictionary={}
+var driving_request:=false
+signal drive_pose(pose: Dictionary)
 
 func configure(source: Node3D, use_server: bool) -> void:
     traffic=source
@@ -106,6 +109,12 @@ func nearby_talker(pos: Vector2) -> String:
 func speak(id: String,message: String,pos: Vector2) -> void:
     _action("speak",{"id":id,"message":message,"language":"it","x":pos.x,"z":pos.y})
 
+func drive_command(command: String,pos: Vector2,turn: int=0) -> void:
+    if not connected or action_pending:return
+    driving_request=true
+    _action("drive",{"command":command,"x":pos.x,"z":pos.y,"turn":turn})
+    if not action_pending:driving_request=false
+
 func perform(id: String,pos: Vector2) -> void:
     _action("action",{"id":id,"x":pos.x,"z":pos.y})
 
@@ -116,6 +125,13 @@ func _action(endpoint: String,data: Dictionary) -> void:
 func _action_received(result: int,code: int,_headers: PackedStringArray,body: PackedByteArray) -> void:
     action_pending=false
     var parsed=JSON.parse_string(body.get_string_from_utf8())
+    if driving_request:
+        driving_request=false
+        if result==HTTPRequest.RESULT_SUCCESS and code==200 and parsed is Dictionary:
+            driving=parsed
+            drive_pose.emit(parsed)
+        elif bool(world.get("confined",false)):
+            driving.clear()
     if result==HTTPRequest.RESULT_SUCCESS and code==200 and parsed is Dictionary and parsed.get("arrival") is Dictionary:
         var arrival: Dictionary=parsed["arrival"]
         first_snapshot.emit(Vector2(float(arrival["x"]),float(arrival["z"])))

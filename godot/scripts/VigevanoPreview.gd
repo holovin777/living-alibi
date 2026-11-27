@@ -33,6 +33,11 @@ var actions_panel: PanelContainer
 var action_list: VBoxContainer
 var owned_car: Node3D
 var parked_bike: Node3D
+var civilian_car: Node3D
+var driving_body: Node3D
+var drive_goal:=Vector3.ZERO
+var driving:=false
+var drive_timer:=0.0
 
 func _ready() -> void:
     var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
@@ -95,6 +100,13 @@ func _ready() -> void:
     owned_car=traffic._car()
     add_child(owned_car)
     owned_car.hide()
+    civilian_car=traffic._car()
+    add_child(civilian_car)
+    civilian_car.hide()
+    driving_body=traffic._car()
+    add_child(driving_body)
+    driving_body.hide()
+    residents.drive_pose.connect(_drive_pose)
     parked_bike=Node3D.new()
     add_child(parked_bike)
     _build_bicycle_marker(parked_bike)
@@ -182,6 +194,16 @@ func _input(event: InputEvent) -> void:
         return
     if event is InputEventKey and event.pressed and not event.echo and not city_map.visible:
         var pos:=Vector2(walker.position.x,walker.position.z)
+        if driving:
+            if event.keycode==KEY_G:
+                residents.drive_command("exit",pos)
+            return
+        if event.keycode==KEY_G and residents.connected:
+            if owned_car.visible and walker.position.distance_to(owned_car.position)<5:
+                residents.drive_command("start",pos)
+            elif civilian_car.visible and walker.position.distance_to(civilian_car.position)<5:
+                residents.drive_command("steal",pos)
+            return
         if event.keycode==KEY_F and residents.connected:
             _open_actions()
             get_viewport().set_input_as_handled()
@@ -208,7 +230,7 @@ func _input(event: InputEvent) -> void:
         Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
     if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
         Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
-    if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED:
+    if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED and not driving:
         walker.rotate_y(-event.relative.x*0.0025)
         head.rotation.x=clampf(head.rotation.x-event.relative.y*0.0025,-1.45,1.45)
 
@@ -217,6 +239,9 @@ func _physics_process(delta: float) -> void:
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
+    if driving:
+        _drive_frame(delta)
+        return
     if city_map.visible or chat.visible or actions_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)))):
         walker.velocity.x=0
         walker.velocity.z=0
@@ -294,6 +319,11 @@ func _update_navigation() -> void:
         if residents.action_pending:hud.text+="\nJava is processing your action..."
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         _sync_parked_vehicle(owned_car,world.get("parkedCar"),pos,Vector3(2.5,0.05,0))
+        if driving:owned_car.hide()
+        _sync_parked_vehicle(civilian_car,world.get("civilianCar"),pos,Vector3(0,0.05,0))
+        if driving:civilian_car.hide()
+        hud.text+="\nG: enter own car / steal nearby civilian car"
+        if driving:hud.text+="\nW: accelerate · A/D: choose turn · G: exit | Fuel %s · Condition %s" % [residents.driving.get("fuel",0),residents.driving.get("condition",0)]
         _sync_parked_vehicle(parked_bike,world.get("parkedBicycle"),pos,Vector3(-2,0.05,0))
         if not nearest.is_empty():
             district_sign.position=Vector3(float(nearest["x"]),2.5,float(nearest["z"]))
@@ -302,11 +332,50 @@ func _update_navigation() -> void:
     elif shared_mode:
         district_sign.hide()
         owned_car.hide()
+        civilian_car.hide()
         parked_bike.hide()
         hud.text+="\nConnecting to shared Java world..."
     else:
         hud.text+="\nLocal traffic: %s cars · %s pedestrians (preview)" % [traffic.count("drive"),traffic.count("walk")]
     if not route_status.is_empty():hud.text+="\n"+route_status
+
+func _drive_pose(pose: Dictionary) -> void:
+    var was_driving:=driving
+    driving=bool(pose.get("active",false))
+    driving_body.visible=driving
+    if driving:
+        drive_goal=Vector3(float(pose["x"]),1.05,float(pose["z"]))
+        walker.rotation.y=float(pose.get("heading",0))
+        head.rotation.x=0
+        if not was_driving:
+            walker.position=drive_goal
+            owned_car.hide()
+            civilian_car.hide()
+    elif was_driving:
+        walker.position=Vector3(float(pose["x"]),1.05,float(pose["z"]))
+        walker.velocity=Vector3.ZERO
+        _stream()
+
+func _drive_frame(delta: float) -> void:
+    if not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)):
+        driving=false
+        driving_body.hide()
+        var location: Dictionary=residents.world.get("playerDistrict",{})
+        if not location.is_empty():_sync_spawn(Vector2(float(location["x"]),float(location["z"])))
+        return
+    walker.position=walker.position.move_toward(drive_goal,delta*12.0)
+    driving_body.position=walker.position-Vector3(0,1.0,0)
+    driving_body.rotation.y=walker.rotation.y
+    _stream()
+    drive_timer+=delta
+    if drive_timer>=0.65:
+        drive_timer=0
+        if Input.is_physical_key_pressed(KEY_W) and not Input.is_physical_key_pressed(KEY_SPACE):
+            var turn:=0
+            if Input.is_physical_key_pressed(KEY_A):turn=-1
+            elif Input.is_physical_key_pressed(KEY_D):turn=1
+            residents.drive_command("step",Vector2(walker.position.x,walker.position.z),turn)
+        _update_navigation()
 
 func _build_bicycle_marker(node: Node3D) -> void:
     # Lightweight parked bicycle silhouette, not a physics vehicle.

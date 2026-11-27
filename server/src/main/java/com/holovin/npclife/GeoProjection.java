@@ -18,7 +18,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,District civilianCar){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -33,6 +33,8 @@ final class GeoProjection {
     }
     final Map<String,Point> nodes=new TreeMap<>();
     final Map<String,List<String>> edges=new TreeMap<>();
+    final Map<String,Point> motorNodes=new TreeMap<>();
+    final Map<String,List<String>> motorEdges=new TreeMap<>();
     final EnumMap<TownLife.Place,String> anchors=new EnumMap<>(TownLife.Place.class);
     final Map<String,Route> routes=new LinkedHashMap<>(128,.75f,true){
         @Override protected boolean removeEldestEntry(Map.Entry<String,Route> e){return size()>512;}
@@ -42,9 +44,11 @@ final class GeoProjection {
         for(String row:rows){
             String[] p=row.split("\t");
             if(p[0].equals("N")){nodes.put(p[1],new Point(Double.parseDouble(p[2]),Double.parseDouble(p[3])));edges.put(p[1],new ArrayList<>());}
+            if(p[0].equals("M")){motorNodes.put(p[1],new Point(Double.parseDouble(p[2]),Double.parseDouble(p[3])));motorEdges.put(p[1],new ArrayList<>());}
         }
         for(String row:rows){
             String[] p=row.split("\t");
+            if(p[0].equals("D")&&motorNodes.containsKey(p[1])&&motorNodes.containsKey(p[2]))motorEdges.get(p[1]).add(p[2]);
             if(p[0].equals("E")&&nodes.containsKey(p[1])&&nodes.containsKey(p[2])){
                 edges.get(p[1]).add(p[2]);edges.get(p[2]).add(p[1]);
             }
@@ -123,6 +127,24 @@ final class GeoProjection {
         return c.currentSpace().equals(TownLife.publicSpace(c.place))&&!"SLEEPING".equals(c.activity)
             &&!"STUDYING".equals(c.activity)&&(!"WORKING".equals(c.activity)||PoliceLife.officer(c));
     }
+    String motorNode(Point p){
+        return motorNodes.keySet().stream().filter(n->!motorEdges.get(n).isEmpty())
+            .min(Comparator.comparingDouble((String n)->motorNodes.get(n).distance(p)).thenComparing(n->n)).orElse(null);
+    }
+    District civilian(TownLife.Town t,Point player){
+        if(VehicleTheftLife.active(t))return null;
+        var district=nearest(player);
+        if(!CityExpansionLife.motorDistrict(district)||district.ordinal()%3!=0)return null;
+        Point at=point(district);String node=motorNode(at);
+        if(node==null||at.distance(motorNodes.get(node))>25)return null;
+        return new District(district.name(),"Civilian car",at.x-2.5,at.z);
+    }
+    boolean carNear(TownLife.Town t,Point player){
+        var p=t.player;
+        if(p.carPlace==null||p.place!=p.carPlace)return false;
+        Point at=point(p.carPlace);
+        return player.distance(new Point(at.x+2.5,at.z))<=5;
+    }
     List<Choice> choices(TownLife.Town t,WorldState s,Point player){
         var p=t.player;var result=new ArrayList<Choice>();
         if(!p.alive||p.travelRemaining>0||JusticeLife.confined(t)||RebirthLife.active(t)||IntercomLife.insideVisit(t,s.day,s.minute))return result;
@@ -186,6 +208,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))),
             district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player));
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player),civilian(t,player));
     }
 }

@@ -42,11 +42,21 @@ final class JusticeLife {
         if(officer)arrest(t,s,truth,observations);
         else if(get(t,"phase")!=1){put(t,"phase",1);put(t,"until",Math.addExact(time(s),60));}
     }
+    static int thefts(TownLife.Town t){return get(t,"vehicle-thefts");}
+    static void reportTheft(TownLife.Town t,WorldState s,boolean officer,List<TownLife.Event> truth,List<TownLife.Observation> observations){
+        requireFree(t);
+        WeaponLicenseLife.revoke(t);
+        put(t,"vehicle-thefts",Math.addExact(thefts(t),1));
+        put(t,"pending",Math.addExact(get(t,"pending"),1));
+        if(officer)arrest(t,s,truth,observations);
+        else if(get(t,"phase")!=1){put(t,"phase",1);put(t,"until",Math.addExact(time(s),60));}
+    }
     private static void arrest(TownLife.Town t,WorldState s,List<TownLife.Event> truth,List<TownLife.Observation> observations){
         put(t,"phase",2);put(t,"until",Math.addExact(time(s),60));
         // Abstract police transfer to custody; no simulated chase.
         t.player.place=TownLife.Place.OFFICE;t.player.destination=t.player.place;
         t.player.travelRemaining=0;t.player.cycling=false;
+        VehicleTheftLife.recover(t);
         t.industryStocks.put("combat:"+t.player.incarnation+":baton",0);
         truth.add(new TownLife.Event(s.day,s.minute,"visitor:"+t.player.incarnation,
                 t.player.place,"custody:"+t.player.incarnation,"Police detained a visitor following a recorded offense."));

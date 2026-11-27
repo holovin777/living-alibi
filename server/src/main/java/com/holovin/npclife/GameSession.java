@@ -531,6 +531,75 @@ public final class GameSession implements AutoCloseable {
         return apply(town.copy(),minutes,"Waited "+minutes+" minute(s).");
     }
 
+    private GeoDrive geoDrive;
+    synchronized GeoDrive.Pose geoDriveControl(GeoProjection map,String command,double x,double z,int turn)throws SQLException{
+        var point=new GeoProjection.Point(x,z);
+        if(JusticeLife.confined(town)||!town.player.alive||RebirthLife.active(town)){
+            geoDrive=null;throw new IllegalArgumentException("Driving unavailable.");
+        }
+        if(command.equals("status"))return drivePose(map,"");
+        if(command.equals("start")||command.equals("steal")){
+            if(geoDrive!=null)throw new IllegalArgumentException("Already driving.");
+            var p=town.player;TransportLife.ready(p);
+            if(p.ownsBicycle&&p.bicycleParked==null)throw new IllegalArgumentException("Park your bicycle first.");
+            if(IntercomLife.insideVisit(town,state.day,state.minute))throw new IllegalArgumentException("Leave the apartment first.");
+            boolean stolen=command.equals("steal");
+            var civilian=map.civilian(town,point);
+            if(stolen){
+                if(civilian==null||!civilian.id().equals(p.place.name())||Math.hypot(civilian.x()-x,civilian.z()-z)>5)
+                    throw new IllegalArgumentException("Approach a civilian car in your current district.");
+            }else if(!map.carNear(town,point))throw new IllegalArgumentException("Approach your own parked car.");
+            String node=map.motorNode(point);
+            if(node==null||map.motorNodes.get(node).distance(point)>30)throw new IllegalArgumentException("No motor road nearby.");
+            if(stolen){
+                var copy=town.copy();var clock=state.copy();var truth=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
+                VehicleTheftLife.take(copy,clock,truth,observations);
+                applyInternal(copy,1,"Civilian car reported stolen.",false,clock,truth,observations);
+                if(JusticeLife.confined(town))return drivePose(map,"Police detained you.");
+            }else if(p.carFuel<1||p.carCondition<3)throw new IllegalArgumentException("Car needs fuel or service.");
+            geoDrive=new GeoDrive(stolen,node);
+            return drivePose(map,stolen?"Stolen vehicle reported to police.":"In your car.");
+        }
+        if(geoDrive==null)throw new IllegalArgumentException("You are not driving.");
+        if(command.equals("exit")){
+            var pointAt=geoDrive.position(map);
+            var destination=map.nearest(pointAt);
+            var copy=town.copy();copy.player.place=destination;copy.player.destination=destination;
+            if(!geoDrive.stolen)copy.player.carPlace=destination;
+            else VehicleTheftLife.recover(copy); // abandoned civilian car is recovered
+            apply(copy,0,"Parked.");
+            geoDrive=null;
+            var park=map.point(destination);
+            return new GeoDrive.Pose(false,false,park.x(),park.z(),0,town.player.carFuel,town.player.carCondition,"Parked at "+destination.label+".");
+        }
+        if(!command.equals("step")||turn<-1||turn>1)throw new IllegalArgumentException("Unknown driving control.");
+        long now=System.nanoTime();
+        if(now-geoDrive.lastStep<400_000_000L)return drivePose(map,"");
+        int fuel=geoDrive.stolen?VehicleTheftLife.get(town,"fuel"):town.player.carFuel;
+        int condition=geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition;
+        if(fuel<1||condition<3)return drivePose(map,"No fuel or service required. Exit the car.");
+        var next=geoDrive.copy();next.lastStep=now;
+        double budget=Math.min(8,(now-geoDrive.lastStep)/1e9*10);
+        int oldUnits=(int)(next.meters/100);
+        double traveled=next.advance(map,turn,budget);
+        int units=(int)(next.meters/100)-oldUnits;
+        var copy=town.copy();var destination=map.nearest(next.position(map));
+        copy.player.place=destination;copy.player.destination=destination;copy.player.cycling=false;
+        if(next.stolen){
+            VehicleTheftLife.set(copy,"fuel",fuel-units);VehicleTheftLife.set(copy,"condition",condition-3*units);
+        }else{
+            copy.player.carPlace=destination;copy.player.carFuel=Math.max(0,fuel-units);copy.player.carCondition=Math.max(0,condition-3*units);
+        }
+        apply(copy,0,"Driving.");geoDrive=next;
+        return drivePose(map,traveled<0.001?"End of this directed road. Exit the vehicle.":"");
+    }
+    private GeoDrive.Pose drivePose(GeoProjection map,String message){
+        if(geoDrive==null)return new GeoDrive.Pose(false,false,0,0,0,town.player.carFuel,town.player.carCondition,message);
+        var p=geoDrive.position(map);
+        return new GeoDrive.Pose(true,geoDrive.stolen,p.x(),p.z(),geoDrive.heading(map),
+            geoDrive.stolen?VehicleTheftLife.get(town,"fuel"):town.player.carFuel,
+            geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,message);
+    }
     synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z){
         return map.view(town,state,new GeoProjection.Point(x,z));
     }

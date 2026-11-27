@@ -20,6 +20,12 @@ def export(source, destination):
         buckets[math.floor(x/cell), math.floor(y/cell)].append(n)
     rows = ["N\t%s\t%.2f\t%.2f" % (n, *points[n]) for n in ids]
     rows.extend("E\t%s\t%s" % edge for edge in edges)
+    # Separate motor nodes: preserve the pedestrian graph and its components.
+    motor = sorted({(str(e[a]),str(e[b])) for e in graph["edges"]
+                    for a,b,flag in (("a","b","drive_ab"),("b","a","drive_ba")) if e.get(flag)})
+    motor_ids = sorted({n for edge in motor for n in edge})
+    rows.extend("M\t%s\t%.2f\t%.2f" % (n,*graph["nodes"][n]) for n in motor_ids)
+    rows.extend("D\t%s\t%s" % edge for edge in motor)
     seen = set()
     for chunk in city["chunks"].values():
         for b in chunk["buildings"]:

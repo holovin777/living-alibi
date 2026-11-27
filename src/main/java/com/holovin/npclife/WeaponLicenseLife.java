@@ -13,7 +13,7 @@ final class WeaponLicenseLife {
     }
     private static boolean eligible(TownLife.Town t,WorldState s){
         var j=JusticeLife.view(t,s);
-        return j.convictions()==0&&j.assaults()==0&&JusticeLife.discharges(t)==0;
+        return j.convictions()==0&&j.assaults()==0&&JusticeLife.discharges(t)==0&&JusticeLife.thefts(t)==0;
     }
     static boolean valid(TownLife.Town t,WorldState s){
         return get(t,"expires")>s.day&&eligible(t,s);

@@ -40,6 +40,13 @@ public final class GeoController {
         if(r.message==null||r.message.isBlank()||r.message.length()>400)throw new IllegalArgumentException("Enter a message up to 400 characters.");
         return Map.of("message",session.geoSpeak(map,r.id,r.message,r.language,r.x,r.z));
     }
+    public record Driving(String command,double x,double z,int turn){}
+    @PostMapping("/drive")
+    public GeoDrive.Pose drive(@RequestBody Driving r)throws SQLException{
+        validate(r.x,r.z);
+        if(r.command==null)throw new IllegalArgumentException("Choose driving command.");
+        return session.geoDriveControl(map,r.command,r.x,r.z,r.turn);
+    }
     public record Action(String id,double x,double z){}
     @PostMapping("/action")
     public GeoProjection.ActionResult action(@RequestBody Action r)throws SQLException{
