@@ -5,6 +5,11 @@ func _initialize() -> void:
     detail.facade({"id":"1","kind":"apartments","height":9.6,"points":[[0,0],[12,0],[12,10],[0,10]]})
     detail.road({"a":[0,20],"b":[30,20],"width":7,"kind":"residential","sidewalk":"both"})
     detail.tree({"point":[12,20]})
+    detail.bench({"id":"bench","point":[14,20]})
+    if detail.lamp_positions.size()!=1 or detail.batches.get("bark",PackedVector3Array()).size()<=36:
+        push_error("Missing light anchor or bench geometry")
+        quit(1)
+        return
     for kind in ["glass","door","pavement","mark","lamp","leaves"]:
         if not detail.batches.has(kind) or detail.batches[kind].is_empty() or detail.batches[kind].size()%3!=0:
             push_error("Invalid detail geometry: "+kind)

@@ -113,3 +113,10 @@ jobs:
           target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoArchitectureSmoke.gd 2>&1 | tee target/godot-bin/geo-architecture.log
           grep -q 'GeoArchitectureSmoke: ALL CHECKS PASSED' target/godot-bin/geo-architecture.log
           if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geo-architecture.log; then exit 1; fi
+
+      - name: Verify geographic precipitation
+        run: |
+          set -euo pipefail
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoWeatherSmoke.gd 2>&1 | tee target/godot-bin/geo-weather.log
+          grep -q 'GeoWeatherSmoke: ALL CHECKS PASSED' target/godot-bin/geo-weather.log
+          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geo-weather.log; then exit 1; fi

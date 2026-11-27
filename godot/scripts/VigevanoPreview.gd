@@ -13,6 +13,10 @@ const Architecture=preload("res://scripts/GeoArchitecture.gd")
 var detail_materials: Dictionary={}
 var daylight: DirectionalLight3D
 var sky_environment: Environment
+const WeatherVisual=preload("res://scripts/GeoWeather.gd")
+var precipitation: Node3D
+var lamp_pool: Array[OmniLight3D]=[]
+const ACTIVE_LAMPS=8
 var road_material: StandardMaterial3D
 var rail_material: StandardMaterial3D
 var ready_to_walk := false
@@ -162,6 +166,17 @@ func _ready() -> void:
     sun.light_energy=0.85
     add_child(sun)
     daylight=sun
+    precipitation=WeatherVisual.new()
+    add_child(precipitation)
+    for i in range(ACTIVE_LAMPS):
+        var light:=OmniLight3D.new()
+        light.light_color=Color("#ffd49b")
+        light.light_energy=1.65
+        light.omni_range=9.0
+        light.shadow_enabled=false
+        light.hide()
+        add_child(light)
+        lamp_pool.append(light)
     var ground := StaticBody3D.new()
     add_child(ground)
     var plane := CollisionShape3D.new()
@@ -268,6 +283,7 @@ func _physics_process(delta: float) -> void:
     impact_flash=maxf(0.0,impact_flash-delta*2.0)
     impact_overlay.color=Color(0.8,0.15,0.05,impact_flash*0.32)
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
+    precipitation.update_weather(residents.world.get("weather",{}),walker.position,not room.is_empty(),delta)
     if driving:
         _drive_frame(delta)
         return
@@ -350,6 +366,8 @@ func _update_navigation() -> void:
         hud.text+="\nDay %s · %02d:%02d · residents %s · nearby %s · €%s · health %s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.population,residents.people.size(),world.get("money",0),world.get("health",0)]
         hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk · F: actions / housing / intercom"
         if bool(world.get("confined",false)) or bool(world.get("rebirth",false)):hud.text+="\nOpen regular game to continue custody / rebirth."
+        var weather: Dictionary=world.get("weather",{})
+        hud.text+="\n%s · %s · %s°C" % [weather.get("season",""),weather.get("sky",""),weather.get("temperatureC","—")]
         hud.text+="\nHunger %s · Thirst %s · %s" % [world.get("hunger",0),world.get("thirst",0),"Cycling" if world.get("cycling",false) else "Walking"]
         if residents.action_pending:hud.text+="\nJava is processing your action..."
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
@@ -595,15 +613,38 @@ func _update_daylight() -> void:
     if not is_instance_valid(daylight) or sky_environment==null:return
     var hour:=float(residents.minute)/60.0 if residents.connected else 12.0
     var sun_amount:=clampf(sin((hour-6.0)*PI/12.0),0.0,1.0)
+    var weather: Dictionary=residents.world.get("weather",{})
+    var overcast:=str(weather.get("sky","CLEAR"))!="CLEAR"
     daylight.rotation_degrees=Vector3(-12.0-sun_amount*55.0,-35.0+(hour-12.0)*7.0,0)
-    daylight.light_energy=0.08+sun_amount*0.90
+    daylight.light_energy=(0.08+sun_amount*0.90)*(0.58 if overcast else 1.0)
     daylight.light_color=Color("#e6bd94").lerp(Color("#fff4e3"),sun_amount)
-    sky_environment.background_color=Color("#263447").lerp(Color("#a7c7de"),sun_amount)
+    sky_environment.background_color=Color("#263447").lerp(Color("#9da8b0") if overcast else Color("#a7c7de"),sun_amount)
     sky_environment.ambient_light_color=Color("#a1b1ce").lerp(Color.WHITE,sun_amount)
     sky_environment.ambient_light_energy=0.32+sun_amount*0.34
     if detail_materials.has("lamp"):
         var lamp: StandardMaterial3D=detail_materials["lamp"]
         lamp.emission_energy_multiplier=0.10 if sun_amount>0.20 else 2.0
+    _local_lights(sun_amount<=0.20 and room.is_empty())
+    var season:=str(weather.get("season","SPRING"))
+    var foliage:=Color("#657e4c")
+    match season:
+        "SUMMER":foliage=Color("#4e713e")
+        "AUTUMN":foliage=Color("#b08542")
+        "WINTER":foliage=Color("#77796a")
+    if detail_materials.has("leaves"):detail_materials["leaves"].albedo_color=foliage
+    if detail_materials.has("leaves_light"):detail_materials["leaves_light"].albedo_color=foliage.lightened(0.15)
+
+func _local_lights(enabled: bool) -> void:
+    var nearby: Array[Vector3]=[]
+    if enabled:
+        for chunk in chunks.values():
+            for at in chunk.get_meta("lamp_positions",[]):
+                if walker.position.distance_squared_to(at)<3600:nearby.append(at)
+        nearby.sort_custom(func(a: Vector3,b: Vector3):return walker.position.distance_squared_to(a)<walker.position.distance_squared_to(b))
+    for i in range(lamp_pool.size()):
+        var light: OmniLight3D=lamp_pool[i]
+        light.visible=i<nearby.size()
+        if light.visible:light.position=nearby[i]
 
 func _point(value: Array,y: float) -> Vector3:
     return Vector3(float(value[0]),y,float(value[1]))
@@ -648,6 +689,8 @@ func _build_chunk(key: String,data: Dictionary) -> void:
         _strip(roads,record,0.025)
         detail.road(record)
     for record in data.get("trees",[]):detail.tree(record)
+    for record in data.get("benches",[]):detail.bench(record)
+    node.set_meta("lamp_positions",detail.lamp_positions)
     for record in data.get("rail",[]):_strip(rails,record,0.035)
     _surface(node,walls,wall_material,true,false)
     for kind in detail.batches:

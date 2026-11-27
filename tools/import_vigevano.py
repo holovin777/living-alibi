@@ -13,7 +13,7 @@ BBOX = (45.3100, 8.8480, 45.3240, 8.8700)
 CHUNK = 128
 SOURCE = "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright"
 SCHEMA = 2
-DETAIL_VERSION = 1
+DETAIL_VERSION = 2
 ROAD_WIDTH = {"motorway": 12, "trunk": 10, "primary": 8, "secondary": 7,
               "tertiary": 6, "residential": 5, "service": 3, "living_street": 4,
               "pedestrian": 5, "footway": 1.8, "path": 1.5, "cycleway": 2.0,
@@ -27,7 +27,7 @@ def project(lat, lon):
 
 def download(path):
     bbox = ",".join(map(str, BBOX))
-    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});node["natural"="tree"]({bbox}););out body;>;out skel qt;'
+    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox}););out body;>;out skel qt;'
     req = urllib.request.Request("https://overpass-api.de/api/interpreter",
                                  data=urllib.parse.urlencode({"data": query}).encode(),
                                  headers={"User-Agent": "LivingAlibi/0.1 local OSM import"})
@@ -84,7 +84,7 @@ def convert(source, output):
     nodes = {n.attrib["id"]: project(float(n.attrib["lat"]), float(n.attrib["lon"]))
              for n in root.findall("node") if "lat" in n.attrib and "lon" in n.attrib}
     chunks = {}
-    counts = {"buildings": 0, "roads": 0, "rail_segments": 0, "trees": 0, "skipped": 0}
+    counts = {"buildings": 0, "roads": 0, "rail_segments": 0, "trees": 0, "benches": 0, "skipped": 0}
     spawn = None
     best = float("inf")
     graph_nodes = {}
@@ -92,13 +92,17 @@ def convert(source, output):
 
     def add(kind, feature, point):
         key = f"{math.floor(point[0]/CHUNK)},{math.floor(point[1]/CHUNK)}"
-        chunks.setdefault(key, {"buildings": [], "roads": [], "rail": [], "trees": []})[kind].append(feature)
+        chunks.setdefault(key, {"buildings": [], "roads": [], "rail": [], "trees": [], "benches": []})[kind].append(feature)
 
     for n in root.findall("node"):
         if n.attrib["id"] in nodes and any(t.attrib.get("k") == "natural" and t.attrib.get("v") == "tree" for t in n.findall("tag")):
             point = nodes[n.attrib["id"]]
             add("trees", {"id": n.attrib["id"], "point": point}, point)
             counts["trees"] += 1
+        if n.attrib["id"] in nodes and any(t.attrib.get("k") == "amenity" and t.attrib.get("v") == "bench" for t in n.findall("tag")):
+            point = nodes[n.attrib["id"]]
+            add("benches", {"id": n.attrib["id"], "point": point}, point)
+            counts["benches"] += 1
 
     for way in root.findall("way"):
         tags = {t.attrib["k"]: t.attrib["v"] for t in way.findall("tag")}

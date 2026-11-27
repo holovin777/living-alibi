@@ -22,7 +22,9 @@ class ImportTest(unittest.TestCase):
             self.assertEqual(4, len(buildings[0]["points"]))
             self.assertAlmostEqual(0, result["spawn"][1])
             self.assertEqual(2, result["schema"])
-            self.assertEqual(1, result["detail_version"])
+            self.assertEqual(2, result["detail_version"])
+            self.assertEqual(1, result["counts"]["benches"])
+            self.assertEqual(1, result["counts"]["trees"])
             roads = [r for c in result["chunks"].values() for r in c["roads"]]
             self.assertTrue(all("kind" in r and "sidewalk" in r and "oneway" in r for r in roads))
             graph = result["graph"]

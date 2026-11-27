@@ -6,6 +6,7 @@ const MAX_WINDOWS=2200
 const MAX_LAMPS=16
 var windows_count:=0
 var lamps_count:=0
+var lamp_positions: Array[Vector3]=[]
 var seen_lamps: Dictionary={}
 var batches: Dictionary={}
 
@@ -120,7 +121,19 @@ func road(record: Dictionary) -> void:
     lamps_count+=1
     _box("iron",loc+Vector3.UP*1.75,Vector3(0.09,3.5,0.09),direction,side)
     _box("iron",loc+Vector3.UP*3.46-side*0.28,Vector3(0.10,0.09,0.62),direction,side)
-    _box("lamp",loc+Vector3.UP*3.39-side*0.56,Vector3(0.24,0.13,0.36),direction,side)
+    var bulb:=loc+Vector3.UP*3.39-side*0.56
+    _box("lamp",bulb,Vector3(0.24,0.13,0.36),direction,side)
+    lamp_positions.append(bulb-Vector3.UP*0.13)
+
+func bench(record: Dictionary) -> void:
+    var at:=Vector3(float(record["point"][0]),0,float(record["point"][1]))
+    var angle:=float(posmod(str(record.get("id","")).hash(),4))*PI/2.0
+    var tangent:=Vector3(cos(angle),0,sin(angle))
+    var normal:=Vector3(-tangent.z,0,tangent.x)
+    for sign_value in [-1.0,1.0]:
+        _box("iron",at+tangent*float(sign_value)*0.65+Vector3.UP*0.25,Vector3(0.09,0.50,0.45),tangent,normal)
+    _box("bark",at+Vector3.UP*0.50,Vector3(1.65,0.09,0.49),tangent,normal)
+    _box("bark",at+Vector3.UP*0.83+normal*0.22,Vector3(1.65,0.29,0.09),tangent,normal)
 
 func tree(record: Dictionary) -> void:
     var at:=Vector3(float(record["point"][0]),0,float(record["point"][1]))
