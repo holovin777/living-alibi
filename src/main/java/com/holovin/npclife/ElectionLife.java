@@ -111,7 +111,7 @@ final class ElectionLife {
         var c=RebirthLife.child(t);
         return RebirthLife.linkedAdult(t,c)?get(t,RESIDENT_VOTER)==c.generationIndex:get(t,VOTER)==t.player.incarnation;
     }
-    static boolean atComune(TownLife.Town.Citizen c,int minute){return RebirthLife.awakePresent(c)&&c.place==TownLife.Place.OFFICE&&minute>=540&&minute<1020;}
+    static boolean atComune(TownLife.Citizen c,int minute){return RebirthLife.awakePresent(c)&&c.place==TownLife.Place.OFFICE&&minute>=540&&minute<1020;}
     static String act(TownLife.Town t,String action,int day,int minute){
         var c=RebirthLife.child(t);boolean linked=RebirthLife.linkedAdult(t,c);
         if(linked){if(!atComune(c,minute))throw new IllegalArgumentException("Visit Comune at Offices, 09:00–17:00.");}
