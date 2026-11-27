@@ -1480,6 +1480,7 @@ func _generate_chunk(place_id: String) -> void:
         "OFFICE":
             _build_digital_office()
             _build_postal_counter()
+            _physical_sign(_scenery,"CENTRO PER L’IMPIEGO",KIOSK_POSITION+Vector3(0,2.85,0.9),0,3.3)
         "QUARRY":
             _add_obstacle(Vector3(-8.0, 0.0, 9.0), Vector2(11.0, 3.0))
             for x in [-11.0, -8.0, -5.0]:
@@ -7511,6 +7512,28 @@ func _render_actions() -> void:
                                 _business_hire.bind(id)))
                 _action_choices.add_child(_button("Withdraw 10 EUR", _business_withdraw.bind(10)))
         "OFFICE":
+            var job_centre: Dictionary = _last_snapshot.get("jobCentre",{})
+            if not job_centre.is_empty():
+                var employment_info := Label.new()
+                employment_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                employment_info.text=tr("Job centre · Centro per l'impiego")
+                employment_info.text+="\n"+tr("Monday–Friday · 09:00–13:00")
+                employment_info.text+="\n"+tr("Local job seekers: %s") % job_centre.get("unemployedResidents",0)
+                if bool(job_centre.get("registered",false)):
+                    employment_info.text+="\n"+tr("Registered job seeker · funded lessons remaining: %s") % job_centre.get("lessonsRemaining",0)
+                _action_choices.add_child(employment_info)
+                if not bool(job_centre.get("registered",false)):
+                    var registration := _button(tr("Register as job seeker · free"),_garden_action.bind("job-centre-register"))
+                    registration.disabled=not bool(job_centre.get("canRegister",false))
+                    _action_choices.add_child(registration)
+                var vacancies := Label.new()
+                vacancies.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                vacancies.text=tr("Funded vacancies · apply at the workplace")
+                for vacancy in job_centre.get("vacancies",[]):
+                    vacancies.text+="\n"+tr("%s · %s · %s EUR/shift") % [tr(str(vacancy.get("title",""))),tr(str(vacancy.get("workplace",""))),vacancy.get("wage",0)]
+                    if int(vacancy.get("missingSkill",0))>0:
+                        vacancies.text+=" · "+tr("Needs %s more %s skill") % [vacancy.get("missingSkill",0),tr(str(vacancy.get("subject","")))]
+                _action_choices.add_child(vacancies)
             var population: Dictionary = _last_snapshot.get("demography",{})
             var census := Label.new()
             census.text = "Anagrafe · Residents %s/%s | Children %s | Retired %s" % [population.get("alive",0),population.get("capacity",40),population.get("children",0),population.get("retired",0)]
@@ -7644,7 +7667,7 @@ func _render_actions() -> void:
             _action_choices.add_child(_button("Apply: investigator",
                     _apply_job.bind("investigator")))
         "SCHOOL":
-            _action_choices.add_child(_button("Study engineering · 10 EUR",
+            _action_choices.add_child(_button(tr("Study engineering · funded" if bool(_last_snapshot.get("jobCentre",{}).get("fundedLesson",false)) else "Study engineering · 10 EUR"),
                     _study.bind("engineering")))
         "LIBRARY":
             var newspaper = _last_snapshot.get("newspaper")
@@ -7691,7 +7714,7 @@ func _render_actions() -> void:
                     _action_choices.add_child(_button("Previous page",_garden_action.bind("archive-year-%s-%s" % [year,page-1])))
                 if page<pages:
                     _action_choices.add_child(_button("Next page",_garden_action.bind("archive-year-%s-%s" % [year,page+1])))
-            _action_choices.add_child(_button("Study investigation · 10 EUR",
+            _action_choices.add_child(_button(tr("Study investigation · funded" if bool(_last_snapshot.get("jobCentre",{}).get("fundedLesson",false)) else "Study investigation · 10 EUR"),
                     _study.bind("investigation")))
         "RIVER":
             _action_choices.add_child(_button("Drink river water (unsafe)",
@@ -7825,6 +7848,9 @@ func _garden_action(action: String) -> void:
         return
     if action.begins_with("caritas-"):
         if _near_charity() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
+    if action=="job-centre-register":
+        if _current_place=="OFFICE" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
         return
     if action=="employment-resign":
         if _near_kiosk() and _connected and not _api.is_busy():
