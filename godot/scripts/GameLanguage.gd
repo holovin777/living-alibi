@@ -214,6 +214,8 @@ const IT := {
     "Tax %s · Pension %s · TFR %s EUR": "Imposte %s · Contributi %s · TFR %s EUR",
     "TFR reserve %s · Pension contributions %s EUR": "TFR accumulato %s · Contributi pensione %s EUR",
     "Register a fiscal code to activate payroll deductions.": "Registra il codice fiscale per attivare le trattenute.",
+    "Pension fund · balance %s EUR · arrears %s EUR": "Fondo pensioni · saldo %s EUR · arretrati %s EUR",
+    "Pensioners %s · weekly entitlement %s EUR": "Pensionati %s · quota settimanale %s EUR",
     "Resign from job": "Dimettiti dal lavoro",
     "POSTAL_IDLE": "Nessuna consegna in attesa",
     "POSTAL_QUEUED": "In attesa di consegna",

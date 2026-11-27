@@ -96,6 +96,11 @@ final class PopulationLife {
         else if(PhoneLife.homeVisitWindow(town,c,clock))desired=c.home;
         else if(PhoneLife.meetingWindow(town,c,clock))desired=TownLife.Place.CAFE;
         else if(DojoCommunityLife.scheduled(town,c,clock.day,minute))desired=TownLife.Place.SCHOOL;
+        else if(retired&&minute>=600&&minute<720&&!CityExpansionLife.outer(c.home)){
+            // A regular morning walk or library/cafe visit, not a workplace.
+            int choice=Math.floorMod(c.personalSeed,3);
+            desired=choice==0?TownLife.Place.PARK:choice==1?TownLife.Place.LIBRARY:TownLife.Place.CAFE;
+        }
         else if(minute>=960 && minute<1200) {
             // The same resident favors a location consistently for a given day.
             // Unlit parks lose visitors at dusk; they choose a covered cafe.

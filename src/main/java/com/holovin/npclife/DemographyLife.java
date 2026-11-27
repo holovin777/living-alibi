@@ -154,18 +154,14 @@ final class DemographyLife {
                         RentalLife.moveHome(t,c,guardian.home,guardian.homeUnit);
                     support(t,c);
                 }
-                if(c.alive&&"Retired".equals(c.occupation)&&(day-1)%7==0){
-                    int city=t.employerFunds.getOrDefault(MunicipalLife.CITY,0);
-                    if(city>=MunicipalLife.RESERVE+WEEKLY_PENSION){
-                        c.money=Math.addExact(c.money,WEEKLY_PENSION);t.employerFunds.put(MunicipalLife.CITY,city-WEEKLY_PENSION);
-                        set(t,PENSIONS,Math.addExact(get(t,PENSIONS),WEEKLY_PENSION));
-                    }
-                }
+                // Pension claims are settled together below so the first
+                // resident in insertion order cannot consume the whole fund.
             }
             if(!c.alive&&get(t,c,"estate")==0)
                 ArchiveLife.record(t,"death:"+c.id,day,360,"Population",c.name+" was recorded as deceased.");
             estate(t,c);
         }
+        PensionLife.tick(t,clock);
         if((day-1)%30!=0)return;
         for(int i=0;i<residents.size();i++){
             var a=residents.get(i);

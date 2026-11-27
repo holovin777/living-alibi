@@ -7396,6 +7396,13 @@ func _render_actions() -> void:
             budget_info.text += "\nEducation %s | Healthcare %s | Maintenance %s EUR" % [comune.get("education",0),comune.get("healthcare",0),comune.get("maintenance",0)]
             budget_info.text += "\nClinic reserve %s EUR | Medical aid %s EUR" % [comune.get("clinicFunds",0),comune.get("medicalAid",0)]
             _action_choices.add_child(budget_info)
+            var pension: Dictionary = _last_snapshot.get("pension",{})
+            if not pension.is_empty():
+                var pension_label := Label.new()
+                pension_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                pension_label.text=tr("Pension fund · balance %s EUR · arrears %s EUR") % [pension.get("fund",0),pension.get("arrears",0)]
+                pension_label.text+="\n"+tr("Pensioners %s · weekly entitlement %s EUR") % [pension.get("retirees",0),pension.get("weeklyPension",35)]
+                _action_choices.add_child(pension_label)
             var registry: Dictionary = _last_snapshot.get("registry",{})
             if not registry.is_empty():
                 var identity := Label.new()
