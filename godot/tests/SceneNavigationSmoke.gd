@@ -626,6 +626,31 @@ func _exercise() -> void:
         return
     world._on_world_updated(_world("PARK","Park"))
 
+    var bus_day := _world("PARK","Park")
+    bus_day["minute"]=613
+    bus_day["bus"]={"atStop":true,"available":true,"serviceOpen":true,"waitMinutes":2,"routes":[{"id":"WORKSHOP","label":"Workshop","minutes":6}]}
+    world._on_world_updated(bus_day)
+    var bus_stop: Node3D=world._bus_stop_node()
+    if not _check(bus_stop!=null and bus_stop.get_node("Bus").visible,
+            "physical municipal bus is at the platform before departure"):return
+    world._avatar.position=world._bus_platform()
+    world._render_actions()
+    if not _check(world._near_bus_stop() and world._can_stand(world._bus_platform(),world.WALKER_RADIUS)
+            and not world._can_stand(bus_stop.position,world.WALKER_RADIUS)
+            and _has_button(world._action_choices,"Bus to Workshop"),
+            "bus platform provides tickets and bus body is solid"):return
+    bus_day=bus_day.duplicate(true)
+    bus_day["minute"]=620
+    world._on_world_updated(bus_day)
+    if not _check(not bus_stop.get_node("Bus").visible,"bus leaves the platform between departures"):return
+    world._bus_pending="WORKSHOP"
+    var bus_arrived := _world("WORKSHOP","Workshop")
+    bus_arrived["minute"]=619
+    world._on_world_updated(bus_arrived)
+    if not _check(world._bus_pending.is_empty() and world._avatar.position.is_equal_approx(world._bus_platform()),
+            "confirmed bus trip arrives at destination platform"):return
+    world._on_world_updated(_world("PARK","Park"))
+
     var driver := _world("WORKSHOP","Workshop")
     driver["player"]["carPlace"] = "WORKSHOP"
     driver["player"]["carFuel"] = 6

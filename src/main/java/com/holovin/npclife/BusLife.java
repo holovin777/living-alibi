@@ -17,14 +17,16 @@ final class BusLife {
     static boolean open(int minute){return minute>=360&&minute+waitMinutes(minute)<1320;}
     static int duration(TownLife.Place a,TownLife.Place b,int minute){return waitMinutes(minute)+Math.max(4,CityExpansionLife.distance(a,b)*2);}
     record Route(String id,String label,int minutes){}
-    record View(boolean atStop,boolean available,int fare,int waitMinutes,List<Route> routes){}
+    record View(boolean atStop,boolean available,int fare,int waitMinutes,List<Route> routes,boolean serviceOpen,int nextDepartureMinute,int localBusTravellers){}
     static View view(TownLife.Town t,WorldState s){
         var p=t.player;
         boolean at=stop(p.place);
         boolean available=at&&open(s.minute)&&p.alive&&!RebirthLife.active(t)&&!JusticeLife.confined(t)&&p.travelRemaining==0
                 &&!p.cycling&&(!p.ownsBicycle||p.bicycleParked!=null)&&p.money>=FARE&&!IntercomLife.insideVisit(t,s.day,s.minute);
+        int travellers=at?(int)t.people.values().stream().filter(c->c.alive&&c.place==p.place&&NpcTransportLife.mode(t,c)==NpcTransportLife.BUS).count():0;
         return new View(at,available,FARE,waitMinutes(s.minute),at?PlayerLife.publicPlaces().stream().filter(d->route(p.place,d))
-                .map(d->new Route(d.name(),d.label,duration(p.place,d,s.minute))).toList():List.of());
+                .map(d->new Route(d.name(),d.label,duration(p.place,d,s.minute))).toList():List.of(),
+                open(s.minute),open(s.minute)?s.minute+waitMinutes(s.minute):-1,travellers);
     }
     static int ride(TownLife.Town t,WorldState s,TownLife.Place destination){
         if(!view(t,s).available()||!route(t.player.place,destination))throw new IllegalArgumentException("Bus service unavailable for this journey.");

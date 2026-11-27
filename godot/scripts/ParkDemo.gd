@@ -168,6 +168,7 @@ var _traffic_root: Node3D
 var _traffic_edges: Dictionary = {}
 var _traffic_seconds := 0.0
 var _road_pending := ""
+var _bus_pending := ""
 var _road_arrival := Vector3.ZERO
 var _road_blocked := ""
 var _last_snapshot: Dictionary = {}
@@ -417,7 +418,7 @@ func _process(delta: float) -> void:
     _update_first_steps()
     if not _near_gate():
         _travel_panel.visible = false
-    if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck():
+    if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck() and not _near_bus_stop():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
@@ -427,6 +428,8 @@ func _process(delta: float) -> void:
         _hint.text = tr("G: enter stairwell · E: intercom")
     elif _near_intercom()>0:
         _hint.text = tr("E: ring the intercom")
+    elif _near_bus_stop():
+        _hint.text = tr("F: municipal bus timetable and tickets.")
     elif _near_truck():
         _hint.text = "F: assigned freight truck."
     elif _near_car():
@@ -1543,7 +1546,7 @@ func _generate_chunk(place_id: String) -> void:
     if place_id in FREIGHT_DISTRICTS:
         _build_freight_parking(place_id)
     if TownLayout.bus_stop(place_id):
-        _sign(_scenery,"BUS · Fermata · F",KIOSK_POSITION+Vector3(0,3.0,0))
+        _build_bus_stop(place_id)
     _build_road_links(place_id)
     _street_marker(place_id)
     _chunks[place_id] = {
@@ -1551,6 +1554,97 @@ func _generate_chunk(place_id: String) -> void:
         "ground": _ground_material, "obstacles": _obstacles,
         "roads": _road_links, "lamps": _park_lamps, "water": _fountain_water
     }
+
+# Reserve a small pull-out away from buildings, car parking and motor axes.
+# If no safe bay fits, retain the existing kiosk-based transport service.
+func _build_bus_stop(place_id: String) -> void:
+    var candidates: Array[Vector3]=[]
+    for x in [-12.0,-8.0,8.0,12.0,-5.5,5.5]:
+        for z in [-10.0,-5.0,5.0,10.0,0.0]:
+            if TownLayout.outer(place_id) and absf(z)<7.8:continue
+            candidates.append(Vector3(x,0,z))
+    for at in candidates:
+        var bay := Rect2(Vector2(at.x-1.5,at.z-3.7),Vector2(5.1,7.4))
+        if TownLayout.outer(place_id) and (absf(at.x)<5.5 or bay.position.x<3.5 and bay.end.x> -3.5):continue
+        var blocked := false
+        for obstacle in _obstacles:
+            if bay.intersects(obstacle.grow(0.45)):
+                blocked=true
+                break
+        if blocked:continue
+        if TownLayout.motor_district(place_id) and bay.intersects(Rect2(Vector2(CAR_PARK.x-2.0,CAR_PARK.z-2.6),Vector2(4.0,6.0))):continue
+        if place_id in FREIGHT_DISTRICTS:
+            var truck := _truck_parking(place_id)
+            if bay.intersects(Rect2(Vector2(truck.x-2,truck.z-2.8),Vector2(4,6))):continue
+        if (place_id in RACK_DISTRICTS or TownLayout.outer(place_id)) and bay.has_point(Vector2(RACK_POSITION.x,RACK_POSITION.z)):continue
+        var stop := Node3D.new()
+        stop.name="MunicipalBusStop"
+        stop.position=at
+        _scenery.add_child(stop)
+        _box(stop,Vector3(2.9,0.045,7.2),Color("#454b4d"),Vector3(0,0.03,0),"asphalt")
+        _box(stop,Vector3(1.6,0.08,6.8),Color("#c9c1ad"),Vector3(2.3,0.035,0),"paving")
+        for z in [-3.3,3.3]:
+            _box(stop,Vector3(2.6,0.02,0.10),Color("#e4ca71"),Vector3(0,0.065,z))
+        _box(stop,Vector3(0.1,2.8,0.1),Color("#697378"),Vector3(3.2,1.4,2.8))
+        _physical_sign(stop,"BUS · Fermata",Vector3(3.2,2.75,2.8),0.0,1.7)
+        var board := Label3D.new()
+        board.name="Timetable"
+        board.position=Vector3(2.6,1.85,2.7)
+        board.font_size=32
+        board.pixel_size=0.007
+        board.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+        stop.add_child(board)
+        var bus := Node3D.new()
+        bus.name="Bus"
+        stop.add_child(bus)
+        var blue := Color("#416c9c")
+        var glass := Color("#344d5b")
+        _box(bus,Vector3(2.15,1.9,5.5),blue,Vector3(0,1.45,0))
+        _box(bus,Vector3(2.2,0.14,5.55),Color("#e3dfd1"),Vector3(0,2.48,0))
+        _box(bus,Vector3(1.85,0.84,0.06),glass,Vector3(0,1.85,-2.78))
+        _box(bus,Vector3(1.7,0.72,0.06),glass,Vector3(0,1.8,2.78))
+        for side in [-1.0,1.0]:
+            for z in [-1.5,-0.3,0.9,1.9]:
+                if side>0 and z==-1.5:continue
+                _box(bus,Vector3(0.05,0.72,0.92),glass,Vector3(side*1.09,1.85,z))
+            for z in [-1.75,1.75]:
+                var wheel := _cylinder(bus,0.40,0.23,Color("#27292a"),Vector3(side*1.0,0.43,z))
+                wheel.rotation.z=PI/2
+            _box(bus,Vector3(0.30,0.20,0.07),Color("#fff0be"),Vector3(side*0.7,0.85,-2.79))
+            _box(bus,Vector3(0.30,0.20,0.07),Color("#bd302d"),Vector3(side*0.7,0.85,2.79))
+        var door := Node3D.new()
+        door.name="PassengerDoor"
+        bus.add_child(door)
+        for i in range(2):
+            _box(door,Vector3(0.07,1.55,0.48),Color("#d4d6d0"),Vector3(1.10,1.28,-1.75+float(i)*0.50))
+            _box(door,Vector3(0.08,0.70,0.40),glass,Vector3(1.15,1.63,-1.75+float(i)*0.50))
+        _physical_sign(bus,"BUS URBANO",Vector3(0,2.36,-2.82),PI,1.65)
+        bus.visible=false
+        return
+    _sign(_scenery,"BUS · Fermata · F",KIOSK_POSITION+Vector3(0,3.0,0))
+
+func _bus_stop_node() -> Node3D:
+    return _scenery.get_node_or_null("MunicipalBusStop") as Node3D if is_instance_valid(_scenery) else null
+
+func _bus_platform() -> Vector3:
+    var stop := _bus_stop_node()
+    return stop.position+Vector3(2.3,0,0) if stop!=null else KIOSK_POSITION+Vector3(0,0,2)
+
+func _near_bus_stop() -> bool:
+    return TownLayout.bus_stop(_current_place) and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(_bus_platform())<1.65
+
+func _sync_bus_stops() -> void:
+    var minute := int(_last_snapshot.get("minute",0))
+    var wait := posmod(-minute,15)
+    var open := _last_snapshot.has("bus") and minute>=360 and minute+wait<1320
+    for chunk in _chunks.values():
+        var stop := (chunk["root"] as Node3D).get_node_or_null("MunicipalBusStop") as Node3D
+        if stop==null:continue
+        var bus := stop.get_node("Bus") as Node3D
+        var board := stop.get_node("Timetable") as Label3D
+        bus.visible= open and wait<=2
+        bus.get_node("PassengerDoor").visible=not bus.visible
+        board.text=tr("Next bus: %s min") % wait if open else tr("Bus service closed")
 
 func _build_road_links(place_id: String) -> void:
     _road_links.clear()
@@ -2005,6 +2099,9 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         var truck_at := _truck_parking(_current_place)
         if Rect2(Vector2(truck_at.x-1.1,truck_at.z-2.4),Vector2(2.2,4.8)).grow(radius).has_point(p):
             return false
+    var bus_stop := _bus_stop_node()
+    if bus_stop!=null and (bus_stop.get_node("Bus") as Node3D).visible:
+        if Rect2(Vector2(bus_stop.position.x-1.1,bus_stop.position.z-2.8),Vector2(2.2,5.6)).grow(radius).has_point(p):return false
     if _car_place()==_current_place and TownLayout.motor_district(_current_place):
         if Rect2(Vector2(CAR_PARK.x-0.94,CAR_PARK.z-1.81),Vector2(1.88,3.62)).grow(radius).has_point(p):
             return false
@@ -6401,7 +6498,7 @@ func _toggle_actions() -> void:
             _render_actions()
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
         return
-    if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck()) or not _connected:
+    if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck() and not _near_bus_stop()) or not _connected:
         _message.text = "Approach a local kiosk or your rented bed."
         return
     _close_dialog()
@@ -6410,6 +6507,7 @@ func _toggle_actions() -> void:
     if _action_panel.visible:
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
         _render_actions()
+        if _near_bus_stop():return
         if _current_place == "WORKSHOP" and not _near_sport_counter() and not _api.is_busy():
             _api.view_business()
         elif _current_place in ["OFFICE","NORTH_RESIDENCES"] and not _api.is_busy():
@@ -6959,7 +7057,11 @@ func _render_actions() -> void:
             donation.disabled=not bool(charity.get("canDonateBread" if item=="bread" else "canDonateWater",false))
             _action_choices.add_child(donation)
         return
-    if _near_kiosk() and not _near_sport_counter() and not _near_car() and not _rebirth_active():
+    if _near_bus_stop() and not _rebirth_active():
+        _action_title.text=tr("Municipal bus stop")
+        _render_bus()
+        return
+    if _near_kiosk() and _bus_stop_node()==null and not _near_sport_counter() and not _near_car() and not _rebirth_active():
         _render_bus()
     var justice: Dictionary = _last_snapshot.get("player",{}).get("justice",{})
     var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
@@ -8140,6 +8242,8 @@ func _render_bus() -> void:
     if not bool(bus.get("atStop",false)):return
     var info := Label.new()
     info.text=tr("Municipal bus · 06:00–22:00 · 2 EUR")
+    info.text+="\n"+(tr("Next bus: %s min") % bus.get("waitMinutes",0) if bool(bus.get("serviceOpen",true)) else tr("Bus service closed"))
+    info.text+="\n"+tr("Local residents travelling by bus: %s") % bus.get("localBusTravellers",0)
     _action_choices.add_child(info)
     for route in bus.get("routes",[]):
         var id := str(route.get("id",""))
@@ -8149,7 +8253,10 @@ func _render_bus() -> void:
         _action_choices.add_child(choice)
 
 func _ride_bus(id: String) -> void:
-    if not _connected or _api.is_busy() or not _near_kiosk() or not TownLayout.bus_stop(_current_place):return
+    if not _connected or _api.is_busy() or not _bus_pending.is_empty() or not TownLayout.bus_stop(_current_place):return
+    if not _near_bus_stop() and not (_bus_stop_node()==null and _near_kiosk()):return
+    if not bool(_last_snapshot.get("bus",{}).get("available",false)):return
+    _bus_pending=id
     _action_panel.visible=false
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     _api.garden_action("bus-ride:"+id)
@@ -8966,6 +9073,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     var continue_in_cabin := not was_freight and _drive_pending and not _drive_target.is_empty() and new_place==_drive_target and _car_place()==new_place
     if _drive_active() and not continue_in_cabin and (_drive_pending or new_place!=_current_place or _car_place()!=_current_place):
         _end_driving(new_place==_current_place)
+    var bus_arrival := not _bus_pending.is_empty() and new_place==_bus_pending
+    _bus_pending=""
     var road_arrival := new_place == _road_pending and not _road_pending.is_empty()
     if not _road_pending.is_empty():
         _road_blocked = "" if road_arrival else _road_pending
@@ -9002,7 +9111,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _current_place = new_place
         _render_place(new_place)
         var car_arrival := not old_car_place.is_empty() and old_car_place!=_car_place() and _car_place()==new_place
-        _avatar.position = _truck_exit(new_place) if truck_arrival else (CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO))
+        _sync_bus_stops()
+        _avatar.position = _bus_platform() if bus_arrival else (_truck_exit(new_place) if truck_arrival else (CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO)))
         if not _can_stand(_avatar.position, WALKER_RADIUS, true):
             _avatar.position = Vector3.ZERO
         _tick_public_door(1.0)
@@ -9031,6 +9141,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _sync_coop()
     _sync_orchard()
     _sync_construction_site()
+    _sync_bus_stops()
     _sync_owned_car()
     _car_label.text = "Car: none" if _car_place().is_empty() else "Car: %s | Fuel %s/12 | Condition %s%%" % [_car_place().capitalize(),player.get("carFuel",0),player.get("carCondition",0)]
     _refresh_transport_buttons(false)
@@ -9360,6 +9471,11 @@ func _on_request_failed(message: String) -> void:
         if _intercom.visible:
             _intercom_reply.text = tr(message)
     _home_transition=false
+    if not _bus_pending.is_empty():
+        _bus_pending=""
+        _connected=false
+        _message.text=tr("Bus response uncertain. Refresh world before retrying.")
+        return
     if _drive_pending:
         _end_driving(true)
         _connected = false
