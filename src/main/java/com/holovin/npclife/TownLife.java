@@ -744,6 +744,7 @@ final class TownLife {
         SecondFleetLife.tick(town,marco,truth,observations);
         RentalLife.tick(town,marco.day,marco.minute);
         EconomyLife.tick(town,marco,truth,observations);
+        CondominiumLife.tick(town,marco);
         PropertyLife.tick(town,marco);
         MafiaLife.tick(town,marco);
         InvestigationLife.tick(town,marco,truth,observations);

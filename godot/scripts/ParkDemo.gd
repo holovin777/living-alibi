@@ -359,6 +359,9 @@ func _process(delta: float) -> void:
             var condo: Dictionary = _last_snapshot.get("condominium",{})
             if not condo.is_empty():
                 _stairwell_hint.text+="\n"+(tr("Building reserve: %s EUR · unpaid contributions: %s EUR") % [condo.get("reserve",0),condo.get("arrears",0)])
+                var status := str(condo.get("maintenanceStatus",""))
+                if not status.is_empty():
+                    _stairwell_hint.text+="\n"+tr("Maintenance: %s") % tr(status)
         if not _nearest_resident().is_empty():
             _stairwell_hint.text+="\n"+tr("T or click: talk to a person")
         _tick_live_clock(delta)
