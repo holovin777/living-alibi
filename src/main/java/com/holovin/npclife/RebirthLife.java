@@ -296,6 +296,9 @@ final class RebirthLife {
     static void holdPublicPlace(TownLife.Town t,TownLife.Citizen c){
         t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(c.place)+1);
     }
+    static void releaseManualRoutine(TownLife.Town t){
+        t.industryStocks.put(TRAVEL,0);
+    }
     static String resumeRoutine(TownLife.Town t){
         requireAdult(t);
         t.industryStocks.put(TRAVEL,0);

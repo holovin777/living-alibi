@@ -9972,6 +9972,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     var walking_transition := _home_transition or not _road_pending.is_empty()
     _home_transition=false
     _clock_pending = false
+    var first_snapshot:=_last_snapshot.is_empty()
     var previous_phase:=str(_last_snapshot.get("rebirth",{}).get("phase",""))
     _connected = true
     var old_car_place := _car_place()
@@ -10035,6 +10036,15 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _park_in_cabin()
 
     _render_hud_summary(snapshot)
+    if first_snapshot:
+        var away=snapshot.get("offlineReport")
+        if away is Dictionary and int(away.get("minutesAdvanced",0))>0:
+            var minutes:=int(away.get("minutesAdvanced",0))
+            var report:=("Mentre eri via: %s minuti simulati." if TranslationServer.get_locale().begins_with("it") else "While you were away: %s minutes simulated.") % minutes
+            if bool(away.get("capped",false)):report+=" · "+("Limite locale" if TranslationServer.get_locale().begins_with("it") else "Local catch-up limit")
+            if bool(away.get("lifeEnded",false)):report+=" · "+("La tua vita è terminata" if TranslationServer.get_locale().begins_with("it") else "Your life ended")
+            _message.text=report
+            _phone.add_notification(report)
     _sync_custody(player.get("justice",{}))
     var home = snapshot.get("rebirth",{}).get("homeOptions")
     var life: Dictionary=snapshot.get("rebirth",{})

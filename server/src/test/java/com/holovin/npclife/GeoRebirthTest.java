@@ -332,6 +332,26 @@ class GeoRebirthTest {
         parent.activity="AT_HOME";parent.travelRemaining=3;
         assertTrue(SpontaneousSpeechLife.view(t,1,600).stream().noneMatch(o->o.residentId().equals(parent.id)));
     }
+    @Test void offlineRoutineIsBoundedAndKeepsTheLinkedIdentity(){
+        assertEquals(0,OfflineRoutineLife.minutes(0,9999));
+        assertEquals(0,OfflineRoutineLife.minutes(1000,999));
+        assertEquals(0,OfflineRoutineLife.minutes(1000,1059));
+        assertEquals(2,OfflineRoutineLife.minutes(1000,1120));
+        assertEquals(180,OfflineRoutineLife.minutes(1000,100000));
+        var s=new WorldState();var t=TownLife.create(s);
+        PopulationGenerator.add(t,20);
+        RebirthLife.enableRandomBirth(t,true);
+        assertTrue(InitialFamilyLife.start(t,s));
+        var c=RebirthLife.child(t);
+        int money=c.money;
+        RebirthLife.childExit(t,s);
+        OfflineRoutineLife.prepare(t);
+        assertEquals(RebirthLife.CHILDHOOD,RebirthLife.phase(t));
+        assertSame(c,RebirthLife.child(t));
+        assertEquals(money,c.money);
+        assertEquals(0,ChildhoodPrologue.view(t).elapsedSeconds());
+        assertNull(RebirthLife.childOuting(t,c,s.day,s.minute));
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");
