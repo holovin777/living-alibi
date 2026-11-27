@@ -11,6 +11,7 @@ final class EmotionLife {
         if(PublicSafetyLife.alarmed(town,c,day,minute))return Mood.STRESSED;
         if(c.fatigue>=85)return Mood.TIRED;
         if(c.hunger>=85 || c.thirst>=85)return Mood.IRRITATED;
+        if(FuneralLife.grieving(town,c,day))return Mood.SAD;
         long now=(long)(day-1)*1440L+minute;
         int recentTension=0;boolean friendly=false;
         long lastContact=-1;
