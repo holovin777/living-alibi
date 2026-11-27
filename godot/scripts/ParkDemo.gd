@@ -7138,6 +7138,23 @@ func _render_actions() -> void:
     _action_title.text = "Local actions — " + _current_place.capitalize()
     var player: Dictionary = _last_snapshot.get("player", {})
     var employed := str(player.get("jobId", ""))
+    for application in _last_snapshot.get("jobApplications",[]):
+        if str(application.get("workplace",""))!=_current_place:continue
+        var appointment := int(application.get("appointmentDay",0))
+        var retry := int(application.get("retryDay",0))
+        var day := int(_last_snapshot.get("day",1))
+        if appointment<=0 and retry<=day:continue
+        var notice := Label.new()
+        notice.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        notice.text=tr(str(application.get("title","")))
+        if appointment>=day:
+            notice.text+="\n"+tr("Interview day %s · 09:00–17:00") % appointment
+            notice.text+="\n"+tr("Prepare: rest, wash and build relevant skills.")
+        elif appointment>0:
+            notice.text+="\n"+tr("Missed interview. Submit a new application.")
+        if retry>day:
+            notice.text+="\n"+tr("Apply again from day %s") % retry
+        _action_choices.add_child(notice)
     var contract: Dictionary = _last_snapshot.get("employmentContract",{})
     if bool(contract.get("active",false)) and _near_kiosk() and not _near_car() and not _near_truck():
         var contract_label := Label.new()
@@ -7196,21 +7213,19 @@ func _render_actions() -> void:
                 report.get("vegetablesInField",0),report.get("riceInField",0),
                 report.get("vegetablesInBarn",0),report.get("riceInBarn",0),report.get("payroll",0)]
             _action_choices.add_child(label)
-            _action_choices.add_child(_button("Apply: farm worker",_apply_job.bind("farm-worker")))
+            _action_choices.add_child(_job_button("farm-worker","Apply: farm worker"))
         "QUARRY":
-            _action_choices.add_child(_button("Apply: freight driver",_apply_job.bind("freight-driver")))
+            _action_choices.add_child(_job_button("freight-driver","Apply: freight driver"))
             if employed=="freight-driver" and not bool(_last_snapshot.get("freight",{}).get("active",false)):
                 _action_choices.add_child(_button("Load ore truck · paid delivery",_freight_action.bind("load")))
-            _action_choices.add_child(_button("Apply: quarry miner",
-                    _apply_job.bind("miner")))
+            _action_choices.add_child(_job_button("miner","Apply: quarry miner"))
             if employed == "miner":
                 _action_choices.add_child(_button("Survey western mineral deposit · 2h",
                         _prospect))
         "FACTORY":
             if employed=="freight-driver" and not bool(_last_snapshot.get("freight",{}).get("active",false)):
                 _action_choices.add_child(_button("Load parts truck · paid delivery",_freight_action.bind("load")))
-            _action_choices.add_child(_button("Apply: factory machinist",
-                    _apply_job.bind("machinist")))
+            _action_choices.add_child(_job_button("machinist","Apply: factory machinist"))
         "CENTRO":
             var food_id := _centro_food_counter()
             if food_id.is_empty():
@@ -7379,7 +7394,7 @@ func _render_actions() -> void:
             shop_status.text+=" · "+("%02d:%02d–%02d:%02d" % [floori(start/60.0),start%60,floori(finish/60.0),finish%60])
             _action_choices.add_child(shop_status)
             if _current_place=="MARKET" and employed!="shop-assistant":
-                _action_choices.add_child(_button("Apply: market assistant",_apply_job.bind("shop-assistant")))
+                _action_choices.add_child(_job_button("shop-assistant","Apply: market assistant"))
             for item in _last_snapshot.get("shop",[]):
                 var id := str(item.get("id",""))
                 var stock := int(item.get("stock",0))
@@ -7471,7 +7486,7 @@ func _render_actions() -> void:
                 _action_choices.add_child(supply)
                 if _car_place()==_current_place:
                     _action_choices.add_child(_button("Refuel · up to 3 units",_car_action.bind("refuel")))
-                _action_choices.add_child(_button("Apply: fuel station attendant",_apply_job.bind("fuel-attendant")))
+                _action_choices.add_child(_job_button("fuel-attendant","Apply: fuel station attendant"))
         "LOGISTICS_DEPOT":
             _render_logistics(logistics)
         "WORKSHOP":
@@ -7483,8 +7498,7 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Service car · 15 EUR",_car_action.bind("repair")))
             if not bool(player.get("ownsBicycle",false)):
                 _action_choices.add_child(_button("Buy used bicycle · 45 EUR",_buy_bicycle))
-            _action_choices.add_child(_button("Apply: technician",
-                    _apply_job.bind("technician")))
+            _action_choices.add_child(_job_button("technician","Apply: technician"))
             var business: Dictionary = _business_report
             if not bool(business.get("registered", false)) or not bool(business.get("yours", false)):
                 _action_choices.add_child(_button("Register / acquire workshop · 15 EUR",
@@ -7662,10 +7676,8 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Repay loan · up to 10 EUR",_garden_action.bind("bank-repay")))
             elif bool(bank.get("eligible",false)):
                 _action_choices.add_child(_button("Borrow 50 EUR · weekly interest",_garden_action.bind("bank-borrow")))
-            _action_choices.add_child(_button("Apply: engineer",
-                    _apply_job.bind("engineer")))
-            _action_choices.add_child(_button("Apply: investigator",
-                    _apply_job.bind("investigator")))
+            _action_choices.add_child(_job_button("engineer","Apply: engineer"))
+            _action_choices.add_child(_job_button("investigator","Apply: investigator"))
         "SCHOOL":
             _action_choices.add_child(_button(tr("Study engineering · funded" if bool(_last_snapshot.get("jobCentre",{}).get("fundedLesson",false)) else "Study engineering · 10 EUR"),
                     _study.bind("engineering")))
@@ -7676,7 +7688,7 @@ func _render_actions() -> void:
                 press.text = "Il Giornale · Editorial funds %s EUR" % newspaper.get("funds",0)
                 press.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 _action_choices.add_child(press)
-                _action_choices.add_child(_button("Apply: journalist · Investigation 2",_apply_job.bind("journalist")))
+                _action_choices.add_child(_job_button("journalist","Apply: journalist · Investigation 2"))
                 if employed=="journalist":
                     var hint := Label.new()
                     hint.text = "Dispatch filed today." if bool(newspaper.get("filedToday",false)) else "Interview a resident in town, then return to the library for your shift."
@@ -7800,10 +7812,29 @@ func _business_withdraw(amount: int) -> void:
         _action_panel.visible = false
         _api.business_withdraw(amount)
 
+func _job_application(job_id: String) -> Dictionary:
+    for entry in _last_snapshot.get("jobApplications",[]):
+        if str(entry.get("id",""))==job_id:return entry
+    return {}
+
+func _job_button(job_id: String, fallback: String) -> Button:
+    var application := _job_application(job_id)
+    var appointment := int(application.get("appointmentDay",0))
+    var day := int(_last_snapshot.get("day",1))
+    var label := tr(fallback)
+    if appointment>=day:
+        label=tr("Interview: %s · day %s") % [tr(str(application.get("title",""))),appointment]
+    var btn := _button(label,_apply_job.bind(job_id))
+    btn.disabled=not bool(application.get("canAttend",false)) if appointment>=day else not bool(application.get("canSubmit",false))
+    return btn
+
 func _apply_job(job_id: String) -> void:
-    if _near_kiosk() and not _api.is_busy():
-        _action_panel.visible = false
-        _api.apply_for_job(job_id)
+    if _near_kiosk() and _connected and not _api.is_busy():
+        var application := _job_application(job_id)
+        if bool(application.get("canAttend",false)):
+            _api.garden_action("job-interview:"+job_id)
+        elif bool(application.get("canSubmit",false)):
+            _api.garden_action("job-application:"+job_id)
 
 func _study(subject: String) -> void:
     if _near_kiosk() and not _api.is_busy():
