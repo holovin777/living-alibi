@@ -33,6 +33,32 @@ class WorkplaceDialogueTest {
             NaturalDialogue.reply(town,lead,contact,"@work-advice",1,600));
     }
 
+    @Test void workplaceMoodAndJokesRecognizedInThreeLanguages() {
+        for(String phrase:new String[]{"How is your shift?","Come va il lavoro?","Як робота?"})
+            assertEquals("@work-mood",NaturalDialogue.canonical(phrase,null));
+        for(String phrase:new String[]{"Tell me a joke","Raccontami una barzelletta","Розкажи жарт"})
+            assertEquals("@work-joke",NaturalDialogue.canonical(phrase,null));
+    }
+
+    @Test void workplacePersonalityAndNeedsChangeReplies() {
+        var town=new TownLife.Town();
+        var person=worker(town,"joker","Programmer");
+        var contact=new PlayerLife.Contact(person.id);
+        person.sociability=90;person.carefulness=45;contact.trust=65;
+        assertTrue(NaturalDialogue.reply(town,person,contact,"@work-mood",1,600).contains("conversation"));
+        assertTrue(NaturalDialogue.reply(town,person,contact,"@work-joke",1,600).contains("tests"));
+        contact.trust=20;
+        assertTrue(NaturalDialogue.reply(town,person,contact,"@work-joke",1,600).contains("know each other"));
+        contact.trust=65;person.carefulness=90;
+        assertTrue(NaturalDialogue.reply(town,person,contact,"@work-mood",1,600).contains("concentrating"));
+        assertTrue(NaturalDialogue.reply(town,person,contact,"@work-joke",1,600).contains("concentrate"));
+        person.fatigue=85;
+        assertTrue(NaturalDialogue.reply(town,person,contact,"@work-mood",1,600).contains("break"));
+        assertTrue(NaturalDialogue.reply(town,person,contact,"@work-joke",1,600).contains("worn out"));
+        person.activity="FREE_TIME";
+        assertTrue(NaturalDialogue.reply(town,person,contact,"@work-mood",1,600).contains("off duty"));
+    }
+
     private static TownLife.Citizen worker(TownLife.Town town,String id,String role) {
         var person=new TownLife.Citizen(id,id,role,TownLife.Place.OFFICE);
         person.activity="WORKING";

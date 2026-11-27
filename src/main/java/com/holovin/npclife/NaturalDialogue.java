@@ -59,6 +59,8 @@ final class NaturalDialogue {
         if(has(n,"who is working today","who is on shift","who is at work","chi lavora oggi","chi e di turno","chi e al lavoro","хто сьогодні працює","хто на зміні"))return "@shift-team";
         if(has(n,"what should i do at work","what should i do next","what is our task","what are our tasks","what is today's task","cosa devo fare al lavoro","cosa devo fare adesso","qual e il nostro compito","cosa facciamo oggi","що мені робити на роботі","що робимо сьогодні","яке наше завдання"))return "@work-advice";
         if(has(n,"shall we take a break","coffee break","let's take a break","facciamo una pausa","pausa caffe","підемо на перерву","зробимо перерву"))return "@work-break";
+        if(has(n,"how is work","how's work","how is your shift","come va il lavoro","come va il turno","як робота","як проходить зміна"))return "@work-mood";
+        if(has(n,"tell me a joke","make me laugh","raccontami una barzelletta","fammi ridere","розкажи анекдот","розкажи жарт"))return "@work-joke";
         if(has(n,"where do you work","where is your workplace","dove lavori","dove lavora","де ти працюєш","де ви працюєте"))return "@workplace";
         if(has(n,"what do you do","what is your job","what's your job","what do you work as","your profession","your occupation",
                 "che lavoro fai","che lavoro fa","cosa fai nella vita","di cosa ti occupi","che mestiere fai",
@@ -115,7 +117,7 @@ final class NaturalDialogue {
         return switch(intent) {
             case "@police-help","@police-work","@police-cases" -> PoliceLife.assistance(town,resident,intent,day,minute);
             case "@jobs" -> "Look for job notices on your phone or ask at the market. They can tell you whether work is available.";
-            case "@coworker","@shift-team","@work-advice","@work-break" -> workReply(town,resident,contact,intent,day);
+            case "@coworker","@shift-team","@work-advice","@work-break","@work-mood","@work-joke" -> workReply(town,resident,contact,intent,day);
             case "@workplace" -> resident.employed&&resident.workplace!=null
                     ? "My workplace is "+resident.workplace.label+"." : "I don't have a workplace at the moment.";
             case "@activity" -> switch(resident.activity) {
@@ -185,6 +187,30 @@ final class NaturalDialogue {
                     default -> "Check today's assignments, supplies and priorities with the supervisor.";
                 };
                 yield resident.sociability>=70&&contact.trust>=55?"Of course, happy to help. "+advice:advice;
+            }
+            case "@work-mood" -> {
+                if(!working)yield "I'm off duty right now. I prefer to leave work at work.";
+                if(resident.fatigue>=75||resident.hunger>=75||resident.thirst>=75)
+                    yield "It's a long shift. I could really use a break when my duties allow it.";
+                if(resident.carefulness>=75)yield "I'm concentrating on getting things right. Rushing only creates more work.";
+                if(resident.sociability>=75)yield "Pretty good! A bit of conversation makes the shift go faster.";
+                if(resident.curiosity>=75)yield "I'm looking for a better way to do things today.";
+                yield "Nothing unusual today. I'm getting on with my work.";
+            }
+            case "@work-joke" -> {
+                if(!working)yield "I'm off duty. Maybe another time.";
+                if(resident.fatigue>=75||resident.hunger>=75||resident.thirst>=75)
+                    yield "Not right now, I'm worn out.";
+                if(resident.sociability<70||resident.carefulness>=80)
+                    yield "I'd rather concentrate on work right now.";
+                if(!colleague&&contact.trust<55)
+                    yield "Maybe when we know each other better.";
+                yield switch(resident.occupation) {
+                    case "Programmer" -> "My code works perfectly. The tests have a different opinion!";
+                    case "Baker" -> "I'm on a roll today. Literally.";
+                    case "Engineer","Mechanic","Factory machinist" -> "The machine and I have an agreement: I fix it, it finds a new problem.";
+                    default -> "I asked the clock for a promotion. It just kept ticking.";
+                };
             }
             case "@work-break" -> {
                 if(!colleague)yield "Maybe another time. I have my own schedule.";
