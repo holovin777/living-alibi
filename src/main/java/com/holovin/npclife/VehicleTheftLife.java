@@ -32,5 +32,5 @@ final class VehicleTheftLife {
         if(owner!=null)events.add(new TownLife.Event(s.day,s.minute,owner.id,owner.place,owner.currentSpace(),"The resident vehicle was reported missing."));
         JusticeLife.reportTheft(t,s,officer,events,observations);
     }
-    static void recover(TownLife.Town t){if(active(t)&&NpcTransportLife.enabled(t))NpcTransportLife.returned(t,get(t,"owner"),get(t,"fuel"),get(t,"condition"));set(t,"active",0);set(t,"fuel",0);set(t,"condition",0);set(t,"origin",0);set(t,"owner",0);set(t,"stolen-remainder",0);}
+    static void recover(TownLife.Town t){if(active(t)&&NpcTransportLife.enabled(t))NpcTransportLife.returned(t,get(t,"owner"),get(t,"fuel"),get(t,"condition"));set(t,"active",0);set(t,"fuel",0);set(t,"condition",0);set(t,"origin",0);set(t,"owner",0);set(t,"stolen-remainder",0);set(t,"local-type",0);set(t,"local-parked",0);}
 }

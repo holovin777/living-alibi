@@ -433,7 +433,7 @@ func _process(delta: float) -> void:
     _update_first_steps()
     if not _near_gate():
         _travel_panel.visible = false
-    if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck() and not _near_bus_stop():
+    if not _rebirth_active() and not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck() and not _near_bus_stop() and not _near_vehicle_crime():
         _action_panel.visible = false
     if not _road_pending.is_empty():
         _hint.text = "Waiting for Java to confirm arrival..."
@@ -443,6 +443,8 @@ func _process(delta: float) -> void:
         _hint.text = tr("G: enter stairwell · E: intercom")
     elif _near_intercom()>0:
         _hint.text = tr("E: ring the intercom")
+    elif _near_vehicle_crime():
+        _hint.text = tr("F: vehicle interactions")
     elif _near_bus_stop():
         _hint.text = tr("F: municipal bus timetable and tickets.")
     elif _near_truck():
@@ -940,6 +942,36 @@ func _drive_truck(destination: String) -> void:
 func _car_place() -> String:
     var value = _last_snapshot.get("player",{}).get("carPlace")
     return "" if value==null else str(value)
+
+func _near_vehicle_crime() -> bool:
+    if _apartment_active or _guest_active or _stairwell_active or _rebirth_active():return false
+    var report: Dictionary=_last_snapshot.get("vehicleCrime",{})
+    if bool(report.get("active",false)) and str(report.get("parked",""))==_current_place:
+        return _near_kiosk() or _near_bus_stop() or _avatar.position.distance_to(CAR_ARRIVAL)<3.0
+    return (bool(report.get("carAvailable",false)) and _avatar.position.distance_to(CAR_ARRIVAL)<3.0) or (bool(report.get("busAvailable",false)) and _near_bus_stop()) or (bool(report.get("truckAvailable",false)) and _near_truck())
+
+func _vehicle_crime_action(action: String) -> void:
+    if _near_vehicle_crime() and _connected and not _api.is_busy():
+        _api.garden_action(action)
+
+func _render_vehicle_crime() -> void:
+    if not _near_vehicle_crime():return
+    var report: Dictionary=_last_snapshot.get("vehicleCrime",{})
+    if bool(report.get("active",false)):
+        var status := Label.new()
+        status.text=tr("Stolen vehicle · fuel %s · condition %s%%") % [report.get("fuel",0),report.get("condition",0)]
+        _action_choices.add_child(status)
+        for id in report.get("destinations",[]):
+            _action_choices.add_child(_button(tr("Drive stolen vehicle to %s") % TownLayout.label_for(str(id)),_vehicle_crime_action.bind("vehicle-stolen-drive:"+str(id))))
+        _action_choices.add_child(_button(tr("Abandon stolen vehicle"),_vehicle_crime_action.bind("vehicle-stolen-abandon")))
+        return
+    for kind in ["car","bus","truck"]:
+        var available := bool(report.get(str(kind)+"Available",false))
+        if kind=="car":available=available and _avatar.position.distance_to(CAR_ARRIVAL)<3.0
+        elif kind=="bus":available=available and _near_bus_stop()
+        else:available=available and _near_truck()
+        if available:
+            _action_choices.add_child(_button(tr("Steal civilian car") if kind=="car" else (tr("Steal municipal bus") if kind=="bus" else tr("Steal employer truck")),_vehicle_crime_action.bind("vehicle-steal:"+kind)))
 
 func _near_car() -> bool:
     return _car_place()==_current_place and TownLayout.motor_district(_current_place) and _avatar.position.distance_to(CAR_PARK)<3.3
@@ -6532,7 +6564,7 @@ func _toggle_actions() -> void:
             _render_actions()
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
         return
-    if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck() and not _near_bus_stop()) or not _connected:
+    if (not _near_kiosk() and not _near_home_station() and not _near_car() and not _near_truck() and not _near_bus_stop() and not _near_vehicle_crime()) or not _connected:
         _message.text = "Approach a local kiosk or your rented bed."
         return
     _close_dialog()
@@ -7048,6 +7080,9 @@ func _render_barber() -> void:
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _custody_active:return
+    if _near_vehicle_crime():
+        _render_vehicle_crime()
+        if not _near_bus_stop() and not _near_truck() and not _near_kiosk():return
     if _near_shelter() and not _rebirth_active():
         _action_title.text=tr("Shelter · Dormitorio solidale")
         var shelter: Dictionary=_last_snapshot.get("shelter",{})
@@ -8332,7 +8367,7 @@ func _begin_bus_preview(destination: String,minutes: int) -> void:
         for z in [-3.65,-2.1,-0.55,1.0,2.55,3.65]:
             _box(cabin,Vector3(0.10,1.25,0.10),trim,Vector3(side*1.25,1.45,z))
         for z in [-2.0,0.65,2.3]:
-            var x := side*0.75
+            var x: float = side*0.75
             _box(cabin,Vector3(0.54,0.13,0.55),upholstery,Vector3(x,0.52,z))
             _box(cabin,Vector3(0.54,0.64,0.13),upholstery,Vector3(x,0.91,z+0.25))
             _box(cabin,Vector3(0.12,0.46,0.12),floor_color,Vector3(x,0.23,z))
