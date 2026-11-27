@@ -324,6 +324,8 @@ func _update_navigation() -> void:
         if driving:civilian_car.hide()
         hud.text+="\nG: enter own car / steal nearby civilian car"
         if driving:hud.text+="\nW: accelerate · A/D: choose turn · G: exit | Fuel %s · Condition %s" % [residents.driving.get("fuel",0),residents.driving.get("condition",0)]
+        var justice: Dictionary=world.get("justice",{})
+        if str(justice.get("status",""))=="REPORTED":hud.text+="\nPolice report · possible detention in %s game min" % justice.get("minutesRemaining",0)
         _sync_parked_vehicle(parked_bike,world.get("parkedBicycle"),pos,Vector3(-2,0.05,0))
         if not nearest.is_empty():
             district_sign.position=Vector3(float(nearest["x"]),2.5,float(nearest["z"]))
@@ -358,6 +360,7 @@ func _drive_pose(pose: Dictionary) -> void:
 
 func _drive_frame(delta: float) -> void:
     if not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)):
+        if not residents.connected:return # freeze until authoritative state is available again
         driving=false
         driving_body.hide()
         var location: Dictionary=residents.world.get("playerDistrict",{})

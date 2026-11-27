@@ -558,6 +558,8 @@ public final class GameSession implements AutoCloseable {
                 if(JusticeLife.confined(town))return drivePose(map,"Police detained you.");
             }else if(p.carFuel<1||p.carCondition<3)throw new IllegalArgumentException("Car needs fuel or service.");
             geoDrive=new GeoDrive(stolen,node);
+            geoDrive.to=map.motorEdges.get(node).get(0);
+            geoDrive.meters=VehicleTheftLife.get(town,stolen?"stolen-remainder":"owned-remainder")/1000.0;
             return drivePose(map,stolen?"Stolen vehicle reported to police.":"In your car.");
         }
         if(geoDrive==null)throw new IllegalArgumentException("You are not driving.");
@@ -590,6 +592,7 @@ public final class GameSession implements AutoCloseable {
         }else{
             copy.player.carPlace=destination;copy.player.carFuel=Math.max(0,fuel-units);copy.player.carCondition=Math.max(0,condition-3*units);
         }
+        VehicleTheftLife.set(copy,next.stolen?"stolen-remainder":"owned-remainder",(int)Math.round((next.meters%100)*1000));
         apply(copy,0,"Driving.");geoDrive=next;
         return drivePose(map,traveled<0.001?"End of this directed road. Exit the vehicle.":"");
     }
@@ -605,9 +608,11 @@ public final class GameSession implements AutoCloseable {
     }
     synchronized void geoTick(int minutes) throws SQLException {
         if(!RebirthLife.active(town))waitMinutes(minutes);
+        if(JusticeLife.confined(town)||RebirthLife.active(town)||!town.player.alive)geoDrive=null;
     }
     synchronized void geoEnter(GeoProjection map,String destination,double x,double z) throws SQLException {
         JusticeLife.requireFree(town);
+        if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
         if(RebirthLife.active(town))throw new IllegalArgumentException("Use regular mode for rebirth.");
         PlayerLife.requireAlive(town.player);
         var place=PlayerLife.destination(destination);
@@ -623,12 +628,14 @@ public final class GameSession implements AutoCloseable {
         apply(copy,0,"Entered "+place.label+".");
     }
     synchronized String geoSpeak(GeoProjection map,String id,String message,String language,double x,double z) throws SQLException {
+        if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
         var actor=geoNearby(map,x,z).residents().stream().filter(a->a.id().equals(id)&&a.talkable()
                 &&Math.hypot(a.x()-x,a.z()-z)<=4).findFirst().orElseThrow(()->new IllegalArgumentException("Approach an available resident in your current district."));
         return speak(actor.id(),message,language).message();
     }
 
     synchronized GeoProjection.ActionResult geoAction(GeoProjection map,String action,double x,double z)throws SQLException{
+        if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
         if(action==null||map.choices(town,state,new GeoProjection.Point(x,z)).stream().noneMatch(a->a.id().equals(action)))
             throw new IllegalArgumentException("This action is not available here.");
         var before=town.player.place;

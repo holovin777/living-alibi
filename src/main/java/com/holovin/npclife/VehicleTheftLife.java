@@ -18,5 +18,5 @@ final class VehicleTheftLife {
         TownLife.publish(t,s,"visitor:"+t.player.incarnation,t.player.place,"A civilian vehicle was reported stolen.",events,observations);
         JusticeLife.reportTheft(t,s,officer,events,observations);
     }
-    static void recover(TownLife.Town t){set(t,"active",0);set(t,"fuel",0);set(t,"condition",0);set(t,"origin",0);}
+    static void recover(TownLife.Town t){set(t,"active",0);set(t,"fuel",0);set(t,"condition",0);set(t,"origin",0);set(t,"stolen-remainder",0);}
 }
