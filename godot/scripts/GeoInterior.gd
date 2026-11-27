@@ -2,6 +2,8 @@ extends Node3D
 ## Modular fictional interiors, streamed separately from the OSM exterior.
 const LEVEL=150.0
 var materials: Dictionary={}
+var task_board: Label3D
+var task_board_text:=""
 
 func _mat(color: Color) -> StandardMaterial3D:
     if not materials.has(color):
@@ -109,6 +111,7 @@ func build(record: Dictionary) -> void:
             _box(Vector3(x,0.34,z+0.05),Vector3(0.55,0.12,0.52),Color("#72887a"))
             _box(Vector3(x,0.65,z+0.29),Vector3(0.55,0.52,0.10),Color("#72887a"))
             _box(Vector3(x,0.62,z-0.65),Vector3(0.34,0.03,0.24),Color("#ebe0c7"),false)
+    if kind=="OFFICE":_office()
     for x in [-3.5,3.5]:
         var lamp:=OmniLight3D.new()
         lamp.position=Vector3(x,2.9,0)
@@ -117,6 +120,47 @@ func build(record: Dictionary) -> void:
         add_child(lamp)
         _box(Vector3(x,3.12,0),Vector3(1.7,0.12,0.65),Color("#f5ecd5"),false)
     _sign(str(record.get("label","")),Vector3(0,2.9,-6.72))
+
+func _office() -> void:
+    # Real Java office workers occupy the existing back-row stations. The
+    # front workbenches are reserved for player interaction, not fake employees.
+    for x in [-4.0,4.0]:
+        _box(Vector3(x,0.83,2.8),Vector3(2.3,0.12,1.1),Color("#b6a68d"))
+        for dx in [-1.02,1.02]:
+            _box(Vector3(x+dx,0.4,2.8),Vector3(0.12,0.8,1.0),Color("#43515b"))
+        _box(Vector3(x,1.13,2.4),Vector3(0.12,0.48,0.12),Color("#303b45"),false)
+        _box(Vector3(x,1.43,2.39),Vector3(1.12,0.68,0.12),Color("#26343e"),false)
+        _box(Vector3(x,1.43,2.46),Vector3(1.04,0.59,0.02),Color("#477c91"),false)
+        _box(Vector3(x,0.92,3.02),Vector3(0.72,0.055,0.27),Color("#36444c"),false)
+        _box(Vector3(x+0.58,0.92,3.04),Vector3(0.13,0.065,0.22),Color("#36444c"),false)
+        _box(Vector3(x-0.9,0.27,2.4),Vector3(0.35,0.54,0.55),Color("#26333d"))
+        _box(Vector3(x+1.35,0.23,4.1),Vector3(0.5,0.46,0.5),Color("#607e82"))
+        var prompt:=Label3D.new()
+        prompt.text="PC · E"
+        prompt.font_size=36
+        prompt.pixel_size=0.008
+        prompt.position=Vector3(x,1.95,2.46)
+        prompt.modulate=Color("#e1edf0")
+        add_child(prompt)
+    _box(Vector3(0,2.0,-6.7),Vector3(5.8,1.4,0.13),Color("#293e4a"),false)
+    task_board=Label3D.new()
+    task_board.font_size=34
+    task_board.pixel_size=0.007
+    task_board.position=Vector3(0,2.0,-6.60)
+    task_board.modulate=Color("#dce9e8")
+    add_child(task_board)
+    update_work_board({})
+
+func update_work_board(work: Dictionary) -> void:
+    if not is_instance_valid(task_board):return
+    var lines: PackedStringArray=["BORGO DIGITAL · PROJECT BOARD"]
+    for project in work.get("projects",[]):
+        lines.append("%s · %s" % [project.get("title",""),project.get("phase","")])
+    if lines.size()==1:lines.append("IT workspace · access requires qualification")
+    var words: String="\n".join(lines)
+    if words!=task_board_text:
+        task_board_text=words
+        task_board.text=words
 
 func _home() -> void:
     # Four functional zones around an unobstructed central hallway.

@@ -14,5 +14,8 @@ class GeoWorkTest {
         var t=TownLife.create(new WorldState());
         assertTrue(GeoWork.view(t,new WorldState()).actions().isEmpty());
         assertTrue(GeoWork.view(t,new WorldState()).inputs().isEmpty());
+        assertTrue(GeoWork.campusAction("rebirth-study"));
+        assertTrue(GeoWork.campusAction("rebirth-enroll-programming"));
+        assertFalse(GeoWork.campusAction("rebirth-java-onboard"));
     }
 }

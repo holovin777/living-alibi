@@ -268,6 +268,10 @@ func _input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
             return
         if event.keycode==KEY_E:
+            if _near_office_computer() and residents.world.get("work",{}).get("workspace") is Dictionary:
+                _open_actions(true)
+                get_viewport().set_input_as_handled()
+                return
             residents.enter_district(pos)
             return
         elif event.keycode==KEY_T:
@@ -381,8 +385,10 @@ func _update_navigation() -> void:
     _update_daylight()
     var pos:=Vector2(walker.position.x,walker.position.z)
     if not room.is_empty():
+        if is_instance_valid(interior_node):interior_node.update_work_board(residents.world.get("work",{}))
         hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions · P phone\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
         if bool(residents.world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions · E: leave home"
+        if _near_office_computer() and residents.world.get("work",{}).get("workspace") is Dictionary:hud.text+="\nBorgo Digital · E: use computer"
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         return
     city_map.player=pos
@@ -602,12 +608,17 @@ func _life_summary() -> String:
     if str(life.get("phase",""))=="CHOICE":return "Choose your next family / Scegli la famiglia"
     return "%s · age %s · %s · school days %s" % [life.get("name",""),life.get("age",0),life.get("activity",""),life.get("schoolDays",0)]
 
-func _open_actions() -> void:
+func _near_office_computer() -> bool:
+    if str(room.get("id",""))!="OFFICE":return false
+    var at:=Vector2(walker.position.x,walker.position.z)-room_exit
+    return minf(at.distance_to(Vector2(-4,4.1)),at.distance_to(Vector2(4,4.1)))<=2.0
+
+func _open_actions(work_only: bool=false) -> void:
     for child in action_list.get_children():
         action_list.remove_child(child)
         child.queue_free()
     var title:=Label.new()
-    title.text="Life / Vita" if bool(residents.world.get("rebirth",false)) else "Actions / Azioni"
+    title.text="Borgo Digital · Workstation" if work_only else ("Life / Vita" if bool(residents.world.get("rebirth",false)) else "Actions / Azioni")
     action_list.add_child(title)
     var info:=Label.new()
     info.text="Java validates availability, money and time."
@@ -620,14 +631,19 @@ func _open_actions() -> void:
         if life.get("parentA")!=null:biography.text+="\nParents / Genitori: "+str(life.get("parentA"))+" + "+str(life.get("parentB"))
         action_list.add_child(biography)
     var work: Dictionary=residents.world.get("work",{})
-    if not work.is_empty():WorkPanel.build(action_list,work,_perform_action)
+    if work_only or str(room.get("id",""))=="SCHOOL":WorkPanel.build(action_list,work,_perform_action)
+    elif work.get("workspace") is Dictionary:
+        var hint:=Label.new()
+        hint.text="Use E at an office computer / Usa il PC in ufficio"
+        hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        action_list.add_child(hint)
     var enterprise=residents.world.get("enterprise")
     if enterprise is Dictionary and bool(enterprise.get("yours",false)):
         var summary:=Label.new()
         summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         summary.text="Workshop / Officina\nCompany cash: €%s · machine: %s/100\nParts: %s · staff: %s\nPaid hours today: %s" % [enterprise.get("cash",0),enterprise.get("machineCondition",0),enterprise.get("spareParts",0),enterprise.get("employeeName","—"),enterprise.get("paidHoursToday",0)]
         action_list.add_child(summary)
-    for action in residents.world.get("actions",[]):
+    for action in ([] if work_only else residents.world.get("actions",[])):
         var button:=Button.new()
         button.text=str(action.get("label",""))
         button.pressed.connect(_perform_action.bind(str(action.get("id",""))))

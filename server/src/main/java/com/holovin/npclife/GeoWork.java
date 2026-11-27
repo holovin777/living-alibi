@@ -61,6 +61,17 @@ final class GeoWork {
         }
         return new View(college,workspace,projects,List.copyOf(actions),List.copyOf(inputs));
     }
+    /** The two computer interaction points match GeoInterior's office desks. */
+    static boolean nearComputer(GeoProjection map,TownLife.Town t,double x,double z){
+        var c=RebirthLife.child(t);
+        if(!RebirthLife.linkedAdult(t,c)||!RebirthLife.awakePresent(c)||GeoLife.atHome(c)||c.place!=TownLife.Place.OFFICE)return false;
+        var center=map.point(c.place);
+        return Math.min(Math.hypot(x-center.x()+4,z-center.z()-4.1),
+                        Math.hypot(x-center.x()-4,z-center.z()-4.1))<=2.0;
+    }
+    static boolean campusAction(String action){
+        return action!=null&&(action.equals("rebirth-study")||action.startsWith("rebirth-enroll-"));
+    }
     static boolean accepts(View view,String action){
         if(action==null)return false;
         if(view.actions().stream().anyMatch(a->a.id().equals(action)))return true;

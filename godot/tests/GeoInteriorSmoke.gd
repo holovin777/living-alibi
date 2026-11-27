@@ -11,6 +11,12 @@ func _check() -> void:
             push_error("Interior build failed: "+kind)
             quit(1)
             return
+        if kind=="OFFICE":
+            room.update_work_board({"projects":[{"title":"Water control","phase":"DEPLOYED"}]})
+            if not is_instance_valid(room.task_board) or not room.task_board.text.contains("DEPLOYED"):
+                push_error("Office project board not updated")
+                quit(1)
+                return
         root.remove_child(room)
         room.queue_free()
     print("GeoInteriorSmoke: ALL CHECKS PASSED")

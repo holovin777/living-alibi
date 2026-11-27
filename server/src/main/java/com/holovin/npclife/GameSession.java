@@ -699,7 +699,12 @@ public final class GameSession implements AutoCloseable {
     synchronized GeoProjection.ActionResult geoAction(GeoProjection map,String action,double x,double z)throws SQLException{
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
         if(RebirthLife.active(town)){
-            if(action==null||GeoLife.choices(town,state,map).stream().noneMatch(a->a.id().equals(action))&&!GeoWork.accepts(GeoWork.view(town,state),action))throw new IllegalArgumentException("This life action is not available. Check qualification, location, hours and current task.");
+            boolean lifeAction=action!=null&&GeoLife.choices(town,state,map).stream().anyMatch(a->a.id().equals(action));
+            boolean workAction=GeoWork.accepts(GeoWork.view(town,state),action);
+            if(!lifeAction&&!workAction)throw new IllegalArgumentException("This life action is not available. Check qualification, location, hours and current task.");
+            if(workAction&&!GeoWork.campusAction(action)&&!GeoWork.nearComputer(map,town,x,z))
+                throw new IllegalArgumentException("Approach an office computer to work.");
+
             var result=gardenAction(action);
             geoInterior=null;geoDrive=null;
             return new GeoProjection.ActionResult(result.message(),null);
