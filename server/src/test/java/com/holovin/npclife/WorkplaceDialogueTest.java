@@ -59,6 +59,30 @@ class WorkplaceDialogueTest {
         assertTrue(NaturalDialogue.reply(town,person,contact,"@work-mood",1,600).contains("off duty"));
     }
 
+    @Test void hierarchyFollowsTenureSkillsAndCurrentEmployment() {
+        var town=new TownLife.Town();
+        var a=worker(town,"a","Programmer");
+        var b=worker(town,"b","Programmer");
+        var c=worker(town,"c","Teacher");
+        a.lastHiredDay=1;b.lastHiredDay=38;c.lastHiredDay=1;
+        EducationLife.set(town,a,"technical",70);
+        EducationLife.set(town,b,"technical",65);
+        EducationLife.set(town,c,"academic",100);
+        assertEquals(WorkplaceHierarchy.Rank.TRAINEE,WorkplaceHierarchy.rank(town,b,40));
+        assertEquals(WorkplaceHierarchy.Rank.TEAM_LEAD,WorkplaceHierarchy.rank(town,a,40));
+        assertSame(a,WorkplaceHierarchy.lead(town,b,40));
+        assertNull(WorkplaceHierarchy.lead(town,c,40));
+        assertEquals(WorkplaceHierarchy.Rank.SENIOR,WorkplaceHierarchy.rank(town,b,55));
+        a.activity="FREE_TIME";
+        assertTrue(NaturalDialogue.reply(town,b,new PlayerLife.Contact(b.id),"@work-lead",55,600).contains("isn't on shift"));
+        a.employed=false;
+        assertNull(WorkplaceHierarchy.lead(town,b,55));
+        a.employed=true;a.occupation="Teacher";
+        assertNull(WorkplaceHierarchy.lead(town,b,55));
+        assertEquals("@work-lead",NaturalDialogue.canonical("Chi è il responsabile?",null));
+        assertEquals("@work-rank",NaturalDialogue.canonical("Яка твоя посада в команді?",null));
+    }
+
     private static TownLife.Citizen worker(TownLife.Town town,String id,String role) {
         var person=new TownLife.Citizen(id,id,role,TownLife.Place.OFFICE);
         person.activity="WORKING";

@@ -61,6 +61,8 @@ final class NaturalDialogue {
         if(has(n,"shall we take a break","coffee break","let's take a break","facciamo una pausa","pausa caffe","підемо на перерву","зробимо перерву"))return "@work-break";
         if(has(n,"how is work","how's work","how is your shift","come va il lavoro","come va il turno","як робота","як проходить зміна"))return "@work-mood";
         if(has(n,"tell me a joke","make me laugh","raccontami una barzelletta","fammi ridere","розкажи анекдот","розкажи жарт"))return "@work-joke";
+        if(has(n,"who is the team lead","who is in charge","who is our supervisor","chi e il caposquadra","chi e il responsabile","хто керівник","хто бригадир"))return "@work-lead";
+        if(has(n,"what is your rank at work","are you a trainee","qual e il tuo ruolo in squadra","sei un tirocinante","яка твоя посада в команді","ти стажер"))return "@work-rank";
         if(has(n,"where do you work","where is your workplace","dove lavori","dove lavora","де ти працюєш","де ви працюєте"))return "@workplace";
         if(has(n,"what do you do","what is your job","what's your job","what do you work as","your profession","your occupation",
                 "che lavoro fai","che lavoro fa","cosa fai nella vita","di cosa ti occupi","che mestiere fai",
@@ -117,7 +119,7 @@ final class NaturalDialogue {
         return switch(intent) {
             case "@police-help","@police-work","@police-cases" -> PoliceLife.assistance(town,resident,intent,day,minute);
             case "@jobs" -> "Look for job notices on your phone or ask at the market. They can tell you whether work is available.";
-            case "@coworker","@shift-team","@work-advice","@work-break","@work-mood","@work-joke" -> workReply(town,resident,contact,intent,day);
+            case "@coworker","@shift-team","@work-advice","@work-break","@work-mood","@work-joke","@work-lead","@work-rank" -> workReply(town,resident,contact,intent,day);
             case "@workplace" -> resident.employed&&resident.workplace!=null
                     ? "My workplace is "+resident.workplace.label+"." : "I don't have a workplace at the moment.";
             case "@activity" -> switch(resident.activity) {
@@ -187,6 +189,22 @@ final class NaturalDialogue {
                     default -> "Check today's assignments, supplies and priorities with the supervisor.";
                 };
                 yield resident.sociability>=70&&contact.trust>=55?"Of course, happy to help. "+advice:advice;
+            }
+            case "@work-lead" -> {
+                var lead=WorkplaceHierarchy.lead(town,resident,day);
+                if(lead==null)yield "We don't have a qualified team lead in my role yet.";
+                if(lead==resident)yield "I coordinate this team."+(working?" I'm on shift now.":" I'm off duty now.");
+                if(!WorkplaceHierarchy.onDuty(lead,day))yield "Our team lead isn't on shift right now.";
+                yield "Our team lead is on shift here. Ask the lead about priorities.";
+            }
+            case "@work-rank" -> {
+                var rank=WorkplaceHierarchy.rank(town,resident,day);
+                yield rank==null?"I don't have a team rank.":switch(rank) {
+                    case TRAINEE -> "I'm new to this team and still learning.";
+                    case WORKER -> "I'm a regular member of the team.";
+                    case SENIOR -> "I'm an experienced member of the team. I can share advice.";
+                    case TEAM_LEAD -> "I coordinate the team's work.";
+                };
             }
             case "@work-mood" -> {
                 if(!working)yield "I'm off duty right now. I prefer to leave work at work.";
