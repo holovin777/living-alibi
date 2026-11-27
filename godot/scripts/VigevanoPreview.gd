@@ -45,6 +45,10 @@ var driving:=false
 var drive_timer:=0.0
 var impact_flash:=0.0
 var impact_overlay: ColorRect
+const InteriorScene=preload("res://scripts/GeoInterior.gd")
+var interior_node: Node3D
+var room: Dictionary={}
+var room_exit:=Vector2.ZERO
 
 func _ready() -> void:
     var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
@@ -78,6 +82,7 @@ func _ready() -> void:
     residents.configure(traffic,shared_mode)
     traffic.set_java_population(shared_mode)
     residents.first_snapshot.connect(_sync_spawn)
+    residents.interior_changed.connect(_change_interior)
     district_sign=Label3D.new()
     district_sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
     district_sign.font_size=42
@@ -210,7 +215,7 @@ func _input(event: InputEvent) -> void:
             if event.keycode==KEY_G:
                 residents.drive_command("exit",pos)
             return
-        if event.keycode==KEY_G and residents.connected:
+        if event.keycode==KEY_G and residents.connected and room.is_empty():
             if owned_car.visible and walker.position.distance_to(owned_car.position)<5:
                 residents.drive_command("start",pos)
             elif civilian_car.visible and walker.position.distance_to(civilian_car.position)<5:
@@ -222,6 +227,7 @@ func _input(event: InputEvent) -> void:
             return
         if event.keycode==KEY_E:
             residents.enter_district(pos)
+            return
         elif event.keycode==KEY_T:
             chat_target=residents.nearby_talker(pos)
             if not chat_target.is_empty():
@@ -231,6 +237,7 @@ func _input(event: InputEvent) -> void:
                 chat.grab_focus()
                 get_viewport().set_input_as_handled()
                 return
+    if not room.is_empty() and event is InputEventKey and event.keycode==KEY_M:return
     if event is InputEventKey and event.pressed and not event.echo and (event.keycode==KEY_M or (event.keycode==KEY_ESCAPE and city_map.visible)):
         city_map.visible=not city_map.visible
         Input.mouse_mode=Input.MOUSE_MODE_VISIBLE if city_map.visible else Input.MOUSE_MODE_CAPTURED
@@ -271,7 +278,7 @@ func _physics_process(delta: float) -> void:
     if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):direction.x-=1
     if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):direction.x+=1
     direction=walker.basis*direction.normalized()
-    var cycling:=bool(residents.world.get("cycling",false))
+    var cycling:=room.is_empty() and bool(residents.world.get("cycling",false))
     var speed := 8.0 if cycling else (7.0 if Input.is_physical_key_pressed(KEY_SHIFT) else 4.5)
     walker.velocity.x=direction.x*speed
     walker.velocity.z=direction.z*speed
@@ -286,6 +293,7 @@ func _physics_process(delta: float) -> void:
         _update_navigation()
 
 func _stream() -> void:
+    if not room.is_empty():return
     var cell := Vector2i(floori(walker.position.x/chunk_size),floori(walker.position.z/chunk_size))
     if cell==loaded_cell:return
     loaded_cell=cell
@@ -312,6 +320,10 @@ func _select_destination(point: Vector2) -> void:
 func _update_navigation() -> void:
     if not is_instance_valid(walker) or not is_instance_valid(city_map):return
     var pos:=Vector2(walker.position.x,walker.position.z)
+    if not room.is_empty():
+        hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E exit · T talk · F actions\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
+        if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
+        return
     city_map.player=pos
     street_name=roads.street(pos)
     route_status=""
@@ -528,6 +540,37 @@ func _perform_action(id: String) -> void:
     actions_panel.hide()
     Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
     residents.perform(id,Vector2(walker.position.x,walker.position.z))
+
+func _change_interior(next_room: Dictionary) -> void:
+    if is_instance_valid(interior_node):
+        remove_child(interior_node)
+        interior_node.queue_free()
+        interior_node=null
+    room=next_room
+    walker.velocity=Vector3.ZERO
+    if not room.is_empty():
+        room_exit=Vector2(float(room["x"]),float(room["z"]))
+        interior_node=InteriorScene.new()
+        add_child(interior_node)
+        interior_node.build(room)
+        walker.position=Vector3(room_exit.x,151.05,room_exit.y+5.6)
+        walker.rotation.y=0
+        head.rotation.x=0
+        for node in chunks.values():node.hide()
+        district_sign.hide()
+        owned_car.hide()
+        civilian_car.hide()
+        parked_bike.hide()
+        _sync_patrols([])
+        _sync_commutes([])
+        city_map.hide()
+    else:
+        for node in chunks.values():node.show()
+        var place: Dictionary=residents.world.get("playerDistrict",{})
+        if not place.is_empty():room_exit=Vector2(float(place["x"]),float(place["z"]))
+        walker.position=Vector3(room_exit.x,1.05,room_exit.y)
+        _stream()
+    _update_navigation()
 
 func _sync_spawn(point: Vector2) -> void:
     walker.position=Vector3(point.x,1.05,point.y)

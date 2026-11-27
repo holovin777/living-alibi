@@ -99,3 +99,10 @@ jobs:
           mkdir -p target/geo-world
           javac -d target/geo-world tools/geoworld/GeoWorld.java tools/geoworld/GeoWorldSmoke.java
           java -cp target/geo-world GeoWorldSmoke
+
+      - name: Test modular geographic interiors
+        run: |
+          set -euo pipefail
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoInteriorSmoke.gd 2>&1 | tee target/godot-bin/geo-interior.log
+          grep -q 'GeoInteriorSmoke: ALL CHECKS PASSED' target/godot-bin/geo-interior.log
+          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geo-interior.log; then exit 1; fi

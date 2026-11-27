@@ -14,6 +14,8 @@ var world: Dictionary={}
 var action_http: HTTPRequest
 var last_message:=""
 signal first_snapshot(point: Vector2)
+signal interior_changed(room: Dictionary)
+var room: Dictionary={}
 var first:=true
 var action_pending:=false
 var driving: Dictionary={}
@@ -62,6 +64,12 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
     connected=true
     traffic.set_java_population(true)
     world=parsed
+    var next_room: Dictionary=parsed["interior"] if parsed.get("interior") is Dictionary else {}
+    if str(next_room.get("id",""))!=str(room.get("id","")):
+        room=next_room
+        for record in people.values():record["node"].queue_free()
+        people.clear()
+        interior_changed.emit(room)
     if first and parsed.get("playerDistrict") is Dictionary:
         first=false
         var place: Dictionary=parsed["playerDistrict"]
@@ -73,7 +81,7 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
     var seen: Dictionary={}
     for person in parsed["residents"]:
         var id:=str(person["id"])
-        var goal:=Vector3(float(person["x"]),0.05,float(person["z"]))
+        var goal:=Vector3(float(person["x"]),0.05 if room.is_empty() else 150.05,float(person["z"]))
         seen[id]=true
         if not people.has(id):
             var node: Node3D=traffic._person()
@@ -89,7 +97,7 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
             people.erase(id)
 
 func enter_district(pos: Vector2) -> void:
-    if not connected or not bool(world.get("canEnter",false)):return
+    if not connected or (room.is_empty() and not bool(world.get("canEnter",false))):return
     var destination: Dictionary=world.get("nearestDistrict",{})
     _action("enter",{"destination":destination.get("id",""),"x":pos.x,"z":pos.y})
 

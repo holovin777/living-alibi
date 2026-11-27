@@ -532,6 +532,7 @@ public final class GameSession implements AutoCloseable {
     }
 
     private GeoDrive geoDrive;
+    private TownLife.Place geoInterior;
     private GeoResponse geoResponse;
     private long geoLastImpact;
     private void updateGeoResponse(GeoProjection map,GeoProjection.Point target)throws SQLException{
@@ -561,6 +562,7 @@ public final class GameSession implements AutoCloseable {
         }
     }
     synchronized GeoDrive.Pose geoDriveControl(GeoProjection map,String command,double x,double z,int turn)throws SQLException{
+        if(geoInterior!=null)throw new IllegalArgumentException("Leave the building first.");
         var point=new GeoProjection.Point(x,z);
         if(JusticeLife.confined(town)||!town.player.alive||RebirthLife.active(town)){
             geoDrive=null;throw new IllegalArgumentException("Driving unavailable.");
@@ -643,7 +645,8 @@ public final class GameSession implements AutoCloseable {
     synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z)throws SQLException{
         var target=geoDrive==null?new GeoProjection.Point(x,z):geoDrive.position(map);
         updateGeoResponse(map,target);
-        return map.view(town,state,target,geoResponse==null?null:geoResponse.view(map));
+        if(JusticeLife.confined(town)||RebirthLife.active(town)||!town.player.alive||geoInterior!=null&&town.player.place!=geoInterior)geoInterior=null;
+        return map.view(town,state,target,geoResponse==null?null:geoResponse.view(map),geoInterior);
     }
     synchronized void geoTick(int minutes) throws SQLException {
         if(!NpcTransportLife.enabled(town)&&!JusticeLife.confined(town)&&!RebirthLife.active(town)){
@@ -657,17 +660,18 @@ public final class GameSession implements AutoCloseable {
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
         if(RebirthLife.active(town))throw new IllegalArgumentException("Use regular mode for rebirth.");
         PlayerLife.requireAlive(town.player);
+        if(geoInterior!=null){geoInterior=null;return;}
         var place=PlayerLife.destination(destination);
         var view=map.view(town,state,new GeoProjection.Point(x,z));
         if(!view.canEnter()||!view.nearestDistrict().id().equals(place.name()))
             throw new IllegalArgumentException("Approach the district marker.");
-        if(town.player.place==place)return;
         if(IntercomLife.insideVisit(town,state.day,state.minute))
             throw new IllegalArgumentException("Finish the apartment visit.");
         var copy=town.copy();
         // The player has walked there in Godot; avoid charging travel twice.
         copy.player.place=place;copy.player.destination=place;copy.player.travelRemaining=0;
         apply(copy,0,"Entered "+place.label+".");
+        if(GeoProjection.hasInterior(place))geoInterior=place;
     }
     synchronized String geoSpeak(GeoProjection map,String id,String message,String language,double x,double z) throws SQLException {
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
@@ -678,6 +682,7 @@ public final class GameSession implements AutoCloseable {
 
     synchronized GeoProjection.ActionResult geoAction(GeoProjection map,String action,double x,double z)throws SQLException{
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
+        if(geoInterior!=null&&action!=null&&GeoProjection.outsideAction(action))throw new IllegalArgumentException("Leave the building first.");
         if(action==null||map.choices(town,state,new GeoProjection.Point(x,z)).stream().noneMatch(a->a.id().equals(action)))
             throw new IllegalArgumentException("This action is not available here.");
         var before=town.player.place;
