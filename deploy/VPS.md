@@ -42,10 +42,17 @@ No Godot installation is required on the VPS. Do not open inbound 8080.
 
 ## Current limits
 
-After 30 seconds without client requests, the server releases manual routine
-and advances a game minute per idle tick (10 seconds by default, plus processing).
-Connected clients retain action-driven time; this is not yet a unified
-multiplayer clock. Local client sends a heartbeat to prevent false absence.
+The server targets 1:24 time: one game minute per 2.5 real seconds, one
+game day per real hour, whether the client is connected or not. After 30
+seconds without requests, it releases manual routine. The client refreshes
+instead of advancing time, and explicit wait actions are rejected. The
+clock catches up in bounded batches when the engine is busy.
+
+The existing synchronous travel, work and sleep actions can still advance the
+world ahead of the target. Those minutes are credited against future clock
+ticks, not added twice. Consequently instantaneous jumps and pauses are still
+possible; true multiplayer needs timed individual actions instead. A stopped
+VPS does not simulate downtime. The local single-player clock is unchanged.
 Existing player partnerships can have children automatically, with no pregnancy
 stage. Newborns are ordinary persistent residents and remain linked to both
 parents. Future multiplayer needs authenticated account-to-resident mapping,

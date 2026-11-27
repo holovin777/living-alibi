@@ -289,13 +289,13 @@ func _ready() -> void:
     _api.refresh_world()
 
 func _process(delta: float) -> void:
-    if _custody_active:
-        return
     if OS.get_environment("LIVING_ALIBI_REMOTE")=="1" and _api!=null:
         _remote_heartbeat+=delta
-        if _remote_heartbeat>=10.0 and not _api.is_busy() and not _dialog_pending:
+        if _remote_heartbeat>=2.5 and not _api.is_busy() and not _dialog_pending:
             _remote_heartbeat=0.0
             _api.refresh_world()
+    if _custody_active:
+        return
     _tick_childhood_prologue(delta)
     if _bus_preview_active():
         _tick_bus_preview(delta)
@@ -6130,6 +6130,11 @@ func _create_interface() -> void:
     _clock_selector.select(3)
     _clock_selector.item_selected.connect(_on_clock_speed_selected)
     clock_row.add_child(_clock_selector)
+    if OS.get_environment("LIVING_ALIBI_REMOTE")=="1":
+        _clock_selector.clear()
+        _clock_selector.add_item("1:24 · Server",24)
+        _clock_selector.select(0)
+        _clock_selector.disabled=true
     var graphics_row := HBoxContainer.new()
     _hud_details.add_child(graphics_row)
     var graphics_label := Label.new()
@@ -9397,6 +9402,7 @@ func _tick_childhood_prologue(delta: float) -> void:
         _api.garden_action("rebirth-prologue-step")
 
 func _tick_live_clock(delta: float) -> void:
+    if OS.get_environment("LIVING_ALIBI_REMOTE")=="1":return
     if _api == null:
         return
     var eligible: bool = _connected and not _api.is_busy() and not _clock_pending \
@@ -9408,6 +9414,9 @@ func _tick_live_clock(delta: float) -> void:
         _api.wait_for(1)
 
 func _wait_one_hour() -> void:
+    if OS.get_environment("LIVING_ALIBI_REMOTE")=="1":
+        _message.text="1:24 · Server time / Tempo del server"
+        return
     if not _api.is_busy():
         _api.wait_for(60)
 

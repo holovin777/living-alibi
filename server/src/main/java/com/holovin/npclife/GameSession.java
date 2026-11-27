@@ -21,6 +21,7 @@ public final class GameSession implements AutoCloseable {
     private TownLife.Town town;
     private int archiveYear,archivePage=1;
     private final boolean localOfflineProgress;
+    private final boolean persistentWorld;
     private OfflineRoutineLife.View offlineReport=new OfflineRoutineLife.View(0,false,false);
     private boolean closed;
     private final List<SocialLife.Interaction> recentPeerEvents=new ArrayList<>();
@@ -29,9 +30,10 @@ public final class GameSession implements AutoCloseable {
 
     @Autowired
     public GameSession(@Value("${living-alibi.database:data/world.db}") String databasePath,
-                       @Value("${living-alibi.population:240}") int population)
+                       @Value("${living-alibi.population:240}") int population,
+                       @Value("${living-alibi.persistent-world:false}") boolean persistentWorld)
             throws Exception {
-        this(Path.of(databasePath),population,true);
+        this(Path.of(databasePath),population,true,persistentWorld);
     }
 
     // Small deterministic fixtures remain available to existing regression tests.
@@ -43,9 +45,13 @@ public final class GameSession implements AutoCloseable {
         this(databasePath,population,false);
     }
     GameSession(Path databasePath,int population,boolean randomBirth) throws Exception {
+        this(databasePath,population,randomBirth,false);
+    }
+    GameSession(Path databasePath,int population,boolean randomBirth,boolean persistentWorld) throws Exception {
+        this.persistentWorld=persistentWorld;
         if(population<12||population>PopulationGenerator.MAX_GENERATED)
             throw new IllegalArgumentException("Initial generated population must be between 12 and "+PopulationGenerator.MAX_GENERATED);
-        localOfflineProgress=randomBirth;
+        localOfflineProgress=randomBirth&&!persistentWorld;
         boolean firstLaunch=Files.notExists(databasePath);
         db=new WorldDatabase(databasePath);
         state=db.load();
@@ -581,6 +587,7 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView waitMinutes(int minutes) throws SQLException {
+        if(persistentWorld)throw new IllegalArgumentException("The server clock runs at 1:24. Waiting cannot advance the entire world.");
         if(minutes<1 || minutes>1440)
             throw new IllegalArgumentException("Wait between 1 and 1440 game minutes.");
         if(JusticeLife.confined(town)){
@@ -708,15 +715,19 @@ public final class GameSession implements AutoCloseable {
         if(geoInterior!=null&&GeoProjection.residential(geoInterior)&&!GeoProjection.ownHome(town,state)&&!IntercomLife.insideVisit(town,state.day,state.minute))geoInterior=null;
         return map.view(town,state,target,geoResponse==null?null:geoResponse.view(map),geoInterior);
     }
-    synchronized void persistentIdleTick(int minutes,boolean justWentOffline)throws SQLException{
-        if(closed||minutes<1||minutes>15)return;
+    synchronized long persistentMinute(){return (state.day-1L)*1440+state.minute;}
+    synchronized void persistentTickTo(long target,boolean justWentOffline)throws SQLException{
+        if(closed)return;
+        int minutes=(int)Math.max(0,Math.min(15,target-persistentMinute()));
+        if(minutes==0&&!justWentOffline)return;
         var copy=town.copy();
         if(justWentOffline)OfflineRoutineLife.prepare(copy);
         boolean confined=JusticeLife.confined(copy);
-        if(confined)minutes=Math.min(minutes,JusticeLife.waitDuration(copy,state,minutes));
-        if(minutes>0)applyInternal(copy,minutes,"Persistent world routine.",RebirthLife.active(copy),state.copy(),new ArrayList<>(),new ArrayList<>(),confined);
+        if(confined&&minutes>0)minutes=Math.min(minutes,JusticeLife.waitDuration(copy,state,minutes));
+        applyInternal(copy,minutes,"Persistent world routine.",RebirthLife.active(copy),state.copy(),new ArrayList<>(),new ArrayList<>(),confined);
     }
     synchronized void geoTick(int minutes) throws SQLException {
+        if(persistentWorld)return;
         if(!NpcTransportLife.enabled(town)&&!JusticeLife.confined(town)&&!RebirthLife.active(town)){
             var copy=town.copy();copy.industryStocks.put(NpcTransportLife.ENABLED,1);apply(copy,0,"Resident transport enabled.");
         }
@@ -931,6 +942,8 @@ public final class GameSession implements AutoCloseable {
     }
 
     public synchronized ActionView gardenAction(String action) throws SQLException {
+        if(persistentWorld&&action!=null&&action.startsWith("rebirth-wait"))
+            throw new IllegalArgumentException("The server clock runs at 1:24. Waiting cannot advance the entire world.");
         if("justice-pay-fine".equals(action)){
             var copy=town.copy();return apply(copy,1,JusticeLife.payFine(copy));
         }
@@ -1248,7 +1261,7 @@ public final class GameSession implements AutoCloseable {
             if(action.equals("rebirth-prologue-step")){
                 String message=ChildhoodPrologue.step(copy);
                 if(RebirthLife.phase(copy)==RebirthLife.LINKED_ADULT)ParentingLife.prompt(copy,RebirthLife.child(copy),state.day);
-                return applyInternal(copy,1,message,true);
+                return applyInternal(copy,persistentWorld?0:1,message,true);
             }
             if(action.startsWith("rebirth-parent:")){
                 var result=ParentingLife.act(copy,action.substring("rebirth-parent:".length()));
@@ -1432,7 +1445,7 @@ public final class GameSession implements AutoCloseable {
         if(closed)return;
         closed=true;
         try{
-            if(localOfflineProgress)db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
+            if(localOfflineProgress||persistentWorld)db.save(state,List.of(),List.of(),town,List.of(),List.of(),List.of());
         }finally{db.close();}
     }
 }
