@@ -181,16 +181,7 @@ final class GeoProjection {
         var host=t.people.get(visit.residentId());
         var members=t.people.values().stream().filter(c->HouseholdLife.availableMember(host,c))
             .sorted(Comparator.comparing((TownLife.Citizen c)->!c.id.equals(host.id)).thenComparing(c->c.id)).limit(8).toList();
-        Point center=point(place);
-        var result=new ArrayList<Actor>();
-        for(int i=0;i<members.size();i++){
-            var c=members.get(i);
-            String activity=HomeRoutineLife.activity(t,c,s.day,s.minute);
-            double x=-4.5+(i%4)*3,z=-1.5+(i/4)*3;
-            String pose=switch(activity){case "COOKING","CLEANING"->"SERVE";case "HOMEWORK","READING","FAMILY_DINNER"->"DESK";default->"STAND";};
-            result.add(new Actor(c.id,center.x+x,center.z+z,activity,true,pose,0,"","",GameSession.appearanceStage(c)));
-        }
-        return List.copyOf(result);
+        return GeoHome.actors(t,s,point(place),members,c->true);
     }
     List<Choice> homeChoices(TownLife.Town t,WorldState s,Point player,TownLife.Place room){
         var result=new ArrayList<Choice>();
