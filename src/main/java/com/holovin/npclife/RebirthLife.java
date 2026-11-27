@@ -575,7 +575,7 @@ final class RebirthLife {
         };
         return new Personality(c.sociability,c.carefulness,c.curiosity,ambition,canChooseAmbition(t,c)?AMBITIONS:List.of());
     }
-    record Identity(String residentId,int generationIndex,int bornDay,int savings,boolean graduated,List<KnownPerson> relationships,int fitness,int hobbyDays,int allowanceTotal,Personality personality,List<GenealogyLife.Relative> familyTree){}
+    record Identity(String residentId,int generationIndex,int bornDay,int savings,boolean graduated,List<KnownPerson> relationships,int fitness,int hobbyDays,int allowanceTotal,Personality personality,List<GenealogyLife.Relative> familyTree,ChildhoodLife.View upbringing){}
     static Identity identity(TownLife.Town t,TownLife.Citizen c){
         if(c==null)return null;
         int a=DemographyLife.get(t,c,"parent-a"),b=DemographyLife.get(t,c,"parent-b");
@@ -593,7 +593,7 @@ final class RebirthLife {
         known.sort(java.util.Comparator.comparing(KnownPerson::family).reversed()
                 .thenComparing(KnownPerson::name).thenComparing(KnownPerson::id));
         return new Identity(c.id,c.generationIndex,DemographyLife.get(t,c,"born"),c.money,
-                EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known),GenealogyLife.relatives(t,c));
+                EducationLife.get(t,c,"graduate")>0,List.copyOf(known),EducationLife.get(t,c,"fitness"),EducationLife.get(t,c,"hobby-days"),EducationLife.get(t,c,"allowance-total"),personality(t,c,known),GenealogyLife.relatives(t,c),ChildhoodLife.view(t,c));
     }
     // Linked residents shop with their actual wallet and the same finite retail stock
     // as first-life visitors. Food is represented by the existing resident portions.

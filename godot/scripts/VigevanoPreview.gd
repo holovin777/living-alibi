@@ -669,6 +669,12 @@ func _open_actions(work_only: bool=false) -> void:
         biography.text=_life_summary()+"\nSavings / Risparmi: €"+str(life.get("savings",0))
         if life.get("parentA")!=null:biography.text+="\nParents / Genitori: "+str(life.get("parentA"))+" + "+str(life.get("parentB"))
         action_list.add_child(biography)
+        var upbringing=life.get("upbringing")
+        if upbringing is Dictionary and int(upbringing.get("observedDays",0))>0:
+            var development:=Label.new()
+            development.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            development.text="Childhood / Infanzia\nSecurity / Sicurezza: %s · Confidence / Fiducia: %s · Independence / Autonomia: %s\nDays together / Giorni insieme: %s/%s" % [upbringing.get("security",50),upbringing.get("confidence",50),upbringing.get("independence",50),upbringing.get("supportedDays",0),upbringing.get("observedDays",0)]
+            action_list.add_child(development)
         var relatives: Array=life.get("familyTree",[])
         if not relatives.is_empty():
             var tree:=Label.new()

@@ -7400,6 +7400,12 @@ func _render_actions() -> void:
                     _action_choices.add_child(traits)
                     for goal in personality.get("choices",[]):
                         _action_choices.add_child(_button("Aim: "+str(goal).replace("_"," ").capitalize(),_garden_action.bind("rebirth-ambition-"+str(goal))))
+                var upbringing=identity.get("upbringing")
+                if upbringing is Dictionary and int(upbringing.get("observedDays",0))>0:
+                    var development:=Label.new()
+                    development.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                    development.text="Childhood / Infanzia\nSecurity / Sicurezza: %s · Confidence / Fiducia: %s · Independence / Autonomia: %s\nDays together / Giorni insieme: %s/%s" % [upbringing.get("security",50),upbringing.get("confidence",50),upbringing.get("independence",50),upbringing.get("supportedDays",0),upbringing.get("observedDays",0)]
+                    _action_choices.add_child(development)
                 var relatives: Array=identity.get("familyTree",[])
                 if not relatives.is_empty():
                     var tree:=Label.new()

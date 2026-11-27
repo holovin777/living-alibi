@@ -74,6 +74,39 @@ class GeoRebirthTest {
             assertTrue(GenealogyLife.inheritedTrait(90,90,seed)<=90);
         }
     }
+    @Test void upbringingUsesActualHomeContactAndPersistsInWorldCopy(){
+        var clock=new WorldState();var t=TownLife.create(clock);
+        var residents=PopulationGenerator.add(t,3);
+        var a=residents.get(0);var b=residents.get(1);var c=residents.get(2);
+        a.age=30;b.age=30;c.age=8;
+        for(var person:residents){
+            person.home=a.home;person.homeUnit=a.homeUnit;
+            person.place=a.home;person.destination=a.home;person.travelRemaining=0;
+            person.activity="AT_HOME";person.money=0;
+        }
+        DemographyLife.set(t,c,"parent-a",a.generationIndex);
+        DemographyLife.set(t,c,"parent-b",b.generationIndex);
+        var relationship=new SocialLife.Relationship(a.id,b.id);
+        t.peerRelationships.put(SocialNetwork.key(a.id,b.id),relationship);
+        for(int day=1;day<=7;day++){
+            clock.day=day;clock.minute=1080;ChildhoodLife.tick(t,clock);
+            clock.minute=1260;ChildhoodLife.tick(t,clock);ChildhoodLife.tick(t,clock);
+        }
+        var v=ChildhoodLife.view(t,c);
+        assertEquals(7,v.observedDays());assertEquals(7,v.supportedDays());assertEquals(0,v.conflictDays());
+        assertEquals(51,v.security());assertEquals(51,v.confidence());assertEquals(51,v.independence());
+        assertEquals(0,a.money);assertEquals(0,b.money);
+        relationship.tension=80;
+        for(int day=8;day<=14;day++){
+            clock.day=day;clock.minute=1080;ChildhoodLife.tick(t,clock);
+            clock.minute=1260;ChildhoodLife.tick(t,clock);
+        }
+        assertEquals(7,ChildhoodLife.view(t,c).conflictDays());
+        assertEquals(51,ChildhoodLife.view(t,c).confidence());
+        var saved=t.copy();var adult=saved.get(c.id);adult.age=18;
+        clock.day=15;clock.minute=1260;ChildhoodLife.tick(saved,clock);
+        assertEquals(ChildhoodLife.view(t,c),ChildhoodLife.view(saved,adult));
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");
