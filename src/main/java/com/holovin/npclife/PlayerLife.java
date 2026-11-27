@@ -343,7 +343,7 @@ final class PlayerLife {
         return t.industryStocks.getOrDefault(introductionKey(t,id),0)>0;
     }
     static String displayName(TownLife.Town t,TownLife.Citizen c){
-        return knowsResident(t,c.id)?c.name:"Unknown resident";
+        return FamilyDialogueLife.family(t,c)||knowsResident(t,c.id)?c.name:"Unknown resident";
     }
     static void learnResident(TownLife.Town t,String id){
         t.industryStocks.put(introductionKey(t,id),1);

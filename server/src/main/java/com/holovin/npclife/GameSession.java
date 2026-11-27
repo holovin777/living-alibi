@@ -339,8 +339,8 @@ public final class GameSession implements AutoCloseable {
                 .map(c->{
                     var contact=p.contacts.get(c.id);
                     return new ResidentView(c.id,PlayerLife.displayName(town,c),c.activity,
-                            contact==null?null:contact.knownName,
-                            contact==null?0:contact.conversations,PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""),ConversationAvailability.minutes(town,c,state.day,state.minute),ConversationAvailability.reason(c,state.day,state.minute),factoryStation(c));
+                            FamilyDialogueLife.family(town,c)?linked.name:contact==null?null:contact.knownName,
+                            contact==null?0:contact.conversations,FamilyDialogueLife.family(town,c)?"FAMILY":PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name(),PersonalLoanLife.outstanding(town,c.id),PersonalLoanLife.dueDay(town,c.id),workVisual(c),outfitVisual(c),appearanceStage(c),companions.getOrDefault(c.id,""),ConversationAvailability.minutes(town,c,state.day,state.minute),ConversationAvailability.reason(c,state.day,state.minute),factoryStation(c));
                 }).toList();
         var resources=NatureLife.available(town).values().stream()
                 .map(s->new SourceView(s.id,s.label,s.kind.name(),s.stock,s.capacity)).toList();
@@ -512,6 +512,7 @@ public final class GameSession implements AutoCloseable {
         String reply=null;
         boolean rendered=false;
         boolean understood=true;
+        if(FamilyDialogueLife.family(copy,resident))copy.player.contacts.computeIfAbsent(resident.id,PlayerLife.Contact::new).knownName=RebirthLife.child(copy).name;
         var existingContact=copy.player.contacts.get(resident.id);
         var prior=existingContact==null?null:existingContact.copy();
         if(language!=null){
@@ -528,6 +529,10 @@ public final class GameSession implements AutoCloseable {
                 reply=ResidentLanguages.languageQuestion(region,message,resident.id,language);
                 rendered=reply!=null;
             }
+        }
+        if(reply==null&&understood){
+            reply=FamilyDialogueLife.reply(copy,resident,message,language);
+            if(reply!=null)rendered=language!=null;
         }
         if(reply==null&&understood){
             reply=StreetAidLife.dialogue(copy,resident,message,state.day,state.minute);
@@ -563,6 +568,7 @@ public final class GameSession implements AutoCloseable {
         }
         if(understood){
             var contact=copy.player.contacts.computeIfAbsent(resident.id,PlayerLife.Contact::new);
+            if(FamilyDialogueLife.family(copy,resident))contact.knownName=RebirthLife.child(copy).name;
             contact.lastDay=state.day;contact.lastMinute=state.minute;
             ConversationMemory.remember(contact,state.day,state.minute,language,message.strip(),reply);
             ConversationMemory.captureMilestones(town,copy,prior,contact,contact.dialogue.getLast());

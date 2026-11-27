@@ -171,6 +171,8 @@ const IT := {
     "You already have a planned meeting.": "Hai già un incontro programmato.",
     "Unknown resident": "Persona sconosciuta",
     "Familiar face": "Volto familiare",
+    "Family": "Famiglia",
+    "This person is part of your family.": "Questa persona fa parte della tua famiglia.",
     "E: ring the intercom": "E: suona al citofono",
     "G: enter stairwell · E: intercom": "G: entra nel vano scale · E: citofono",
     "Elevator · floor %s · E: up · R: down": "Ascensore · piano %s · E: sali · R: scendi",

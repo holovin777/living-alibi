@@ -6544,6 +6544,8 @@ func _open_dialog(preferred_id: String = "") -> void:
     var known := str(person.get_meta("known_name",""))
     _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
+    if str(person.get_meta("relationship",""))=="FAMILY":
+        _dialog_reply.text=tr("This person is part of your family.")
     if str(person.get_meta("activity",""))=="ASKING_FOR_HELP":
         _dialog_reply.text=_reply_translate("Excuse me, could you spare a little change?")
     if id==_ambient_speaker and _ambient_speech_remaining>0.0:
