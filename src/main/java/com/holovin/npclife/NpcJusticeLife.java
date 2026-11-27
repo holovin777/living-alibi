@@ -23,6 +23,17 @@ final class NpcJusticeLife {
         c.hunger=Math.min(c.hunger,45);c.thirst=Math.min(c.thirst,40);c.fatigue=Math.min(c.fatigue,50);
     }
     static int convictions(TownLife.Town t,TownLife.Citizen c){return t.industryStocks.getOrDefault(count(c),0);}
+    static void vehicleConviction(TownLife.Town t,WorldState s,TownLife.Citizen offender,int incident){
+        if(!eligible(t,offender))return;
+        String key=PREFIX+"vehicle-case:"+incident;
+        if(t.industryStocks.putIfAbsent(key,1)!=null)return;
+        int now=time(s);
+        t.industryStocks.put(until(offender),Math.addExact(Math.max(now,t.industryStocks.getOrDefault(until(offender),0)),2880));
+        t.industryStocks.merge(count(offender),1,Math::addExact);
+        custody(offender);
+        ArchiveLife.record(t,"npc-vehicle-court:"+incident,s.day,s.minute,"Public safety",
+                "A fictional court imposed a custodial sentence in a confirmed vehicle theft case.");
+    }
     static void tick(TownLife.Town t,WorldState s){
         int now=time(s);
         for(var c:t.people.values()){

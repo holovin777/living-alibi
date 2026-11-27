@@ -57,6 +57,8 @@ final class PoliceLife {
         if(detective(c)){
             // Visit a public scene of a recent open case, then return to the office.
             if(minute>=570&&minute<840){
+                var vehicleScene=NpcVehicleCrimeLife.scene(t);
+                if(vehicleScene!=null&&NpcVehicleCrimeLife.get(t,"examined")==0)return vehicleScene;
                 var latest=t.cases.values().stream().filter(f->!f.solved&&day-f.day<=7&&day>=f.day
                         &&PlayerLife.publicPlaces().contains(f.place))
                         .max(Comparator.comparingInt((InvestigationLife.CaseFile f)->f.day)

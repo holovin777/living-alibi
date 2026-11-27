@@ -53,6 +53,7 @@ final class NpcTransportLife {
         set(t,c,"mode",WALK);
         int distance=CityExpansionLife.distance(c.place,desired);
         int units=Math.max(1,(distance+3)/4);
+        if(distance>=2&&NpcVehicleCrimeLife.borrowTrip(t,c,desired,units))return;
         if(owns(t,c)&&!VehicleTheftLife.missing(t,c)&&parked(t,c)==c.place&&distance>=2&&
                 get(t,c,"fuel")>=units&&get(t,c,"condition")>=units*3){
             set(t,c,"mode",CAR);set(t,c,"fuel",get(t,c,"fuel")-units);

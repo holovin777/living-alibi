@@ -13,7 +13,7 @@ final class VehicleTheftLife {
         return c.alive&&c.age>=18&&c.generationIndex>0&&c.generationIndex%3==0&&!PoliceLife.staff(c);
     }
     static boolean missing(TownLife.Town t,TownLife.Citizen c){
-        return active(t)&&get(t,"owner")==c.generationIndex;
+        return (active(t)&&get(t,"owner")==c.generationIndex)||NpcVehicleCrimeLife.missing(t,c);
     }
     static void take(TownLife.Town t,WorldState s,List<TownLife.Event> events,List<TownLife.Observation> observations){
         take(t,s,null,events,observations);
@@ -21,7 +21,7 @@ final class VehicleTheftLife {
     static void take(TownLife.Town t,WorldState s,TownLife.Citizen owner,List<TownLife.Event> events,List<TownLife.Observation> observations){
         TransportLife.ready(t.player);JusticeLife.requireFree(t);
         if(active(t)||RebirthLife.active(t))throw new IllegalArgumentException("A stolen vehicle is already in your custody.");
-        if(owner!=null&&(!(NpcTransportLife.enabled(t)?NpcTransportLife.owns(t,owner):owner(owner))||(NpcTransportLife.enabled(t)?NpcTransportLife.mode(t,owner)==NpcTransportLife.CAR||NpcTransportLife.parked(t,owner)!=t.player.place:owner.travelRemaining>0||owner.place!=t.player.place)))
+        if(owner!=null&&(missing(t,owner)||!(NpcTransportLife.enabled(t)?NpcTransportLife.owns(t,owner):owner(owner))||(NpcTransportLife.enabled(t)?NpcTransportLife.mode(t,owner)==NpcTransportLife.CAR||NpcTransportLife.parked(t,owner)!=t.player.place:owner.travelRemaining>0||owner.place!=t.player.place)))
             throw new IllegalArgumentException("That resident vehicle is not parked here.");
         set(t,"active",1);set(t,"fuel",owner!=null&&NpcTransportLife.enabled(t)&&NpcTransportLife.get(t,owner,"initialized")==1?NpcTransportLife.get(t,owner,"fuel"):6);
         set(t,"condition",owner!=null&&NpcTransportLife.enabled(t)&&NpcTransportLife.get(t,owner,"initialized")==1?NpcTransportLife.get(t,owner,"condition"):75);
