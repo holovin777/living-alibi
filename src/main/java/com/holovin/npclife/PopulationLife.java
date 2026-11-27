@@ -72,6 +72,7 @@ final class PopulationLife {
         boolean postalRound=PostalLife.assigned(town,c,clock);
         boolean homeService=HomeServiceLife.assigned(town,c,clock);
         TownLife.Place residentService=ResidentServiceLife.destination(town,c,clock);
+        TownLife.Place serviceReturn=ServiceFleetLife.returnDestination(town,c,clock);
         TownLife.Place askingPlace=StreetAidLife.destination(town,c,clock.day,minute);
         boolean volunteering=CaritasLife.assigned(town,c,clock);
         boolean seekingMeal=CaritasLife.seekingMeal(town,c,clock);
@@ -84,6 +85,7 @@ final class PopulationLife {
         else if(manual!=null)desired=manual;
         else if(homeService)desired=TownLife.Place.SOUTH_RESIDENCES;
         else if(residentService!=null)desired=residentService;
+        else if(serviceReturn!=null)desired=serviceReturn;
         else if(condominiumRepair||condominiumCleaning||postalRound)desired=TownLife.Place.NORTH_RESIDENCES;
         else if(freightRun)desired=freightDestination;
         else if(!publicSafety&&!child&&!carrier&&!RebirthLife.linkedAdult(town,c)&&PublicSafetyLife.alarmed(town,c,clock.day,minute))desired=c.home;

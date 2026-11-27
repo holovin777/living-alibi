@@ -51,6 +51,7 @@ final class NpcTransportLife {
     static void depart(TownLife.Town t,TownLife.Citizen c,TownLife.Place desired,WorldState s){
         if(!enabled(t)||!eligible(c)||c.travelRemaining>0||c.place==desired)return;
         set(t,c,"mode",WALK);
+        if(ServiceFleetLife.depart(t,c,desired,s))return;
         int distance=CityExpansionLife.distance(c.place,desired);
         int units=Math.max(1,(distance+3)/4);
         if(distance>=2&&NpcVehicleCrimeLife.borrowTrip(t,c,desired,units))return;

@@ -23,6 +23,7 @@ final class ServiceCompanyLife {
         return true;
     }
     static void tick(TownLife.Town t,WorldState s){
+        ServiceFleetLife.tick(t,s);
         if(s.minute!=480||get(t,"restock-day")>=s.day)return;
         set(t,"restock-day",s.day);
         if(get(t,"parts")<2)purchasePart(t);
@@ -36,9 +37,9 @@ final class ServiceCompanyLife {
         count(t,"revenue",HomeServiceLife.REPAIR_PRICE);count(t,"labor-expense",LABOR);
         count(t,"completed",1);
     }
-    record View(int cash,int parts,int completed,int cancelled,int missed,int revenue,int laborExpense,int partsExpense,int queued,int active){}
+    record View(int cash,int parts,int completed,int cancelled,int missed,int revenue,int laborExpense,int partsExpense,int queued,int active,ServiceFleetLife.View fleet){}
     static View view(TownLife.Town t){
         return new View(cash(t),get(t,"parts"),get(t,"completed"),get(t,"cancelled"),
-            get(t,"missed"),get(t,"revenue"),get(t,"labor-expense"),get(t,"parts-expense"),ResidentServiceLife.queued(t),ResidentServiceLife.active(t));
+            get(t,"missed"),get(t,"revenue"),get(t,"labor-expense"),get(t,"parts-expense"),ResidentServiceLife.queued(t),ResidentServiceLife.active(t),ServiceFleetLife.view(t));
     }
 }

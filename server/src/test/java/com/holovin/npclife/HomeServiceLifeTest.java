@@ -129,4 +129,33 @@ class HomeServiceLifeTest {
         assertEquals(2,ResidentServiceLife.active(t));
         assertEquals(2,ResidentServiceLife.queued(t.copy()));
     }
+    @Test void fleetPurchaseAndRoundTripUseCompanyMoneyAndPhysicalFuel(){
+        var s=new WorldState();s.day=8;s.minute=1200;var t=TownLife.create(s);
+        var tech=new TownLife.Citizen("fleet-tech","Technician","Mechanic",WORKSHOP);
+        tech.generationIndex=501;tech.money=20;t.people.put(tech.id,tech);
+        var customer=new TownLife.Citizen("fleet-client","Customer","Retired",NORTH_RESIDENCES);
+        customer.generationIndex=401;customer.age=70;t.people.put(customer.id,customer);
+        ResidentServiceLife.assign(t,0,customer,tech,s.day);
+        assertFalse(ServiceFleetLife.buy(t,0));
+        t.employerFunds.put(ServiceCompanyLife.ACCOUNT,200);
+        assertTrue(ServiceFleetLife.buy(t,0));
+        assertEquals(140,ServiceCompanyLife.cash(t));
+        int fuel=ServiceFleetLife.units(WORKSHOP,NORTH_RESIDENCES)*2;
+        int station=FuelLife.stock(t);
+        assertTrue(ServiceFleetLife.depart(t,tech,NORTH_RESIDENCES,s));
+        assertEquals(station-fuel,FuelLife.stock(t));
+        assertEquals(140-fuel*FuelLife.PRICE,ServiceCompanyLife.cash(t));
+        assertEquals(20,tech.money);
+        tech.place=NORTH_RESIDENCES;tech.travelRemaining=0;
+        ServiceFleetLife.tick(t,s);
+        assertEquals(NORTH_RESIDENCES,ServiceFleetLife.parked(t,0));
+        ResidentServiceLife.clear(t,0);
+        assertEquals(WORKSHOP,ServiceFleetLife.returnDestination(t,tech,s));
+        assertTrue(ServiceFleetLife.depart(t,tech,WORKSHOP,s));
+        tech.place=WORKSHOP;ServiceFleetLife.tick(t,s);
+        assertEquals(WORKSHOP,ServiceFleetLife.parked(t,0));
+        assertEquals(-1,ServiceFleetLife.assigned(t,tech));
+        assertEquals(station-fuel,FuelLife.stock(t));
+        assertEquals(ServiceFleetLife.view(t),ServiceFleetLife.view(t.copy()));
+    }
 }
