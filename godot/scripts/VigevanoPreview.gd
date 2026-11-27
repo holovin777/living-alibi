@@ -719,6 +719,11 @@ func _open_actions(work_only: bool=false) -> void:
         if psych is Dictionary:biography.text+="\nStress: %s · Loneliness / Solitudine: %s · Satisfaction / Soddisfazione: %s" % [psych.get("stress",0),psych.get("loneliness",0),psych.get("satisfaction",0)]
         var substance=life.get("substance")
         if substance is Dictionary and int(substance.get("dependence",0))>0:biography.text+="\nDependence / Dipendenza: "+str(substance.get("dependence",0))
+        var clinical=life.get("clinical")
+        if clinical is Dictionary:
+            var pending=str(clinical.get("requested",""))
+            if not pending.is_empty():biography.text+="\nAppointment / Visita: "+pending
+            for condition in clinical.get("diagnosed",[]):biography.text+="\n"+str(condition.get("name",""))+" · "+str(condition.get("status",""))
         action_list.add_child(biography)
         var search=life.get("childSearch")
         if search is Dictionary and str(search.get("status","NONE"))!="NONE":
