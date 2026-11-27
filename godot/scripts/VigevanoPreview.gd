@@ -643,6 +643,24 @@ func _open_actions(work_only: bool=false) -> void:
         summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         summary.text="Workshop / Officina\nCompany cash: €%s · machine: %s/100\nParts: %s · staff: %s\nPaid hours today: %s" % [enterprise.get("cash",0),enterprise.get("machineCondition",0),enterprise.get("spareParts",0),enterprise.get("employeeName","—"),enterprise.get("paidHoursToday",0)]
         action_list.add_child(summary)
+    if not work_only:
+        var commerce: Dictionary=residents.world.get("commerce",{})
+        var stall=commerce.get("stall")
+        if stall is Dictionary and bool(stall.get("registered",false)):
+            WorkPanel.label(action_list,"MARKET STALL / BANCARELLA\nStock %s/%s · sales %s · revenue €%s\nPayroll €%s · regular customers %s" % [stall.get("stocked",0),stall.get("capacity",0),stall.get("sales",0),stall.get("revenue",0),stall.get("reserve",0),stall.get("regularCustomers",0)])
+            var supply: Dictionary=stall.get("supply",{})
+            WorkPanel.label(action_list,"Farm supply €%s · in transit %s · delivered %s" % [supply.get("reserve",0),supply.get("cargo",0),supply.get("delivered",0)])
+            for item in stall.get("items",[]):
+                WorkPanel.label(action_list,"%s: %s units · €%s" % [item.get("id",""),item.get("stock",0),item.get("price",0)])
+        var freight=commerce.get("freight")
+        if freight is Dictionary:
+            WorkPanel.label(action_list,"FREIGHT / TRASPORTO\n%s · %s %s + %s %s\nTruck: %s · next: %s" % [freight.get("cargoLabel",""),freight.get("firstUnits",0),freight.get("firstLabel",""),freight.get("secondUnits",0),freight.get("secondLabel",""),freight.get("truckPlace",""),str(freight.get("nextDestination","Unload"))])
+        var logistics=commerce.get("logistics")
+        if logistics is Dictionary and bool(logistics.get("yours",false)):
+            var accounts: Dictionary=logistics.get("financials",{})
+            WorkPanel.label(action_list,"CARRIER / TRASPORTI\nCash €%s · truck condition %s/100 · operating net €%s\nDriver: %s" % [logistics.get("cash",0),logistics.get("condition",0),accounts.get("operatingNet",0),str(logistics.get("driverName",""))])
+            var second: Dictionary=logistics.get("secondTruck",{})
+            if bool(second.get("purchased",false)):WorkPanel.label(action_list,"Truck 2 · condition %s/100 · driver %s · deliveries %s" % [second.get("condition",0),str(second.get("driverName","")),second.get("completed",0)])
     for action in ([] if work_only else residents.world.get("actions",[])):
         var button:=Button.new()
         button.text=str(action.get("label",""))

@@ -726,6 +726,15 @@ public final class GameSession implements AutoCloseable {
             if(action.startsWith("intercom:enter:")&&IntercomLife.insideVisit(town,state.day,state.minute))geoInterior=before;
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.startsWith("stall-")){
+            var result=gardenAction(action);
+            return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.startsWith("freight:")){
+            String[] command=action.split(":",3);
+            var result=freightAction(command[1],command[2]);
+            return new GeoProjection.ActionResult(result.message(),before!=town.player.place?map.district(town.player.place):null);
+        }
         if(action.startsWith("bank-")){
             var result=gardenAction(action);
             return new GeoProjection.ActionResult(result.message(),null);
