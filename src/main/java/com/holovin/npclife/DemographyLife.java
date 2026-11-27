@@ -163,6 +163,7 @@ final class DemographyLife {
         }
         PensionLife.tick(t,clock);
         if((day-1)%30!=0)return;
+        var newborns=new java.util.ArrayList<TownLife.Citizen>();
         for(int i=0;i<residents.size();i++){
             var a=residents.get(i);
             if(!parentAge(a))continue;
@@ -173,9 +174,13 @@ final class DemographyLife {
             var b=byIndex(t,get(t,a,"partner"));
             if(b!=null&&a.generationIndex<b.generationIndex&&!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,b)){
                 var newborn=birth(t,a,b,day);
-                if(newborn!=null)TownLife.publish(t,clock,a.id,a.place,a.name+" welcomed a new family member.",events,observations);
+                if(newborn!=null){
+                    newborns.add(newborn);
+                    TownLife.publish(t,clock,a.id,a.place,a.name+" welcomed a new family member.",events,observations);
+                }
             }
         }
+        RebirthLife.acceptNaturalBirths(t,clock,newborns);
     }
     record Report(int alive,int children,int workingAge,int retired,int births,int deaths,int pensions,int inherited,int capacity){}
     static Report report(TownLife.Town t){

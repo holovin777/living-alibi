@@ -18,6 +18,11 @@ final class GeoLife {
         if(!RebirthLife.active(t)||JusticeLife.confined(t))return result;
         var life=view(t,s);var c=RebirthLife.child(t);
         if(life.phase().equals("CHOICE")){
+            if(RebirthLife.randomBirth(t)){
+                add(result,"rebirth-wait","Await birth: 1 day / Attendi la nascita: 1 giorno");
+                add(result,"rebirth-wait-fast","Await birth: up to 7 days / Attendi la nascita: fino a 7 giorni");
+                return List.copyOf(result);
+            }
             for(var f:RebirthLife.families(t,s.day))add(result,"rebirth-family-"+f.first()+"-"+f.second(),familyLabel(f));
             add(result,"rebirth-wait","Wait 1 day / Attendi un giorno");
             add(result,"rebirth-adult","Start as a new adult / Inizia adulto");

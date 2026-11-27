@@ -14,6 +14,31 @@ final class RebirthLife {
         t.industryStocks.putIfAbsent(FOCUS,0);t.industryStocks.putIfAbsent(LAST_CHAT,0);
         t.industryStocks.putIfAbsent(TRAVEL,0);
     }
+    // Persisted policy: existing characters survive the upgrade, but future lives
+    // attach to an independently born resident instead of creating a chosen child.
+    static final String RANDOM_BIRTH="rebirth:random-birth";
+    static boolean randomBirth(TownLife.Town t){return t.industryStocks.getOrDefault(RANDOM_BIRTH,0)==1;}
+    static boolean enableRandomBirth(TownLife.Town t,boolean firstLaunch){
+        boolean changed=!randomBirth(t);
+        t.industryStocks.put(RANDOM_BIRTH,1);
+        if(firstLaunch&&!active(t)){
+            t.player.alive=false;t.player.health=0;t.player.money=0;
+            t.industryStocks.put(PHASE,CHOICE);t.industryStocks.put(CHILD,0);
+            changed=true;
+        }
+        return changed;
+    }
+    static boolean acceptNaturalBirths(TownLife.Town t,WorldState clock,List<TownLife.Citizen> births){
+        if(!randomBirth(t)||phase(t)!=CHOICE)return false;
+        var eligible=births.stream().filter(c->c.alive&&c.age==0
+                &&DemographyLife.get(t,c,"born")==clock.day
+                &&DemographyLife.get(t,c,"played-incarnation")==0)
+                .sorted(java.util.Comparator.comparing(c->c.id)).toList();
+        if(eligible.isEmpty())return false;
+        var rng=new java.util.SplittableRandom(clock.rng^((long)clock.day<<32)^t.player.incarnation);
+        linkNewborn(t,eligible.get(rng.nextInt(eligible.size())));
+        return true;
+    }
     static int phase(TownLife.Town t){return t.industryStocks.getOrDefault(PHASE,ADULT);}
     static boolean active(TownLife.Town t){return phase(t)!=ADULT;}
     static TownLife.Citizen child(TownLife.Town t){return DemographyLife.byIndex(t,t.industryStocks.getOrDefault(CHILD,0));}
@@ -60,17 +85,21 @@ final class RebirthLife {
         return List.copyOf(result);
     }
     static String choose(TownLife.Town t,int day,int first,int second){
+        if(randomBirth(t))throw new IllegalArgumentException("Birth is assigned by the world.");
         if(phase(t)!=CHOICE)throw new IllegalArgumentException("No family selection is pending.");
         var a=DemographyLife.byIndex(t,first);var b=DemographyLife.byIndex(t,second);
         if(first>=second||!DemographyLife.canBirth(t,a,b,day))
             throw new IllegalArgumentException("This family is not currently eligible.");
         var newborn=DemographyLife.birth(t,a,b,day);
         if(newborn==null)throw new IllegalArgumentException("This family is no longer available.");
+        linkNewborn(t,newborn);
+        return "Born as "+newborn.name+". Follow family life and discover new choices as you grow.";
+    }
+    private static void linkNewborn(TownLife.Town t,TownLife.Citizen newborn){
         t.industryStocks.put(CHILD,newborn.generationIndex);t.industryStocks.put(PHASE,CHILDHOOD);
         DemographyLife.set(t,newborn,"played-incarnation",t.player.incarnation);
         t.industryStocks.put(FOCUS,0);t.industryStocks.put(LAST_CHAT,0);t.industryStocks.put(TRAVEL,0);
         synchronize(t);
-        return "Born as "+newborn.name+". Follow family life and discover new choices as you grow.";
     }
     static void synchronize(TownLife.Town t){
         if(phase(t)!=CHILDHOOD&&phase(t)!=LINKED_ADULT)return;
@@ -449,7 +478,7 @@ final class RebirthLife {
     record Conversation(String id,String name){}
     // Bound each request: early childhood is faster, adolescence is slower.
     static int maxWaitDays(TownLife.Town t){
-        if(phase(t)==CHOICE)return 1;
+        if(phase(t)==CHOICE)return randomBirth(t)?7:1;
         var c=child(t);
         if(phase(t)!=CHILDHOOD||c==null||!c.alive||c.age>=18)return 0;
         return c.age<6?7:c.age<13?3:1;
@@ -464,6 +493,7 @@ final class RebirthLife {
         return phase(t)==initialPhase&&maxWaitDays(t)>0&&maxWaitDays(t)==initialMaxDays;
     }
     static String adultFallback(TownLife.Town t){
+        if(randomBirth(t))throw new IllegalArgumentException("Wait for a natural birth.");
         if(phase(t)!=CHOICE)throw new IllegalArgumentException("Only available before choosing a family.");
         var p=new PlayerLife.Player();p.incarnation=t.player.incarnation;t.player=p;
         t.industryStocks.put(PHASE,ADULT);t.industryStocks.put(CHILD,0);
@@ -722,7 +752,7 @@ final class RebirthLife {
         var skills=new LinkedHashMap<String,Integer>();
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
-        return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE?families(t,day):List.of(),
+        return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE&&!randomBirth(t)?families(t,day):List.of(),
             c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),extendedWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day,minute),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute),EducationLife.college(t,day,minute),TechnicalWorkLife.linkedOrders(t,day,minute),SoftwareLife.projects(t,day,minute),JavaTicketLife.workspace(t,day,minute),SportLife.view(t,c,day,minute),DojoLife.view(t,c,day,minute),DojoCommunityLife.view(t,day,minute),KumiteLife.view(t,c,day,minute));
     }
 }

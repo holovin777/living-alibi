@@ -157,6 +157,47 @@ class GeoRebirthTest {
             assertEquals(Integer.valueOf(2),t.industryStocks.get("child-search:"+resident.id+":incidents"));
         }
     }
+    @Test void randomBirthIsNaturalAndCannotBeChosenOrRepeated()throws Exception{
+        var clock=new WorldState();var t=TownLife.create(clock);
+        var people=PopulationGenerator.add(t,2);
+        var a=people.get(0);var b=people.get(1);
+        a.age=30;b.age=29;a.money=300;b.money=300;
+        var rel=new SocialLife.Relationship(a.id,b.id);
+        rel.affinity=80;rel.trust=80;rel.tension=0;
+        t.peerRelationships.put(SocialNetwork.key(a.id,b.id),rel);
+        assertTrue(DemographyLife.pair(t,a,b,1));
+        RebirthLife.enableRandomBirth(t,true);
+        assertEquals(1,t.player.incarnation);
+        assertTrue(t.pastLives.isEmpty());
+        assertEquals(RebirthLife.CHOICE,RebirthLife.phase(t));
+        assertTrue(RebirthLife.report(t,271).families().isEmpty());
+        assertThrows(IllegalArgumentException.class,()->RebirthLife.choose(t,271,a.generationIndex,b.generationIndex));
+        assertThrows(IllegalArgumentException.class,()->RebirthLife.adultFallback(t));
+        clock.day=271;clock.minute=360;
+        assertFalse(RebirthLife.acceptNaturalBirths(t,clock,java.util.List.of()));
+        int count=t.people.size();
+        DemographyLife.tick(t,clock,new java.util.ArrayList<>(),new java.util.ArrayList<>());
+        var child=RebirthLife.child(t);
+        assertNotNull(child);assertEquals(0,child.age);
+        assertEquals(count+1,t.people.size());
+        assertEquals(RebirthLife.CHILDHOOD,RebirthLife.phase(t));
+        assertEquals(1,DemographyLife.get(t,child,"played-incarnation"));
+        assertFalse(RebirthLife.acceptNaturalBirths(t,clock,java.util.List.of(child)));
+        assertEquals(child.id,RebirthLife.child(t.copy()).id);
+    }
+    @Test void productionBirthPolicySurvivesFirstLaunchAndRestart()throws Exception{
+        var file=folder.resolve("natural-birth.db");
+        try(var game=new GameSession(file,12,true)){
+            assertEquals("CHOICE",game.snapshot().rebirth().phase());
+            assertTrue(game.snapshot().rebirth().pastLives().isEmpty());
+            assertNull(game.snapshot().player().passport());
+            assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-adult"));
+        }
+        try(var game=new GameSession(file,12,true)){
+            assertEquals("CHOICE",game.snapshot().rebirth().phase());
+            assertTrue(game.snapshot().rebirth().pastLives().isEmpty());
+        }
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

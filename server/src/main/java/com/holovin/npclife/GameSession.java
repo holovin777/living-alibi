@@ -28,7 +28,7 @@ public final class GameSession implements AutoCloseable {
     public GameSession(@Value("${living-alibi.database:data/world.db}") String databasePath,
                        @Value("${living-alibi.population:240}") int population)
             throws Exception {
-        this(Path.of(databasePath),population);
+        this(Path.of(databasePath),population,true);
     }
 
     // Small deterministic fixtures remain available to existing regression tests.
@@ -37,6 +37,9 @@ public final class GameSession implements AutoCloseable {
     }
 
     GameSession(Path databasePath,int population) throws Exception {
+        this(databasePath,population,false);
+    }
+    GameSession(Path databasePath,int population,boolean randomBirth) throws Exception {
         if(population<12||population>PopulationGenerator.MAX_GENERATED)
             throw new IllegalArgumentException("Initial generated population must be between 12 and "+PopulationGenerator.MAX_GENERATED);
         boolean firstLaunch=Files.notExists(databasePath);
@@ -64,6 +67,7 @@ public final class GameSession implements AutoCloseable {
         changed=StaffingLife.establish(town,state,population,firstNew)||changed;
         changed=FactoryNetworkLife.ensure(town)||changed;
         if(population>=24&&!NpcTransportLife.enabled(town)){town.industryStocks.put(NpcTransportLife.ENABLED,1);changed=true;}
+        if(randomBirth)changed=RebirthLife.enableRandomBirth(town,firstLaunch)||changed;
         // Old save files might contain a deceased visitor.
         changed=PassportLife.ensure(town,state)||changed;
         changed=RebirthLife.restoreIdentity(town)||changed;
@@ -1327,7 +1331,7 @@ public final class GameSession implements AutoCloseable {
     private ActionView applyInternal(TownLife.Town candidateTown,int minutes,String message,boolean rebirthAction,
             WorldState candidateState,List<TownLife.Event> truth,List<TownLife.Observation> observations,boolean custodyWait) throws SQLException {
         if(!custodyWait)JusticeLife.requireFree(town);
-        if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Choose a family or use childhood actions first.");
+        if(RebirthLife.active(town)&&!rebirthAction)throw new IllegalArgumentException("Wait for birth or use childhood actions first.");
         if("You shared dinner.".equals(message)||"You cooked and ate together.".equals(message)){
             var host=candidateTown.get("marco");
             candidateState.food=host.food;candidateState.water=host.water;
@@ -1350,10 +1354,12 @@ public final class GameSession implements AutoCloseable {
         }
         if(!candidateTown.player.alive&&!RebirthLife.active(candidateTown)) {
             RebirthLife.prepare(candidateTown,candidateState.day,candidateState.minute);
-            message+=" Your previous life ended. Choose a family for your next life.";
+            message+=RebirthLife.randomBirth(candidateTown)?" Your previous life ended. Await your next birth.":" Your previous life ended. Choose a family for your next life.";
         }
         if(RebirthLife.settleLinkedDeath(candidateTown,candidateState.day,candidateState.minute))
-            message+=" Your life ended. Its history is preserved. Choose a new family.";
+            message+=RebirthLife.randomBirth(candidateTown)?" Your life ended. Its history is preserved. Await your next birth.":" Your life ended. Its history is preserved. Choose a new family.";
+        if(initialPhase==RebirthLife.CHOICE&&RebirthLife.phase(candidateTown)==RebirthLife.CHILDHOOD&&RebirthLife.randomBirth(candidateTown))
+            message+=" Born as "+RebirthLife.child(candidateTown).name+".";
         RebirthLife.synchronize(candidateTown);
         PassportLife.ensure(candidateTown,candidateState);
         db.save(candidateState,events,List.of(),candidateTown,truth,observations,interactions);

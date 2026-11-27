@@ -648,7 +648,7 @@ func _phone_route(point: Vector2) -> void:
 
 func _life_summary() -> String:
     var life: Dictionary=residents.world.get("life",{})
-    if str(life.get("phase",""))=="CHOICE":return "Choose your next family / Scegli la famiglia"
+    if str(life.get("phase",""))=="CHOICE":return "Awaiting a new life / In attesa di una nuova vita"
     return "%s · age %s · %s · school days %s" % [life.get("name",""),life.get("age",0),life.get("activity",""),life.get("schoolDays",0)]
 
 func _near_office_computer() -> bool:
