@@ -35,7 +35,7 @@ final class DomesticLife {
         set(t,c,"power",Math.addExact(get(t,c,"power"),1));
     }
     private static void water(TownLife.Town t,TownLife.Citizen c){
-        c.water--;set(t,c,"water",Math.addExact(get(t,c,"water"),1));
+        c.water--;WaterNetworkLife.discharge(t);set(t,c,"water",Math.addExact(get(t,c,"water"),1));
     }
     static RebirthLife.HomeAction act(TownLife.Town t,TownLife.Citizen c,String action){
         var options=new java.util.ArrayList<String>();actions(t,c,options);

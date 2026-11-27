@@ -30,6 +30,7 @@ final class UtilityLife {
 
     private static int transferRiverWater(TownLife.Town town,int amount) {
         if(!status(town).fountainWorking() || amount<=0)return 0;
+        if(WaterNetworkLife.active(town))return WaterNetworkLife.fountain(town,amount);
         var source=town.naturalResources.get("river-water");
         if(source==null)return 0;
         int taken=JavaTicketLife.waterUnits(amount,source.stock,TANK_CAPACITY-town.cleanWater);
@@ -50,7 +51,7 @@ final class UtilityLife {
                      List<TownLife.Observation> observations) {
         if(clock.minute==0 && clock.day>town.lastWaterPumpDay) {
             town.lastWaterPumpDay=clock.day;
-            transferRiverWater(town,DAILY_PUMP_UNITS+(SoftwareLife.deployed(town,"water-control")?2:0));
+            if(!WaterNetworkLife.active(town))transferRiverWater(town,DAILY_PUMP_UNITS+(SoftwareLife.deployed(town,"water-control")?2:0));
         }
         if(clock.minute%60==0) {
             for(var c:town.people.values()) {

@@ -58,7 +58,7 @@ final class HomeApplianceLife {
         require(t,s,"washer");
         if(get(t,"laundry-dirt")==0)throw new IllegalArgumentException("Your clothes are already clean.");
         if(FoodLife.quantity(t.player,"water",false)<1)throw new IllegalArgumentException("Need one water unit for laundry.");
-        FoodLife.change(t.player,"water",false,-1);consume(t);HomeServiceLife.wear(t,"washer",4);set(t,"laundry-dirt",0);
+        FoodLife.change(t.player,"water",false,-1);WaterNetworkLife.discharge(t);consume(t);HomeServiceLife.wear(t,"washer",4);set(t,"laundry-dirt",0);
         return "Laundry completed. Clothes are clean.";
     }
     static void tick(TownLife.Town t,WorldState s){

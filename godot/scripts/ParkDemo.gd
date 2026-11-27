@@ -7683,6 +7683,7 @@ func _render_actions() -> void:
         return
     _render_personal_repair()
     if _current_place in ["FARM","RIVER","FACTORY","OFFICE"]:_render_energy()
+    if _current_place in ["RIVER","FACTORY","OFFICE"]:_render_water_network()
     var logistics: Dictionary = _last_snapshot.get("logistics",{})
     if _current_place in ["FARM","QUARRY","FACTORY"] and bool(logistics.get("yours",false)) and bool(logistics.get("truck",false)) and not bool(_last_snapshot.get("freight",{}).get("active",false)):
         var relocation := " · relocation 8 EUR + fuel" if str(logistics.get("truckPlace",""))!=_current_place else ""
@@ -8442,6 +8443,18 @@ func _render_factory_report() -> void:
         line.text+=" · "+tr("Condition")+": "+str(plant.get("condition",100))+"% · "+tr("Lost batches")+": "+str(plant.get("lostBatches",0))
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
+
+func _render_water_network() -> void:
+    var w: Dictionary = _last_snapshot.get("waterNetwork",{})
+    if not bool(w.get("active",false)):return
+    var line := Label.new()
+    line.text=tr("Water treatment")+" · "+str(w.get("treated",0))+"/"+str(w.get("capacity",48))+" · "+str(w.get("waterCondition",100))+"%"
+    line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _action_choices.add_child(line)
+    var sewer := Label.new()
+    sewer.text=tr("Wastewater")+" · "+str(w.get("sewage",0))+"/"+str(w.get("sewerCapacity",32))+" · "+str(w.get("sewerCondition",100))+"% · "+tr("Overflow")+": "+str(w.get("overflow",0))
+    sewer.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _action_choices.add_child(sewer)
 
 func _render_energy() -> void:
     var e: Dictionary = _last_snapshot.get("energy",{})
