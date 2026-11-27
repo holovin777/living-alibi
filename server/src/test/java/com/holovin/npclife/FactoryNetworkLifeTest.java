@@ -80,4 +80,25 @@ class FactoryNetworkLifeTest {
   assertEquals(60,FactoryMaintenance.condition(t.copy(),p));
   assertTrue(FactoryNetworkLife.produce(t,p));
  }
+ @Test void inspectionScrapsDefectiveUnitsWithoutRefundingMaterials(){
+  var s=new WorldState();s.day=8;
+  var t=TownLife.create(s);t.industryStocks.put(StaffingLife.ENABLED,1);
+  FactoryNetworkLife.ensure(t);
+  var p=FactoryNetworkLife.PLANTS.stream().filter(x->x.id().equals("paper-mill")).findFirst().orElseThrow();
+  FactoryNetworkLife.change(t,"logs",3);
+  t.industryStocks.put(FactoryMaintenance.key(p,"condition"),40);
+  t.industryStocks.put(FactoryQuality.key(p,"credit"),90);
+  int cash=t.employerFunds.get(FactoryNetworkLife.account(p));
+  assertTrue(FactoryNetworkLife.produce(t,p,s.day));
+  assertEquals(1,FactoryQuality.rejected(t,p));
+  assertEquals(1,FactoryQuality.accepted(t,p));
+  assertEquals(1,FactoryNetworkLife.stock(t,"paper"));
+  assertEquals(2,FactoryNetworkLife.stock(t,"logs"));
+  assertEquals(cash-2,t.employerFunds.get(FactoryNetworkLife.account(p)).intValue());
+  assertEquals(72,FactoryQuality.reputation(t,p));
+  assertEquals(1,FactoryQuality.rejected(t.copy(),p));
+  t.industryStocks.put(FactoryQuality.key(p,"reputation"),30);
+  assertEquals(8,FactoryQuality.wholesalePrice(t,p,10));
+  assertEquals(1,FactoryQuality.wholesalePrice(t,p,1));
+ }
 }

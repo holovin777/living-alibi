@@ -50,7 +50,8 @@ final class FactoryNetworkLife {
         if(cash>=4){t.employerFunds.put(account,cash-4);c.money=Math.addExact(c.money,4);}
         return true;
     }
-    static boolean produce(TownLife.Town t,Plant p){
+    static boolean produce(TownLife.Town t,Plant p){return produce(t,p,0);}
+    static boolean produce(TownLife.Town t,Plant p,int day){
         if(!FactoryMaintenance.operational(t,p))return false;
         if(stock(t,p.output())+p.units()>12||p.inputs().entrySet().stream().anyMatch(e->stock(t,e.getKey())<e.getValue()))return false;
         int cost=p.inputs().entrySet().stream().filter(e->!supplier(e.getKey()).equals(SUPPLIER)).mapToInt(e->2*e.getValue()).sum();
@@ -59,7 +60,8 @@ final class FactoryNetworkLife {
             if(!supplier(e.getKey()).equals(SUPPLIER))SupplyChainLife.pay(t,account(p),supplier(e.getKey()),2*e.getValue());
             change(t,e.getKey(),-e.getValue());
         }
-        change(t,p.output(),p.units());FactoryMaintenance.wear(t,p);return true;
+        int accepted=FactoryQuality.inspect(t,p,day);
+        change(t,p.output(),accepted);FactoryMaintenance.wear(t,p);return true;
     }
     static boolean procure(TownLife.Town t,String item,Plant p){
         if(!List.of("cotton","components").contains(item)||stock(t,item)>=8||FuelLife.stock(t)<1
@@ -79,7 +81,7 @@ final class FactoryNetworkLife {
     static boolean deliver(TownLife.Town t,Plant p){
         String item=p.output();if(!List.of("book","clothing","phone","watch","shelf").contains(item)||stock(t,item)<1||retailStock(t,item)>=4||FuelLife.stock(t)<1)return false;
         String shop=item.equals("shelf")?"technician":"shop-assistant";
-        int cost=item.equals("shelf")?12:PersonalGoodsLife.product(item).price()/2;
+        int cost=FactoryQuality.wholesalePrice(t,p,item.equals("shelf")?12:PersonalGoodsLife.product(item).price()/2);
         if(t.employerFunds.getOrDefault(shop,0)<cost+FuelLife.PRICE)return false;
         SupplyChainLife.pay(t,shop,account(p),cost);SupplyChainLife.pay(t,shop,FuelLife.ACCOUNT,FuelLife.PRICE);
         SupplyChainLife.set(t,FuelLife.STOCK,FuelLife.stock(t)-1);change(t,item,-1);
@@ -102,18 +104,18 @@ final class FactoryNetworkLife {
             for(var p:PLANTS)FactoryMaintenance.service(t,s,p);
         }
         if(s.minute==780&&SupplyChainLife.once(t,"network-production",s.day)){
-            for(var p:PLANTS)if(SupplyChainLife.attending(t,p.site(),p.occupation()))produce(t,p);
+            for(var p:PLANTS)if(SupplyChainLife.attending(t,p.site(),p.occupation()))produce(t,p,s.day);
         }
         if(s.minute==900&&SupplyChainLife.once(t,"network-delivery",s.day)&&freight){
             for(var p:PLANTS)if(deliver(t,p))WorkplaceRewards.afterSale(t,s,p);
         }
     }
-    record PlantView(String id,String district,String output,int stock,int employees,int funds,int condition,boolean operational){}
+    record PlantView(String id,String district,String output,int stock,int employees,int funds,int condition,boolean operational,int accepted,int rejected,int reputation){}
     record View(boolean active,int forest,List<PlantView> plants){}
     static View view(TownLife.Town t){
         return new View(StaffingLife.enabled(t),SupplyChainLife.get(t,"factory-network:forest"),
             PLANTS.stream().map(p->new PlantView(p.id(),p.site().name(),p.output(),stock(t,p.output()),
                 (int)t.people.values().stream().filter(c->c.alive&&c.employed&&p.occupation().equals(c.occupation)&&c.workplace==p.site()).count(),
-                t.employerFunds.getOrDefault(account(p),0),FactoryMaintenance.condition(t,p),FactoryMaintenance.operational(t,p))).toList());
+                t.employerFunds.getOrDefault(account(p),0),FactoryMaintenance.condition(t,p),FactoryMaintenance.operational(t,p),FactoryQuality.accepted(t,p),FactoryQuality.rejected(t,p),FactoryQuality.reputation(t,p))).toList());
     }
 }
