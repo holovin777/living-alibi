@@ -31,5 +31,25 @@ func _check() -> void:
         push_error("Property visuals not removed")
         quit(1)
         return
+    # A whole plot must fit inside the imported geographic envelope.
+    var bounded={"origin":[0.0,0.0],"bounds":[-0.001,-0.001,0.001,0.001],"chunks":{}}
+    if not Scenery.clear_at(bounded,Vector2(100,0),5.0) or Scenery.clear_at(bounded,Vector2(110,0),5.0) or Scenery.clear_at(bounded,Vector2(0,-115),1.0):
+        push_error("Geographic map envelope not enforced")
+        quit(1)
+        return
+    # Seeing the construction site first must not allow a later garden
+    # to overlap the reserved site, even after its mesh is unloaded.
+    var reverse=Scenery.new()
+    root.add_child(reverse)
+    reverse.configure(bounded)
+    var near_site={"anchor":{"x":-11,"z":0},"stage":1,"active":true}
+    reverse.sync({"site":near_site})
+    var site_center: Vector3=reverse.models["site"].position
+    reverse.sync({})
+    reverse.sync({"yard":yard,"site":near_site})
+    if reverse.models.size()!=2 or reverse.models["yard"].position.distance_to(site_center)<11.0 or reverse.models["site"].position!=site_center:
+        push_error("Reserved plots overlap or move after reload")
+        quit(1)
+        return
     print("GeoPropertyScenerySmoke: ALL CHECKS PASSED")
     quit(0)
