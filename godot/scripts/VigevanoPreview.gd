@@ -727,6 +727,9 @@ func _open_actions(work_only: bool=false) -> void:
         var athletics=life.get("athletics")
         if athletics is Dictionary and not str(athletics.get("club","")).is_empty():
             biography.text+="\n"+str(athletics.get("club",""))+" · Skill / Abilità: "+str(athletics.get("skill",0))+" · Wins / Vittorie: "+str(athletics.get("wins",0))
+        var culture=life.get("culture")
+        if culture is Dictionary and int(culture.get("works",0))>0:
+            biography.text+="\nCreative works / Opere: "+str(culture.get("works",0))+" · Sales / Vendite: "+str(culture.get("sales",0))+" · Reputation / Reputazione: "+str(culture.get("reputation",0))
         action_list.add_child(biography)
         var search=life.get("childSearch")
         if search is Dictionary and str(search.get("status","NONE"))!="NONE":

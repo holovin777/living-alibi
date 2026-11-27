@@ -112,6 +112,7 @@ final class PopulationLife {
         else if(working)desired=c.workplace;
         else if(ClinicalLife.seekingCare(town,c,clock))desired=TownLife.Place.CLINIC;
         else if(AthleticsLife.destination(town,c,clock)!=null)desired=AthleticsLife.destination(town,c,clock);
+        else if(CultureLife.destination(town,c,clock)!=null)desired=CultureLife.destination(town,c,clock);
         else if(PhoneLife.playerHomeWindow(town,c,clock))desired=HousingLife.HOUSE_DISTRICT;
         else if(PhoneLife.homeVisitWindow(town,c,clock))desired=c.home;
         else if(PhoneLife.meetingWindow(town,c,clock))desired=TownLife.Place.CAFE;
