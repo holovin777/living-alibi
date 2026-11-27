@@ -5,11 +5,14 @@ import static com.holovin.npclife.TownLife.Place.*;
 /** Staffing targets, not guaranteed attendance. New immigrants arrive with professional training. */
 final class StaffingLife {
     private StaffingLife(){}
-    static final int DEFAULT_POPULATION=224, MIN_POPULATION=96;
+    static final int DEFAULT_POPULATION=240, MIN_POPULATION=96;
     static final String ENABLED="staffing:enabled";
     record Role(String name,TownLife.Place workplace,int target,String fund,String diploma,int skill){}
     static Role job(String name,TownLife.Place place,int target){return new Role(name,place,target,null,null,20);}
     static final List<Role> ROLES=List.of(
+        job("Forestry worker",WOODS,2),job("Sawmill worker",FACTORY,2),job("Paper mill worker",FACTORY,1),
+        job("Textile worker",FACTORY,1),job("Printer",FACTORY,1),job("Garment worker",FACTORY,1),
+        job("Carpenter",WORKSHOP,2),job("Electronics assembler",FACTORY,2),job("Device assembler",FACTORY,1),job("Watch assembler",FACTORY,1),
         new Role("Doctor",CLINIC,3,null,"medicine",65),job("Nurse",CLINIC,5),job("Pharmacist",CLINIC,2),
         job("Teacher",SCHOOL,6),job("Police officer",OFFICE,5),new Role("Detective",OFFICE,2,null,"investigation",45),
         job("Mechanic",WORKSHOP,5),job("Electrician",WORKSHOP,3),job("Plumber",WORKSHOP,3),job("Heating technician",WORKSHOP,3),

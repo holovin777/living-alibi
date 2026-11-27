@@ -45,12 +45,14 @@ final class EmploymentLife {
             // wider local job market instead of starving in an unpaid post.
             String industryAccount=IndustryLife.companyFor(p.occupation);
             boolean workshopEmployee=BusinessLife.isEmployee(town,p);
+            String factoryAccount=FactoryNetworkLife.employer(p.occupation);
+            boolean insolventFactory=factoryAccount!=null&&town.employerFunds.getOrDefault(factoryAccount,0)<4;
             boolean insolventFood=RetailLife.foodRole(p.occupation)&&town.employerFunds.getOrDefault(RetailLife.foodAccount(p.occupation),0)<RetailLife.FOOD_WAGE;
             boolean insolventWorkshop=workshopEmployee &&
                     town.business.cash<BusinessLife.HOURLY_WAGE;
             if(p.employed && ((PostalLife.postalWorker(p)&&!PostalLife.funded(town)) || (industryAccount!=null &&
                     town.employerFunds.getOrDefault(industryAccount,0)<IndustryLife.HOURLY_WAGE) ||
-                    (NewspaperLife.reporter(p)&&town.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY) || insolventWorkshop || insolventFood || (MarketStallLife.isEmployee(town,p)&&MarketStallLife.get(town,MarketStallLife.RESERVE)<MarketStallLife.WAGE))) {
+                    (NewspaperLife.reporter(p)&&town.employerFunds.getOrDefault(NewspaperLife.JOB,0)<NewspaperLife.REPORTER_PAY) || insolventWorkshop || insolventFood || insolventFactory || (MarketStallLife.isEmployee(town,p)&&MarketStallLife.get(town,MarketStallLife.RESERVE)<MarketStallLife.WAGE))) {
                 loseJob(town,clock,p);
             }
             if(!p.employed) {

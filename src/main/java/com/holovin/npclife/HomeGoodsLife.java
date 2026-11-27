@@ -23,13 +23,13 @@ final class HomeGoodsLife {
         if(t.player.place!=p.shop()||!open(s.minute)||!t.player.ownsHouse)
             throw new IllegalArgumentException("Visit the open showroom and own a house before ordering delivery.");
         if(installed(t,id)||t.player.money<p.price())throw new IllegalArgumentException("Already installed or insufficient funds.");
-        if(SupplyChainLife.RECIPES.stream().anyMatch(r->r.id().equals(id)))SupplyChainLife.take(t,id);
+        SupplyChainLife.take(t,id);
         t.player.money-=p.price();
         t.employerFunds.merge(p.shop()==WORKSHOP?"technician":"shop-assistant",p.price(),Math::addExact);
         set(t,id,1);
         return "Household item delivered and installed.";
     }
-    static int available(TownLife.Town t,String id){return SupplyChainLife.RECIPES.stream().anyMatch(r->r.id().equals(id))?SupplyChainLife.stock(t,id):Integer.MAX_VALUE;}
+    static int available(TownLife.Town t,String id){return SupplyChainLife.stock(t,id);}
     static boolean home(TownLife.Town t,WorldState s){
         return t.player.ownsHouse&&t.player.place==SOUTH_RESIDENCES
             ||!t.player.ownsHouse&&t.player.place==NORTH_RESIDENCES&&HousingLife.active(t.player,s.day,s.minute);
