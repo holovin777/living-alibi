@@ -47,7 +47,7 @@ final class ITBusinessLife {
     static RebirthLife.HomeAction action(TownLife.Town t,int day,int minute,String action){
         var c=RebirthLife.requireAdult(t);var status=report(t,day,minute);
         if(status==null)throw new IllegalArgumentException("Join the programming team first.");
-        if(action.startsWith("hire:")||action.equals("dismiss")||action.startsWith("delegate:"))return ITStaffLife.action(t,c,day,minute,action,status);
+        if(action.startsWith("hire:")||action.equals("dismiss")||action.startsWith("delegate:")||action.equals("manage-on")||action.equals("manage-off"))return ITStaffLife.action(t,c,day,minute,action,status);
         int duration=5;String message;
         switch(action){
             case "register" -> {

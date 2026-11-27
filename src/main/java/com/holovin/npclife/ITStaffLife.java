@@ -9,7 +9,7 @@ final class ITStaffLife {
     static final int BONUS=10,WAGE=12;
     record Candidate(String id,String name,int age,int technical,boolean diploma){}
     record Employee(String id,String name,int technical,String activity,boolean sick){}
-    record Staff(Employee employee,List<Candidate> candidates,boolean canDismiss,int delegated,List<String> delegatable){}
+    record Staff(Employee employee,List<Candidate> candidates,boolean canDismiss,int delegated,List<String> delegatable,boolean managed,int managementProfit,int managementFailures){}
     static int get(TownLife.Town t,TownLife.Citizen c,String k){return ITBusinessLife.get(t,c,k);}
     static void set(TownLife.Town t,TownLife.Citizen c,String k,int v){ITBusinessLife.set(t,c,k,v);}
     static TownLife.Citizen employee(TownLife.Town t,TownLife.Citizen owner){
@@ -29,7 +29,7 @@ final class ITStaffLife {
     }
     static boolean eligible(TownLife.Town t,TownLife.Citizen owner,TownLife.Citizen w,int day){
         return w!=owner&&w.generationIndex>0&&w.alive&&DemographyLife.workingAge(w)&&!w.employed
-            &&!EmploymentLife.sick(w,day)&&EducationLife.get(t,w,"technical")>=20;
+            &&!RelationshipBoundaryLife.controlled(t,w)&&!EmploymentLife.sick(w,day)&&EducationLife.get(t,w,"technical")>=20;
     }
     static Staff report(TownLife.Town t,TownLife.Citizen owner,int day,int minute,List<ITBusinessLife.Offer> offers){
         boolean own=ITBusinessLife.registered(t,owner),ready=own&&ITBusinessLife.ready(t,owner,day,minute,5);
@@ -41,21 +41,67 @@ final class ITStaffLife {
             &&!EmploymentLife.sick(w,day)&&w.presentAt(TownLife.Place.OFFICE)&&"WORKING".equals(w.activity)
             &&get(t,owner,"last-assignment")<day;
         return new Staff(w==null?null:new Employee(w.id,w.name,EducationLife.get(t,w,"technical"),w.activity,EmploymentLife.sick(w,day)),
-            cv,ready&&w!=null,get(t,owner,"delegated"),canDelegate?offers.stream().filter(ITBusinessLife.Offer::available).map(ITBusinessLife.Offer::id).toList():List.of());
+            cv,ready&&w!=null,get(t,owner,"delegated"),canDelegate?offers.stream().filter(ITBusinessLife.Offer::available).map(ITBusinessLife.Offer::id).toList():List.of(),get(t,owner,"managed")>0,get(t,owner,"management-profit"),get(t,owner,"management-failures"));
     }
     static void release(TownLife.Town t,TownLife.Citizen owner){
         var w=employee(t,owner);
         if(w!=null){w.employed=false;w.unemploymentDays=0;w.occupation="Job seeker";set(t,w,"employer",0);}
-        set(t,owner,"employee",0);
+        set(t,owner,"employee",0);set(t,owner,"managed",0);
     }
     static void tick(TownLife.Town t,int day,int minute){
-        if(minute!=390)return;
-        for(var owner:t.people.values())if(get(t,owner,"employee")>0&&
-            (!owner.alive||!ITBusinessLife.registered(t,owner)||get(t,owner,"rent-until")<day||employee(t,owner)==null))
-            release(t,owner);
+        if(minute==390){
+            for(var owner:t.people.values())if(get(t,owner,"employee")>0){
+                if(!owner.alive||!ITBusinessLife.registered(t,owner)||employee(t,owner)==null){release(t,owner);continue;}
+                if(get(t,owner,"rent-until")<day&&get(t,owner,"managed")>0&&get(t,owner,"cash")>=ITBusinessLife.RENT+WAGE){
+                    set(t,owner,"cash",get(t,owner,"cash")-ITBusinessLife.RENT);
+                    ITBusinessLife.credit(t,MunicipalLife.CITY,ITBusinessLife.RENT);
+                    set(t,owner,"rent-until",day+6);
+                }
+                // Managed firms pause when the lease cannot be renewed; ownership is retained.
+                if(get(t,owner,"rent-until")<day&&get(t,owner,"managed")==0)release(t,owner);
+            }
+        }
+        if(minute==900)for(var owner:t.people.values())managedShift(t,owner,day,minute);
+    }
+    /** One real paid assignment per day; no owner travel or personal spending. */
+    static void managedShift(TownLife.Town t,TownLife.Citizen owner,int day,int minute){
+        if(!owner.alive||!ITBusinessLife.registered(t,owner)||get(t,owner,"managed")==0||
+                get(t,owner,"last-assignment")>=day||get(t,owner,"cash")<WAGE)return;
+        var w=employee(t,owner);
+        if(w==null||!scheduled(t,w,day,minute)||EmploymentLife.sick(w,day)||
+                !w.presentAt(TownLife.Place.OFFICE)||!"WORKING".equals(w.activity)||w.fatigue>=85)return;
+        String id=null,client=null;int gross=0,tax=0;
+        if(SoftwareLife.deployed(t,"retail-api")&&!DevOpsLife.unavailable(t)&&ITBusinessLife.eligibleWeek(t,owner,"retail",day)
+                &&t.employerFunds.getOrDefault("shop-assistant",0)>=40){id="retail";client="shop-assistant";gross=40;tax=8;}
+        else if(SoftwareLife.deployed(t,"water-control")&&ITBusinessLife.eligibleWeek(t,owner,"utility",day)
+                &&MunicipalLife.balance(t,MunicipalLife.CITY)>=50){id="utility";client=MunicipalLife.CITY;gross=50;tax=10;}
+        if(id==null)return;
+        set(t,owner,"last-assignment",day);
+        set(t,owner,"cash",get(t,owner,"cash")-WAGE);w.money=Math.addExact(w.money,WAGE);
+        w.fatigue=Math.min(100,w.fatigue+4);
+        int skill=EducationLife.get(t,w,"technical");
+        // Modest deterministic quality risk: wages remain due even for rejected work.
+        int quality=Math.floorMod(w.personalSeed^((long)day*0x9E3779B97F4A7C15L),100);
+        if(quality>=Math.min(98,65+skill/3)){
+            set(t,owner,"management-failures",Math.addExact(get(t,owner,"management-failures"),1));
+            set(t,owner,"management-profit",Math.subtractExact(get(t,owner,"management-profit"),WAGE));
+            return;
+        }
+        t.employerFunds.merge(client,-gross,Integer::sum);ITBusinessLife.credit(t,MunicipalLife.CITY,tax);
+        set(t,owner,"cash",Math.addExact(get(t,owner,"cash"),gross-tax));
+        set(t,owner,"tax-paid",Math.addExact(get(t,owner,"tax-paid"),tax));
+        set(t,owner,"last-"+id,day);set(t,owner,"contracts",Math.addExact(get(t,owner,"contracts"),1));
+        set(t,owner,"delegated",Math.addExact(get(t,owner,"delegated"),1));
+        set(t,owner,"management-profit",Math.addExact(get(t,owner,"management-profit"),gross-tax-WAGE));
+        EducationLife.learn(t,w,"technical",1);
     }
     static RebirthLife.HomeAction action(TownLife.Town t,TownLife.Citizen owner,int day,int minute,String action,ITBusinessLife.Status status){
         var staff=status.staff();
+        if(action.equals("manage-on")||action.equals("manage-off")){
+            if(!staff.canDismiss())throw new IllegalArgumentException("An available support employee and office access are required.");
+            set(t,owner,"managed",action.equals("manage-on")?1:0);
+            return new RebirthLife.HomeAction(5,action.equals("manage-on")?"Authorized ongoing management.":"Returned to manual management.");
+        }
         if(action.startsWith("hire:")){
             String id=action.substring(5);
             if(staff.candidates().stream().noneMatch(p->p.id().equals(id)))throw new IllegalArgumentException("Applicant unavailable or insufficient company funds.");

@@ -54,7 +54,10 @@ final class GeoWork {
                 var staff=business.staff();
                 if(staff!=null){
                     for(var candidate:staff.candidates())add(actions,"rebirth-it:hire:"+candidate.id(),"Hire / Assumi "+candidate.name()+" · technical "+candidate.technical());
-                    if(staff.canDismiss())add(actions,"rebirth-it:dismiss","End support contract / Termina contratto");
+                    if(staff.canDismiss()){
+                        add(actions,"rebirth-it:dismiss","End support contract / Termina contratto");
+                        add(actions,staff.managed()?"rebirth-it:manage-off":"rebirth-it:manage-on",staff.managed()?"Resume manual management / Gestione manuale":"Authorize ongoing management / Delega gestione");
+                    }
                     for(String id:staff.delegatable())add(actions,"rebirth-it:delegate:"+id,"Delegate / Delega "+id+" · €12");
                 }
             }
