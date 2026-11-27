@@ -12,6 +12,15 @@ var roof_material: StandardMaterial3D
 var road_material: StandardMaterial3D
 var rail_material: StandardMaterial3D
 var ready_to_walk := false
+const RoadGraph=preload("res://scripts/GeoRoadGraph.gd")
+const CityMap=preload("res://scripts/GeoCityMap.gd")
+var roads=RoadGraph.new()
+var city_map: Control
+var route_status := ""
+var street_timer := 0.0
+var street_name := ""
+var route_destination := Vector2.ZERO
+var has_destination := false
 
 func _ready() -> void:
     var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
@@ -31,10 +40,21 @@ func _ready() -> void:
         hud.text="Map missing. Run bash play-vigevano.sh to import real OSM data."
         return
     var parsed = JSON.parse_string(FileAccess.get_file_as_string(map_path))
-    if not parsed is Dictionary or int(parsed.get("schema",0))!=1 or not parsed.get("chunks") is Dictionary:
+    if not parsed is Dictionary or int(parsed.get("schema",0))!=2 or not parsed.get("chunks") is Dictionary:
         hud.text="Invalid geographic map. Re-run the importer."
         return
     city=parsed
+    roads.build(city.get("graph",{}))
+    city_map=CityMap.new()
+    canvas.add_child(city_map)
+    city_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    city_map.offset_left=16
+    city_map.offset_top=65
+    city_map.offset_right=-16
+    city_map.offset_bottom=-42
+    city_map.configure(city.get("graph",{}))
+    city_map.destination_selected.connect(_select_destination)
+    city_map.hide()
     chunk_size=float(city.get("chunk_size",128))
     wall_material=_material(Color("#cbb49b"))
     roof_material=_material(Color("#925f4d"))
@@ -94,6 +114,13 @@ func _material(color: Color) -> StandardMaterial3D:
 
 func _input(event: InputEvent) -> void:
     if not ready_to_walk:return
+    if event is InputEventKey and event.pressed and not event.echo and (event.keycode==KEY_M or (event.keycode==KEY_ESCAPE and city_map.visible)):
+        city_map.visible=not city_map.visible
+        Input.mouse_mode=Input.MOUSE_MODE_VISIBLE if city_map.visible else Input.MOUSE_MODE_CAPTURED
+        city_map.queue_redraw()
+        get_viewport().set_input_as_handled()
+        return
+    if city_map.visible:return
     if event is InputEventMouseButton and event.pressed and event.button_index==MOUSE_BUTTON_LEFT:
         Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
     if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
@@ -105,6 +132,10 @@ func _input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
     if not ready_to_walk:return
     var direction := Vector3.ZERO
+    if city_map.visible:
+        walker.velocity.x=0
+        walker.velocity.z=0
+        return
     if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):direction.z-=1
     if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):direction.z+=1
     if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):direction.x-=1
@@ -118,6 +149,10 @@ func _physics_process(delta: float) -> void:
     else:walker.velocity.y=0
     walker.move_and_slide()
     _stream()
+    street_timer+=delta
+    if street_timer>=0.5:
+        street_timer=0
+        _update_navigation()
 
 func _stream() -> void:
     var cell := Vector2i(floori(walker.position.x/chunk_size),floori(walker.position.z/chunk_size))
@@ -136,7 +171,29 @@ func _stream() -> void:
             chunks.erase(key)
     for key in wanted:
         if not chunks.has(key):_build_chunk(key,city["chunks"][key])
-    hud.text="VIGEVANO · geographic preview\nWASD · click to look · Space jump · Esc cursor\nOSM buildings: %s | loaded chunks: %s/9\nNo NPC or Java connection in this preview." % [city.get("counts",{}).get("buildings",0),chunks.size()]
+    _update_navigation()
+
+func _select_destination(point: Vector2) -> void:
+    route_destination=point
+    has_destination=true
+    _update_navigation()
+
+func _update_navigation() -> void:
+    if not is_instance_valid(walker) or not is_instance_valid(city_map):return
+    var pos:=Vector2(walker.position.x,walker.position.z)
+    city_map.player=pos
+    street_name=roads.street(pos)
+    route_status=""
+    if has_destination:
+        var path: PackedVector2Array=roads.route(pos,route_destination)
+        city_map.route=path
+        if path.is_empty():
+            route_status="No connected walking route"
+        else:
+            route_status="Walking route: %.0f m along streets" % RoadGraph.length(path)
+    city_map.queue_redraw()
+    hud.text="VIGEVANO · "+(street_name if not street_name.is_empty() else "Geographic preview")+"\nWASD · Space jump · M map · Esc cursor | chunks %s/9" % chunks.size()
+    if not route_status.is_empty():hud.text+="\n"+route_status
 
 func _point(value: Array,y: float) -> Vector3:
     return Vector3(float(value[0]),y,float(value[1]))

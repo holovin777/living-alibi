@@ -12,6 +12,7 @@ ORIGIN = (45.3173, 8.8579)
 BBOX = (45.3100, 8.8480, 45.3240, 8.8700)
 CHUNK = 128
 SOURCE = "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright"
+SCHEMA = 2
 ROAD_WIDTH = {"motorway": 12, "trunk": 10, "primary": 8, "secondary": 7,
               "tertiary": 6, "residential": 5, "service": 3, "living_street": 4,
               "pedestrian": 5, "footway": 1.8, "path": 1.5, "cycleway": 2.0,
@@ -58,6 +59,23 @@ def height(tags):
     return 6.4
 
 
+def access(tags):
+    """Basic access flags. Detailed conditional access/turn restrictions are not parsed."""
+    kind = tags.get("highway")
+    public = tags.get("access") not in ("no", "private")
+    foot = tags.get("foot")
+    motor = tags.get("motor_vehicle", tags.get("motorcar", tags.get("vehicle")))
+    walk = kind not in ("motorway", "trunk") and public
+    drive = kind in ("motorway", "trunk", "primary", "secondary", "tertiary", "residential",
+                     "service", "living_street", "unclassified", "track") and public
+    if foot in ("yes", "designated", "permissive"): walk = True
+    if foot in ("no", "private"): walk = False
+    if motor in ("yes", "designated", "permissive"): drive = True
+    if motor in ("no", "private"): drive = False
+    direction = tags.get("oneway", "yes" if tags.get("junction") == "roundabout" else "no")
+    return walk, drive, direction
+
+
 def convert(source, output):
     root = ET.parse(source).getroot()
     if root.tag != "osm":
@@ -68,6 +86,8 @@ def convert(source, output):
     counts = {"buildings": 0, "roads": 0, "rail_segments": 0, "skipped": 0}
     spawn = None
     best = float("inf")
+    graph_nodes = {}
+    graph_edges = []
 
     def add(kind, feature, point):
         key = f"{math.floor(point[0]/CHUNK)},{math.floor(point[1]/CHUNK)}"
@@ -89,6 +109,18 @@ def convert(source, output):
             add("buildings", {"id": way.attrib["id"], "points": points, "height": height(tags),
                               "name": name, "kind": tags["building"]}, center)
             counts["buildings"] += 1
+        if tags.get("highway") in ROAD_WIDTH:
+            walk, drive, direction = access(tags)
+            if walk or drive:
+                for a_id, b_id in zip(refs, refs[1:]):
+                    distance = math.dist(nodes[a_id], nodes[b_id])
+                    if a_id == b_id or distance < .05:
+                        continue
+                    graph_nodes[a_id], graph_nodes[b_id] = nodes[a_id], nodes[b_id]
+                    graph_edges.append({"a": a_id, "b": b_id, "meters": round(distance, 2),
+                                        "name": name, "walk": walk,
+                                        "drive_ab": drive and direction != "-1",
+                                        "drive_ba": drive and direction not in ("yes", "1", "true")})
         if tags.get("highway") in ROAD_WIDTH or tags.get("railway") in ("rail", "light_rail"):
             rail = tags.get("railway") in ("rail", "light_rail")
             for a, b in zip(points, points[1:]):
@@ -104,13 +136,13 @@ def convert(source, output):
                     add("rail" if rail else "roads", {"id": way.attrib["id"], "a": aa, "b": bb,
                         "name": name, "width": 1.8 if rail else ROAD_WIDTH[tags["highway"]]}, center)
                     counts["rail_segments" if rail else "roads"] += 1
-                    if not rail and tags.get("highway") not in ("motorway","trunk","steps"):
+                    if not rail and access(tags)[0] and tags.get("highway") != "steps":
                         d = math.hypot(*center)
                         if d < best:
                             spawn, best = center, d
     if not counts["buildings"] or not counts["roads"] or spawn is None:
         raise ValueError("Extract must contain buildings and walkable roads")
-    result = {"schema": 1, "origin": list(ORIGIN), "bounds": list(BBOX),
+    result = {"schema": SCHEMA, "graph": {"nodes": graph_nodes, "edges": graph_edges}, "origin": list(ORIGIN), "bounds": list(BBOX),
               "chunk_size": CHUNK, "attribution": SOURCE, "counts": counts,
               "spawn": spawn, "chunks": chunks}
     output.parent.mkdir(parents=True, exist_ok=True)

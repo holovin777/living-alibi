@@ -78,3 +78,9 @@ jobs:
             2>&1 | tee target/godot-bin/geography.log
           grep -q 'VigevanoPreview: loaded' target/godot-bin/geography.log
           if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geography.log; then exit 1; fi
+
+      - name: Test geographic walking and directed motor graph
+        run: |
+          set -euo pipefail
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoRoadGraphSmoke.gd 2>&1 | tee target/godot-bin/geograph.log
+          grep -q 'GeoRoadGraphSmoke: ALL CHECKS PASSED' target/godot-bin/geograph.log
