@@ -3,6 +3,19 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.*;
 class NpcTransportTest {
+    @Test void busFareAndDepartureIdentityPersistAcrossTrip(){
+        var s=new WorldState();s.minute=600;
+        var t=TownLife.create(s);t.industryStocks.put(NpcTransportLife.ENABLED,1);
+        var c=new TownLife.Citizen("test-passenger","Test passenger","Mechanic",TownLife.Place.PARK);
+        c.generationIndex=2;c.money=100;t.people.put(c.id,c);
+        NpcTransportLife.depart(t,c,TownLife.Place.WORKSHOP,s);
+        TownLife.move(t,c,TownLife.Place.WORKSHOP,s,new ArrayList<>(),new ArrayList<>());
+        assertEquals(NpcTransportLife.BUS,NpcTransportLife.mode(t,c));
+        assertEquals(98,c.money);
+        int departure=NpcTransportLife.get(t,c,"bus-departure");
+        s.minute++;TownLife.move(t,c,TownLife.Place.WORKSHOP,s,new ArrayList<>(),new ArrayList<>());
+        assertEquals(departure,NpcTransportLife.get(t,c,"bus-departure"));
+    }
     @Test void residentCommutesPaysAndRetainsCar(){
         var s=new WorldState();s.minute=600;
         var t=TownLife.create(s);t.industryStocks.put(NpcTransportLife.ENABLED,1);

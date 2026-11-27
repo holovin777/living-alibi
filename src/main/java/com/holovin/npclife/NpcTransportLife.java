@@ -59,6 +59,7 @@ final class NpcTransportLife {
             set(t,c,"condition",get(t,c,"condition")-units*3);set(t,c,"parked",desired.ordinal()+1);
         }else if(BusLife.route(c.place,desired)&&BusLife.open(s.minute)&&c.money>=BusLife.FARE+10){
             c.money-=BusLife.FARE;t.employerFunds.merge("city-maintenance",BusLife.FARE,Math::addExact);set(t,c,"mode",BUS);
+            set(t,c,"bus-departure",Math.addExact(Math.multiplyExact(s.day-1,1440),s.minute)+1);
         }
     }
     static void returned(TownLife.Town t,int index,int fuel,int condition){
