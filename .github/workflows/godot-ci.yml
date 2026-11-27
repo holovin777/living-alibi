@@ -84,3 +84,10 @@ jobs:
           set -euo pipefail
           target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoRoadGraphSmoke.gd 2>&1 | tee target/godot-bin/geograph.log
           grep -q 'GeoRoadGraphSmoke: ALL CHECKS PASSED' target/godot-bin/geograph.log
+
+      - name: Test bounded geographic traffic
+        run: |
+          set -euo pipefail
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoTrafficSmoke.gd 2>&1 | tee target/godot-bin/geotraffic.log
+          grep -q 'GeoTrafficSmoke: ALL CHECKS PASSED' target/godot-bin/geotraffic.log
+          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geotraffic.log; then exit 1; fi

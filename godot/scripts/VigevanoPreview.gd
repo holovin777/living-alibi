@@ -21,6 +21,8 @@ var street_timer := 0.0
 var street_name := ""
 var route_destination := Vector2.ZERO
 var has_destination := false
+const Traffic=preload("res://scripts/GeoTraffic.gd")
+var traffic: Node3D
 
 func _ready() -> void:
     var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
@@ -45,6 +47,9 @@ func _ready() -> void:
         return
     city=parsed
     roads.build(city.get("graph",{}))
+    traffic=Traffic.new()
+    add_child(traffic)
+    traffic.configure(city.get("graph",{}))
     city_map=CityMap.new()
     canvas.add_child(city_map)
     city_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -132,6 +137,7 @@ func _input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
     if not ready_to_walk:return
     var direction := Vector3.ZERO
+    traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
     if city_map.visible:
         walker.velocity.x=0
         walker.velocity.z=0
@@ -193,6 +199,7 @@ func _update_navigation() -> void:
             route_status="Walking route: %.0f m along streets" % RoadGraph.length(path)
     city_map.queue_redraw()
     hud.text="VIGEVANO · "+(street_name if not street_name.is_empty() else "Geographic preview")+"\nWASD · Space jump · M map · Esc cursor | chunks %s/9" % chunks.size()
+    hud.text+="\nLocal traffic: %s cars · %s pedestrians" % [traffic.count("drive"),traffic.count("walk")]
     if not route_status.is_empty():hud.text+="\n"+route_status
 
 func _point(value: Array,y: float) -> Vector3:
