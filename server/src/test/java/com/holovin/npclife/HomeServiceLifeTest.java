@@ -181,4 +181,31 @@ class HomeServiceLifeTest {
         assertEquals(1,PlayerServiceBusiness.get(t,"tax"));assertEquals(0,ServiceCompanyLife.cash(t));
         assertEquals(6,PlayerServiceBusiness.get(t.copy(),"cash"));
     }
+    @Test void competingRepairBusinessCanHireMultipleStaffAndLockQuotedPrice(){
+        var s=new WorldState();s.day=8;s.minute=600;var t=TownLife.create(s);
+        t.player.place=WORKSHOP;t.player.money=200;
+        PlayerServiceBusiness.act(t,s,"register");
+        for(int i=0;i<4;i++)PlayerServiceBusiness.act(t,s,"invest");
+        PlayerServiceBusiness.act(t,s,"rent");PlayerServiceBusiness.act(t,s,"tools");
+        for(int i=0;i<3;i++){
+            var tech=new TownLife.Citizen("new-tech-"+i,"Technician","Mechanic",WORKSHOP);
+            tech.age=35;tech.generationIndex=600+i;tech.employed=false;tech.money=20;t.people.put(tech.id,tech);
+            EducationLife.set(t,tech,"technical",70);
+            PlayerServiceBusiness.act(t,s,"hire:"+tech.id);
+        }
+        assertEquals(3,PlayerServiceBusiness.workers(t).size());
+        assertEquals(-1,PlayerServiceBusiness.freeStaff(t));
+        PlayerServiceBusiness.act(t,s,"price:14");
+        var c=new TownLife.Citizen("new-customer","Customer","Retired",NORTH_RESIDENCES);
+        c.age=70;c.generationIndex=701;c.money=200;t.people.put(c.id,c);
+        EducationLife.set(t,c,"interior-laundry",1);ResidentServiceLife.set(t,c,"wear",80);
+        var tech=t.people.get("new-tech-0");
+        ResidentServiceLife.assign(t,0,c,tech,s.day);
+        PlayerServiceBusiness.act(t,s,"price:20");
+        assertEquals(14,ResidentServiceLife.slot(t,0,"price"));
+        tech.place=NORTH_RESIDENCES;tech.activity="WORKING";t.technicalMaterials.put("spare-parts",1);
+        for(int i=0;i<30;i++){s.minute=1200+i;ResidentServiceLife.tick(t,s);}
+        assertEquals(186,c.money);assertEquals(14,PlayerServiceBusiness.get(t,"revenue"));
+        assertEquals(3,PlayerServiceBusiness.workers(t.copy()).size());
+    }
 }

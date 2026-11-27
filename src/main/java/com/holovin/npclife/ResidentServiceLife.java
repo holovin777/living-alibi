@@ -59,10 +59,11 @@ final class ResidentServiceLife {
         return eligible(t,c)&&InteriorLife.installed(t,c,"laundry")&&condition(t,c)<=40;
     }
     static void clear(TownLife.Town t,int i){
-        for(String f:List.of("customer","mechanic","day","minutes","last-minute"))slot(t,i,f,0);
+        for(String f:List.of("customer","mechanic","day","minutes","last-minute","price","contractor"))slot(t,i,f,0);
     }
     static void assign(TownLife.Town t,int i,TownLife.Citizen c,TownLife.Citizen tech,int day){
         clear(t,i);slot(t,i,"customer",c.generationIndex);slot(t,i,"mechanic",tech.generationIndex);slot(t,i,"day",day);
+        slot(t,i,"price",fee(t,tech));slot(t,i,"contractor",PlayerServiceBusiness.employee(t,tech)?1:2);
     }
     /** Preserve a previously scheduled appointment when upgrading an old save. */
     static void migrate(TownLife.Town t){
@@ -81,6 +82,8 @@ final class ResidentServiceLife {
         for(String f:List.of("resident-customer","resident-mechanic","resident-day","resident-minutes","resident-last-minute"))
             ServiceCompanyLife.set(t,f,0);
     }
+    static int fee(TownLife.Town t,TownLife.Citizen tech){return PlayerServiceBusiness.employee(t,tech)?PlayerServiceBusiness.price(t):HomeServiceLife.REPAIR_PRICE;}
+    static int minimumFee(TownLife.Town t,int day){return PlayerServiceBusiness.operating(t,day)&&!PlayerServiceBusiness.workers(t).isEmpty()?Math.min(HomeServiceLife.REPAIR_PRICE,PlayerServiceBusiness.price(t)):HomeServiceLife.REPAIR_PRICE;}
     static void prepare(TownLife.Town t,WorldState s){
         migrate(t);
         if(!StaffingLife.enabled(t)||s.minute!=360||ServiceCompanyLife.get(t,"resident-prepare-day")>=s.day)return;
@@ -94,13 +97,13 @@ final class ResidentServiceLife {
             if(InteriorLife.installed(t,c,"laundry"))
                 set(t,c,"wear",Math.min(100,get(t,c,"wear")+1+Math.floorMod(c.generationIndex,3)));
             if(!needsService(t,c))set(t,c,"queued-day",0);
-            else if(c.money>=RESERVE+HomeServiceLife.REPAIR_PRICE&&get(t,c,"queued-day")==0)
+            else if(c.money>=RESERVE+minimumFee(t,s.day)&&get(t,c,"queued-day")==0)
                 set(t,c,"queued-day",s.day);
         }
         if((s.day-1)%7>=5)return;
         // Old requests first; fully broken appliances win ties within the same day.
         var queue=people.stream().filter(c->get(t,c,"queued-day")>0&&needsService(t,c)
-                &&c.money>=RESERVE+HomeServiceLife.REPAIR_PRICE)
+                &&c.money>=RESERVE+minimumFee(t,s.day))
             .sorted(Comparator.<TownLife.Citizen>comparingInt(c->get(t,c,"queued-day"))
                 .thenComparingInt(c->condition(t,c)).thenComparingInt(c->c.generationIndex)).toList();
         var busy=new HashSet<Integer>();
@@ -115,8 +118,9 @@ final class ResidentServiceLife {
             if(free<0)break;
             var tech=people.stream().filter(p->p!=c&&!p.homeUnit.equals(c.homeUnit)
                     &&!busy.contains(p.generationIndex)&&!scheduled.contains(p.generationIndex)
-                    &&availableTech(t,p,s))
-                .min(Comparator.<TownLife.Citizen>comparingInt(p->p.home==c.home?0:1)
+                    &&availableTech(t,p,s)&&c.money>=RESERVE+fee(t,p))
+                .min(Comparator.<TownLife.Citizen>comparingInt(p->fee(t,p))
+                    .thenComparingInt(p->p.home==c.home?0:1)
                     .thenComparingInt(p->p.generationIndex)).orElse(null);
             if(tech==null)continue;
             assign(t,free,c,tech,s.day);busy.add(tech.generationIndex);scheduled.add(c.generationIndex);
@@ -132,16 +136,19 @@ final class ResidentServiceLife {
             if(s.day!=day||s.minute<START)continue;
             var c=customer(t,i);
             var tech=NpcVehicleCrimeLife.person(t,slot(t,i,"mechanic"));
-            boolean ready=needsService(t,c)&&tech!=null&&destination(t,tech,s)==c.home
+            int quoted=slot(t,i,"price");if(quoted==0)quoted=HomeServiceLife.REPAIR_PRICE;
+            boolean own=PlayerServiceBusiness.employee(t,tech);
+            int contractor=slot(t,i,"contractor");
+            boolean ready=(contractor==0||contractor==(own?1:2))&&needsService(t,c)&&tech!=null&&destination(t,tech,s)==c.home
                 &&HomeRoutineLife.atHome(c)&&tech.presentAt(c.home)&&"WORKING".equals(tech.activity)
-                &&c.money>=RESERVE+HomeServiceLife.REPAIR_PRICE&&(PlayerServiceBusiness.employee(t,tech)?PlayerServiceBusiness.available(t):ServiceCompanyLife.available(t));
+                &&c.money>=RESERVE+quoted&&(own?PlayerServiceBusiness.available(t):ServiceCompanyLife.available(t));
             if(!ready){slot(t,i,"minutes",0);continue;}
             if(slot(t,i,"last-minute")==s.minute)continue;
             slot(t,i,"last-minute",s.minute);
             slot(t,i,"minutes",slot(t,i,"minutes")+1);
             if(slot(t,i,"minutes")<30)continue;
-            c.money-=HomeServiceLife.REPAIR_PRICE;
-            if(PlayerServiceBusiness.employee(t,tech))PlayerServiceBusiness.complete(t,tech);
+            c.money-=quoted;
+            if(own)PlayerServiceBusiness.complete(t,tech,quoted);
             else {ServiceCompanyLife.complete(t,tech);ServiceCompanyLife.count(t,"resident-completed",1);}
             set(t,c,"wear",0);set(t,c,"queued-day",0);clear(t,i);
         }

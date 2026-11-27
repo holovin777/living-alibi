@@ -8454,6 +8454,14 @@ func _render_repair_business() -> void:
     for choice in [["canInvest","invest","Invest","20"],["canWithdraw","withdraw","Withdraw","20"],["canRent","rent","Rent workshop","10"],["canTools","tools","Buy tools","20"]]:
         if bool(b.get(choice[0],false)):
             _action_choices.add_child(_button(tr(str(choice[2]))+" · "+str(choice[3])+" EUR",_garden_action.bind("repair-business:"+str(choice[1]))))
+    var price := int(b.get("price",15))
+    var pricing := Label.new()
+    pricing.text=tr("Repair price")+": "+str(price)+" EUR · "+tr("Staff")+": "+str(b.get("staffCount",0))+"/3"
+    _action_choices.add_child(pricing)
+    for amount in [14,15,17,20]:
+        var price_button := _button(str(amount)+" EUR",_garden_action.bind("repair-business:price:"+str(amount)))
+        price_button.disabled=amount==price
+        _action_choices.add_child(price_button)
     for candidate in b.get("candidates",[]):
         _action_choices.add_child(_button(tr("Hire")+" "+str(candidate.get("name",""))+" · 5 EUR",_garden_action.bind("repair-business:hire:"+str(candidate.get("id","")))))
 
