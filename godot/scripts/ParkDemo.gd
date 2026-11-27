@@ -6624,12 +6624,12 @@ func _open_dialog(preferred_id: String = "") -> void:
     var id := preferred_id if not preferred_id.is_empty() else _nearest_resident()
     if preferred_id.is_empty() and _ambient_speech_remaining>0.0:
         var speaker:=_dialog_person(_ambient_speaker)
-        if speaker!=null and _avatar.position.distance_to(speaker.position)<2.5:id=_ambient_speaker
+        if _dialog_reachable(speaker):id=_ambient_speaker
     if id.is_empty():
         _message.text = tr("Approach a resident to talk.")
         return
     var person := _dialog_person(id)
-    if person == null or _avatar.position.distance_to(person.position) >= 2.5:
+    if not _dialog_reachable(person):
         _message.text = tr("Approach a resident to talk.")
         return
     _dialog_target = id
@@ -6710,7 +6710,22 @@ func _localized_resident_reply(message: String) -> String:
 func _dialog_world_minute() -> int:
     return (int(_last_snapshot.get("day",1))-1)*1440+int(_last_snapshot.get("minute",0))
 
+func _medical_service_reachable(person: Node3D) -> bool:
+    if person==null or _current_place!="CLINIC" or str(person.get_meta("activity",""))!="WORKING":return false
+    var role := str(person.get_meta("work_visual",""))
+    var at := _avatar.position
+    # Do not greet customers through walls or from the other building.
+    if role=="PHARMACY" and at.x>4.0 and at.x<12.0 and at.z>-10.5 and at.z<-3.5:
+        return at.distance_to(person.position)<4.0
+    if role in ["DOCTOR","NURSE"] and at.x<-4.0 and at.x>-12.0 and at.z>3.5 and at.z<10.5:
+        return at.distance_to(person.position)<4.0
+    return false
+
+func _dialog_reachable(person: Node3D) -> bool:
+    return person!=null and (_avatar.position.distance_to(person.position)<2.5 or _medical_service_reachable(person))
+
 func _dialog_patience(person: Node3D) -> int:
+    if _medical_service_reachable(person):return 20
     if person.has_meta("conversation_minutes"):
         return int(person.get_meta("conversation_minutes"))
     var activity := str(person.get_meta("activity",""))
@@ -6777,10 +6792,14 @@ func _tick_ambient_speech(delta: float) -> void:
         var resident_id:=str(offer.get("residentId",""))
         var kind:=str(offer.get("kind",""))
         if _ambient_speech_seen.has(id):continue
-        var cooldown_key:=resident_id+":"+kind
+        var service := kind in ["PHARMACY_SERVICE","CLINIC_SERVICE"]
+        # One greeting for the shop, not a chorus of every employee.
+        var cooldown_key:=kind if service else resident_id+":"+kind
         if now-int(_ambient_speech_last.get(cooldown_key,-120000))<60000:continue
         var person:=_dialog_person(resident_id)
-        if person==null or not person.is_visible_in_tree() or _avatar.position.distance_to(person.position)>2.5:continue
+        if person==null or not person.is_visible_in_tree():continue
+        if service and not _medical_service_reachable(person):continue
+        if not service and _avatar.position.distance_to(person.position)>2.5:continue
         if str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:continue
         if _ambient_speech_seen.size()>1024:_ambient_speech_seen.clear()
         _ambient_speech_seen[id]=true
@@ -6792,12 +6811,13 @@ func _tick_ambient_speech(delta: float) -> void:
         _ambient_speech_label.show()
         _ambient_speech_remaining=8.0
         _ambient_speech_cooldown=12.0
-        _begin_resident_reply(person,italian)
+        _begin_resident_reply(person,_ambient_line)
         if _spoken_dialog_enabled:
-            var voices:=DisplayServer.tts_get_voices_for_language("it")
+            var ambient_language := "it" if TranslationServer.get_locale().begins_with("it") else "en"
+            var voices:=DisplayServer.tts_get_voices_for_language(ambient_language)
             if not voices.is_empty():
                 var seed_value:=absi(resident_id.hash())
-                DisplayServer.tts_speak(italian,str(voices[seed_value%voices.size()]),75,0.90+float(seed_value%21)/100.0,1.0,0,false)
+                DisplayServer.tts_speak(_ambient_line,str(voices[seed_value%voices.size()]),75,0.90+float(seed_value%21)/100.0,1.0,0,false)
         return
 
 func _speak_resident_reply(reply: String) -> void:
@@ -6834,7 +6854,7 @@ func _send_dialog(message: String) -> void:
         _dialog_reply.text = tr("The world is updating. Try sending again.")
         return
     var person := _dialog_person(_dialog_target)
-    if person == null or _avatar.position.distance_to(person.position) >= 2.5:
+    if not _dialog_reachable(person):
         _close_dialog()
         return
     if message.strip_edges().is_empty():

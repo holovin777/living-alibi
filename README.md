@@ -165,3 +165,12 @@ space. Available parents can interrupt work and travel to the reported district.
 The officer stays assigned during the reunion phase, and the arriving parent
 has a short reunion window. No character is teleported. A previous incorrectly
 closed report can be reopened by asking for help again.
+
+### Medical counter conversations
+
+On-duty pharmacists, doctors and nurses offer a greeting to nearby customers.
+Italian requests such as `Voglio le pastiglie` prompt clarification; fictional
+recovery kits and existing medical services can be requested in dialogue.
+Explicit confirmation (`confermo il kit`, `confermo assistenza`, or
+`confermo la visita`) uses the existing eligibility, cost and time rules.
+The game does not prescribe real medicine. No purchase follows a vague request.

@@ -437,6 +437,12 @@ public final class GameSession implements AutoCloseable {
 
     /** Travel is visible to the client, but distance and time remain Java-owned. */
     public synchronized List<DestinationView> destinations() {
+        if(RebirthLife.active(town)){
+            var c=RebirthLife.child(town);
+            if(c==null||!c.alive||c.travelRemaining>0)return List.of();
+            return PlayerLife.publicPlaces().stream().map(place->new DestinationView(place.name(),place.label,
+                    TownLife.travelTime(c.place,place))).toList();
+        }
         return PlayerLife.publicPlaces().stream()
                 .map(place->new DestinationView(place.name(),place.label,
                         PlayerLife.travelMinutes(town.player,place))).toList();
@@ -525,6 +531,34 @@ public final class GameSession implements AutoCloseable {
             var applied=applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+assistance,true);
             return new ActionView(applied.message(),applied.world(),replyLanguage,true,
                     region.localeFor(replyLanguage),null);
+        }
+        // Medical customer service is part of the shift, not a leisure chat.
+        String serviceLanguage=language==null?"en":language;
+        var service=language==null||ResidentLanguages.speaks(region,resident.id,language)
+                ?MedicalServiceDialogue.reply(copy,resident,message,state.day,state.minute,serviceLanguage):null;
+        if(service!=null){
+            var contact=copy.player.contacts.computeIfAbsent(resident.id,PlayerLife.Contact::new);
+            var previous=contact.copy();
+            String answer=service.text();
+            int duration=1;
+            var person=RebirthLife.child(copy);
+            if(RebirthLife.linkedAdult(copy,person)&&!RebirthLife.atHome(person))
+                RebirthLife.holdPublicPlace(copy,person);
+            if(service.action()!=null){
+                var performed=RebirthLife.medicalAction(copy,state.day,state.minute,service.action());
+                duration=performed.minutes();
+                answer="it".equals(serviceLanguage)?switch(service.action()){
+                    case "collect"->"Ecco il suo kit di recupero. Pagamento: 9 euro.";
+                    case "first-aid"->"Assistenza di base completata. Pagamento: 5 euro.";
+                    default->"Visita completata. Pagamento: 15 euro.";
+                }:performed.message();
+            }
+            contact.conversations++;
+            contact.lastDay=state.day;contact.lastMinute=state.minute;contact.lastHeard=message.strip();
+            ConversationMemory.remember(contact,state.day,state.minute,serviceLanguage,message.strip(),answer);
+            ConversationMemory.captureMilestones(town,copy,previous,contact,contact.dialogue.getLast());
+            var applied=applyInternal(copy,duration,PlayerLife.displayName(copy,resident)+": "+answer,RebirthLife.active(town));
+            return new ActionView(applied.message(),applied.world(),serviceLanguage,true,region.localeFor(serviceLanguage),null);
         }
         if(!ConversationAvailability.allowed(copy,resident,state.day,state.minute)){
             String actual=language!=null&&!ResidentLanguages.speaks(region,resident.id,language)?region.nativeLanguage():language;
@@ -634,6 +668,8 @@ public final class GameSession implements AutoCloseable {
             int duration=JusticeLife.waitDuration(town,state,minutes);
             return applyInternal(town.copy(),duration,"Time passed in custody.",false,state.copy(),new ArrayList<>(),new ArrayList<>(),true);
         }
+        if(RebirthLife.linkedAdult(town,RebirthLife.child(town)))
+            return applyInternal(town.copy(),minutes,"Waited "+minutes+" minute(s).",true);
         return apply(town.copy(),minutes,"Waited "+minutes+" minute(s).");
     }
 

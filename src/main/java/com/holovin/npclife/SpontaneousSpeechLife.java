@@ -35,6 +35,12 @@ final class SpontaneousSpeechLife {
                     result.add(offer(t,c,"SEARCH","Where have you been? We were worried!","Dove sei stato? Eravamo preoccupati!",110,day));continue;
                 }
             }
+            if(MedicalServiceDialogue.staff(c)&&MedicalServiceDialogue.open(minute)){
+                boolean pharmacy=MedicalServiceDialogue.pharmacy(c);
+                result.add(offer(t,c,pharmacy?"PHARMACY_SERVICE":"CLINIC_SERVICE",
+                        "Hello! How can I help you?","Buongiorno! Mi dica, come posso aiutarla?",95,tick/60));
+                continue;
+            }
             if(ConversationAvailability.urgent(c)||ConversationAvailability.duty(c,day,minute))continue;
             if(parent&&minute>=420&&minute<1320){
                 result.add(offer(t,c,"FAMILY_GREETING","How are you doing?","Come stai?",70,tick/180));continue;

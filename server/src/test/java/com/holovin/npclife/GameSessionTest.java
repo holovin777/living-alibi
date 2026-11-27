@@ -30,6 +30,23 @@ class GameSessionTest {
     }
 
     @Test
+    void pharmacistUnderstandsTabletsAndInitiatesCustomerService() {
+        var t=TownLife.create(new WorldState());
+        var worker=PopulationGenerator.add(t,1).getFirst();
+        worker.occupation="Pharmacist";worker.employed=true;worker.place=TownLife.Place.CLINIC;
+        worker.activity="WORKING";worker.home=TownLife.Place.NORTH_RESIDENCES;
+        worker.health=100;worker.hunger=20;worker.thirst=20;worker.fatigue=20;
+        t.player.place=TownLife.Place.CLINIC;
+        var reply=MedicalServiceDialogue.reply(t,worker,"Voglio le pastiglie",2,600,"it");
+        assertNotNull(reply);
+        assertTrue(reply.text().contains("pastiglie"));
+        assertNull(reply.action());
+        assertTrue(SpontaneousSpeechLife.view(t,2,600).stream().anyMatch(o->o.residentId().equals(worker.id)&&o.kind().equals("PHARMACY_SERVICE")));
+        worker.activity="FREE_TIME";
+        assertNull(MedicalServiceDialogue.reply(t,worker,"Voglio le pastiglie",2,600,"it"));
+    }
+
+    @Test
     void indoorWorkersExposeOnlyTheirActualOnDutyWorkVisual() {
         var c=new TownLife.Citizen("test-medical","Test Medical","Doctor",TownLife.Place.CLINIC);
         c.activity="WORKING";
