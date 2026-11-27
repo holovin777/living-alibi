@@ -37,6 +37,7 @@ var chat: LineEdit
 var chat_target:=""
 var shared_mode:=false
 var district_sign: Label3D
+var entrance_signs: Dictionary={}
 var actions_panel: PanelContainer
 const PhonePanel=preload("res://scripts/GeoPhone.gd")
 const WorkPanel=preload("res://scripts/GeoWorkPanel.gd")
@@ -387,11 +388,36 @@ func _select_destination(point: Vector2) -> void:
     has_destination=true
     _update_navigation()
 
+func _sync_entrance_signs(entrances: Array,pos: Vector2) -> void:
+    var seen: Dictionary={}
+    for door in entrances:
+        var id:=str(door.get("id",""))
+        var at:=Vector2(float(door["x"]),float(door["z"]))
+        if at.distance_to(pos)>55:continue
+        seen[id]=true
+        if not entrance_signs.has(id):
+            var sign:=Label3D.new()
+            sign.font_size=40
+            sign.pixel_size=0.008
+            sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+            sign.modulate=Color("#a5d9ee")
+            add_child(sign)
+            entrance_signs[id]=sign
+        var label: Label3D=entrance_signs[id]
+        label.position=Vector3(at.x,1.7+0.42*(int(id)-1),at.y)
+        label.text=str(door.get("label",""))+" · CITOFONO / INTERCOM"
+        if at.distance_to(pos)<=4:label.text+=" · F"
+    for id in entrance_signs.keys():
+        if not seen.has(id):
+            entrance_signs[id].queue_free()
+            entrance_signs.erase(id)
+
 func _update_navigation() -> void:
     if not is_instance_valid(walker) or not is_instance_valid(city_map):return
     _update_daylight()
     property_scenery.sync(residents.world.get("propertyScenery",{}) if room.is_empty() and residents.connected else {})
     var pos:=Vector2(walker.position.x,walker.position.z)
+    _sync_entrance_signs(residents.world.get("entrances",[]) if room.is_empty() and residents.connected else [],pos)
     if not room.is_empty():
         if is_instance_valid(interior_node):interior_node.update_work_board(residents.world.get("work",{}))
         hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions · P phone\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
@@ -417,6 +443,10 @@ func _update_navigation() -> void:
         var nearest: Dictionary=world.get("nearestDistrict",{})
         hud.text+="\nDay %s · %02d:%02d · residents %s · nearby %s · €%s · health %s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.population,residents.people.size(),world.get("money",0),world.get("health",0)]
         hud.text+="\nCurrent: "+str(district.get("label",""))+" · E: enter "+str(nearest.get("label",""))+" · T: talk · F: actions · P: phone"
+        for door in world.get("entrances",[]):
+            if pos.distance_to(Vector2(float(door["x"]),float(door["z"])))<=4:
+                var expected: String="SOUTH_RESIDENCES" if str(door["id"])=="3" else "NORTH_RESIDENCES"
+                hud.text+="\n"+str(door["label"])+" · "+("F: known contacts / Citofono" if str(district.get("id",""))==expected else "E at residential district first / Entra nel quartiere")
         if bool(world.get("confined",false)):hud.text+="\nOpen regular game to continue custody."
         if bool(world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · Local walking · F: travel/life"
         var phone: Dictionary=world.get("phone",{})
