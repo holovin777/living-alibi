@@ -15,12 +15,13 @@ final class GeoProjection {
     record Choice(String id,String label){}
     record CivilianCar(String id,String district,int ownerIndex,double x,double z,double heading){}
     record Patrol(String id,double x,double z,double heading,boolean responding){}
+    record TrafficCar(String id,double x,double z,double heading,String kind,int condition){}
     record ActionResult(String message,District arrival){}
     record View(int day,int minute,int population,int commuting,List<Actor> residents,
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -40,6 +41,9 @@ final class GeoProjection {
     final EnumMap<TownLife.Place,String> anchors=new EnumMap<>(TownLife.Place.class);
     final Map<String,Route> routes=new LinkedHashMap<>(128,.75f,true){
         @Override protected boolean removeEldestEntry(Map.Entry<String,Route> e){return size()>512;}
+    };
+    final Map<String,Optional<Route>> motorRoutes=new LinkedHashMap<>(128,.75f,true){
+        @Override protected boolean removeEldestEntry(Map.Entry<String,Optional<Route>> e){return size()>512;}
     };
     GeoProjection(Path graph)throws IOException{
         var rows=Files.readAllLines(graph);
@@ -133,6 +137,37 @@ final class GeoProjection {
         return motorNodes.keySet().stream().filter(n->!motorEdges.get(n).isEmpty())
             .min(Comparator.comparingDouble((String n)->motorNodes.get(n).distance(p)).thenComparing(n->n)).orElse(null);
     }
+    Route motorRoute(TownLife.Place from,TownLife.Place to){
+        String key=from.name()+":"+to.name();var cached=motorRoutes.get(key);if(cached!=null)return cached.orElse(null);
+        String a=motorNode(point(from)),b=motorNode(point(to));
+        Route result=null;
+        if(a!=null&&b!=null){
+            var distances=new HashMap<String,Double>();var previous=new HashMap<String,String>();
+            var queue=new PriorityQueue<Step>(Comparator.comparingDouble(Step::cost).thenComparing(Step::id));
+            distances.put(a,0.0);queue.add(new Step(a,0));
+            while(!queue.isEmpty()){
+                var e=queue.remove();if(e.cost>distances.getOrDefault(e.id,Double.POSITIVE_INFINITY))continue;
+                if(e.id.equals(b))break;
+                for(String next:motorEdges.getOrDefault(e.id,List.of())){
+                    double cost=e.cost+motorNodes.get(e.id).distance(motorNodes.get(next));
+                    if(cost<distances.getOrDefault(next,Double.POSITIVE_INFINITY)){distances.put(next,cost);previous.put(next,e.id);queue.add(new Step(next,cost));}
+                }
+            }
+            if(distances.containsKey(b)&&distances.get(b)>0){
+                var points=new ArrayList<Point>();for(String at=b;at!=null;at=previous.get(at)){points.add(motorNodes.get(at));if(at.equals(a))break;}
+                Collections.reverse(points);result=new Route(List.copyOf(points),distances.get(b));
+            }
+        }
+        motorRoutes.put(key,Optional.ofNullable(result));return result;
+    }
+    TrafficCar movingVehicle(TownLife.Town t,TownLife.Citizen c){
+        int mode=NpcTransportLife.mode(t,c);if(!NpcTransportLife.enabled(t)||mode==NpcTransportLife.WALK)return null;
+        var route=motorRoute(c.place,c.destination);if(route==null)return null;
+        double fraction=1.0-c.travelRemaining/(double)Math.max(1,TownLife.travelTime(c.place,c.destination));
+        Point at=route.at(fraction),next=route.at(Math.min(1,fraction+.01)),prev=route.at(Math.max(0,fraction-.01));
+        double heading=Math.atan2(-(next.x-prev.x),-(next.z-prev.z));
+        return new TrafficCar(mode==NpcTransportLife.CAR?"npc-car-"+c.generationIndex:"bus-"+c.place.name()+"-"+c.destination.name()+"-"+c.travelRemaining,at.x,at.z,heading,mode==NpcTransportLife.CAR?"CAR":"BUS",mode==NpcTransportLife.CAR?NpcTransportLife.get(t,c,"condition"):100);
+    }
     CivilianCar civilian(TownLife.Town t,Point player){
         if(VehicleTheftLife.active(t))return null;
         var district=t.player.place;
@@ -140,7 +175,7 @@ final class GeoProjection {
         if(at.distance(player)>40)return null;
         String node=motorNode(at);
         if(node==null||at.distance(motorNodes.get(node))>25)return null;
-        var resident=t.people.values().stream().filter(c->VehicleTheftLife.owner(c)&&c.presentAt(district)
+        var resident=t.people.values().stream().filter(c->(NpcTransportLife.enabled(t)?NpcTransportLife.owns(t,c)&&NpcTransportLife.parked(t,c)==district&&NpcTransportLife.mode(t,c)!=NpcTransportLife.CAR:VehicleTheftLife.owner(c)&&c.presentAt(district))
             &&!VehicleTheftLife.missing(t,c)).min(Comparator.comparingInt(c->c.generationIndex)).orElse(null);
         if(resident==null)return null;
         Point road=motorNodes.get(node),next=motorNodes.get(motorEdges.get(node).get(0));
@@ -219,10 +254,12 @@ final class GeoProjection {
         var p=t.player;
         boolean confined=JusticeLife.confined(t),rebirth=RebirthLife.active(t);
         var talking=new HashSet<>(PlayerLife.visible(t));
-        var nearby=new ArrayList<Actor>();int population=0,commuting=0;
+        var nearby=new ArrayList<Actor>();var traffic=new LinkedHashMap<String,TrafficCar>();int population=0,commuting=0;
         for(var c:t.people.values()){
             if(!c.alive)continue;population++;
             if(c.travelRemaining>0)commuting++;
+            var vehicle=movingVehicle(t,c);
+            if(vehicle!=null){if(new Point(vehicle.x,vehicle.z).distance(player)<=160)traffic.putIfAbsent(vehicle.id,vehicle);continue;}
             if(!outdoor(c))continue;
             Point at=position(c);
             if(at.distance(player)<=140)nearby.add(new Actor(c.id,at.x,at.z,c.activity,talking.contains(c)&&!rebirth));
@@ -236,6 +273,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))),
             district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player),civilian(t,player),JusticeLife.view(t,s),JusticeLife.thefts(t),List.copyOf(visiblePatrols));
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player),civilian(t,player),JusticeLife.view(t,s),JusticeLife.thefts(t),List.copyOf(visiblePatrols),traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(player))).limit(32).toList());
     }
 }

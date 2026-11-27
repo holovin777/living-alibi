@@ -20,7 +20,7 @@ func set_java_population(enabled: bool) -> void:
     java_population=enabled
     if enabled:
         for i in range(actors.size()-1,-1,-1):
-            if actors[i]["mode"]=="walk":
+            if actors[i]["mode"] in ["walk","drive"]:
                 actors[i]["node"].queue_free()
                 actors.remove_at(i)
 var car_colors: Array[Color]=[Color("#a63938"),Color("#3e6580"),Color("#d0ccc0"),Color("#55585a"),Color("#777f59")]
@@ -194,5 +194,5 @@ func update_traffic(player: Vector2,delta: float) -> void:
     if clock<0.4:return
     clock=0.0
     # Gradual spawn keeps the frame cost stable. Dead ends stop rather than reverse illegally.
-    if count("drive")<MAX_CARS:_spawn("drive",player)
+    if not java_population and count("drive")<MAX_CARS:_spawn("drive",player)
     if not java_population and count("walk")<MAX_PEOPLE:_spawn("walk",player)

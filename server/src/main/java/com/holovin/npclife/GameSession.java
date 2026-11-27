@@ -646,6 +646,9 @@ public final class GameSession implements AutoCloseable {
         return map.view(town,state,target,geoResponse==null?null:geoResponse.view(map));
     }
     synchronized void geoTick(int minutes) throws SQLException {
+        if(!NpcTransportLife.enabled(town)&&!JusticeLife.confined(town)&&!RebirthLife.active(town)){
+            var copy=town.copy();copy.industryStocks.put(NpcTransportLife.ENABLED,1);apply(copy,0,"Resident transport enabled.");
+        }
         if(!RebirthLife.active(town))waitMinutes(minutes);
         if(JusticeLife.confined(town)||RebirthLife.active(town)||!town.player.alive)geoDrive=null;
     }

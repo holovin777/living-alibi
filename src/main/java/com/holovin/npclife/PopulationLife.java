@@ -104,7 +104,9 @@ final class PopulationLife {
             else if(preference==2)desired=TownLife.Place.CENTRO;
             else desired=TownLife.Place.PARK;
         } else desired=c.home;
+        NpcTransportLife.prepare(town,c,clock,events,observations);
         if(c.travelRemaining>0 || c.place!=desired) {
+            NpcTransportLife.depart(town,c,desired,clock);
             TownLife.move(town,c,desired,clock,events,observations);
             if(c.travelRemaining>0){c.activity="TRAVELING";return;}
         }

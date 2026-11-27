@@ -37,6 +37,8 @@ var civilian_car: Node3D
 var civilian_id:=""
 var patrol_models: Dictionary={}
 var patrol_goals: Dictionary={}
+var commute_models: Dictionary={}
+var commute_goals: Dictionary={}
 var driving_body: Node3D
 var drive_goal:=Vector3.ZERO
 var driving:=false
@@ -249,6 +251,7 @@ func _physics_process(delta: float) -> void:
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
     _animate_patrols(delta)
+    _animate_commutes(delta)
     impact_flash=maxf(0.0,impact_flash-delta*2.0)
     impact_overlay.color=Color(0.8,0.15,0.05,impact_flash*0.32)
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
@@ -335,6 +338,8 @@ func _update_navigation() -> void:
         if driving:owned_car.hide()
         _sync_civilian(world.get("civilianCar"),pos)
         _sync_patrols(world.get("patrols",[]))
+        _sync_commutes(world.get("traffic",[]))
+        hud.text+="\nJava traffic: %s" % commute_models.size()
         if driving:civilian_car.hide()
         hud.text+="\nG: enter own car / steal nearby civilian car"
         if driving:hud.text+="\nW: accelerate · A/D: choose turn · G: exit | Fuel %s · Condition %s" % [residents.driving.get("fuel",0),residents.driving.get("condition",0)]
@@ -350,6 +355,7 @@ func _update_navigation() -> void:
         owned_car.hide()
         civilian_car.hide()
         _sync_patrols([])
+        _sync_commutes([])
         parked_bike.hide()
         hud.text+="\nConnecting to shared Java world..."
     else:
@@ -409,6 +415,39 @@ func _sync_civilian(record,pos: Vector2) -> void:
         add_child(civilian_car)
     _sync_parked_vehicle(civilian_car,record,pos,Vector3(0,0.05,0))
     civilian_car.rotation.y=float(record.get("heading",0))
+
+func _sync_commutes(records: Array) -> void:
+    var seen: Dictionary={}
+    for record in records:
+        var id:=str(record.get("id",""))
+        var goal:=Vector3(float(record["x"]),0.05,float(record["z"]))
+        seen[id]=true
+        if not commute_models.has(id):
+            var car: Node3D
+            if str(record.get("kind",""))=="BUS":
+                car=Node3D.new()
+                traffic._box(car,Vector3(2.2,2.2,6.4),Vector3(0,1.3,0),Color("#e3ad45"))
+                traffic._box(car,Vector3(2.24,0.8,5.8),Vector3(0,1.9,0),Color("#405767"))
+                traffic._box(car,Vector3(2.25,0.25,6.5),Vector3(0,2.45,0),Color("#e3ad45"))
+            else:
+                var palette: Array[Color]=[Color("#9b403d"),Color("#456b89"),Color("#d0ccc0"),Color("#64696b"),Color("#73805a")]
+                car=traffic._car(palette[posmod(id.hash(),palette.size())])
+            add_child(car)
+            car.position=goal
+            commute_models[id]=car
+        commute_goals[id]={"point":goal,"heading":float(record.get("heading",0))}
+    for id in commute_models.keys():
+        if not seen.has(id):
+            commute_models[id].queue_free()
+            commute_models.erase(id)
+            commute_goals.erase(id)
+
+func _animate_commutes(delta: float) -> void:
+    for id in commute_models:
+        var car: Node3D=commute_models[id]
+        var goal: Dictionary=commute_goals[id]
+        car.position=car.position.move_toward(goal["point"],delta*12.0)
+        car.rotation.y=lerp_angle(car.rotation.y,float(goal["heading"]),minf(1.0,delta*5.0))
 
 func _sync_patrols(records: Array) -> void:
     var seen: Dictionary={}
