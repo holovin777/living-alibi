@@ -6732,10 +6732,10 @@ func _dialog_patience(person: Node3D) -> int:
     if activity in ["SLEEPING","TRAVELING","SICK_LEAVE","RESTING_WHILE_SICK"]:
         return 1
     if activity in ["WORKING","STUDYING","JOB_SEARCH","SHOPPING"]:
-        return 4
-    if str(person.get_meta("relationship",""))=="FRIENDLY":
-        return 18
-    return 10
+        return 12
+    if str(person.get_meta("relationship","")) in ["FRIENDLY","FAMILY"]:
+        return 28
+    return 20
 
 func _finish_dialog_autonomously(farewell: String) -> void:
     _close_dialog()
@@ -6793,13 +6793,15 @@ func _tick_ambient_speech(delta: float) -> void:
         var kind:=str(offer.get("kind",""))
         if _ambient_speech_seen.has(id):continue
         var service := kind in ["PHARMACY_SERVICE","CLINIC_SERVICE"]
+        var counter_service := kind=="CUSTOMER_SERVICE"
         # One greeting for the shop, not a chorus of every employee.
-        var cooldown_key:=kind if service else resident_id+":"+kind
+        var cooldown_key:=kind+":"+_current_place if service or counter_service else resident_id+":"+kind
         if now-int(_ambient_speech_last.get(cooldown_key,-120000))<60000:continue
         var person:=_dialog_person(resident_id)
         if person==null or not person.is_visible_in_tree():continue
         if service and not _medical_service_reachable(person):continue
         if not service and _avatar.position.distance_to(person.position)>2.5:continue
+        if counter_service and str(person.get_meta("activity",""))!="WORKING":continue
         if str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:continue
         if _ambient_speech_seen.size()>1024:_ambient_speech_seen.clear()
         _ambient_speech_seen[id]=true
@@ -6810,7 +6812,7 @@ func _tick_ambient_speech(delta: float) -> void:
         _ambient_speech_label.text=_ambient_line+" · T"
         _ambient_speech_label.show()
         _ambient_speech_remaining=8.0
-        _ambient_speech_cooldown=12.0
+        _ambient_speech_cooldown=9.0
         _begin_resident_reply(person,_ambient_line)
         if _spoken_dialog_enabled:
             var ambient_language := "it" if TranslationServer.get_locale().begins_with("it") else "en"

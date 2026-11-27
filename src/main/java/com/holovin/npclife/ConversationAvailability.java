@@ -22,17 +22,34 @@ final class ConversationAvailability {
         return c.health<45||c.hunger>=85||c.thirst>=85||c.fatigue>=85||
                 Set.of("SICK_LEAVE","RESTING_WHILE_SICK","SLEEPING","TRAVELING").contains(c.activity);
     }
+    /** Service workers talk to customers as part of their actual jobs. */
+    static boolean customerService(TownLife.Citizen c){
+        if(c==null||!c.alive||!c.employed||c.travelRemaining>0||!"WORKING".equals(c.activity)
+                ||c.place!=c.workplace||urgent(c)||c.occupation==null)return false;
+        return Set.of("Pharmacist","Doctor","Nurse","Barber","Barista","Baker","Pizzaiolo","Gelataio",
+                "Market vendor","Shopkeeper","Book seller","Clothing seller","Electronics seller","Furniture seller",
+                "Librarian","Bank clerk","Office clerk","Fuel station attendant","Station attendant").contains(c.occupation);
+    }
+    private static int warmth(TownLife.Citizen c){
+        return Math.max(0,Math.min(100,c.sociability))/20;
+    }
+    private static boolean close(TownLife.Town t,TownLife.Citizen c){
+        var contact=t.player.contacts.get(c.id);
+        return FamilyDialogueLife.family(t,c)||contact!=null&&contact.affinity>=30&&contact.trust>=70;
+    }
     static int minutes(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         if(urgent(c))return 2;
-        if(duty(c,day,minute))return PoliceLife.staff(c)?4:5;
-        var contact=t.player.contacts.get(c.id);
-        return contact!=null&&contact.affinity>=30&&contact.trust>=70?18:
-                8+Math.floorMod(c.sociability,5);
+        int warmth=warmth(c),bonus=close(t,c)?8:0;
+        if(customerService(c))return 20+warmth+bonus;
+        if(duty(c,day,minute))return (PoliceLife.staff(c)?9:10)+warmth+bonus/2;
+        return 16+warmth*2+bonus;
     }
     static int turns(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         if(urgent(c))return 1;
-        if(duty(c,day,minute))return 2;
-        return minutes(t,c,day,minute)>=18?8:5;
+        int warmth=warmth(c),bonus=close(t,c)?3:0;
+        if(customerService(c))return 12+warmth+bonus;
+        if(duty(c,day,minute))return 6+warmth/2+bonus;
+        return 10+warmth+bonus;
     }
     private static boolean fresh(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         int last=get(t,c,"last");
@@ -60,7 +77,8 @@ final class ConversationAvailability {
         boolean it="it".equals(language);
         if(urgent(c))return it?"Scusami, devo occuparmi di me. Ci sentiamo più tardi.":"Sorry, I need to take care of myself. Talk later.";
         if(PoliceLife.scheduled(c,day,minute))return it?"Scusami, devo continuare il mio turno. Buona giornata.":"Sorry, I have to get back to my shift. Have a good day.";
-        if(duty(c,day,minute))return it?"Scusami, ho delle cose da fare. A dopo!":"Sorry, I have things to do. See you later!";
+        if(customerService(c))return it?"Mi scusi, devo occuparmi anche del resto del lavoro. Possiamo riprendere tra poco.":"Excuse me, I need to attend to the rest of my work too. We can continue shortly.";
+        if(duty(c,day,minute))return it?"Mi ha fatto piacere parlare. Ora devo tornare ai miei impegni; ci sentiamo più tardi.":"It was nice talking. I need to get back to my commitments now; we can talk later.";
         return it?"Ora devo andare. Ci vediamo un'altra volta!":"I have to go now. See you another time!";
     }
 }

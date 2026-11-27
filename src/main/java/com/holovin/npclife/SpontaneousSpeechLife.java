@@ -41,19 +41,24 @@ final class SpontaneousSpeechLife {
                         "Hello! How can I help you?","Buongiorno! Mi dica, come posso aiutarla?",95,tick/60));
                 continue;
             }
+            if(ConversationAvailability.customerService(c)){
+                result.add(offer(t,c,"CUSTOMER_SERVICE","Hello! Can I help you with something?",
+                        "Buongiorno! Posso aiutarla?",90,tick/60));continue;
+            }
             if(ConversationAvailability.urgent(c)||ConversationAvailability.duty(c,day,minute))continue;
             if(parent&&minute>=420&&minute<1320){
                 result.add(offer(t,c,"FAMILY_GREETING","How are you doing?","Come stai?",70,tick/180));continue;
             }
-            if(minute<420||minute>=1320||c.sociability<35)continue;
+            if(minute<420||minute>=1320||c.sociability<20)continue;
             var contact=t.player.contacts.get(c.id);
             var relation=self==null?null:t.existingRelationship(self.id,c.id);
             boolean known=contact!=null&&contact.conversations>0||relation!=null&&relation.conversations>0;
             boolean friend=relation!=null&&relation.affinity>=65&&relation.trust>=58||contact!=null&&contact.conversations>=3&&contact.trust>=65;
-            long slot=tick/60;
-            // Stable opportunities in a one-hour window. More sociable people
-            // initiate more often, without consuming the world's RNG on reads.
-            if(Math.floorMod(c.personalSeed^slot,100)>=c.sociability/3)continue;
+            long slot=tick/30;
+            // Stable opportunities in a half-hour window; still no random
+            // state change on reads. Friends and acquaintances initiate more.
+            int likelihood=Math.min(90,15+c.sociability/2+(known?15:0)+(friend?15:0));
+            if(Math.floorMod(c.personalSeed^slot,100)>=likelihood)continue;
             if(known&&Math.floorMod(c.personalSeed+slot,7)==0){
                 String en=LifetimeMemoryLife.recollect(t,c,"en");
                 String it=LifetimeMemoryLife.recollect(t,c,"it");
@@ -65,6 +70,9 @@ final class SpontaneousSpeechLife {
                 result.add(offer(t,c,"GREETING","Hi! How's it going?","Ciao! Come va?",40,slot));
             else if(!HomeRoutineLife.atHome(c)&&Math.floorMod(c.personalSeed+slot,5)==0)
                 result.add(offer(t,c,"DIRECTIONS","Excuse me, do you know the way to the town center?","Scusa, sai come si arriva in centro?",25,slot));
+            else if(minute>=1080)result.add(offer(t,c,"HELLO","Good evening!","Buonasera!",20,slot));
+            else if(Math.floorMod(c.personalSeed+slot,3)==0)
+                result.add(offer(t,c,"HELLO","Hi! Everything all right?","Ciao! Tutto bene?",20,slot));
             else result.add(offer(t,c,"HELLO","Good morning!","Buongiorno!",20,slot));
         }
         result.sort(Comparator.comparingInt(Offer::priority).reversed().thenComparing(Offer::residentId));

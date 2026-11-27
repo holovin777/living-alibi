@@ -28,8 +28,10 @@ final class PopulationLife {
         // minute, rather than starting their autonomous commute mid-sentence.
         // GameSession removes this transient flag before persisting the world.
         if(TownLife.inPlayerConversation(town,c)) {
-            if(!PoliceLife.staff(c)&&!(c.place==TownLife.Place.SCHOOL
-                    &&("STUDYING".equals(c.activity)||"Teacher".equals(c.occupation)&&"WORKING".equals(c.activity))))
+            // Speaking at a counter, in class or during a patrol does not
+            // erase the work activity or move the worker outside.
+            if(!PoliceLife.staff(c)&&!ConversationAvailability.duty(c,clock.day,minute)
+                    &&!"SEARCHING_FOR_CHILD".equals(c.activity))
                 c.activity="SOCIALIZING";
             return;
         }

@@ -648,10 +648,11 @@ public final class GameSession implements AutoCloseable {
         }
         boolean ending=ConversationAvailability.record(copy,resident,state.day,state.minute);
         String farewell=ending?ConversationAvailability.farewell(resident,state.day,state.minute,language):null;
-        // A brief reply never reserves a working or urgently occupied resident.
-        // Only a willing leisure contact may pause for a single simulation minute.
-        if(!stairwell&&!ending&&!ConversationAvailability.duty(resident,state.day,state.minute)
-                &&!ConversationAvailability.urgent(resident))
+        // A willing resident may finish this reply before resuming the
+        // schedule, including a worker. Never reserve an urgent resident or
+        // block a missing-child search. The hold expires after this tick.
+        if(!stairwell&&!ending&&!ConversationAvailability.urgent(resident)
+                &&!"SEARCHING_FOR_CHILD".equals(resident.activity))
             copy.industryStocks.put(TownLife.conversationHoldKey(resident.id),1);
         // Conversation is valid in both a visitor life and a born/linked
         // life. The latter must use the rebirth-aware time/commit path.

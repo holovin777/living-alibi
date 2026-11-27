@@ -21,21 +21,39 @@ class ConversationAvailabilityTest {
         try(var db=new WorldDatabase(file)){
             var clock=db.load();var town=db.loadTown(clock);var c=officer(town);
             minute=PoliceLife.shiftStart(c)+10;
-            assertEquals(4,ConversationAvailability.minutes(town,c,1,minute));
-            assertTrue(ConversationAvailability.allowed(town,c,1,minute));
-            assertFalse(ConversationAvailability.record(town,c,1,minute));
-            assertTrue(ConversationAvailability.record(town,c,1,minute+1));
-            assertFalse(ConversationAvailability.allowed(town,c,1,minute+2));
-            assertTrue(ConversationAvailability.farewell(c,1,minute+2,"it").contains("turno"));
-            clock.minute=minute+2;
+            int turns=ConversationAvailability.turns(town,c,1,minute);
+            assertTrue(turns>=6);
+            assertTrue(ConversationAvailability.minutes(town,c,1,minute)>=9);
+            for(int n=0;n<turns;n++){
+                assertTrue(ConversationAvailability.allowed(town,c,1,minute+n));
+                assertEquals(n==turns-1,ConversationAvailability.record(town,c,1,minute+n));
+            }
+            assertFalse(ConversationAvailability.allowed(town,c,1,minute+turns));
+            assertTrue(ConversationAvailability.farewell(c,1,minute+turns,"it").contains("turno"));
+            clock.minute=minute+turns;
             db.save(clock,List.of(),List.of(),town,List.of(),List.of(),List.of());
         }
         try(var db=new WorldDatabase(file)){
             var clock=db.load();var town=db.loadTown(clock);var c=officer(town);
-            assertFalse(ConversationAvailability.allowed(town,c,1,minute+3));
-            assertTrue(ConversationAvailability.allowed(town,c,1,minute+16));
+            assertFalse(ConversationAvailability.allowed(town,c,1,clock.minute));
+            assertTrue(ConversationAvailability.allowed(town,c,1,clock.minute+16));
         }
     }
+    @Test
+    void customerServiceAndQuietResidentsStillHaveTimeToListen(){
+        var t=TownLife.create(new WorldState());var c=t.get("marco");
+        c.occupation="Baker";c.employed=true;c.place=TownLife.Place.BAKERY;c.workplace=c.place;
+        c.activity="WORKING";c.health=100;c.hunger=20;c.thirst=20;c.fatigue=20;c.sociability=20;
+        assertTrue(ConversationAvailability.customerService(c));
+        assertTrue(ConversationAvailability.turns(t,c,1,600)>=12);
+        int quiet=ConversationAvailability.minutes(t,c,1,600);
+        c.sociability=90;
+        assertTrue(ConversationAvailability.minutes(t,c,1,600)>quiet);
+        c.hunger=95;
+        assertFalse(ConversationAvailability.customerService(c));
+        assertEquals(1,ConversationAvailability.turns(t,c,1,600));
+    }
+
     @Test
     void friendshipAndNeedsChangePatience(){
         var t=TownLife.create(new WorldState());var c=t.get("marco");
