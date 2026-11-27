@@ -896,6 +896,10 @@ public final class GameSession implements AutoCloseable {
             var result=ShelterLife.sleep(copy,state);
             return apply(copy,result.minutes(),"Slept in the shelter for eight hours.");
         }
+        if("shelter-housing".equals(action)){
+            var copy=town.copy();
+            return apply(copy,15,ShelterLife.housing(copy,state));
+        }
         if("shelter-wash".equals(action)){
             var copy=town.copy();
             return apply(copy,10,ShelterLife.wash(copy,state));

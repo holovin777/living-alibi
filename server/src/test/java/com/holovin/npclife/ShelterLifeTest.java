@@ -31,4 +31,41 @@ class ShelterLifeTest {
             s.day++;assertTrue(ShelterLife.canSleep(t,s));
         }
     }
+    @Test void transitionalHousingUsesExistingFundsAndCannotBeRepeated() throws Exception {
+        var file=folder.resolve("housing.db");
+        try(var db=new WorldDatabase(file)){
+            var s=db.load();var t=db.loadTown(s);var p=t.player;
+            s.day=2;s.minute=1200;
+            p.place=CaritasLife.PLACE;p.destination=p.place;p.money=7;
+            p.ownsHouse=false;p.roomUntil=0;p.fatigue=90;
+            t.employerFunds.put(SocialProtectionLife.ACCOUNT,27);
+            int guesthouse=t.employerFunds.getOrDefault("guesthouse",0);
+            assertFalse(ShelterLife.canHousing(t,s));
+            ShelterLife.sleep(t,s);
+            s.day++;s.minute=540;
+            assertFalse(ShelterLife.canHousing(t,s));
+            assertThrows(IllegalArgumentException.class,()->ShelterLife.housing(t,s));
+            assertEquals(7,p.money);
+            assertEquals(27,t.employerFunds.get(SocialProtectionLife.ACCOUNT));
+            t.employerFunds.put(SocialProtectionLife.ACCOUNT,28);
+            assertTrue(ShelterLife.canHousing(t,s));
+            ShelterLife.housing(t,s);
+            assertEquals(0,p.money);
+            assertEquals(0,t.employerFunds.get(SocialProtectionLife.ACCOUNT));
+            assertEquals(guesthouse+35,t.employerFunds.get("guesthouse"));
+            assertEquals(HousingLife.now(s.day,s.minute)+15+HousingLife.TERM,p.roomUntil);
+            assertTrue(ShelterLife.report(t,s).housingUsed());
+            assertFalse(ShelterLife.canSleep(t,s));
+            db.save(s,List.of(),List.of(),t,List.of(),List.of(),List.of());
+        }
+        try(var db=new WorldDatabase(file)){
+            var s=db.load();var t=db.loadTown(s);
+            assertTrue(ShelterLife.report(t,s).housingUsed());
+            assertTrue(HousingLife.active(t.player,s.day,s.minute));
+            assertEquals(0,t.player.money);
+            t.player.roomUntil=0;
+            t.employerFunds.put(SocialProtectionLife.ACCOUNT,100);
+            assertFalse(ShelterLife.canHousing(t,s));
+        }
+    }
 }

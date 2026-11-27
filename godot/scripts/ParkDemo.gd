@@ -6747,6 +6747,7 @@ func _render_actions() -> void:
         info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         info.text=tr("Free emergency bed · check-in 20:00–22:00")
         info.text+="\n"+tr("For visitors without housing and less than 35 EUR.")
+        info.text+="\n"+tr("Shower hours: 18:00–22:00")
         _action_choices.add_child(info)
         var bed := _button(tr("Sleep safely · 8 hours"),_garden_action.bind("shelter-sleep"))
         bed.disabled=not bool(shelter.get("canSleep",false))
@@ -6754,6 +6755,17 @@ func _render_actions() -> void:
         var wash := _button(tr("Free shower · 10 min"),_garden_action.bind("shelter-wash"))
         wash.disabled=not bool(shelter.get("canWash",false))
         _action_choices.add_child(wash)
+        var housing_info := Label.new()
+        housing_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        housing_info.text=tr("Housing assistance · 09:00–12:00")
+        housing_info.text+="\n"+tr("After one shelter stay, once per character, if the welfare fund can pay.")
+        housing_info.text+="\n"+tr("Your contribution: %s EUR · Welfare subsidy: %s EUR") % [shelter.get("housingContribution",0),shelter.get("housingSubsidy",0)]
+        if bool(shelter.get("housingUsed",false)):
+            housing_info.text+="\n"+tr("Housing assistance already received.")
+        _action_choices.add_child(housing_info)
+        var housing := _button(tr("Request seven-day guest room"),_garden_action.bind("shelter-housing"))
+        housing.disabled=not bool(shelter.get("canHousing",false))
+        _action_choices.add_child(housing)
         return
     if _near_charity() and not _rebirth_active():
         _action_title.text=tr("Caritas · Community kitchen")

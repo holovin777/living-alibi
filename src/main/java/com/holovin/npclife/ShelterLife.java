@@ -30,8 +30,35 @@ final class ShelterLife {
         t.player.hygiene=100;set(t,"wash",s.day);
         return "Washed at the shelter.";
     }
-    record Report(boolean canSleep,boolean canWash,int stays,int lastNight){}
+    // One transitional lease per character, paid directly to the guesthouse.
+    // The visitor contributes at most 10 EUR; the existing welfare fund pays the rest.
+    static int housingContribution(TownLife.Town t){
+        return Math.max(0,Math.min(10,t.player.money));
+    }
+    static int housingSubsidy(TownLife.Town t){
+        return HousingLife.RENT-housingContribution(t);
+    }
+    static boolean canHousing(TownLife.Town t,WorldState s){
+        return eligible(t,s)&&s.minute>=540&&s.minute+15<=720&&get(t,"stays")>0&&
+                get(t,"housing")==0&&t.employerFunds.getOrDefault(SocialProtectionLife.ACCOUNT,0)>=housingSubsidy(t);
+    }
+    static String housing(TownLife.Town t,WorldState s){
+        if(!canHousing(t,s))throw new IllegalArgumentException("Housing assistance is available 09:00–12:00 after a shelter stay, once per character, subject to welfare funds.");
+        int contribution=housingContribution(t),subsidy=housingSubsidy(t);
+        int balance=t.employerFunds.getOrDefault(SocialProtectionLife.ACCOUNT,0);
+        int guesthouse=Math.addExact(t.employerFunds.getOrDefault("guesthouse",0),HousingLife.RENT);
+        HousingLife.expire(t.player,s.day,s.minute);
+        t.player.money-=contribution;
+        t.employerFunds.put(SocialProtectionLife.ACCOUNT,balance-subsidy);
+        t.employerFunds.put("guesthouse",guesthouse);
+        t.player.roomUntil=HousingLife.now(s.day,s.minute)+15+HousingLife.TERM;
+        set(t,"housing",1);
+        return "Received a seven-day guest room lease. Visit the north residences.";
+    }
+    record Report(boolean canSleep,boolean canWash,int stays,int lastNight,boolean canHousing,
+                  int housingContribution,int housingSubsidy,boolean housingUsed){}
     static Report report(TownLife.Town t,WorldState s){
-        return new Report(canSleep(t,s),canWash(t,s),get(t,"stays"),get(t,"night"));
+        return new Report(canSleep(t,s),canWash(t,s),get(t,"stays"),get(t,"night"),canHousing(t,s),
+                housingContribution(t),housingSubsidy(t),get(t,"housing")!=0);
     }
 }
