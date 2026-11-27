@@ -2882,6 +2882,13 @@ func _build_home_goods_display(house: Node3D) -> void:
     _box(fridge,Vector3(0.70,0.65,0.68),Color("#e3e6e4"),Vector3(-5.05,1.36,11.55))
     _box(fridge,Vector3(0.04,0.53,0.62),Color("#c7d2d2"),Vector3(-5.42,1.36,11.55))
     _box(fridge,Vector3(0.06,0.26,0.05),Color("#52616a"),Vector3(-5.46,1.39,11.31))
+    var washer := Node3D.new()
+    washer.name="washer"
+    display.add_child(washer)
+    _box(washer,Vector3(0.62,0.61,0.61),Color("#dce0df"),Vector3(-5.05,1.36,13.05))
+    var washer_door := _cylinder(washer,0.22,0.06,Color("#50616b"),Vector3(-5.39,1.32,13.05))
+    washer_door.rotation.z=PI/2.0
+    _box(washer,Vector3(0.06,0.08,0.43),Color("#9aa6a8"),Vector3(-5.39,1.60,13.05))
     var shelf := Node3D.new()
     shelf.name="shelf"
     display.add_child(shelf)
@@ -7741,6 +7748,7 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Sleep in your house · 2h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 2h",_sleep_room.bind(2)))
                 _action_choices.add_child(_button("Sleep in your house · 8h" if _current_place=="SOUTH_RESIDENCES" else "Sleep in guest room · 8h",_sleep_room.bind(8)))
             elif _near_kitchen():
+                if _owns_house():_render_home_appliances()
                 var phone_data = _last_snapshot.get("phone")
                 if _owns_house() and phone_data is Dictionary:
                     for meeting in phone_data.get("meetings",[]):
@@ -8319,6 +8327,45 @@ func _render_personal_goods() -> void:
             elif str(item.get("borrowerId",""))==who:
                 _action_choices.add_child(_button(tr("Request %s back from %s") % [label,name_text],_garden_action.bind("personal-good:return:"+id+":"+who)))
 
+func _render_home_appliances() -> void:
+    var appliances: Dictionary=_last_snapshot.get("homeAppliances",{})
+    if appliances.is_empty():return
+    var installed: Array=_last_snapshot.get("homeGoods",{}).get("installed",[])
+    var meter := Label.new()
+    meter.text=tr("Electricity: %s · Bill: %s EUR") % [tr("Connected") if bool(appliances.get("power",false)) else tr("Disconnected"),appliances.get("bill",0)]
+    _action_choices.add_child(meter)
+    if int(appliances.get("bill",0))>0:
+        _action_choices.add_child(_button(tr("Pay electricity bill"),_garden_action.bind("home-appliance:pay")))
+    if "fridge" in installed:
+        var cold: Dictionary=appliances.get("refrigerator",{})
+        var bag: Dictionary=_last_snapshot.get("player",{}).get("bag",{})
+        var capacity := Label.new()
+        capacity.text=tr("Refrigerator: %s/%s") % [_inventory_count(cold),appliances.get("capacity",12)]
+        _action_choices.add_child(capacity)
+        for id in cold:
+            if int(bag.get(id,0))>0:
+                var store := _button(tr("Refrigerate %s") % tr(str(id).capitalize()),_garden_action.bind("home-appliance:store:"+str(id)))
+                store.disabled=not bool(appliances.get("power",false)) or _inventory_count(cold)>=int(appliances.get("capacity",12))
+                _action_choices.add_child(store)
+            if int(cold.get(id,0))>0:
+                _action_choices.add_child(_button(tr("Retrieve %s (%s)") % [tr(str(id).capitalize()),cold[id]],_garden_action.bind("home-appliance:take:"+str(id))))
+    if "television" in installed:
+        var watch := _button(tr("Watch local news · 10m"),_garden_action.bind("home-appliance:watch"))
+        watch.disabled=not bool(appliances.get("canWatch",false))
+        _action_choices.add_child(watch)
+        if not str(appliances.get("bulletin","")).is_empty():
+            var bulletin := Label.new()
+            bulletin.text=str(appliances.get("bulletin",""))
+            bulletin.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            _action_choices.add_child(bulletin)
+    if "washer" in installed:
+        var laundry := _button(tr("Wash clothes · 30m · 1 water"),_garden_action.bind("home-appliance:wash"))
+        laundry.disabled=not bool(appliances.get("canWash",false))
+        _action_choices.add_child(laundry)
+        var clean := Label.new()
+        clean.text=tr("Clothing cleanliness: %s/100") % appliances.get("clothingCleanliness",100)
+        _action_choices.add_child(clean)
+
 func _render_home_goods() -> void:
     var goods: Dictionary=_last_snapshot.get("homeGoods",{})
     for offer in goods.get("offers",[]):
@@ -8332,6 +8379,9 @@ func _render_home_goods() -> void:
         _action_choices.add_child(info)
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("home-appliance:"):
+        if _current_place=="SOUTH_RESIDENCES" and _owns_house() and _near_kitchen() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("home-good:"):
         if _current_place in ["PORTICI","WORKSHOP"] and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
         return
