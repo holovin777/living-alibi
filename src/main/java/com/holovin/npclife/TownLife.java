@@ -773,6 +773,8 @@ final class TownLife {
         PhoneLife.tick(town,marco);
         IntercomLife.tick(town,marco);
         PeerAidLife.tick(town,marco,truth,observations);
+        StreetAidLife.tick(town,marco);
+        FamilyCareLife.tick(town,marco);
         for(int i=before;i<interactions.size();i++) {
             var conversation=interactions.get(i);
             KnowledgeLife.exchange(town,marco,conversation.firstId(),conversation.secondId());

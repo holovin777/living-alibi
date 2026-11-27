@@ -478,6 +478,9 @@ public final class GameSession implements AutoCloseable {
                 rendered=reply!=null;
             }
         }
+        if(reply==null&&understood){
+            reply=StreetAidLife.dialogue(copy,resident,message,state.day,state.minute);
+        }
         if(reply==null&&understood&&java.util.Set.of("can i meet your family","introduce me to your family","mi presenti la tua famiglia","posso conoscere la tua famiglia","mi fai conoscere la tua famiglia").contains(NaturalDialogue.normalize(message))){
             reply=IntercomLife.introduceFamily(copy,resident.id,state.day,state.minute,language);
             rendered=language!=null;

@@ -361,6 +361,8 @@ final class PlayerLife {
             throw new IllegalArgumentException(displayName(town,resident)+" is not available for a conversation.");
         Contact contact=town.player.contacts.computeIfAbsent(resident.id,Contact::new);
         String rawMessage=spoken;
+        String aid=StreetAidLife.dialogue(town,resident,rawMessage,day,minute);
+        if(aid!=null)return aid;
         // Interpret paraphrases while retaining the actual text in persistent memory.
         spoken=NaturalDialogue.canonical(rawMessage,contact.lastHeard);
         boolean askingName=spoken.equalsIgnoreCase("What is your name?")||spoken.equalsIgnoreCase("Come ti chiami?");

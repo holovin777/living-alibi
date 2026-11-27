@@ -3934,6 +3934,7 @@ func _render_residents() -> void:
     _assign_resident_seats()
     _assign_work_stations()
     _assign_market_queues()
+    _assign_street_aid_spots()
     _sync_office_joker()
     _sync_hosted_guest()
 
@@ -4251,6 +4252,32 @@ func _assign_market_queues() -> void:
             person.set_meta("market_queue_target",slots.pop_front())
         else:
             person.remove_meta("market_queue_target")
+
+# Asking for help is a real server activity, not a new decorative resident.
+func _assign_street_aid_spots() -> void:
+    if not _current_place in ["MARKET","BAKERY"] or _apartment_active:return
+    var spots: Array[Vector3]=[]
+    if _current_place=="MARKET":
+        spots=[Vector3(-11.0,0,0.0),Vector3(-3.4,0,0.0),Vector3(-11.0,0,-1.5)]
+    else:
+        spots=[Vector3(-2.7,0,5.7),Vector3(-2.7,0,8.3),Vector3(-1.6,0,9.0)]
+    var people := _residents_root.get_children()
+    people.sort_custom(func(a,b): return str(a.get_meta("resident_id","")) < str(b.get_meta("resident_id","")))
+    for child in people:
+        var person := child as Node3D
+        if str(person.get_meta("activity",""))=="ASKING_FOR_HELP":
+            while not spots.is_empty():
+                var at: Vector3=spots.pop_front()
+                if not _can_stand(at,WALKER_RADIUS):continue
+                if not person.has_meta("pre_aid_anchor"):
+                    person.set_meta("pre_aid_anchor",person.get_meta("anchor",person.position))
+                if not (_dialog_panel.visible and _dialog_target==str(person.get_meta("resident_id",""))):
+                    person.position=at
+                    person.set_meta("anchor",at)
+                break
+        elif person.has_meta("pre_aid_anchor"):
+            person.set_meta("anchor",person.get_meta("pre_aid_anchor"))
+            person.remove_meta("pre_aid_anchor")
 
 func _sync_office_joker() -> void:
     if _current_place!="OFFICE" or _apartment_active:return
@@ -5683,6 +5710,8 @@ func _create_interface() -> void:
     more_choices.add_child(_button(tr("Offer support"),_send_dialog.bind("I'm here for you.")))
     more_choices.add_child(_button(tr("Ask about shared memories"),_send_dialog.bind("What do you remember about me?")))
     more_choices.add_child(_button(tr("Offer bread"),_send_dialog.bind("Offer bread")))
+    more_choices.add_child(_button(tr("Give 2 EUR"),_send_dialog.bind("Give 2 EUR")))
+    more_choices.add_child(_button(tr("Decline request"),_send_dialog.bind("Decline request")))
     more_choices.add_child(_button(tr("Offer water"),_send_dialog.bind("Offer water")))
     more_choices.add_child(_button(tr("Ask for bread"),_send_dialog.bind("Ask for bread")))
     more_choices.add_child(_button(tr("Ask for water"),_send_dialog.bind("Ask for water")))
@@ -5901,6 +5930,8 @@ func _open_dialog(preferred_id: String = "") -> void:
     var known := str(person.get_meta("known_name",""))
     _dialog_reply.text = tr("They know you as %s") % known if not known.is_empty() else (
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
+    if str(person.get_meta("activity",""))=="ASKING_FOR_HELP":
+        _dialog_reply.text=_reply_translate("Excuse me, could you spare a little change?")
     _dialog_input.clear()
     _dialog_history.clear()
     _dialog_history.append_text(_dialog_reply.text+"\n")
