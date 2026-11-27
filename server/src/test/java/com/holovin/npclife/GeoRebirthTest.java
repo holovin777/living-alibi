@@ -290,6 +290,28 @@ class GeoRebirthTest {
         assertEquals(c.homeUnit,p.homeUnit);
         assertTrue(ParentingLife.view(t,c).isEmpty());
     }
+    @Test void newbornCanLeaveHomeAndMissingReportDoesNotMoveTheChild(){
+        var s=new WorldState();var t=TownLife.create(s);
+        PopulationGenerator.add(t,20);
+        RebirthLife.enableRandomBirth(t,true);
+        assertTrue(InitialFamilyLife.start(t,s));
+        var c=RebirthLife.child(t);
+        s.minute=420;
+        RebirthLife.childExit(t,s);
+        assertFalse(EarlyChildhoodLife.atHome(c));
+        assertEquals("OUTSIDE_HOME",c.activity);
+        s.minute=435;ChildSearchLife.tick(t,s);
+        var p=ParentingLife.parents(t,c).getFirst();
+        // No parent is physically in the child's public space.
+        s.minute=465;ChildSearchLife.tick(t,s);
+        assertTrue(ChildSearchLife.view(t,c,s).policeReported());
+        assertEquals(c.home,c.place);
+        assertEquals(0,c.age);
+        RebirthLife.childReturn(t);
+        s.minute=480;ChildSearchLife.tick(t,s);
+        assertTrue(EarlyChildhoodLife.atHome(c));
+        assertEquals("NONE",ChildSearchLife.view(t,c,s).status());
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

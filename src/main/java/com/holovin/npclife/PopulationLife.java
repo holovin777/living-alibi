@@ -81,9 +81,9 @@ final class PopulationLife {
         if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
             RebirthLife.resumeRoutine(town);manual=null;
         }
-        TownLife.Place search=child||sick||homeService||residentService!=null||freightRun||condominiumRepair||condominiumCleaning||postalRound||publicSafety
+        TownLife.Place search=child||sick||homeService||residentService!=null||freightRun||condominiumRepair||condominiumCleaning||postalRound
                 ?null:ChildSearchLife.destination(town,c,clock);
-        if(ChildhoodPrologue.active(town,c))desired=c.home;
+        if(ChildhoodPrologue.active(town,c)&&manual==null)desired=c.home;
         else if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;
         else if(search!=null)desired=search;
@@ -184,6 +184,8 @@ final class PopulationLife {
             TownLife.publish(town,clock,c.id,c.place,c.name+" drank water.",events,observations);
         }
         if(search!=null&&manual==null)c.activity="SEARCHING_FOR_CHILD";
+        else if(RebirthLife.childOutsideHome(town,c))c.activity="OUTSIDE_HOME";
+        else if(RebirthLife.freeChild(town,c)&&manual!=null)c.activity="FREE_TIME";
         else if(sleeping)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
         else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":c.place==c.home?"AT_HOME":

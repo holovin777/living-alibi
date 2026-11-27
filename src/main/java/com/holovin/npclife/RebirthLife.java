@@ -323,13 +323,31 @@ final class RebirthLife {
         if(c.age<13)return List.of(TownLife.Place.PARK,TownLife.Place.LIBRARY);
         return List.of(TownLife.Place.PARK,TownLife.Place.LIBRARY,TownLife.Place.CENTRO,TownLife.Place.PORTICI,TownLife.Place.MARKET);
     }
+    static boolean freeChild(TownLife.Town t,TownLife.Citizen c){return randomBirth(t)&&linkedChild(t,c);}
+    static boolean childOutsideHome(TownLife.Town t,TownLife.Citizen c){
+        return freeChild(t,c)&&c.place==c.home&&t.industryStocks.getOrDefault(TRAVEL,0)>0;
+    }
+    static String childExit(TownLife.Town t,WorldState s){
+        var c=child(t);
+        if(!freeChild(t,c)||!EarlyChildhoodLife.atHome(c))throw new IllegalArgumentException("Approach your home exit.");
+        int index=PlayerLife.publicPlaces().indexOf(c.home);
+        if(index<0)throw new IllegalArgumentException("No public street at this address.");
+        t.industryStocks.put(TRAVEL,index+1);c.activity="OUTSIDE_HOME";
+        ChildSearchLife.departed(t,c,s);
+        return "Left the family home.";
+    }
+    static int childRoad(TownLife.Town t,TownLife.Place destination,int day,int minute){
+        var c=child(t);
+        if(!freeChild(t,c)||EarlyChildhoodLife.atHome(c)||!adjacent(c.place,destination))throw new IllegalArgumentException("Follow an adjacent road.");
+        return childTravel(t,destination,day,minute);
+    }
     static TownLife.Place childOuting(TownLife.Town t,TownLife.Citizen c,int day,int minute){
         if(!linkedChild(t,c))return null;
         int n=t.industryStocks.getOrDefault(TRAVEL,0);
         var places=PlayerLife.publicPlaces();
         if(n<=0||n>places.size())return null;
         var destination=places.get(n-1);
-        if(EmploymentLife.sick(c,day)||!childDestinations(c).contains(destination)){
+        if(EmploymentLife.sick(c,day)||(!freeChild(t,c)&&!childDestinations(c).contains(destination))){
             t.industryStocks.put(TRAVEL,0);
             return null;
         }
@@ -337,22 +355,24 @@ final class RebirthLife {
     }
     static int childTravel(TownLife.Town t,TownLife.Place destination,int day,int minute){
         var c=child(t);
-        if(!linkedChild(t,c)||!awakePresent(c)||EmploymentLife.sick(c,day)||!outingHours(c,minute)
-                ||!childDestinations(c).contains(destination))
+        boolean free=freeChild(t,c);
+        if(!linkedChild(t,c)||c.travelRemaining>0||EmploymentLife.sick(c,day)||(!free&&(!awakePresent(c)||!outingHours(c,minute)
+                ||!childDestinations(c).contains(destination)))||!PlayerLife.publicPlaces().contains(destination))
             throw new IllegalArgumentException("This outing is not available at your age, time or condition.");
         int duration=TownLife.travelTime(c.place,destination);
-        if(minute+duration>=outingEnd(c))throw new IllegalArgumentException("It is time to return home.");
+        if(!free&&minute+duration>=outingEnd(c))throw new IllegalArgumentException("It is time to return home.");
         t.industryStocks.put(TRAVEL,PlayerLife.publicPlaces().indexOf(destination)+1);
         if(duration>0){c.destination=destination;c.travelRemaining=duration;c.activity="TRAVELING";}
         return duration;
     }
     static int childReturn(TownLife.Town t){
         var c=child(t);
-        if(!linkedChild(t,c)||c.age<6||c.travelRemaining>0||t.industryStocks.getOrDefault(TRAVEL,0)==0)
+        if(!linkedChild(t,c)||(!freeChild(t,c)&&c.age<6)||c.travelRemaining>0||t.industryStocks.getOrDefault(TRAVEL,0)==0)
             throw new IllegalArgumentException("No active outing to end.");
         t.industryStocks.put(TRAVEL,0);
         int duration=TownLife.travelTime(c.place,c.home);
         if(duration>0){c.destination=c.home;c.travelRemaining=duration;c.activity="TRAVELING";}
+        else c.activity="AT_HOME";
         return duration;
     }
     record Hobby(String id,String label,int minutes){}
@@ -743,7 +763,7 @@ final class RebirthLife {
         }
         throw new IllegalArgumentException("This medical service is unavailable.");
     }
-    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,int extendedWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery,Cafe cafe,Medical medical,EducationLife.College college,List<TechnicalWorkLife.LinkedOrder> engineeringOrders,List<SoftwareLife.ProjectView> softwareProjects,JavaTicketLife.Workspace javaWorkspace,SportLife.View sports,DojoLife.View dojo,DojoCommunityLife.View dojoCommunity,KumiteLife.View kumite,boolean randomBirth,EarlyChildhoodLife.View earlyChildhood,ChildhoodPrologue.View prologue,boolean familyAtHome,List<ParentingLife.Notice> parenting){}
+    record Report(String phase,List<Family> families,String childName,int age,String parentA,String parentB,String district,boolean preview,int maxWaitDays,int extendedWaitDays,String schoolFocus,Map<String,Integer> skills,int schoolDays,List<Conversation> conversations,Identity identity,AdultOptions adultOptions,List<PastLife> pastLives,ChildOptions childOptions,FamilyOptions familyOptions,HomeOptions homeOptions,Grocery grocery,Cafe cafe,Medical medical,EducationLife.College college,List<TechnicalWorkLife.LinkedOrder> engineeringOrders,List<SoftwareLife.ProjectView> softwareProjects,JavaTicketLife.Workspace javaWorkspace,SportLife.View sports,DojoLife.View dojo,DojoCommunityLife.View dojoCommunity,KumiteLife.View kumite,boolean randomBirth,EarlyChildhoodLife.View earlyChildhood,ChildhoodPrologue.View prologue,boolean familyAtHome,List<ParentingLife.Notice> parenting,boolean childOutsideHome,ChildSearchLife.View childSearch){}
     static Report report(TownLife.Town t,int day){return report(t,day,0);}
     static Report report(TownLife.Town t,int day,int minute){
         int phase=phase(t);var c=child(t);
@@ -753,6 +773,6 @@ final class RebirthLife {
         if(c!=null)for(String subject:EducationLife.SUBJECTS)skills.put(subject,EducationLife.get(t,c,subject));
         var conversations=conversationPartners(t,day).stream().map(p->new Conversation(p.id,p.name)).toList();
         return new Report(phase==CHOICE?"CHOICE":phase==CHILDHOOD?"CHILDHOOD":phase==LINKED_ADULT?"LINKED_ADULT":"ADULT",phase==CHOICE&&!randomBirth(t)?families(t,day):List.of(),
-            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),extendedWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day,minute),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute),EducationLife.college(t,day,minute),TechnicalWorkLife.linkedOrders(t,day,minute),SoftwareLife.projects(t,day,minute),JavaTicketLife.workspace(t,day,minute),SportLife.view(t,c,day,minute),DojoLife.view(t,c,day,minute),DojoCommunityLife.view(t,day,minute),KumiteLife.view(t,c,day,minute),randomBirth(t),EarlyChildhoodLife.view(t),ChildhoodPrologue.view(t),EarlyChildhoodLife.atHome(c),ParentingLife.view(t,c));
+            c==null?null:c.name,c==null?0:c.age,a==null?null:a.name,b==null?null:b.name,c==null?null:c.home.label,phase==CHILDHOOD,maxWaitDays(t),extendedWaitDays(t),c==null||c.age<6?null:storedFocus(t),skills,c==null?0:EducationLife.get(t,c,"school-days"),conversations,identity(t,c),adultOptions(t,day),history(t),childOptions(t,day,minute),familyOptions(t,day),homeOptions(t,day,minute),grocery(t,day,minute),cafe(t,day,minute),medical(t,day,minute),EducationLife.college(t,day,minute),TechnicalWorkLife.linkedOrders(t,day,minute),SoftwareLife.projects(t,day,minute),JavaTicketLife.workspace(t,day,minute),SportLife.view(t,c,day,minute),DojoLife.view(t,c,day,minute),DojoCommunityLife.view(t,day,minute),KumiteLife.view(t,c,day,minute),randomBirth(t),EarlyChildhoodLife.view(t),ChildhoodPrologue.view(t),EarlyChildhoodLife.atHome(c),ParentingLife.view(t,c),childOutsideHome(t,c),ChildSearchLife.view(t,c,day,minute));
     }
 }

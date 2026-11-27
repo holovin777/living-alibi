@@ -417,6 +417,9 @@ func _process(delta: float) -> void:
         if prologue is Dictionary:
             var remaining:=maxi(0,int(prologue.get("totalSeconds",1800))-int(prologue.get("elapsedSeconds",0)))
             _hint.text=tr("Childhood: %02d:%02d remaining · F: family activities") % [int(remaining/60),remaining%60]
+            var search= _last_snapshot.get("rebirth",{}).get("childSearch")
+            if search is Dictionary and str(search.get("status","NONE")) not in ["NONE","LOCATED"]:
+                _hint.text+="\n"+("Police notified / Polizia avvisata" if bool(search.get("policeReported",false)) else "Family is looking for you / La famiglia ti cerca")
             return
         if not _nearest_resident().is_empty():
             _hint.text=tr("Talk: approach someone and press T or click on them.")
@@ -634,7 +637,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                         _town_audio.play_effect("door")
                         _hands.reach()
                 elif action=="exit":
-                    _request_home_transition("rebirth-home-exit")
+                    _request_home_transition("rebirth-child-exit" if str(_last_snapshot.get("rebirth",{}).get("phase",""))=="CHILDHOOD" else "rebirth-home-exit")
                 elif not action.is_empty():
                     _garden_action("rebirth-home-"+action)
                 get_viewport().set_input_as_handled()
@@ -675,7 +678,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_E and _near_family_entrance() and not _action_panel.visible:
-                _request_home_transition("rebirth-home-go")
+                _request_home_transition("rebirth-child-home" if str(_last_snapshot.get("rebirth",{}).get("phase",""))=="CHILDHOOD" else "rebirth-home-go")
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_F:
                 _grocery_menu=false
@@ -2128,7 +2131,7 @@ func _try_road_crossing(motion: Vector3) -> void:
     var lateral := _avatar.position - direction * _avatar.position.dot(direction)
     _road_arrival = lateral - direction * 23.0
     if _rebirth_active():
-        _api.garden_action("rebirth-road-"+destination)
+        _api.garden_action(("rebirth-child-road-" if str(_last_snapshot.get("rebirth",{}).get("phase",""))=="CHILDHOOD" else "rebirth-road-")+destination)
     else:
         _api.go_to(destination)
 
@@ -6803,7 +6806,7 @@ func _rebirth_active() -> bool:
 func _child_can_walk() -> bool:
     var r: Dictionary = _last_snapshot.get("rebirth",{})
     var age:=int(r.get("age",0))
-    var min_age:=0 if r.get("prologue") is Dictionary and _apartment_active else 3
+    var min_age:=0 if bool(r.get("randomBirth",false)) else 3
     return str(r.get("phase","")) == "LINKED_ADULT" or (str(r.get("phase","")) == "CHILDHOOD" and age >= min_age and age < 18)
 
 func _office_station() -> String:
@@ -9347,7 +9350,8 @@ func _wait_one_hour() -> void:
         _api.wait_for(60)
 
 func _can_walk_roads() -> bool:
-    return not _stairwell_active and not _apartment_active and (not _rebirth_active() or str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT")
+    var life: Dictionary=_last_snapshot.get("rebirth",{})
+    return not _stairwell_active and not _apartment_active and (not _rebirth_active() or str(life.get("phase",""))=="LINKED_ADULT" or (str(life.get("phase",""))=="CHILDHOOD" and bool(life.get("randomBirth",false))))
 
 func _near_family_entrance() -> bool:
     return is_instance_valid(_home_entrance) and _home_entrance.visible and not _apartment_active and _avatar.position.distance_to(_home_entrance.position)<2.0
@@ -9379,6 +9383,8 @@ func _apartment_action() -> String:
     if not _apartment_active:
         return ""
     var home = _last_snapshot.get("rebirth",{}).get("homeOptions")
+    if str(_last_snapshot.get("rebirth",{}).get("phase",""))=="CHILDHOOD":
+        return _apartment.nearby_action(_avatar.position,[])
     return _apartment.nearby_action(_avatar.position,home.get("actions",[])) if home is Dictionary else ""
 
 func _guest_action(action: String) -> void:
@@ -9976,8 +9982,8 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _sync_custody(player.get("justice",{}))
     var home = snapshot.get("rebirth",{}).get("homeOptions")
     var life: Dictionary=snapshot.get("rebirth",{})
-    if str(life.get("phase",""))=="CHILDHOOD" and bool(life.get("familyAtHome",false)):
-        home={"atHome":true}
+    if str(life.get("phase",""))=="CHILDHOOD":
+        home={"atHome":bool(life.get("familyAtHome",false)),"outsideHome":bool(life.get("childOutsideHome",false))}
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
         _apartment.set_furniture_level(int(home.get("furnitureLevel",0)))

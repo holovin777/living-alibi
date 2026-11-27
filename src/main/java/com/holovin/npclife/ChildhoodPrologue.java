@@ -25,16 +25,18 @@ final class ChildhoodPrologue {
         int next=Math.min(TOTAL_SECONDS,elapsed(t,c)+STEP_SECONDS);
         t.industryStocks.put(key(c),next);
         int target=next/100;
-        if(target>=18&&!EarlyChildhoodLife.atHome(c))return "Returning to your family home.";
+        if(target>=18&&c.travelRemaining>0)return "Finishing your journey.";
         c.age=Math.max(c.age,target);
         if(c.age>=18){
             // Unlock adult systems without fabricating school attendance or wages.
             EducationLife.graduate(t,c);
             c.occupation="Job seeker";c.employed=false;c.unemploymentDays=0;
+            boolean home=EarlyChildhoodLife.atHome(c);
             RebirthLife.continueAdult(t);
-            RebirthLife.goHome(t);
+            if(home)RebirthLife.goHome(t);
+            else if(PlayerLife.publicPlaces().contains(c.place))RebirthLife.holdPublicPlace(t,c);
             RebirthLife.synchronize(t);
-            return "You are now eighteen. Begin adult life at your family home.";
+            return "You are now eighteen. Your family home remains available.";
         }
         return "Childhood continues.";
     }
