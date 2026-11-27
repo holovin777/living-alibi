@@ -646,6 +646,7 @@ public final class GameSession implements AutoCloseable {
         var target=geoDrive==null?new GeoProjection.Point(x,z):geoDrive.position(map);
         updateGeoResponse(map,target);
         if(JusticeLife.confined(town)||RebirthLife.active(town)||!town.player.alive||geoInterior!=null&&town.player.place!=geoInterior)geoInterior=null;
+        if(geoInterior!=null&&GeoProjection.residential(geoInterior)&&!GeoProjection.ownHome(town,state)&&!IntercomLife.insideVisit(town,state.day,state.minute))geoInterior=null;
         return map.view(town,state,target,geoResponse==null?null:geoResponse.view(map),geoInterior);
     }
     synchronized void geoTick(int minutes) throws SQLException {
@@ -663,6 +664,8 @@ public final class GameSession implements AutoCloseable {
         if(geoInterior!=null){
             var door=map.point(geoInterior);
             if(Math.hypot(x-door.x(),z-(door.z()+5.6))>3)throw new IllegalArgumentException("Approach the exit door.");
+            var visit=IntercomLife.apartment(town,state.day,state.minute);
+            if(visit!=null&&"VISITING".equals(visit.status()))gardenAction("intercom:leave:1:"+visit.residentId());
             geoInterior=null;return;
         }
         var place=PlayerLife.destination(destination);
@@ -687,12 +690,26 @@ public final class GameSession implements AutoCloseable {
     synchronized GeoProjection.ActionResult geoAction(GeoProjection map,String action,double x,double z)throws SQLException{
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
         if(geoInterior!=null&&action!=null&&GeoProjection.outsideAction(action))throw new IllegalArgumentException("Leave the building first.");
-        if(action==null||map.choices(town,state,new GeoProjection.Point(x,z)).stream().noneMatch(a->a.id().equals(action)))
+        var at=new GeoProjection.Point(x,z);
+        if(action==null||map.view(town,state,at,null,geoInterior).actions().stream().noneMatch(a->a.id().equals(action)))
             throw new IllegalArgumentException("This action is not available here.");
         var before=town.player.place;
+        if(action.equals("home-enter")){geoInterior=before;return new GeoProjection.ActionResult("Welcome home.",null);}
+        if(action.startsWith("intercom:")){
+            var result=gardenAction(action);
+            if(action.startsWith("intercom:enter:")&&IntercomLife.insideVisit(town,state.day,state.minute))geoInterior=before;
+            return new GeoProjection.ActionResult(result.message(),null);
+        }
         String[] parts=action.split(":",2);
         String arg=parts.length>1?parts[1]:"";
         ActionView result=switch(parts[0]){
+            case "home-rent" -> rentRoom();
+            case "home-buy" -> buyHouse();
+            case "home-wash" -> washInRoom();
+            case "home-cook" -> cookRoomMeal();
+            case "home-sleep" -> sleepInRoom(Integer.parseInt(arg));
+            case "home-store" -> transferRoomItem(arg,true);
+            case "home-take" -> transferRoomItem(arg,false);
             case "rest" -> rest(15);
             case "consume" -> consume(arg);
             case "fountain" -> drink("park-fountain");

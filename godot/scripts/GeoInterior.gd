@@ -56,6 +56,9 @@ func build(record: Dictionary) -> void:
     _box(Vector3(0,1.65,7),Vector3(14,3.3,0.25),accent)
     _box(Vector3(0,1.05,6.83),Vector3(1.8,2.1,0.12),Color("#415b56"),false)
     _sign("USCITA / EXIT · E",Vector3(0,2.5,6.7))
+    if kind=="HOME":
+        _home()
+        return
     # Back-wall furnishings leave the resident grid and central aisle clear.
     match kind:
         "MARKET","BAKERY","LIBRARY":
@@ -114,3 +117,45 @@ func build(record: Dictionary) -> void:
         add_child(lamp)
         _box(Vector3(x,3.12,0),Vector3(1.7,0.12,0.65),Color("#f5ecd5"),false)
     _sign(str(record.get("label","")),Vector3(0,2.9,-6.72))
+
+func _home() -> void:
+    # Four functional zones around an unobstructed central hallway.
+    var wood:=Color("#b38c62")
+    var linen:=Color("#e3dfd1")
+    var tiles:=Color("#b7c7c4")
+    _box(Vector3(-3.5,0.025,-3.5),Vector3(6.5,0.05,6.5),Color("#b8a083"),false)
+    _box(Vector3(3.5,0.025,-3.5),Vector3(6.5,0.05,6.5),tiles,false)
+    _box(Vector3(-3.5,0.025,3.5),Vector3(6.5,0.05,6.5),Color("#c3ad91"),false)
+    _box(Vector3(3.5,0.025,3.5),Vector3(6.5,0.05,6.5),Color("#d1d6d3"),false)
+    # Bedroom: bed, pillows and wardrobe.
+    _box(Vector3(-4.8,0.32,-5.4),Vector3(2.1,0.64,2.5),wood)
+    _box(Vector3(-4.8,0.73,-5.4),Vector3(2,0.20,2.4),linen)
+    _box(Vector3(-4.8,0.86,-6.2),Vector3(1.65,0.15,0.5),Color("#f8f3e6"),false)
+    _box(Vector3(-2.2,1.0,-6.2),Vector3(1.5,2.0,0.8),wood)
+    _sign("CAMERA / BEDROOM",Vector3(-4.5,2.75,-6.7))
+    # Kitchen: counter, sink, hob and refrigerator.
+    _box(Vector3(3.3,0.5,-6.15),Vector3(4.0,1.0,0.85),wood)
+    _box(Vector3(3.3,1.04,-6.15),Vector3(4.1,0.10,0.95),Color("#9faaa9"))
+    _box(Vector3(2.2,1.11,-6.1),Vector3(0.8,0.06,0.55),Color("#67797d"),false)
+    _box(Vector3(4.4,1.11,-6.1),Vector3(0.85,0.05,0.55),Color("#343739"),false)
+    _box(Vector3(6.15,1.0,-5.9),Vector3(0.9,2.0,0.95),linen)
+    _sign("CUCINA / KITCHEN",Vector3(3.6,2.75,-6.7))
+    # Living room and dining table.
+    _box(Vector3(-5.6,0.40,4.8),Vector3(1.5,0.8,2.6),Color("#788a7c"))
+    _box(Vector3(-6.12,1.03,4.8),Vector3(0.38,0.85,2.6),Color("#788a7c"))
+    _box(Vector3(-3.0,0.47,4.5),Vector3(1.7,0.94,1.1),wood)
+    _box(Vector3(-3,1.22,6.55),Vector3(1.8,1.0,0.15),Color("#30373b"),false)
+    _sign("SOGGIORNO / LIVING",Vector3(-4,2.75,6.65))
+    # Bathroom behind a partition; functional washing is handled by Java.
+    _box(Vector3(3.8,1.4,2.7),Vector3(4.5,2.8,0.13),Color("#c4cecc"))
+    _box(Vector3(5.6,0.35,5.6),Vector3(1.7,0.7,1.2),linen)
+    _box(Vector3(2.2,0.43,6),Vector3(0.7,0.86,0.6),linen)
+    _box(Vector3(2.2,1.35,6.72),Vector3(0.7,0.8,0.06),Color("#aec8cb"),false)
+    _box(Vector3(6.4,0.45,3.5),Vector3(0.65,0.9,0.65),linen)
+    _sign("BAGNO / BATHROOM",Vector3(4.5,2.75,6.65))
+    for x in [-3.5,3.5]:
+        var light:=OmniLight3D.new()
+        light.position=Vector3(x,2.95,0)
+        light.light_energy=1.7
+        light.omni_range=13
+        add_child(light)

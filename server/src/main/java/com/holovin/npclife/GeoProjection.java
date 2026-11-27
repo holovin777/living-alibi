@@ -133,6 +133,69 @@ final class GeoProjection {
         Point at=point(c.place);int h=c.id.hashCode();
         return new Point(at.x+(Math.floorMod(h,7)-3)*.6,at.z+(Math.floorMod(h/7,7)-3)*.6);
     }
+    static boolean ownHome(TownLife.Town t,WorldState s){
+        var p=t.player;
+        return p.place==HousingLife.HOUSE_DISTRICT&&p.ownsHouse||
+            p.place==HousingLife.DISTRICT&&HousingLife.active(p,s.day,s.minute);
+    }
+    static boolean residential(TownLife.Place p){return p==HousingLife.DISTRICT||p==HousingLife.HOUSE_DISTRICT;}
+    List<Actor> homeActors(TownLife.Town t,WorldState s,TownLife.Place place){
+        var visit=IntercomLife.apartment(t,s.day,s.minute);
+        if(visit==null||!"VISITING".equals(visit.status()))return List.of();
+        var host=t.people.get(visit.residentId());
+        var members=t.people.values().stream().filter(c->HouseholdLife.availableMember(host,c))
+            .sorted(Comparator.comparing((TownLife.Citizen c)->!c.id.equals(host.id)).thenComparing(c->c.id)).limit(8).toList();
+        Point center=point(place);
+        var result=new ArrayList<Actor>();
+        for(int i=0;i<members.size();i++){
+            var c=members.get(i);
+            String activity=HomeRoutineLife.activity(t,c,s.day,s.minute);
+            double x=-4.5+(i%4)*3,z=-1.5+(i/4)*3;
+            String pose=switch(activity){case "COOKING","CLEANING"->"SERVE";case "HOMEWORK","READING","FAMILY_DINNER"->"DESK";default->"STAND";};
+            result.add(new Actor(c.id,center.x+x,center.z+z,activity,true,pose,0,"","",GameSession.appearanceStage(c)));
+        }
+        return List.copyOf(result);
+    }
+    List<Choice> homeChoices(TownLife.Town t,WorldState s,Point player,TownLife.Place room){
+        var result=new ArrayList<Choice>();
+        if(!t.player.alive||JusticeLife.confined(t)||RebirthLife.active(t)||t.player.travelRemaining>0)return result;
+        var visit=IntercomLife.apartment(t,s.day,s.minute);
+        if(room!=null&&residential(room)){
+            if(visit!=null&&"VISITING".equals(visit.status())){
+                for(String action:List.of("talk","coffee","snack","dinner","rest"))
+                    result.add(new Choice("intercom:"+action+":1:"+visit.residentId(),switch(action){
+                        case "talk"->"Chat / Conversa";case "coffee"->"Share coffee / Caffè";
+                        case "snack"->"Share a snack / Merenda";case "dinner"->"Share dinner / Cena";
+                        default->"Relax together / Riposate";}));
+            }else if(ownHome(t,s)){
+                result.add(new Choice("home-wash","Wash / Lavati"));
+                result.add(new Choice("home-cook","Cook bread soup / Zuppa di pane"));
+                result.add(new Choice("home-sleep:1","Sleep 1 hour / Dormi 1 ora"));
+                result.add(new Choice("home-sleep:8","Sleep 8 hours / Dormi 8 ore"));
+                for(String id:List.of("bread","water","pizza","gelato","grape-juice")){
+                    if(FoodLife.quantity(t.player,id,false)>0)result.add(new Choice("home-store:"+id,"Store / Conserva "+id));
+                    if(FoodLife.quantity(t.player,id,true)>0)result.add(new Choice("home-take:"+id,"Retrieve / Prendi "+id));
+                }
+            }
+            return List.copyOf(result);
+        }
+        if(room!=null||!residential(t.player.place)||point(t.player.place).distance(player)>18)return List.of();
+        if(t.player.place==HousingLife.DISTRICT&&!t.player.ownsHouse)
+            result.add(new Choice("home-rent","Rent guest room / Affitta stanza · €35 / 7 days"));
+        if(t.player.place==HousingLife.HOUSE_DISTRICT&&!t.player.ownsHouse)
+            result.add(new Choice("home-buy","Buy house / Compra casa · €320"));
+        if(ownHome(t,s))result.add(new Choice("home-enter","Enter your home / Entra in casa"));
+        for(var entry:AddressLife.contacts(t)){
+            int building=AddressLife.sharedBuilding(t,entry.residentId());
+            if(building==0||!t.player.place.name().equals(entry.district()))continue;
+            String name=entry.name();
+            result.add(new Choice("intercom:ring:"+building+":"+entry.residentId(),"Ring / Citofona "+name+" · "+entry.address()));
+            result.add(new Choice("intercom:visit:"+building+":"+entry.residentId(),"Doorstep chat / Parla alla porta · "+name));
+            if(building==1)result.add(new Choice("intercom:invite:1:"+entry.residentId(),"Ask to come inside / Chiedi di entrare · "+name));
+        }
+        if(visit!=null&&"INVITED".equals(visit.status()))result.add(new Choice("intercom:enter:1:"+visit.residentId(),"Accept invitation / Entra su invito"));
+        return List.copyOf(result);
+    }
     static boolean hasInterior(TownLife.Place p){
         return switch(p){case MARKET,BAKERY,CAFE,SCHOOL,CLINIC,WORKSHOP,LIBRARY,OFFICE,FACTORY->true;default->false;};
     }
@@ -318,11 +381,16 @@ final class GeoProjection {
         var visiblePatrols=new ArrayList<>(patrols(t,s,player));
         if(response!=null){visiblePatrols.removeIf(patrol->patrol.id().equals(response.id()));visiblePatrols.add(0,response);}
         if(visiblePatrols.size()>6)visiblePatrols.subList(6,visiblePatrols.size()).clear();
-        var inside=room==null?List.<Actor>of():interiorActors(t,room);
-        var interior=room==null?null:new Interior(room.name(),room.label,point(room).x,point(room).z,inside.size());
+        var inside=room==null?List.<Actor>of():residential(room)?homeActors(t,s,room):interiorActors(t,room);
+        var visit=IntercomLife.apartment(t,s.day,s.minute);
+        boolean privateRoom=room!=null&&residential(room);
+        var interior=room==null?null:new Interior(privateRoom?"HOME":room.name(),privateRoom?(visit!=null&&"VISITING".equals(visit.status())?"Apartment / Appartamento "+visit.unit():"Your home / Casa tua"):room.label,point(room).x,point(room).z,inside.size());
+        var availableActions=new ArrayList<Choice>();
+        if(!privateRoom)availableActions.addAll(choices(t,s,player).stream().filter(a->room==null||!outsideAction(a.id())).toList());
+        availableActions.addAll(homeChoices(t,s,player,room));
         return new View(s.day,s.minute,population,commuting,room==null?List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))):inside,
             district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player).stream().filter(a->room==null||!outsideAction(a.id())).toList(),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(player))).limit(32).toList():List.of(),interior);
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(player))).limit(32).toList():List.of(),interior);
     }
 }
