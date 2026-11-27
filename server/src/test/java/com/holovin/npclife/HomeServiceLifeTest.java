@@ -263,4 +263,31 @@ class HomeServiceLifeTest {
         VocationalLife.set(t,"mechanical:certificate",0);
         assertFalse(PlayerRepairLife.offer(t,customer));
     }
+    @Test void supervisedTrainingRequiresAvailableMentorAndCorrectDiagnosis(){
+        var s=new WorldState();s.day=36;s.minute=600;var t=TownLife.create(s);
+        t.player.place=WORKSHOP;t.player.money=100;
+        var mentor=new TownLife.Citizen("mentor-tech","Mentor","Mechanic",WORKSHOP);
+        mentor.age=40;mentor.generationIndex=991;mentor.lastHiredDay=1;mentor.activity="WORKING";
+        mentor.home=NORTH_RESIDENCES;mentor.fatigue=0;t.people.put(mentor.id,mentor);
+        EducationLife.set(t,mentor,"technical",70);
+        assertEquals("Student",ApprenticeshipLife.rank(t));
+        assertThrows(IllegalArgumentException.class,()->ApprenticeshipLife.act(t,s,"start:"+mentor.id));
+        VocationalLife.set(t,"mechanical:certificate",1);
+        assertEquals("Trainee",ApprenticeshipLife.rank(t));
+        int skill=t.player.engineeringSkill;
+        ApprenticeshipLife.act(t,s,"start:"+mentor.id);
+        assertFalse(ApprenticeshipLife.answerReady(t,s));
+        s.minute=630;mentor.place=PARK;ApprenticeshipLife.tick(t,s);
+        assertEquals(0,ApprenticeshipLife.get(t,"mentor"));
+        assertThrows(IllegalArgumentException.class,()->ApprenticeshipLife.act(t,s,"start:"+mentor.id));
+        mentor.place=WORKSHOP;
+        for(int i=0;i<3;i++){
+            s.day=37+i;s.minute=600;ApprenticeshipLife.act(t,s,"start:"+mentor.id);
+            s.minute=630;assertTrue(ApprenticeshipLife.answerReady(t,s));
+            ApprenticeshipLife.act(t,s,"answer:"+PlayerRepairLife.part(ApprenticeshipLife.get(t,"fault")));
+        }
+        assertEquals(3,ApprenticeshipLife.get(t.copy(),"sessions"));
+        assertEquals("Apprentice",ApprenticeshipLife.rank(t));
+        assertEquals(skill+3,t.player.engineeringSkill);assertEquals(100,t.player.money);
+    }
 }

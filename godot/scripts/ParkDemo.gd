@@ -8001,6 +8001,7 @@ func _render_actions() -> void:
         "LOGISTICS_DEPOT":
             _render_logistics(logistics)
         "WORKSHOP":
+            _render_apprenticeship()
             _render_repair_business()
             _render_home_goods()
             _render_logistics(logistics)
@@ -8438,6 +8439,28 @@ func _render_factory_report() -> void:
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
 
+func _render_apprenticeship() -> void:
+    var report: Dictionary = _last_snapshot.get("apprenticeship",{})
+    if report.is_empty():return
+    var progress := Label.new()
+    progress.text=tr("Career rank")+": "+tr(str(report.get("rank","Student")))+" · "+tr("Practice")+": "+str(report.get("sessions",0))+" · "+tr("Repairs")+": "+str(report.get("repairs",0))
+    progress.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _action_choices.add_child(progress)
+    for mentor in report.get("mentors",[]):
+        _action_choices.add_child(_button(tr("Train with")+" "+str(mentor.get("name",""))+" · 30 min",_garden_action.bind("apprentice:start:"+str(mentor.get("id","")))))
+    if bool(report.get("active",false)):
+        var status := Label.new()
+        status.text=tr("Mentor")+": "+str(report.get("mentor",""))
+        _action_choices.add_child(status)
+        if bool(report.get("canAnswer",false)):
+            var reading := Label.new()
+            reading.text=tr(str(report.get("reading","")))
+            reading.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            _action_choices.add_child(reading)
+            for part in ["pump","sensor","controller"]:
+                _action_choices.add_child(_button(tr(str(part)),_garden_action.bind("apprentice:answer:"+str(part))))
+        _action_choices.add_child(_button(tr("Cancel training"),_garden_action.bind("apprentice:cancel")))
+
 func _render_vocational() -> void:
     var report: Dictionary = _last_snapshot.get("vocational",{})
     if report.is_empty():return
@@ -8609,6 +8632,9 @@ func _render_home_goods() -> void:
         _action_choices.add_child(info)
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("apprentice:"):
+        if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("vocational:"):
         if _current_place=="SCHOOL" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
         return
