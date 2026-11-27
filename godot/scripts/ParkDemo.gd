@@ -346,7 +346,9 @@ func _process(delta: float) -> void:
         _weather_fx.set_sheltered(true,_environment)
         var unit: int = _stairwell.near_unit(_avatar.position)
         var invitation = _last_snapshot.get("apartmentVisit")
-        if unit>0 and invitation is Dictionary and int(invitation.get("unit",0))==unit:
+        if _stairwell.near_elevator(_avatar.position):
+            _stairwell_hint.text=tr("Elevator · floor %s · E: up · R: down") % _stairwell.floor_number(_avatar.position)
+        elif unit>0 and invitation is Dictionary and int(invitation.get("unit",0))==unit:
             _stairwell_hint.text=tr("E: enter apartment %s") % unit
         elif unit>0:
             _stairwell_hint.text=tr("Apartment %s · locked") % unit
@@ -484,7 +486,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
             return
         if _stairwell_active:
-            if event.keycode==KEY_E:
+            if event.keycode in [KEY_E,KEY_R] and _stairwell.near_elevator(_avatar.position):
+                var destination: Vector3 = _stairwell.elevator_destination(_avatar.position,1 if event.keycode==KEY_E else -1)
+                if destination!=_avatar.position:
+                    _avatar.position=destination
+                    _reset_locomotion()
+                    _follow_player()
+                    _town_audio.play_effect("door")
+            elif event.keycode==KEY_E:
                 _guest_action("enter")
             if event.keycode==KEY_G and _stairwell.near_exit(_avatar.position):
                 _set_stairwell(false)

@@ -446,6 +446,17 @@ func _exercise() -> void:
     world._close_guest()
     if not _check(not world._guest_active and world._avatar.position.is_equal_approx(Vector3(-0.9,0,1)),"guest exit returns to apartment door"):
         return
+    var lift_panel := Vector3(0.9,0,0.4)
+    var upper_panel := Vector3(0.9,3.1,-7.0)
+    var top_panel := Vector3(0.9,6.2,-14.4)
+    if not _check(world._stairwell.near_elevator(lift_panel) and not world._stairwell.near_elevator(Vector3(-0.9,0,1)), "elevator panel is distinct from apartment doorway"):
+        return
+    if not _check(world._stairwell.elevator_destination(lift_panel,1).is_equal_approx(Vector3(0,3.1,-6.4)) and world._stairwell.elevator_destination(lift_panel,-1)==lift_panel, "ground-floor elevator goes up and cannot descend"):
+        return
+    if not _check(world._stairwell.elevator_destination(upper_panel,1).is_equal_approx(Vector3(0,6.2,-13.8)) and world._stairwell.elevator_destination(upper_panel,-1).is_equal_approx(Vector3(0,0,1)), "elevator reaches both neighboring floors"):
+        return
+    if not _check(world._stairwell.elevator_destination(top_panel,1)==top_panel and world._stairwell.elevator_destination(Vector3.ZERO,1)==Vector3.ZERO, "elevator respects floor limits and requires local panel"):
+        return
     world._avatar.position=world.PublicStairwell.SPAWN
     var climb: Vector3 = world._move_on_ground(world._avatar.position,Vector3(0,0,-14.8),world.WALKER_RADIUS)
     if not _check(world._stairwell_active and absf(climb.y-6.2)<0.01 and world._stairwell.floor_number(climb)==2
