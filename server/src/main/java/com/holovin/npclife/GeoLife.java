@@ -75,6 +75,10 @@ final class GeoLife {
                 if(cafe.canRest())add(result,"rebirth-cafe-rest","Coffee break / Pausa · 20 min");
                 for(var guest:cafe.guests())add(result,"rebirth-cafe-chat-"+guest.id(),"Chat at cafe / Conversa: "+guest.name());
             }
+            for(var offer:HomeMarketLife.offers(t,s.minute)){
+                if(offer.canBuy())add(result,"rebirth-property-buy-"+offer.id(),"Buy / Compra "+offer.name()+" · €"+offer.price());
+                if(offer.canSell())add(result,"rebirth-property-sell-"+offer.id(),"Sell / Vendi "+offer.name()+" · €"+(offer.resale()-offer.arrears())+" net");
+            }
             if(home!=null){
                 for(String action:home.actions())add(result,"rebirth-home-"+action,"Home / Casa: "+action);
                 if(home.atHome()){
