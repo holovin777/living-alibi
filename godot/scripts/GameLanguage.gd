@@ -24,6 +24,8 @@ const IT := {
     "Registered sporting weapon purchased.": "Arma sportiva registrata acquistata.",
     "A valid weapon license is required.": "Serve una licenza valida.",
     "Sport": "Arma sportiva",
+    "Municipal bus · 06:00–22:00 · 2 EUR": "Autobus comunale · 06:00–22:00 · 2 EUR",
+    "Bus to %s · %s min": "Autobus per %s · %s min",
     "Whole city overview": "Panoramica della città",
     "Search destinations": "Cerca destinazioni",
     "Public safety alert in this district.": "Allerta di sicurezza in questo quartiere.",

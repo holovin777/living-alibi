@@ -1,0 +1,37 @@
+package com.holovin.npclife;
+
+import java.util.List;
+import static com.holovin.npclife.TownLife.Place.*;
+
+/** Timetabled abstract municipal shuttle. Java owns time, fares and endpoints. */
+final class BusLife {
+    private BusLife(){}
+    static final int FARE=2;
+    static boolean stop(TownLife.Place p){return p==PARK||p==STAZIONE||p==WORKSHOP||CityExpansionLife.serviceHub(p);}
+    static boolean route(TownLife.Place a,TownLife.Place b){
+        if(a==b||!stop(a)||!stop(b))return false;
+        int distance=CityExpansionLife.distance(a,b);
+        return distance>0&&distance<=7;
+    }
+    static int waitMinutes(int minute){return Math.floorMod(-minute,15);}
+    static boolean open(int minute){return minute>=360&&minute+waitMinutes(minute)<1320;}
+    static int duration(TownLife.Place a,TownLife.Place b,int minute){return waitMinutes(minute)+Math.max(4,CityExpansionLife.distance(a,b)*2);}
+    record Route(String id,String label,int minutes){}
+    record View(boolean atStop,boolean available,int fare,int waitMinutes,List<Route> routes){}
+    static View view(TownLife.Town t,WorldState s){
+        var p=t.player;
+        boolean at=stop(p.place);
+        boolean available=at&&open(s.minute)&&p.alive&&!RebirthLife.active(t)&&!JusticeLife.confined(t)&&p.travelRemaining==0
+                &&!p.cycling&&(!p.ownsBicycle||p.bicycleParked!=null)&&p.money>=FARE&&!IntercomLife.insideVisit(t,s.day,s.minute);
+        return new View(at,available,FARE,waitMinutes(s.minute),at?PlayerLife.publicPlaces().stream().filter(d->route(p.place,d))
+                .map(d->new Route(d.name(),d.label,duration(p.place,d,s.minute))).toList():List.of());
+    }
+    static int ride(TownLife.Town t,WorldState s,TownLife.Place destination){
+        if(!view(t,s).available()||!route(t.player.place,destination))throw new IllegalArgumentException("Bus service unavailable for this journey.");
+        int minutes=duration(t.player.place,destination,s.minute);
+        t.player.money-=FARE;
+        t.employerFunds.merge("city-maintenance",FARE,Math::addExact);
+        t.player.cycling=false;t.player.destination=destination;t.player.travelRemaining=minutes;
+        return minutes;
+    }
+}

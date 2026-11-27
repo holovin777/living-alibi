@@ -868,6 +868,9 @@ static func service_hub(id: String) -> bool:
     var cell: Vector2i = DISTRICTS[id]
     return cell.x%5==0 and cell.y%5==0
 
+static func bus_stop(id: String) -> bool:
+    return id in ["PARK","STAZIONE","WORKSHOP"] or service_hub(id)
+
 static func label_for(id: String) -> String:
     return str(LABELS.get(id,id.capitalize()))
 

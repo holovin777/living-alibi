@@ -20,6 +20,13 @@ final class CityExpansionLife {
     record Cell(int x,int y){}
     private static final List<TownLife.Place> OUTER=Arrays.stream(TownLife.Place.values()).filter(CityExpansionLife::outer).toList();
     private static final EnumMap<TownLife.Place,Cell> CELLS=build();
+    private static final List<TownLife.Place> HOMES=OUTER.stream().filter(p->p.label.startsWith("Borgata")&&cell(p).x()<=8&&cell(p).y()<=8).toList();
+    private static final EnumMap<TownLife.Place,List<TownLife.Place>> NEARBY=nearby();
+    private static EnumMap<TownLife.Place,List<TownLife.Place>> nearby(){
+        var map=new EnumMap<TownLife.Place,List<TownLife.Place>>(TownLife.Place.class);
+        for(var p:CELLS.keySet())map.put(p,OUTER.stream().filter(q->distance(p,q)<=4&&distance(p,q)>=0).toList());
+        return map;
+    }
     private static EnumMap<TownLife.Place,Cell> build(){
         var m=new EnumMap<TownLife.Place,Cell>(TownLife.Place.class);
         for(int y=0;y<CORE.length;y++)for(int x=0;x<CORE[y].length;x++)m.put(CORE[y][x],new Cell(x,y));
@@ -37,8 +44,7 @@ final class CityExpansionLife {
     static boolean serviceHub(TownLife.Place p){var c=cell(p);return outer(p)&&c.x()%5==0&&c.y()%5==0;}
     static TownLife.Place newHome(int index){
         // Keep new households in reachable residential blocks while outer services mature.
-        var residential=OUTER.stream().filter(p->p.label.startsWith("Borgata")&&cell(p).x()<=8&&cell(p).y()<=8).toList();
-        return residential.get(Math.floorMod(index,residential.size()));
+        return HOMES.get(Math.floorMod(index,HOMES.size()));
     }
     static boolean adjacent(TownLife.Place a,TownLife.Place b){return distance(a,b)==1;}
     static int distance(TownLife.Place a,TownLife.Place b){
@@ -47,7 +53,7 @@ final class CityExpansionLife {
     }
     static TownLife.Place leisure(TownLife.Citizen c,int day){
         if((day+c.generationIndex)%4==0){
-            var nearby=OUTER.stream().filter(p->distance(c.home,p)>=0&&distance(c.home,p)<=4).toList();
+            var nearby=NEARBY.getOrDefault(c.home,List.of());
             if(!nearby.isEmpty())return nearby.get(Math.floorMod(c.generationIndex*13+day*7,nearby.size()));
         }
         return SOUTH.get(Math.floorMod(c.generationIndex+day,SOUTH.size()));

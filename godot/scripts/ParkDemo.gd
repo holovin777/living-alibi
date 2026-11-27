@@ -1492,6 +1492,8 @@ func _generate_chunk(place_id: String) -> void:
         _build_public_car_park()
     if place_id in FREIGHT_DISTRICTS:
         _build_freight_parking(place_id)
+    if TownLayout.bus_stop(place_id):
+        _sign(_scenery,"BUS · Fermata · F",KIOSK_POSITION+Vector3(0,3.0,0))
     _build_road_links(place_id)
     _street_marker(place_id)
     _chunks[place_id] = {
@@ -6554,6 +6556,8 @@ func _render_barber() -> void:
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _custody_active:return
+    if _near_kiosk() and not _near_sport_counter() and not _near_car() and not _rebirth_active():
+        _render_bus()
     var justice: Dictionary = _last_snapshot.get("player",{}).get("justice",{})
     var permit: Dictionary = _last_snapshot.get("player",{}).get("weaponLicense",{})
     if _near_sport_counter() and not _rebirth_active() and _current_place=="MARKET":
@@ -7593,6 +7597,25 @@ func _try_shoot() -> void:
         return
     var id := _looked_at_resident()
     _api.garden_action("weapon-fire" if id.is_empty() else "weapon-fire:"+id)
+
+func _render_bus() -> void:
+    var bus: Dictionary = _last_snapshot.get("bus",{})
+    if not bool(bus.get("atStop",false)):return
+    var info := Label.new()
+    info.text=tr("Municipal bus · 06:00–22:00 · 2 EUR")
+    _action_choices.add_child(info)
+    for route in bus.get("routes",[]):
+        var id := str(route.get("id",""))
+        var choice := _button(tr("Bus to %s · %s min") % [route.get("label",id),route.get("minutes",0)],_ride_bus.bind(id))
+        choice.disabled=not bool(bus.get("available",false))
+        choice.set_meta("sold_out",choice.disabled)
+        _action_choices.add_child(choice)
+
+func _ride_bus(id: String) -> void:
+    if not _connected or _api.is_busy() or not _near_kiosk() or not TownLayout.bus_stop(_current_place):return
+    _action_panel.visible=false
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+    _api.garden_action("bus-ride:"+id)
 
 func _render_armeria(permit: Dictionary) -> void:
     var player: Dictionary = _last_snapshot.get("player",{})
