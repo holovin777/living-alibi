@@ -18,7 +18,7 @@ final class GeoLife {
         if(!RebirthLife.active(t)||JusticeLife.confined(t))return result;
         var life=view(t,s);var c=RebirthLife.child(t);
         if(life.phase().equals("CHOICE")){
-            for(var f:RebirthLife.families(t,s.day))add(result,"rebirth-family-"+f.first()+"-"+f.second(),f.firstName()+" + "+f.secondName()+" · "+f.district()+" ("+f.firstJob()+" / "+f.secondJob()+")");
+            for(var f:RebirthLife.families(t,s.day))add(result,"rebirth-family-"+f.first()+"-"+f.second(),familyLabel(f));
             add(result,"rebirth-wait","Wait 1 day / Attendi un giorno");
             add(result,"rebirth-adult","Start as a new adult / Inizia adulto");
             return List.copyOf(result);
@@ -65,6 +65,16 @@ final class GeoLife {
         }
         for(var other:RebirthLife.conversationPartners(t,s.day))add(result,"rebirth-chat-"+other.id,"Talk / Parla: "+other.name);
         return List.copyOf(result);
+    }
+    static String familyLabel(RebirthLife.Family f){
+        return f.firstName()+" ("+f.firstAge()+") + "+f.secondName()+" ("+f.secondAge()+")"
+                +" · "+f.firstJob()+" / "+f.secondJob()
+                +" · "+(f.ownedHome()==null?f.district():f.ownedHome()+" / "+f.district())
+                +" · "+f.children().size()+" children / figli"
+                +" · €"+f.walletTotal()+" cash / contanti"
+                +" · €"+f.familySavings()+" savings / risparmi"
+                +" · €"+f.unpaidBills()+" bills / bollette"
+                +" · "+(f.sharedHome()?"Shared home / Casa condivisa":"Separate homes / Case separate");
     }
     private static void add(List<GeoProjection.Choice> choices,String id,String label){choices.add(new GeoProjection.Choice(id,label));}
     static boolean canWalk(TownLife.Town t,WorldState s){

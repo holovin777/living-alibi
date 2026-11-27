@@ -23,21 +23,47 @@ final class RebirthLife {
         t.player.alive=false;t.player.health=0;t.player.money=0;
         t.industryStocks.put(PHASE,CHOICE);t.industryStocks.put(CHILD,0);
     }
-    record Family(int first,int second,String firstName,String secondName,String firstJob,String secondJob,String district){}
+    /** Read-only birth-choice information, derived from existing residents and their accounts. */
+    record FamilyChild(String id,String name,int age){}
+    record Family(int first,int second,String firstName,String secondName,String firstJob,String secondJob,String district,
+                  int firstAge,int secondAge,boolean firstEmployed,boolean secondEmployed,boolean sharedHome,
+                  String ownedHome,long walletTotal,long familySavings,long unpaidBills,List<FamilyChild> children,
+                  Integer affinity,Integer trust,Integer tension){}
+    private static boolean childOf(TownLife.Town t,TownLife.Citizen c,int index){
+        return DemographyLife.get(t,c,"parent-a")==index||DemographyLife.get(t,c,"parent-b")==index;
+    }
+    private static Family preview(TownLife.Town t,TownLife.Citizen a,TownLife.Citizen b){
+        var children=t.people.values().stream().filter(c->c.alive&&c.generationIndex>0
+                &&(childOf(t,c,a.generationIndex)||childOf(t,c,b.generationIndex)))
+                .sorted(java.util.Comparator.comparingInt((TownLife.Citizen c)->c.age).reversed()
+                        .thenComparing(c->c.id))
+                .map(c->new FamilyChild(c.id,c.name,c.age)).toList();
+        var home=HomeMarketLife.owned(t,a);
+        if(home==null||!HomeMarketLife.unit(home).equals(a.homeUnit)){
+            home=HomeMarketLife.owned(t,b);
+            if(home!=null&&!HomeMarketLife.unit(home).equals(a.homeUnit))home=null;
+        }
+        var relation=t.peerRelationships.get(SocialNetwork.key(a.id,b.id));
+        return new Family(a.generationIndex,b.generationIndex,a.name,b.name,a.occupation,b.occupation,a.home.label,
+                a.age,b.age,a.employed,b.employed,together(a,b),home==null?null:home.name(),
+                (long)a.money+b.money,(long)FamilyBudgetLife.savings(t,a)+FamilyBudgetLife.savings(t,b),
+                (long)a.unpaidBills+b.unpaidBills,children,
+                relation==null?null:relation.affinity,relation==null?null:relation.trust,relation==null?null:relation.tension);
+    }
     static List<Family> families(TownLife.Town t,int day){
         var result=new ArrayList<Family>();
         for(var a:t.people.values())if(DemographyLife.parentAge(a)){
             var b=DemographyLife.byIndex(t,DemographyLife.get(t,a,"partner"));
             if(b!=null&&a.generationIndex<b.generationIndex&&DemographyLife.canBirth(t,a,b,day))
-                result.add(new Family(a.generationIndex,b.generationIndex,a.name,b.name,a.occupation,b.occupation,a.home.label));
+                result.add(preview(t,a,b));
         }
         return List.copyOf(result);
     }
     static String choose(TownLife.Town t,int day,int first,int second){
         if(phase(t)!=CHOICE)throw new IllegalArgumentException("No family selection is pending.");
-        if(families(t,day).stream().noneMatch(f->f.first()==first&&f.second()==second))
-            throw new IllegalArgumentException("This family is not currently eligible.");
         var a=DemographyLife.byIndex(t,first);var b=DemographyLife.byIndex(t,second);
+        if(first>=second||!DemographyLife.canBirth(t,a,b,day))
+            throw new IllegalArgumentException("This family is not currently eligible.");
         var newborn=DemographyLife.birth(t,a,b,day);
         if(newborn==null)throw new IllegalArgumentException("This family is no longer available.");
         t.industryStocks.put(CHILD,newborn.generationIndex);t.industryStocks.put(PHASE,CHILDHOOD);
