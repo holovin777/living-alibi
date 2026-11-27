@@ -149,3 +149,14 @@ English and Italian are the supported interface languages; some text is still un
 Build a believable, persistent city in which residents have their own lives and the player is not the center of the world. Improve realism gradually without taking away important personal decisions from the player.
 
 No open-source license has been selected; see the repository for its current licensing status.
+
+
+### A lost child can ask for help
+
+When playing a linked child aged 3–17, tell a nearby resident in Italian
+`Mi sono perso` or `Non trovo i miei genitori` (English: `I'm lost`).
+Safety requests bypass ordinary NPC conversation limits. Most adults,
+including police, help and report a missing child; a few may be unwilling or
+unable to assist and direct the child to someone else. Reports start the
+existing parent/police search, without revealing the child's precise position
+to distant NPCs, teleporting the player, or automatically returning them home.

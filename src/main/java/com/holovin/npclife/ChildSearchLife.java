@@ -27,6 +27,32 @@ final class ChildSearchLife {
         var officer=DemographyLife.byIndex(t,get(t,c,"officer"));
         return officer==null?null:officer.name;
     }
+    /** A face-to-face request can start a search before any curfew timeout. */
+    static void reportedBy(TownLife.Town t,TownLife.Citizen child,TownLife.Citizen helper,WorldState s){
+        if(child==null||helper==null||!DemographyLife.child(child)||helper.age<18
+                ||!helper.alive||!meet(helper,child))return;
+        int status=get(t,child,"status");
+        if(status==0||status==3){
+            release(t,child);releaseOfficer(t,child);
+            set(t,child,"status",1);set(t,child,"start",now(s));
+            set(t,child,"incidents",Math.addExact(get(t,child,"incidents"),1));
+            set(t,child,"departed",now(s)+1);
+            set(t,child,"contacts",0);set(t,child,"contact-attempt",0);
+            set(t,child,"reported",0);
+        }
+        if(get(t,child,"reported")==0){
+            set(t,child,"reported",1);
+            ArchiveLife.record(t,"child-report:"+child.id+":"+get(t,child,"incidents"),s.day,s.minute,
+                    "Family","An adult reported a lost child to police after meeting the child.");
+        }
+        police(t,child,s);
+    }
+    static void foundWithParent(TownLife.Town t,TownLife.Citizen child,TownLife.Citizen parent,WorldState s){
+        if(FamilyDialogueLife.parentOf(t,parent,child)&&meet(parent,child)
+                &&get(t,child,"status")>0&&get(t,child,"status")!=3)
+            located(t,child,s,"a parent");
+    }
+
     static void departed(TownLife.Town t,TownLife.Citizen c,WorldState s){
         set(t,c,"departed",now(s)+1);
     }

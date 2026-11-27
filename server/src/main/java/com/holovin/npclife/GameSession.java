@@ -503,6 +503,22 @@ public final class GameSession implements AutoCloseable {
         String language=spokenLanguage==null?null:ResidentLanguages.normalize(spokenLanguage);
         if(message.isBlank()||message.strip().length()>1000)
             throw new IllegalArgumentException("Speak 1–1000 characters.");
+        if(LostChildAidLife.request(copy,message)){
+            // Emergencies bypass ordinary conversation patience. This also
+            // changes the saved missing-child search instead of just chatting.
+            String replyLanguage=language==null?LostChildAidLife.inferredLanguage(message)
+                    :!ResidentLanguages.speaks(region,resident.id,language)?region.nativeLanguage():language;
+            var contact=copy.player.contacts.computeIfAbsent(resident.id,PlayerLife.Contact::new);
+            var previous=contact.copy();
+            String assistance=LostChildAidLife.respond(copy,resident,state,replyLanguage);
+            contact.conversations++;
+            contact.lastDay=state.day;contact.lastMinute=state.minute;contact.lastHeard=message.strip();
+            ConversationMemory.remember(contact,state.day,state.minute,replyLanguage,message.strip(),assistance);
+            ConversationMemory.captureMilestones(town,copy,previous,contact,contact.dialogue.getLast());
+            var applied=applyInternal(copy,1,PlayerLife.displayName(copy,resident)+": "+assistance,true);
+            return new ActionView(applied.message(),applied.world(),replyLanguage,true,
+                    region.localeFor(replyLanguage),null);
+        }
         if(!ConversationAvailability.allowed(copy,resident,state.day,state.minute)){
             String actual=language!=null&&!ResidentLanguages.speaks(region,resident.id,language)?region.nativeLanguage():language;
             String farewell=ConversationAvailability.farewell(resident,state.day,state.minute,actual);
