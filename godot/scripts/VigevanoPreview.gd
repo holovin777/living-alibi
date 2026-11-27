@@ -713,6 +713,8 @@ func _open_actions(work_only: bool=false) -> void:
         biography.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         biography.text=_life_summary()+"\nSavings / Risparmi: €"+str(life.get("savings",0))
         if life.get("parentA")!=null:biography.text+="\nParents / Genitori: "+str(life.get("parentA"))+" + "+str(life.get("parentB"))
+        var conviction=life.get("conviction")
+        if conviction is Dictionary:biography.text+="\nBelief / Convinzione: "+str(conviction.get("belief",""))
         action_list.add_child(biography)
         var search=life.get("childSearch")
         if search is Dictionary and str(search.get("status","NONE"))!="NONE":

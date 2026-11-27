@@ -34,7 +34,7 @@ final class FuneralLife {
     /** 0 = unspecified/civil default, 1 = explicitly requested religious ceremony. */
     static void setReligiousPreference(TownLife.Town t,TownLife.Citizen c,boolean religious){
         if(!c.alive)throw new IllegalArgumentException("Only a living resident can record a preference.");
-        put(t,c,"religious",religious?1:0);
+        put(t,c,"religious",religious?1:2);
     }
     static void tick(TownLife.Town t,WorldState s){
         if(s.minute!=360)return;
@@ -78,7 +78,8 @@ final class FuneralLife {
         paid+=city;
         t.employerFunds.merge(PROVIDER,paid,Math::addExact);
         put(t,dead,"buried",s.day);put(t,dead,"paid",paid);put(t,dead,"unfunded",price-paid);
-        boolean religious=get(t,dead,"religious")==1;
+        int preference=get(t,dead,"religious");
+        boolean religious=preference==1||preference==0&&ConvictionLife.belief(t,dead).religious;
         String ceremony=religious?"Religious":"Civil";
         ArchiveLife.record(t,"grave:"+dead.id,s.day,s.minute,"Cemetery",
                 dead.name+", age "+dead.age+". "+ceremony+" burial; "+(price==FAMILY?"family-funded ceremony":"basic burial")+

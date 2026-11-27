@@ -91,6 +91,7 @@ final class DemographyLife {
         ensure(t);
         EducationLife.ensureResident(t,c);
         set(t,c,"parent-a",a.generationIndex);set(t,c,"parent-b",b.generationIndex);set(t,c,"born",day);
+        ConvictionLife.upbringing(t,c,a,b);
         for(var p:List.of(a,b)){set(t,p,"children",get(t,p,"children")+1);set(t,p,"last-birth",day);}
         set(t,BIRTHS,Math.addExact(get(t,BIRTHS),1));
         ArchiveLife.record(t,"birth:"+c.id,day,360,"Population",c.name+" was born.");
