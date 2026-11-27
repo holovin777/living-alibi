@@ -214,7 +214,8 @@ final class GeoProjection {
             result.add(new Choice("bus:"+route.id(),"Bus → "+route.label()+" · "+route.minutes()+" min · €"+bus.fare()));
         return List.copyOf(result);
     }
-    View view(TownLife.Town t,WorldState s,Point player){
+    View view(TownLife.Town t,WorldState s,Point player){return view(t,s,player,null);}
+    View view(TownLife.Town t,WorldState s,Point player,Patrol response){
         var p=t.player;
         boolean confined=JusticeLife.confined(t),rebirth=RebirthLife.active(t);
         var talking=new HashSet<>(PlayerLife.visible(t));
@@ -229,9 +230,12 @@ final class GeoProjection {
         nearby.sort(Comparator.comparingDouble((Actor a)->new Point(a.x,a.z).distance(player)).thenComparing(Actor::id));
         var nearest=nearest(player);
         boolean canEnter=p.alive&&!confined&&!rebirth&&p.travelRemaining==0&&point(nearest).distance(player)<=18;
+        var visiblePatrols=new ArrayList<>(patrols(t,s,player));
+        if(response!=null){visiblePatrols.removeIf(patrol->patrol.id().equals(response.id()));visiblePatrols.add(0,response);}
+        if(visiblePatrols.size()>6)visiblePatrols.subList(6,visiblePatrols.size()).clear();
         return new View(s.day,s.minute,population,commuting,List.copyOf(nearby.subList(0,Math.min(40,nearby.size()))),
             district(p.place),district(nearest),canEnter,p.alive,confined,rebirth,p.money,p.hunger,p.thirst,p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player),civilian(t,player),JusticeLife.view(t,s),JusticeLife.thefts(t),patrols(t,s,player));
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,choices(t,s,player),civilian(t,player),JusticeLife.view(t,s),JusticeLife.thefts(t),List.copyOf(visiblePatrols));
     }
 }

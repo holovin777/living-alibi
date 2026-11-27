@@ -51,6 +51,10 @@ final class JusticeLife {
         if(officer)arrest(t,s,truth,observations);
         else if(get(t,"phase")!=1){put(t,"phase",1);put(t,"until",Math.addExact(time(s),60));}
     }
+    static void dispatchDetain(TownLife.Town t,WorldState s,List<TownLife.Event> truth,List<TownLife.Observation> observations){
+        if(get(t,"phase")!=1)throw new IllegalArgumentException("No active police report.");
+        arrest(t,s,truth,observations);
+    }
     private static void arrest(TownLife.Town t,WorldState s,List<TownLife.Event> truth,List<TownLife.Observation> observations){
         put(t,"phase",2);put(t,"until",Math.addExact(time(s),60));
         // Abstract police transfer to custody; no simulated chase.

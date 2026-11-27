@@ -41,6 +41,8 @@ var driving_body: Node3D
 var drive_goal:=Vector3.ZERO
 var driving:=false
 var drive_timer:=0.0
+var impact_flash:=0.0
+var impact_overlay: ColorRect
 
 func _ready() -> void:
     var map_path := ProjectSettings.globalize_path("res://../data/vigevano.json")
@@ -109,6 +111,11 @@ func _ready() -> void:
     driving_body=traffic._car()
     add_child(driving_body)
     driving_body.hide()
+    impact_overlay=ColorRect.new()
+    canvas.add_child(impact_overlay)
+    impact_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    impact_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE
+    impact_overlay.color=Color(0.8,0.15,0.05,0)
     residents.drive_pose.connect(_drive_pose)
     parked_bike=Node3D.new()
     add_child(parked_bike)
@@ -242,6 +249,8 @@ func _physics_process(delta: float) -> void:
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
     _animate_patrols(delta)
+    impact_flash=maxf(0.0,impact_flash-delta*2.0)
+    impact_overlay.color=Color(0.8,0.15,0.05,impact_flash*0.32)
     residents.update_residents(Vector2(walker.position.x,walker.position.z),delta)
     if driving:
         _drive_frame(delta)
@@ -348,6 +357,7 @@ func _update_navigation() -> void:
     if not route_status.is_empty():hud.text+="\n"+route_status
 
 func _drive_pose(pose: Dictionary) -> void:
+    if str(pose.get("message","")).begins_with("Collision:"):impact_flash=1.0
     var was_driving:=driving
     driving=bool(pose.get("active",false))
     driving_body.visible=driving

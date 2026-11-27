@@ -532,6 +532,34 @@ public final class GameSession implements AutoCloseable {
     }
 
     private GeoDrive geoDrive;
+    private GeoResponse geoResponse;
+    private long geoLastImpact;
+    private void updateGeoResponse(GeoProjection map,GeoProjection.Point target)throws SQLException{
+        if(!"REPORTED".equals(JusticeLife.view(town,state).status())||RebirthLife.active(town)||!town.player.alive){geoResponse=null;return;}
+        if(geoResponse!=null){var officer=town.people.get(geoResponse.officer);if(officer==null||!officer.alive||!PoliceLife.officer(officer)||!PoliceLife.scheduled(officer,state.day,state.minute))geoResponse=null;}
+        String goal=map.motorNode(target);if(goal==null)return;
+        long now=System.nanoTime();
+        if(geoResponse==null){
+            var officers=town.people.values().stream().filter(c->c.alive&&PoliceLife.officer(c)&&PoliceLife.scheduled(c,state.day,state.minute))
+                .sorted(java.util.Comparator.comparingDouble(c->map.position(c).distance(target))).toList();
+            for(var officer:officers){
+                String start=map.motorNode(map.position(officer));
+                if(start!=null&&(start.equals(goal)||GeoResponse.next(map,start,goal)!=null)){
+                    geoResponse=new GeoResponse(officer.id,start,now);break;
+                }
+            }
+            if(geoResponse==null)return;
+        }
+        double elapsed=Math.min(1.5,Math.max(0,(now-geoResponse.lastUpdate)/1e9));
+        geoResponse.lastUpdate=now;
+        geoResponse.advance(map,goal,elapsed*9);
+        if(geoResponse.position(map).distance(target)<=4){
+            var copy=town.copy();var clock=state.copy();var events=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
+            JusticeLife.dispatchDetain(copy,clock,events,observations);
+            applyInternal(copy,0,"Police detained you.",false,clock,events,observations);
+            geoResponse=null;geoDrive=null;
+        }
+    }
     synchronized GeoDrive.Pose geoDriveControl(GeoProjection map,String command,double x,double z,int turn)throws SQLException{
         var point=new GeoProjection.Point(x,z);
         if(JusticeLife.confined(town)||!town.player.alive||RebirthLife.active(town)){
@@ -582,20 +610,28 @@ public final class GameSession implements AutoCloseable {
         int condition=geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition;
         if(fuel<1||condition<3)return drivePose(map,"No fuel or service required. Exit the car.");
         var next=geoDrive.copy();next.lastStep=now;
+        var previousPosition=geoDrive.position(map);
         double budget=Math.min(8,(now-geoDrive.lastStep)/1e9*10);
         int oldUnits=(int)(next.meters/100);
         double traveled=next.advance(map,turn,budget);
         int units=(int)(next.meters/100)-oldUnits;
+        int impact=0;
+        if(traveled>0.01&&now-geoLastImpact>2_000_000_000L){
+            var parked=map.civilian(town,previousPosition);
+            boolean collision=parked!=null&&GeoResponse.contact(previousPosition,next.position(map),new GeoProjection.Point(parked.x(),parked.z()));
+            if(next.stolen&&town.player.carPlace!=null){var own=map.point(town.player.carPlace);collision|=GeoResponse.contact(previousPosition,next.position(map),new GeoProjection.Point(own.x()+2.5,own.z()));}
+            if(collision){impact=8;geoLastImpact=now;}
+        }
         var copy=town.copy();var destination=map.nearest(next.position(map));
         copy.player.place=destination;copy.player.destination=destination;copy.player.cycling=false;
         if(next.stolen){
-            VehicleTheftLife.set(copy,"fuel",fuel-units);VehicleTheftLife.set(copy,"condition",condition-3*units);
+            VehicleTheftLife.set(copy,"fuel",fuel-units);VehicleTheftLife.set(copy,"condition",condition-3*units-impact);
         }else{
-            copy.player.carPlace=destination;copy.player.carFuel=Math.max(0,fuel-units);copy.player.carCondition=Math.max(0,condition-3*units);
+            copy.player.carPlace=destination;copy.player.carFuel=Math.max(0,fuel-units);copy.player.carCondition=Math.max(0,condition-3*units-impact);
         }
         VehicleTheftLife.set(copy,next.stolen?"stolen-remainder":"owned-remainder",(int)Math.round((next.meters%100)*1000));
         apply(copy,0,"Driving.");geoDrive=next;
-        return drivePose(map,traveled<0.001?"End of this directed road. Exit the vehicle.":"");
+        return drivePose(map,impact>0?"Collision: vehicle condition reduced.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
     }
     private GeoDrive.Pose drivePose(GeoProjection map,String message){
         if(geoDrive==null)return new GeoDrive.Pose(false,false,0,0,0,town.player.carFuel,town.player.carCondition,message);
@@ -604,8 +640,10 @@ public final class GameSession implements AutoCloseable {
             geoDrive.stolen?VehicleTheftLife.get(town,"fuel"):town.player.carFuel,
             geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,message);
     }
-    synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z){
-        return map.view(town,state,new GeoProjection.Point(x,z));
+    synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z)throws SQLException{
+        var target=geoDrive==null?new GeoProjection.Point(x,z):geoDrive.position(map);
+        updateGeoResponse(map,target);
+        return map.view(town,state,target,geoResponse==null?null:geoResponse.view(map));
     }
     synchronized void geoTick(int minutes) throws SQLException {
         if(!RebirthLife.active(town))waitMinutes(minutes);
