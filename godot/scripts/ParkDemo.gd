@@ -7353,9 +7353,13 @@ func _render_actions() -> void:
         var info := Label.new()
         info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         if str(rebirth.get("phase",""))=="CHOICE":
-            _action_title.text = "A new life · Choose your parents"
+            var automatic := bool(rebirth.get("randomBirth",true))
+            _action_title.text = tr("Awaiting a new life") if automatic else tr("A new life · Choose your parents")
             var families: Array = rebirth.get("families",[])
-            info.text = "The town continues. Choose an eligible family." if not families.is_empty() else "No eligible family today. Wait or start an adult life."
+            if automatic:
+                info.text = tr("Your family will be assigned automatically at the next natural birth. Advance time to continue.")
+            else:
+                info.text = tr("The town continues. Choose an eligible family.") if not families.is_empty() else tr("No eligible family today. Wait or start an adult life.")
             _action_choices.add_child(info)
             var history: Array = rebirth.get("pastLives",[])
             if not history.is_empty():
@@ -7367,10 +7371,11 @@ func _render_actions() -> void:
                 if int(recent.get("age",-1)) >= 0:
                     memorial.text += " · age %s" % recent.get("age",0)
                 _action_choices.add_child(memorial)
-            for family in families:
-                var label_text := "%s (%s) + %s (%s) · %s" % [family.get("firstName",""),family.get("firstJob",""),family.get("secondName",""),family.get("secondJob",""),family.get("district","")]
-                _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-family-%s-%s" % [family.get("first",0),family.get("second",0)])))
-            _action_choices.add_child(_button("Start adult life instead",_garden_action.bind("rebirth-adult")))
+            if not automatic:
+                for family in families:
+                    var label_text := "%s (%s) + %s (%s) · %s" % [family.get("firstName",""),family.get("firstJob",""),family.get("secondName",""),family.get("secondJob",""),family.get("district","")]
+                    _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-family-%s-%s" % [family.get("first",0),family.get("second",0)])))
+                _action_choices.add_child(_button("Start adult life instead",_garden_action.bind("rebirth-adult")))
         else:
             _action_title.text = "Childhood · family life"
             info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nF: choices / local first-person exploration from age 3. School and home routines continue; afternoon outings unlock at age 6." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
@@ -7635,10 +7640,12 @@ func _render_actions() -> void:
             for partner in rebirth.get("conversations",[]):
                 _action_choices.add_child(_button("Talk with "+str(partner.get("name","")),_garden_action.bind("rebirth-chat-"+str(partner.get("id","")))))
         var max_days := int(rebirth.get("maxWaitDays",0))
+        var awaiting_birth := str(rebirth.get("phase",""))=="CHOICE" and bool(rebirth.get("randomBirth",true))
         if max_days > 0:
-            _action_choices.add_child(_button("Advance one shared day",_garden_action.bind("rebirth-wait")))
+            _action_choices.add_child(_button(tr("Await birth: 1 day") if awaiting_birth else tr("Advance one shared day"),_garden_action.bind("rebirth-wait")))
         if max_days > 1:
-            _action_choices.add_child(_button("Advance up to %s shared days" % max_days,_garden_action.bind("rebirth-wait-fast")))
+            var wait_label := tr("Await birth: up to %s days") if awaiting_birth else tr("Advance up to %s shared days")
+            _action_choices.add_child(_button(wait_label % max_days,_garden_action.bind("rebirth-wait-fast")))
         var extended_days := int(rebirth.get("extendedWaitDays",0))
         if extended_days > 0:
             _action_choices.add_child(_button("Grow up: %s days / Cresci: %s giorni" % [extended_days,extended_days],_garden_action.bind("rebirth-wait-extended")))
@@ -9791,7 +9798,7 @@ func _render_hud_summary(snapshot: Dictionary) -> void:
     ]
     if _rebirth_active():
         var child: Dictionary = snapshot.get("rebirth",{})
-        _status.text = tr("Choose a new family") if str(child.get("phase","")) == "CHOICE" else tr("%s | Age %s | %s") % [child.get("childName",""),child.get("age",0),tr("Adult") if str(child.get("phase","")) == "LINKED_ADULT" else tr("Childhood")]
+        _status.text = tr("Awaiting a new life" if bool(child.get("randomBirth",true)) else "Choose a new family") if str(child.get("phase","")) == "CHOICE" else tr("%s | Age %s | %s") % [child.get("childName",""),child.get("age",0),tr("Adult") if str(child.get("phase","")) == "LINKED_ADULT" else tr("Childhood")]
     var climate: Dictionary = snapshot.get("weather", {})
     _weather.text = tr("Day %s  %s:%02d | %s | %s  %s °C") % [
         str(snapshot.get("day", 1)), int(snapshot.get("minute", 450))/60,

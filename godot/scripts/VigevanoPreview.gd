@@ -681,7 +681,7 @@ func _open_identity() -> void:
         if passport.get("parentB")!=null:info.text+="\nParent / Genitore: "+str(passport.get("parentB"))
         info.text+="\n\nPrivate identity / Identità privata"
     else:
-        info.text="No current identity. Choose your next life. / Scegli la prossima vita."
+        info.text="Awaiting birth. / In attesa della nascita."
     action_list.add_child(info)
     var close:=Button.new()
     close.text="Close / Chiudi"

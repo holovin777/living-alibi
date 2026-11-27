@@ -171,6 +171,7 @@ class GeoRebirthTest {
         assertTrue(t.pastLives.isEmpty());
         assertEquals(RebirthLife.CHOICE,RebirthLife.phase(t));
         assertTrue(RebirthLife.report(t,271).families().isEmpty());
+        assertTrue(RebirthLife.report(t,271).randomBirth());
         assertThrows(IllegalArgumentException.class,()->RebirthLife.choose(t,271,a.generationIndex,b.generationIndex));
         assertThrows(IllegalArgumentException.class,()->RebirthLife.adultFallback(t));
         clock.day=271;clock.minute=360;
