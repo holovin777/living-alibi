@@ -22,6 +22,7 @@ final class CondominiumLife {
         set(t,ARREARS,Math.addExact(get(t,ARREARS),CONTRIBUTION));
         t.pendingEconomy.add(new EconomyLife.Entry(clock.day,clock.minute,EconomyLife.Kind.BILL,
                 c.id,"magnolia-condominium",null,CONTRIBUTION,"Common building maintenance share"));
+        PostalLife.queueStatement(t,c);
         return CONTRIBUTION;
     }
 

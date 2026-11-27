@@ -365,6 +365,10 @@ func _process(delta: float) -> void:
                 if condo.has("dirt"):
                     _stairwell_hint.text+="\n"+(tr("Dirt: %s/100 · %s") % [condo.get("dirt",0),tr(str(condo.get("cleaningStatus","")))])
 
+        if _stairwell.near_exit(_avatar.position):
+            var postal: Dictionary = _last_snapshot.get("postal",{})
+            if not postal.is_empty():
+                _stairwell_hint.text+="\n"+(tr("Mail service: %s") % tr(str(postal.get("status","POSTAL_IDLE"))))
         if not _nearest_resident().is_empty():
             _stairwell_hint.text+="\n"+tr("T or click: talk to a person")
         _tick_live_clock(delta)
