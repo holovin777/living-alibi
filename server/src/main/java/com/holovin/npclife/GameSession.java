@@ -1161,6 +1161,10 @@ public final class GameSession implements AutoCloseable {
                 FamilyDoorLife.act(copy,state,action.endsWith("-lock"));
                 return applyInternal(copy,0,action.endsWith("-lock")?"Family door temporarily locked.":"Family door unlocked.",true);
             }
+            if(action.startsWith("rebirth-election-")){
+                String message=ElectionLife.act(copy,action.substring("rebirth-".length()),state.day,state.minute);
+                return applyInternal(copy,0,message,true);
+            }
             if(action.equals("rebirth-separate")){
                 var self=RebirthLife.requireAdult(copy);var partner=RebirthLife.partner(copy,self);
                 if(partner==null)throw new IllegalArgumentException("No current partner.");

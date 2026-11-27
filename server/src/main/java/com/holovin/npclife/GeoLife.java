@@ -58,6 +58,16 @@ final class GeoLife {
             add(result,"rebirth-wait-hour","Advance 1 hour / Avanza un'ora");
             add(result,"rebirth-wait-adult-day","Advance 1 day / Avanza un giorno");
             if(RebirthLife.partner(t,c)!=null)add(result,"rebirth-separate","End partnership / Termina la relazione");
+            if(ElectionLife.atComune(c,s.minute)){
+                if(ElectionLife.campaign(t,s.day)){
+                    if(!ElectionLife.valid(t,4)&&!ElectionLife.registered(t))for(int plan=1;plan<=3;plan++)
+                        add(result,"rebirth-election-register-"+plan,"Run for mayor / Candidati · "+ElectionLife.label(plan));
+                    if(!ElectionLife.voted(t)&&ElectionLife.get(t,ElectionLife.RESIDENT_VOTER)==0)for(var candidate:ElectionLife.report(t,s.day).candidates())
+                        add(result,"rebirth-election-vote-"+candidate.slot(),"Vote / Vota "+candidate.name()+" · "+candidate.programme());
+                }
+                if(ElectionLife.playerMayor(t))for(int plan=0;plan<=3;plan++)
+                    add(result,"rebirth-election-policy-"+plan,"Municipal budget / Bilancio · "+ElectionLife.label(plan));
+            }
             var adult=RebirthLife.adultOptions(t,s.day);
             var home=RebirthLife.homeOptions(t,s.day,s.minute);
             if(adult!=null){
