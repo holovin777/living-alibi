@@ -8,6 +8,27 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CaritasLifeTest {
     @TempDir Path folder;
+    @Test void substituteDoesNotCollectAnotherDonation(){
+        var s=new WorldState();s.day=2;s.minute=630;
+        var t=TownLife.create(s);
+        for(var c:t.people.values())c.employed=true;
+        var a=new TownLife.Citizen("substitute-a","Test A","Job seeker",TownLife.Place.PARK);
+        var b=new TownLife.Citizen("substitute-b","Test B","Job seeker",TownLife.Place.PARK);
+        a.generationIndex=9001;b.generationIndex=9002;
+        for(var c:List.of(a,b)){c.employed=false;c.money=60;t.people.put(c.id,c);}
+        a.sociability=90;b.sociability=80;
+        t.retailStock.put("bread",20);t.retailStock.put("water",20);
+        CaritasLife.prepare(t,s);
+        assertTrue(CaritasLife.assigned(t,a,s));
+        a.sickUntilDay=s.day;
+        s.minute=645;CaritasLife.prepare(t,s);
+        assertFalse(CaritasLife.assigned(t,a,s));
+        assertTrue(CaritasLife.assigned(t,b,s));
+        assertEquals(16,t.retailStock.get("bread"));
+        assertEquals(4,CaritasLife.report(t,s).bread());
+        assertEquals(8,CaritasLife.report(t,s).donated());
+    }
+
     @Test void foodTransfersRequireVolunteerAndCannotBeDuplicated() throws Exception{
         var file=folder.resolve("caritas.db");
         try(var db=new WorldDatabase(file)){

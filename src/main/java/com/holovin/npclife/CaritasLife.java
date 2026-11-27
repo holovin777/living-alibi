@@ -23,8 +23,8 @@ final class CaritasLife {
                 c.health>=50&&c.hunger<80&&c.thirst<80&&c.fatigue<80;
     }
     static void prepare(TownLife.Town t,WorldState s){
-        if(s.minute!=630||get(t,DAY)==s.day)return;
-        set(t,DAY,s.day);set(t,WORKER,0);
+        if(s.minute==630&&get(t,DAY)!=s.day){
+            set(t,DAY,s.day);set(t,WORKER,0);
         // A small modeled merchant donation from existing market inventory.
         for(String item:new String[]{"bread","water"}){
             String k=P+item;
@@ -36,6 +36,13 @@ final class CaritasLife {
                 set(t,DONATED,Math.addExact(get(t,DONATED),amount));
             }
         }
+        }
+        // Try a substitute every fifteen minutes until 13:15. Donations
+        // are collected once per day above, independently of staffing.
+        if(get(t,DAY)!=s.day||s.minute<630||s.minute>795||s.minute%15!=0)return;
+        var previous=DemographyLife.byIndex(t,get(t,WORKER));
+        if(previous!=null&&available(t,previous,s))return;
+        set(t,WORKER,0);
         var worker=t.people.values().stream().filter(c->available(t,c,s)&&c.travelRemaining==0)
                 .sorted(Comparator.comparingInt((TownLife.Citizen c)->-c.sociability).thenComparing(c->c.id))
                 .findFirst().orElse(null);
