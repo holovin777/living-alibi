@@ -9,6 +9,10 @@ var head: Node3D
 var hud: Label
 var wall_material: StandardMaterial3D
 var roof_material: StandardMaterial3D
+const Architecture=preload("res://scripts/GeoArchitecture.gd")
+var detail_materials: Dictionary={}
+var daylight: DirectionalLight3D
+var sky_environment: Environment
 var road_material: StandardMaterial3D
 var rail_material: StandardMaterial3D
 var ready_to_walk := false
@@ -151,11 +155,13 @@ func _ready() -> void:
     environment.ambient_light_color=Color("#ffffff")
     environment.ambient_light_energy=0.65
     world_environment.environment=environment
+    sky_environment=environment
     add_child(world_environment)
     var sun := DirectionalLight3D.new()
     sun.rotation_degrees=Vector3(-55,-35,0)
     sun.light_energy=0.85
     add_child(sun)
+    daylight=sun
     var ground := StaticBody3D.new()
     add_child(ground)
     var plane := CollisionShape3D.new()
@@ -319,6 +325,7 @@ func _select_destination(point: Vector2) -> void:
 
 func _update_navigation() -> void:
     if not is_instance_valid(walker) or not is_instance_valid(city_map):return
+    _update_daylight()
     var pos:=Vector2(walker.position.x,walker.position.z)
     if not room.is_empty():
         hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
@@ -584,6 +591,20 @@ func _send_chat(message: String) -> void:
     if not message.strip_edges().is_empty():
         residents.speak(chat_target,message,Vector2(walker.position.x,walker.position.z))
 
+func _update_daylight() -> void:
+    if not is_instance_valid(daylight) or sky_environment==null:return
+    var hour:=float(residents.minute)/60.0 if residents.connected else 12.0
+    var sun_amount:=clampf(sin((hour-6.0)*PI/12.0),0.0,1.0)
+    daylight.rotation_degrees=Vector3(-12.0-sun_amount*55.0,-35.0+(hour-12.0)*7.0,0)
+    daylight.light_energy=0.08+sun_amount*0.90
+    daylight.light_color=Color("#e6bd94").lerp(Color("#fff4e3"),sun_amount)
+    sky_environment.background_color=Color("#263447").lerp(Color("#a7c7de"),sun_amount)
+    sky_environment.ambient_light_color=Color("#a1b1ce").lerp(Color.WHITE,sun_amount)
+    sky_environment.ambient_light_energy=0.32+sun_amount*0.34
+    if detail_materials.has("lamp"):
+        var lamp: StandardMaterial3D=detail_materials["lamp"]
+        lamp.emission_energy_multiplier=0.10 if sun_amount>0.20 else 2.0
+
 func _point(value: Array,y: float) -> Vector3:
     return Vector3(float(value[0]),y,float(value[1]))
 
@@ -601,6 +622,7 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     var node := Node3D.new()
     add_child(node)
     chunks[key]=node
+    var detail=Architecture.new()
     var walls := PackedVector3Array()
     var roofs := PackedVector3Array()
     var roads := PackedVector3Array()
@@ -621,14 +643,21 @@ func _build_chunk(key: String,data: Dictionary) -> void:
             _quad(walls,b,a,a+Vector3.UP*h,b+Vector3.UP*h)
         for i in triangles:
             roofs.append(_point(points[i],h))
-    for record in data.get("roads",[]):_strip(roads,record,0.025)
+        detail.facade(feature)
+    for record in data.get("roads",[]):
+        _strip(roads,record,0.025)
+        detail.road(record)
+    for record in data.get("trees",[]):detail.tree(record)
     for record in data.get("rail",[]):_strip(rails,record,0.035)
-    _surface(node,walls,wall_material,true)
+    _surface(node,walls,wall_material,true,false)
+    for kind in detail.batches:
+        if not detail_materials.has(kind):detail_materials[kind]=Architecture.material(kind)
+        _surface(node,detail.batches[kind],detail_materials[kind],false)
     _surface(node,roofs,roof_material,false)
     _surface(node,roads,road_material,false)
     _surface(node,rails,rail_material,false)
 
-func _surface(parent: Node3D,vertices: PackedVector3Array,material: StandardMaterial3D,collision: bool) -> void:
+func _surface(parent: Node3D,vertices: PackedVector3Array,material: StandardMaterial3D,collision: bool,visual: bool=true) -> void:
     if vertices.is_empty():return
     var builder := SurfaceTool.new()
     builder.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -638,6 +667,7 @@ func _surface(parent: Node3D,vertices: PackedVector3Array,material: StandardMate
     var instance := MeshInstance3D.new()
     instance.mesh=mesh
     instance.material_override=material
+    instance.visible=visual
     parent.add_child(instance)
     if collision:
         instance.create_trimesh_collision()

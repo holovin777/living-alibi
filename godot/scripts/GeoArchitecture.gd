@@ -1,0 +1,141 @@
+extends RefCounted
+## Batched procedural detail. The OSM footprint remains authoritative;
+## facade details, furniture and street lighting are artistic approximations.
+const PALETTE: Array[Color]=[Color("#cdb49a"),Color("#d5c5a8"),Color("#bc907c"),Color("#e0d1b8"),Color("#b8b4a5"),Color("#d8b18f")]
+const MAX_WINDOWS=2200
+const MAX_LAMPS=16
+var windows_count:=0
+var lamps_count:=0
+var seen_lamps: Dictionary={}
+var batches: Dictionary={}
+
+func _quad(kind: String,a: Vector3,b: Vector3,c: Vector3,d: Vector3) -> void:
+    if not batches.has(kind):batches[kind]=PackedVector3Array()
+    var vertices: PackedVector3Array=batches[kind]
+    vertices.append_array(PackedVector3Array([a,b,c,a,c,d]))
+    batches[kind]=vertices
+
+func _rect(kind: String,at: Vector3,tangent: Vector3,width: float,height: float) -> void:
+    var half:=tangent*width*0.5
+    var up:=Vector3.UP*height*0.5
+    _quad(kind,at-half-up,at+half-up,at+half+up,at-half+up)
+
+func _box(kind: String,at: Vector3,dimensions: Vector3,tangent: Vector3,normal: Vector3) -> void:
+    var x:=tangent*dimensions.x*0.5
+    var y:=Vector3.UP*dimensions.y*0.5
+    var z:=normal*dimensions.z*0.5
+    _quad(kind,at-x-y-z,at+x-y-z,at+x+y-z,at-x+y-z)
+    _quad(kind,at+x-y+z,at-x-y+z,at-x+y+z,at+x+y+z)
+    _quad(kind,at-x-y+z,at-x-y-z,at-x+y-z,at-x+y+z)
+    _quad(kind,at+x-y-z,at+x-y+z,at+x+y+z,at+x+y-z)
+    _quad(kind,at-x+y-z,at+x+y-z,at+x+y+z,at-x+y+z)
+    _quad(kind,at-x-y+z,at+x-y+z,at+x-y-z,at-x-y-z)
+
+func facade(feature: Dictionary) -> void:
+    var points: Array=feature["points"]
+    var h:=float(feature["height"])
+    var type:=str(feature.get("kind","yes"))
+    if points.size()<3:return
+    var id_hash:=str(feature.get("id","")).hash()
+    var wall_key: String="wall_%d" % posmod(id_hash,PALETTE.size())
+    var signed_area:=0.0
+    for i in range(points.size()):
+        var p: Array=points[i]
+        var q: Array=points[(i+1)%points.size()]
+        signed_area+=float(p[0])*float(q[1])-float(q[0])*float(p[1])
+    var floors:=clampi(roundi(h/3.2),1,12)
+    var floor_height:=h/floors
+    var residential:=type in ["yes","residential","apartments","house","terrace","detached"]
+    for i in range(points.size()):
+        var p: Array=points[i]
+        var q: Array=points[(i+1)%points.size()]
+        var a:=Vector3(float(p[0]),0,float(p[1]))
+        var b:=Vector3(float(q[0]),0,float(q[1]))
+        var length:=a.distance_to(b)
+        if length<0.02:continue
+        var tangent: Vector3=(b-a)/length
+        var normal:=Vector3(tangent.z,0,-tangent.x) if signed_area>=0 else Vector3(-tangent.z,0,tangent.x)
+        _quad(wall_key,a,b,b+Vector3.UP*h,a+Vector3.UP*h)
+        if length<3.2 or floor_height<2.0 or type in ["garage","garages","shed","roof","ruins","church","chapel","industrial","warehouse"]:continue
+        var columns:=clampi(floori(length/3.0),1,14)
+        var door_column:=columns/2
+        for floor_index in range(floors):
+            for column in range(columns):
+                if windows_count>=MAX_WINDOWS:return
+                var middle:=a.lerp(b,(column+0.5)/columns)+normal*0.04
+                var is_door:=floor_index==0 and i==0 and column==door_column
+                if is_door:
+                    _rect("stone",middle+Vector3.UP*1.18,tangent,1.44,2.36)
+                    _rect("door",middle+normal*0.025+Vector3.UP*1.1,tangent,1.18,2.15)
+                else:
+                    var at:=middle+Vector3.UP*(floor_height*floor_index+floor_height*0.57)
+                    var wh:=minf(1.35,floor_height*0.48)
+                    _rect("stone",at,tangent,1.28,wh+0.18)
+                    _rect("glass",at+normal*0.02,tangent,1.05,wh)
+                    _rect("frame",at+normal*0.035,tangent,0.055,wh)
+                    _rect("frame",at+normal*0.035,tangent,1.05,0.055)
+                    if residential:
+                        _rect("shutter",at-tangent*0.69+normal*0.03,tangent,0.28,wh)
+                        _rect("shutter",at+tangent*0.69+normal*0.03,tangent,0.28,wh)
+                    if residential and floor_index>0 and floor_index<5 and posmod(id_hash+i+column,5)==0:
+                        var deck:=middle+Vector3.UP*(floor_index*floor_height+0.12)+normal*0.46
+                        _box("stone",deck,Vector3(1.65,0.15,0.9),tangent,normal)
+                        _box("iron",deck+normal*0.42+Vector3.UP*0.88,Vector3(1.65,0.055,0.055),tangent,normal)
+                        for rail in range(5):
+                            _box("iron",deck+normal*0.42+tangent*(rail-2)*0.38+Vector3.UP*0.48,Vector3(0.035,0.82,0.035),tangent,normal)
+                    windows_count+=1
+
+func road(record: Dictionary) -> void:
+    var a:=Vector3(float(record["a"][0]),0.045,float(record["a"][1]))
+    var b:=Vector3(float(record["b"][0]),0.045,float(record["b"][1]))
+    var length:=a.distance_to(b)
+    if length<0.1:return
+    var direction: Vector3=(b-a)/length
+    var side:=Vector3(-direction.z,0,direction.x)
+    var width:=float(record["width"])
+    var kind:=str(record.get("kind",""))
+    var sidewalk:=str(record.get("sidewalk",""))
+    if kind in ["motorway","trunk","track","footway","path","cycleway","steps","pedestrian","service","living_street"]:return
+    if width<4.5:return
+    for sign_value in [-1.0,1.0]:
+        var sign_num: float=sign_value
+        var allowed:=sidewalk in ["both","yes"] or sidewalk=="left" and sign_num<0 or sidewalk=="right" and sign_num>0
+        if sidewalk in ["no","none","separate"]:allowed=false
+        if sidewalk.is_empty():allowed=width>=5.0 # older cached maps, provisional pavement
+        if allowed:
+            var inner:=side*sign_num*(width*0.5)
+            var outer:=side*sign_num*(width*0.5+1.05)
+            _quad("pavement",a+inner+Vector3.UP*0.035,b+inner+Vector3.UP*0.035,b+outer+Vector3.UP*0.035,a+outer+Vector3.UP*0.035)
+            _quad("curb",a+inner,b+inner,b+inner+Vector3.UP*0.035,a+inner+Vector3.UP*0.035)
+    if width>=6.0 and str(record.get("oneway","no")) not in ["yes","1","true","-1"]:
+        for i in range(ceili(length/7.0)):
+            var start:=a+direction*(i*7.0)+Vector3.UP*0.012
+            var end:=a+direction*minf(length,i*7.0+2.5)+Vector3.UP*0.012
+            _quad("mark",start-side*0.055,end-side*0.055,end+side*0.055,start+side*0.055)
+    if lamps_count>=MAX_LAMPS or length<12:return
+    var loc: Vector3=a.lerp(b,0.5)+side*(width*0.5+0.65)
+    var key:=Vector2i(roundi(loc.x/22.0),roundi(loc.z/22.0))
+    if seen_lamps.has(key):return
+    seen_lamps[key]=true
+    lamps_count+=1
+    _box("iron",loc+Vector3.UP*1.75,Vector3(0.09,3.5,0.09),direction,side)
+    _box("iron",loc+Vector3.UP*3.46-side*0.28,Vector3(0.10,0.09,0.62),direction,side)
+    _box("lamp",loc+Vector3.UP*3.39-side*0.56,Vector3(0.24,0.13,0.36),direction,side)
+
+func tree(record: Dictionary) -> void:
+    var at:=Vector3(float(record["point"][0]),0,float(record["point"][1]))
+    _box("bark",at+Vector3.UP*1.4,Vector3(0.26,2.8,0.26),Vector3.RIGHT,Vector3.BACK)
+    _box("leaves",at+Vector3.UP*3.1,Vector3(2.6,2.7,2.6),Vector3.RIGHT,Vector3.BACK)
+    _box("leaves_light",at+Vector3(-0.4,4.1,0.2),Vector3(1.9,1.3,1.8),Vector3.RIGHT,Vector3.BACK)
+
+static func material(kind: String) -> StandardMaterial3D:
+    var mat:=StandardMaterial3D.new()
+    var colors: Dictionary={"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
+    mat.albedo_color=PALETTE[int(kind.trim_prefix("wall_"))] if kind.begins_with("wall_") else colors.get(kind,Color.WHITE)
+    mat.cull_mode=BaseMaterial3D.CULL_DISABLED
+    mat.roughness=0.87
+    if kind=="lamp":
+        mat.emission_enabled=true
+        mat.emission=Color("#ffcf88")
+        mat.emission_energy_multiplier=0.65
+    return mat
