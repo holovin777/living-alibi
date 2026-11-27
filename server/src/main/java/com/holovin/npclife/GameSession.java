@@ -265,7 +265,7 @@ public final class GameSession implements AutoCloseable {
     public record StairwellResident(String id,String name,String appearanceStage,String outfitVisual,String knownName,int conversations,String relationship,String mood) { }
     public record WorldView(int day,int minute,int year,int dayOfYear,String season,
                             WeatherView weather,PlayerView player,List<ResidentView> residents,
-                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber,PublicSafetyLife.View publicSafety,BusLife.View bus,List<StairwellResident> stairwellResidents,TechnicalWorkLife.MagnoliaServices magnoliaServices,CondominiumLife.Report condominium,PostalLife.Report postal,CivilRegistryLife.Report registry,EmploymentContractLife.Report employmentContract,PensionLife.Report pension,SocialProtectionLife.Report socialProtection,CaritasLife.Report caritas,ShelterLife.Report shelter,EmploymentCenterLife.Report jobCentre,List<InterviewLife.Application> jobApplications,LocalVehicleCrimeLife.View vehicleCrime,NpcVehicleCrimeLife.View residentVehicleCrime,NpcPropertyCrimeLife.View residentPropertyCrime,SecurityLife.View security,List<IntercomLife.Access> apartmentAccess) { }
+                            List<SourceView> sources,List<MutualAidLife.Notice> aidNotices,ServicesView services,List<RetailView> shop,FarmLife.Report farm,FuelLife.Report fuel,FreightLife.Report freight,LogisticsLife.Report logistics,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard,MarketStallLife.Report stall,BankLife.Report bank,RentalLife.Report rental,ConstructionLife.Report construction,MunicipalLife.Report comune,DemographyLife.Report demography,EducationLife.Report education,ArchiveLife.Report archive,NewspaperLife.Report newspaper,OpinionLife.Report opinion,ElectionLife.Report election,RebirthLife.Report rebirth,PhoneLife.Report phone,List<AddressLife.Entry> contacts,IntercomLife.ApartmentVisit apartmentVisit,List<PeerEncounterView> peerEncounters,BarberView barber,PublicSafetyLife.View publicSafety,BusLife.View bus,List<StairwellResident> stairwellResidents,TechnicalWorkLife.MagnoliaServices magnoliaServices,CondominiumLife.Report condominium,PostalLife.Report postal,CivilRegistryLife.Report registry,EmploymentContractLife.Report employmentContract,PensionLife.Report pension,SocialProtectionLife.Report socialProtection,CaritasLife.Report caritas,ShelterLife.Report shelter,EmploymentCenterLife.Report jobCentre,List<InterviewLife.Application> jobApplications,LocalVehicleCrimeLife.View vehicleCrime,NpcVehicleCrimeLife.View residentVehicleCrime,NpcPropertyCrimeLife.View residentPropertyCrime,SecurityLife.View security,List<IntercomLife.Access> apartmentAccess,PersonalGoodsLife.View personalGoods) { }
     public record ActionView(String message,WorldView world,String dialogueLanguage,boolean dialogueRendered,String dialogueLocale,String dialogueFarewell) {
         public ActionView(String message,WorldView world){this(message,world,null,false,null,null);}
         public ActionView(String message,WorldView world,String language,boolean rendered,String locale){this(message,world,language,rendered,locale,null);}
@@ -307,7 +307,7 @@ public final class GameSession implements AutoCloseable {
                             return new StairwellResident(c.id,PlayerLife.displayName(town,c),appearanceStage(c),outfitVisual(c),
                                     contact==null?null:contact.knownName,contact==null?0:contact.conversations,
                                     PlayerLife.relationship(contact),EmotionLife.mood(town,c,state.day,state.minute).name());
-                        }).toList(),TechnicalWorkLife.magnolia(town),CondominiumLife.report(town),PostalLife.report(town),CivilRegistryLife.report(town,state),EmploymentContractLife.report(town,state.day),PensionLife.report(town),SocialProtectionLife.report(town,state.day),CaritasLife.report(town,state),ShelterLife.report(town,state),EmploymentCenterLife.report(town,state),InterviewLife.report(town,state),LocalVehicleCrimeLife.view(town,state),NpcVehicleCrimeLife.view(town),NpcPropertyCrimeLife.view(town),SecurityLife.view(town,state),IntercomLife.access(town,state.day,state.minute));
+                        }).toList(),TechnicalWorkLife.magnolia(town),CondominiumLife.report(town),PostalLife.report(town),CivilRegistryLife.report(town,state),EmploymentContractLife.report(town,state.day),PensionLife.report(town),SocialProtectionLife.report(town,state.day),CaritasLife.report(town,state),ShelterLife.report(town,state),EmploymentCenterLife.report(town,state),InterviewLife.report(town,state),LocalVehicleCrimeLife.view(town,state),NpcVehicleCrimeLife.view(town),NpcPropertyCrimeLife.view(town),SecurityLife.view(town,state),IntercomLife.access(town,state.day,state.minute),PersonalGoodsLife.view(town,state));
     }
 
     public synchronized BusinessView business() {
@@ -884,6 +884,16 @@ public final class GameSession implements AutoCloseable {
             var copy=town.copy();return apply(copy,1,JusticeLife.payFine(copy));
         }
         JusticeLife.requireFree(town);
+        if(action!=null&&action.startsWith("personal-good:")){
+            String[] parts=action.split(":",4);var copy=town.copy();
+            if(parts.length<3)throw new IllegalArgumentException("Choose a personal item.");
+            String reply=switch(parts[1]){
+                case "buy" -> PersonalGoodsLife.buy(copy,state,parts[2]);
+                case "sell" -> PersonalGoodsLife.sell(copy,state,parts[2]);
+                case "gift","lend","return" -> {if(parts.length!=4)throw new IllegalArgumentException("Choose a resident.");yield PersonalGoodsLife.exchange(copy,state,parts[1],parts[2],parts[3]);}
+                default -> throw new IllegalArgumentException("Unknown personal goods action.");
+            };return apply(copy,2,reply);
+        }
         if("security-protection".equals(action)||"security-insurance".equals(action)){
             var copy=town.copy();return apply(copy,5,SecurityLife.purchase(copy,state,"security-insurance".equals(action)));
         }

@@ -877,8 +877,8 @@ final class WorldDatabase implements AutoCloseable {
                 ResultSet rs=st.executeQuery("SELECT * FROM property_items ORDER BY id")) {
             while(rs.next()) {
                 String owner=rs.getString("owner_id"),holder=rs.getString("holder_id");
-                if(!town.people.containsKey(owner) ||
-                        (holder!=null && !town.people.containsKey(holder)))continue;
+                if((!town.people.containsKey(owner)&&!PersonalGoodsLife.persistedIdentity(owner)) ||
+                        (holder!=null && !town.people.containsKey(holder)&&!PersonalGoodsLife.persistedIdentity(holder)))continue;
                 var item=new PropertyLife.Item(rs.getString("id"),
                         PropertyLife.Type.valueOf(rs.getString("type")),owner,holder,
                         rs.getString("stored_space"),rs.getInt("stolen")!=0,

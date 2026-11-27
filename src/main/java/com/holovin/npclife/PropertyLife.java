@@ -9,8 +9,8 @@ import java.util.List;
 final class PropertyLife {
     private PropertyLife() { }
 
-    enum Type { WALLET, PHONE, BICYCLE }
-    enum Action { ACQUIRED_AT_MIGRATION, PURCHASED, STOLEN, SEIZED, RETURNED }
+    enum Type { WALLET, PHONE, BICYCLE, BOOK, CLOTHING, WATCH }
+    enum Action { ACQUIRED_AT_MIGRATION, PURCHASED, STOLEN, SEIZED, RETURNED, SOLD, GIFTED, LENT }
 
     static final class Item {
         final String id;
@@ -32,6 +32,7 @@ final class PropertyLife {
         Item copy() {return new Item(id,type,ownerId,holderId,storedSpace,stolen,value,createdDay);}
         String currentSpace(TownLife.Town town) {
             if(holderId==null)return storedSpace;
+            if(holderId.equals(PersonalGoodsLife.visitor(town)))return town.player.travelRemaining>0?"in transit with visitor":TownLife.publicSpace(town.player.place);
             var holder=town.people.get(holderId);
             if(holder==null)return "unknown";
             return holder.travelRemaining>0?"in transit with "+holderId:holder.currentSpace();

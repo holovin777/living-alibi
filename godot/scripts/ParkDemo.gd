@@ -7761,6 +7761,7 @@ func _render_actions() -> void:
                 choice.set_meta("sold_out",stock <= 0)
                 _action_choices.add_child(choice)
             if _current_place == "MARKET":
+                _render_personal_goods()
                 var stall: Dictionary = _last_snapshot.get("stall",{})
                 if not bool(stall.get("registered",false)):
                     _action_choices.add_child(_button("Register private stall · 20 EUR",_garden_action.bind("stall-register")))
@@ -8241,7 +8242,38 @@ func _room_wash() -> void:
     if _near_bath() and _connected and not _api.is_busy():
         _api.room_wash()
 
+func _render_personal_goods() -> void:
+    var goods: Dictionary=_last_snapshot.get("personalGoods",{})
+    if goods.is_empty():return
+    var heading := Label.new()
+    heading.text=tr("Personal belongings")
+    _action_choices.add_child(heading)
+    for offer in goods.get("offers",[]):
+        var buy := _button(tr("Buy %s · %s EUR") % [tr(str(offer.get("label",""))),offer.get("price",0)],_garden_action.bind("personal-good:buy:"+str(offer.get("id",""))))
+        buy.disabled=int(offer.get("stock",0))<=0 or int(_last_snapshot.get("player",{}).get("money",0))<int(offer.get("price",0))
+        _action_choices.add_child(buy)
+    for item in goods.get("items",[]):
+        var id := str(item.get("id",""))
+        var label := tr(str(item.get("label","")))
+        var status := Label.new()
+        status.text=label+" · "+tr("Lent") if bool(item.get("lent",false)) else label
+        _action_choices.add_child(status)
+        if bool(item.get("carried",false)):
+            _action_choices.add_child(_button(tr("Sell %s · %s EUR") % [label,item.get("resalePrice",0)],_garden_action.bind("personal-good:sell:"+id)))
+        for contact in goods.get("contacts",[]):
+            var who := str(contact.get("id",""))
+            var name_text := str(contact.get("name",""))
+            if bool(item.get("carried",false)):
+                _action_choices.add_child(_button(tr("Gift %s to %s") % [label,name_text],_garden_action.bind("personal-good:gift:"+id+":"+who)))
+                if bool(contact.get("canBorrow",false)):
+                    _action_choices.add_child(_button(tr("Lend %s to %s") % [label,name_text],_garden_action.bind("personal-good:lend:"+id+":"+who)))
+            elif str(item.get("borrowerId",""))==who:
+                _action_choices.add_child(_button(tr("Request %s back from %s") % [label,name_text],_garden_action.bind("personal-good:return:"+id+":"+who)))
+
 func _garden_action(action: String) -> void:
+    if action.begins_with("personal-good:"):
+        if _current_place=="MARKET" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("security-"):
         if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
         return
