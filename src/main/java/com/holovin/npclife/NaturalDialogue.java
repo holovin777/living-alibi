@@ -55,6 +55,10 @@ final class NaturalDialogue {
         if(has(n,"looking for a job","looking for work","find a job","find work","need a job","any jobs","job openings",
                 "cerco lavoro","sto cercando lavoro","trovare lavoro","hai lavoro per me","c'e lavoro","assumono",
                 "шукаю роботу","знайти роботу","потрібна робота","є робота"))return "@jobs";
+        if(has(n,"are we colleagues","are we coworkers","do we work together","siamo colleghi","lavoriamo insieme","ми колеги","ми працюємо разом"))return "@coworker";
+        if(has(n,"who is working today","who is on shift","who is at work","chi lavora oggi","chi e di turno","chi e al lavoro","хто сьогодні працює","хто на зміні"))return "@shift-team";
+        if(has(n,"what should i do at work","what should i do next","what is our task","what are our tasks","what is today's task","cosa devo fare al lavoro","cosa devo fare adesso","qual e il nostro compito","cosa facciamo oggi","що мені робити на роботі","що робимо сьогодні","яке наше завдання"))return "@work-advice";
+        if(has(n,"shall we take a break","coffee break","let's take a break","facciamo una pausa","pausa caffe","підемо на перерву","зробимо перерву"))return "@work-break";
         if(has(n,"where do you work","where is your workplace","dove lavori","dove lavora","де ти працюєш","де ви працюєте"))return "@workplace";
         if(has(n,"what do you do","what is your job","what's your job","what do you work as","your profession","your occupation",
                 "che lavoro fai","che lavoro fa","cosa fai nella vita","di cosa ti occupi","che mestiere fai",
@@ -111,6 +115,7 @@ final class NaturalDialogue {
         return switch(intent) {
             case "@police-help","@police-work","@police-cases" -> PoliceLife.assistance(town,resident,intent,day,minute);
             case "@jobs" -> "Look for job notices on your phone or ask at the market. They can tell you whether work is available.";
+            case "@coworker","@shift-team","@work-advice","@work-break" -> workReply(town,resident,contact,intent,day);
             case "@workplace" -> resident.employed&&resident.workplace!=null
                     ? "My workplace is "+resident.workplace.label+"." : "I don't have a workplace at the moment.";
             case "@activity" -> switch(resident.activity) {
@@ -137,6 +142,57 @@ final class NaturalDialogue {
             case "@thanks" -> contact.trust>=55?"You're very welcome.":"You're welcome.";
             case "@bye" -> contact.trust>=55?"See you again. Take care!":"Goodbye.";
             default -> intent.startsWith("@place:") ? directions(town,resident,intent) : null;
+        };
+    }
+    /** Same occupation and workplace conservatively identify a possible team.
+     * Never disclose names or private reasons for another worker's absence. */
+    private static boolean sameTeam(TownLife.Citizen a,TownLife.Citizen b) {
+        return a!=null&&b!=null&&a!=b&&a.alive&&b.alive&&a.employed&&b.employed
+                &&a.workplace!=null&&a.workplace==b.workplace
+                &&java.util.Objects.equals(a.occupation,b.occupation);
+    }
+    private static boolean onShift(TownLife.Citizen p,int day) {
+        return p.alive&&p.employed&&p.workplace!=null&&p.presentAt(p.workplace)
+                &&"WORKING".equals(p.activity)&&!EmploymentLife.sick(p,day);
+    }
+    private static String workReply(TownLife.Town town,TownLife.Citizen resident,
+                                    PlayerLife.Contact contact,String intent,int day) {
+        if(!resident.employed||resident.workplace==null)return "I don't have a job at the moment.";
+        var player=RebirthLife.child(town);
+        boolean colleague=player!=null&&RebirthLife.linkedAdult(town,player)&&sameTeam(resident,player);
+        boolean working=onShift(resident,day);
+        return switch(intent) {
+            case "@coworker" -> colleague
+                ? "We have the same job and workplace. Good to see a colleague."
+                : "We don't appear to be on the same team. I work as "+resident.occupation+".";
+            case "@shift-team" -> {
+                if(!working)yield "I'm not on shift right now. Ask me at work.";
+                long others=town.people.values().stream().filter(p->sameTeam(resident,p)&&onShift(p,day)).count();
+                yield others==0?"I'm the only person in my role working here right now."
+                    : "There are "+others+" other workers in my role on shift here right now.";
+            }
+            case "@work-advice" -> {
+                if(!colleague)yield "Check with your own supervisor about your assignments.";
+                if(!working)yield "I'm off duty right now. Let's discuss work when we're on shift.";
+                if(!player.presentAt(player.workplace))yield "Come to the workplace first, then check your assignments.";
+                String advice=switch(resident.occupation) {
+                    case "Programmer" -> "Check the ticket board, acceptance criteria and tests before changing code.";
+                    case "Baker" -> "Check the ingredients and orders before starting the next batch.";
+                    case "Market vendor" -> "Check stock and serve waiting customers before restocking.";
+                    case "Engineer","Mechanic","Factory machinist" -> "Check the work order, equipment status and available materials before starting.";
+                    case "Teacher" -> "Check the lesson plan and prepare the classroom.";
+                    case "Transport driver" -> "Check the assigned route and vehicle before departure.";
+                    default -> "Check today's assignments, supplies and priorities with the supervisor.";
+                };
+                yield resident.sociability>=70&&contact.trust>=55?"Of course, happy to help. "+advice:advice;
+            }
+            case "@work-break" -> {
+                if(!colleague)yield "Maybe another time. I have my own schedule.";
+                if(working&&resident.fatigue<65)yield "Not yet, I still have work to finish.";
+                if(working)yield "I could use a break, but I need to finish my current duties first.";
+                yield resident.sociability>=60?"A coffee sounds nice, if we both have time.":"I'll take my break on my own, thanks.";
+            }
+            default -> null;
         };
     }
     private static String directions(TownLife.Town town,TownLife.Citizen resident,String intent) {
