@@ -743,10 +743,6 @@ public final class GameSession implements AutoCloseable {
     synchronized void geoEnter(GeoProjection map,String destination,double x,double z) throws SQLException {
         JusticeLife.requireFree(town);
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
-        if("phone-digital-pay".equals(action)||"phone-telecom-subscribe".equals(action)){
-            if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action)))throw new IllegalArgumentException("Digital action unavailable.");
-            return new GeoProjection.ActionResult(gardenAction(action).message(),null);
-        }
         if(RebirthLife.active(town)){
             var c=RebirthLife.child(town);
             if(!GeoLife.canWalk(town,state)||!RebirthLife.linkedAdult(town,c)||!GeoLife.atHome(c))throw new IllegalArgumentException("Use F for permitted travel.");
@@ -784,6 +780,10 @@ public final class GameSession implements AutoCloseable {
 
     synchronized GeoProjection.ActionResult geoAction(GeoProjection map,String action,double x,double z)throws SQLException{
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
+        if("phone-digital-pay".equals(action)||"phone-telecom-subscribe".equals(action)){
+            if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action)))throw new IllegalArgumentException("Digital action unavailable.");
+            return new GeoProjection.ActionResult(gardenAction(action).message(),null);
+        }
         if(RebirthLife.active(town)){
             boolean lifeAction=action!=null&&GeoLife.choices(town,state,map).stream().anyMatch(a->a.id().equals(action));
             boolean workAction=GeoWork.accepts(GeoWork.view(town,state),action);
