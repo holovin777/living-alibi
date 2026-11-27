@@ -81,8 +81,11 @@ final class PopulationLife {
         if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
             RebirthLife.resumeRoutine(town);manual=null;
         }
+        TownLife.Place search=child||sick||homeService||residentService!=null||freightRun||condominiumRepair||condominiumCleaning||postalRound||publicSafety
+                ?null:ChildSearchLife.destination(town,c,clock);
         if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;
+        else if(search!=null)desired=search;
         else if(homeService)desired=TownLife.Place.SOUTH_RESIDENCES;
         else if(residentService!=null)desired=residentService;
         else if(serviceReturn!=null)desired=serviceReturn;
@@ -90,7 +93,8 @@ final class PopulationLife {
         else if(freightRun)desired=freightDestination;
         else if(!publicSafety&&!child&&!carrier&&!RebirthLife.linkedAdult(town,c)&&PublicSafetyLife.alarmed(town,c,clock.day,minute))desired=c.home;
         else if(sleeping)desired=c.home;
-        else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:c.home;
+        else if(child)desired=c.age>=6&&workday&&minute>=480&&minute<780?TownLife.Place.SCHOOL:
+                RebirthLife.linkedChild(town,c)?c.home:ChildSearchLife.leisure(c,clock);
         else if(volunteering||seekingMeal&&!working)desired=CaritasLife.PLACE;
         else if(itEmployee && working)desired=TownLife.Place.OFFICE;
         else if(carrier && working)desired=c.workplace;
@@ -178,9 +182,11 @@ final class PopulationLife {
             c.water--;c.thirst=clamp(c.thirst-52);
             TownLife.publish(town,clock,c.id,c.place,c.name+" drank water.",events,observations);
         }
-        if(sleeping)c.activity="SLEEPING";
+        if(search!=null&&manual==null)c.activity="SEARCHING_FOR_CHILD";
+        else if(sleeping)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
-        else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":c.place==c.home?"AT_HOME":"FREE_TIME";
+        else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":c.place==c.home?"AT_HOME":
+                c.place==TownLife.Place.LIBRARY?"READING":c.place==TownLife.Place.PARK?"PLAYING":"FREE_TIME";
         else if(RebirthLife.outsideHome(town,c))c.activity="OUTSIDE_HOME";
         else if(RebirthLife.stayingHome(town,c)&&c.place==c.home)c.activity="AT_HOME";
         else if(volunteering&&c.place==CaritasLife.PLACE&&desired==CaritasLife.PLACE)c.activity="VOLUNTEERING";

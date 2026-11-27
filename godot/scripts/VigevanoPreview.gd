@@ -669,6 +669,13 @@ func _open_actions(work_only: bool=false) -> void:
         biography.text=_life_summary()+"\nSavings / Risparmi: €"+str(life.get("savings",0))
         if life.get("parentA")!=null:biography.text+="\nParents / Genitori: "+str(life.get("parentA"))+" + "+str(life.get("parentB"))
         action_list.add_child(biography)
+        var search=life.get("childSearch")
+        if search is Dictionary and str(search.get("status","NONE"))!="NONE":
+            var warning:=Label.new()
+            warning.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            warning.text="Expected home / Rientro previsto · "+str(search.get("status",""))+" · "+str(search.get("minutesOverdue",0))+" min"
+            if search.get("searchingParent")!=null:warning.text+="\nSearching / Ti cerca: "+str(search.get("searchingParent"))
+            action_list.add_child(warning)
         var upbringing=life.get("upbringing")
         if upbringing is Dictionary and int(upbringing.get("observedDays",0))>0:
             var development:=Label.new()

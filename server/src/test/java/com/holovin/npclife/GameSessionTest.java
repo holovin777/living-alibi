@@ -1918,10 +1918,13 @@ class GameSessionTest {
         }
         try(var game=new GameSession(file)){
             assertTrue(game.snapshot().rebirth().childOptions().outing());
-            var home=game.gardenAction("rebirth-child-hour").world();
-            assertFalse(home.rebirth().childOptions().outing());
-            assertTrue(home.rebirth().childOptions().destinations().isEmpty());
+            var late=game.gardenAction("rebirth-child-hour").world();
+            assertTrue(late.rebirth().childOptions().outing());
+            assertEquals("PARK",late.player().placeId());
+            assertTrue(late.rebirth().childOptions().destinations().isEmpty());
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-child-travel-PARK"));
+            var home=game.gardenAction("rebirth-child-home").world();
+            assertFalse(home.rebirth().childOptions().outing());
         }
         try(var db=new WorldDatabase(file)){
             var state=db.load();var town=db.loadTown(state);var child=RebirthLife.child(town);

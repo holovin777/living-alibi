@@ -107,6 +107,27 @@ class GeoRebirthTest {
         clock.day=15;clock.minute=1260;ChildhoodLife.tick(saved,clock);
         assertEquals(ChildhoodLife.view(t,c),ChildhoodLife.view(saved,adult));
     }
+    @Test void lateChildIsSearchedForByActualParentWithoutTeleporting(){
+        var s=new WorldState();var t=TownLife.create(s);
+        var pair=PopulationGenerator.add(t,2);var p=pair.get(0);var c=pair.get(1);
+        p.age=30;c.age=10;p.activity="AT_HOME";p.place=p.home;p.destination=p.home;p.travelRemaining=0;
+        c.place=TownLife.Place.LIBRARY;c.destination=c.place;c.activity="READING";c.travelRemaining=0;
+        DemographyLife.set(t,c,"parent-a",p.generationIndex);
+        s.minute=1080;ChildSearchLife.tick(t,s);
+        assertEquals("SEARCHING",ChildSearchLife.view(t,c,s).status());
+        assertEquals(TownLife.Place.PARK,ChildSearchLife.destination(t,p,s));
+        assertEquals(TownLife.Place.LIBRARY,c.place);
+        assertEquals(p.home,p.place);
+        s.minute=1140;p.place=TownLife.Place.LIBRARY;p.destination=p.place;p.activity="SEARCHING_FOR_CHILD";
+        ChildSearchLife.tick(t,s);
+        assertEquals("LOCATED",ChildSearchLife.view(t,c,s).status());
+        assertNull(ChildSearchLife.destination(t,p,s));
+        assertEquals(TownLife.Place.LIBRARY,c.place);
+        c.place=c.home;c.destination=c.home;c.activity="AT_HOME";
+        s.minute=1155;ChildSearchLife.tick(t,s);
+        assertEquals("NONE",ChildSearchLife.view(t,c,s).status());
+        assertEquals(1,ChildSearchLife.view(t,c,s).incidents());
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

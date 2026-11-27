@@ -285,7 +285,7 @@ final class RebirthLife {
     static boolean linkedChild(TownLife.Town t,TownLife.Citizen c){
         return c!=null&&phase(t)==CHILDHOOD&&c==child(t)&&c.alive&&c.age<18;
     }
-    // A voluntary afternoon outing never replaces school, sleep or care at home.
+    // The expected return time is a family rule, not a forced teleport.
     static int outingEnd(TownLife.Citizen c){return c.age<13?1080:1200;}
     static boolean outingHours(TownLife.Citizen c,int minute){return minute>=780&&minute<outingEnd(c);}
     static List<TownLife.Place> childDestinations(TownLife.Citizen c){
@@ -299,7 +299,7 @@ final class RebirthLife {
         var places=PlayerLife.publicPlaces();
         if(n<=0||n>places.size())return null;
         var destination=places.get(n-1);
-        if(!outingHours(c,minute)||EmploymentLife.sick(c,day)||!childDestinations(c).contains(destination)){
+        if(EmploymentLife.sick(c,day)||!childDestinations(c).contains(destination)){
             t.industryStocks.put(TRAVEL,0);
             return null;
         }
@@ -392,7 +392,7 @@ final class RebirthLife {
         if(!linkedChild(t,c)||c.age<6)return null;
         var destinations=awakePresent(c)&&!EmploymentLife.sick(c,day)&&outingHours(c,minute)
                 ?childDestinations(c).stream().filter(p->minute+TownLife.travelTime(c.place,p)<outingEnd(c)).map(Enum::name).toList():List.<String>of();
-        boolean outing=t.industryStocks.getOrDefault(TRAVEL,0)>0&&outingHours(c,minute)&&!EmploymentLife.sick(c,day);
+        boolean outing=t.industryStocks.getOrDefault(TRAVEL,0)>0&&!EmploymentLife.sick(c,day);
         return new ChildOptions(destinations,outing,outingEnd(c),c.activity,hobbies(t,c,day,minute),allowanceAmount(t,c,day,minute));
     }
     static String focus(TownLife.Town t,TownLife.Citizen c){
