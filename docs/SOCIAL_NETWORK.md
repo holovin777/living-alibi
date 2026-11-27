@@ -10,6 +10,22 @@ This milestone gives each pair of residents **its own persistent relationship**.
 - At most one approach roll per pair per game day; at most one successful conversation per pair per day. A failed approach does not generate a conversation.
 - Interactions update affinity, trust and tension; conversations are logged as world facts and observed only by physically co-present witnesses.
 
+## Autonomous workplace conversations
+
+Co-present, employed NPCs in the same occupation and workplace can initiate
+a work conversation during their shifts. Sick, travelling and off-duty
+workers do not qualify. Shared duties modestly increase the existing
+approach chance; the same per-pair daily and encounter limits still apply.
+Topics depend on occupation, fatigue, carefulness, sociability and trust:
+work orders, code review, quality checks, workload, breaks and jokes.
+Existing tension can produce disagreements or reconciliation. These
+conversations update the same persisted relationship and witness journal.
+No new database schema or client commands are required.
+
+This is a rule-based journal event, not a scheduled break, actual task
+transfer, spoken exchange or exact employer roster. Matching job and place
+is a conservative proxy until every NPC has an employer ID.
+
 ## Data storage
 
 `town_relationships` stores `first_id`, `second_id`, affinity, trust, tension, encounters, conversations, arguments, RNG state and timing. SQLite migrations add `last_seen_tick`, `meeting_since_tick`, and `last_attempt_day` without dropping old columns or rows. First and second IDs for generated pairs use lexicographically sorted stable IDs. The original (`marco`, `elena`) relationship remains in its original row for backward compatibility.

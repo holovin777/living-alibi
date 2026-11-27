@@ -18,6 +18,38 @@ final class SocialNetwork {
         return v==0?1:v;
     }
 
+    /** A shared district alone is not proof of a shared employer. Until employer
+     * IDs exist for every NPC, require matching occupation and workplace. */
+    static boolean coworkersOnShift(TownLife.Citizen a,TownLife.Citizen b,int day) {
+        return a!=b && a.alive && b.alive && a.employed && b.employed &&
+                a.workplace!=null && a.workplace==b.workplace &&
+                java.util.Objects.equals(a.occupation,b.occupation) &&
+                a.presentAt(a.workplace) && b.presentAt(b.workplace) &&
+                a.currentSpace().equals(b.currentSpace()) &&
+                "WORKING".equals(a.activity) && "WORKING".equals(b.activity) &&
+                !EmploymentLife.sick(a,day) && !EmploymentLife.sick(b,day);
+    }
+
+    private static String workTopic(TownLife.Citizen a,TownLife.Citizen b,SocialLife.Relationship r) {
+        String names=a.name+" and "+b.name;
+        if(Math.max(a.fatigue,b.fatigue)>=70)
+            return names+" discussed workload and when to take a break";
+        if(r.trust>=55 && Math.max(a.sociability,b.sociability)>=75 &&
+                Math.min(a.carefulness,b.carefulness)<80)
+            return names+" shared a workplace joke";
+        if(Math.max(a.carefulness,b.carefulness)>=75)
+            return names+" exchanged advice about checking the quality of their work";
+        return names+" discussed "+switch(a.occupation==null?"":a.occupation) {
+            case "Programmer" -> "the ticket board and code review";
+            case "Baker" -> "ingredients and the next baking batch";
+            case "Market vendor" -> "stock and customer orders";
+            case "Engineer","Mechanic","Factory machinist" -> "work orders and equipment";
+            case "Teacher" -> "lessons and classroom preparation";
+            case "Transport driver" -> "the route and vehicle checks";
+            default -> "today's assignments and priorities";
+        };
+    }
+
     static void tick(TownLife.Town town,WorldState clock,
                      List<TownLife.Event> truth,List<TownLife.Observation> witnesses,
                      List<SocialLife.Interaction> social) {
@@ -58,6 +90,9 @@ final class SocialNetwork {
                 // small town from turning into hundreds of conversations per day.
                 int chance=clamp(7+(first.sociability+second.sociability)/10-
                         (first.fatigue+second.fatigue)/15-relation.tension/5);
+                boolean coworkers=coworkersOnShift(first,second,clock.day);
+                // A modest boost for shared duties, not an extra approach or a forced chat.
+                if(coworkers)chance=clamp(chance+12);
                 if(relation.nextInt(100)>=chance)continue;
                 int pressure=(first.hunger+second.hunger+first.thirst+second.thirst)/4+
                         relation.tension/2;
@@ -75,13 +110,19 @@ final class SocialNetwork {
                     relation.trust=clamp(relation.trust-4);
                     relation.tension=clamp(relation.tension+17);
                     relation.arguments++;
-                    description=names+" had an argument at "+first.place.label+".";
+                    description=names+(coworkers?" disagreed about their workload at ":" had an argument at ")+first.place.label+".";
                 } else if(reconcile) {
                     kind=SocialLife.Kind.RECONCILIATION;
                     relation.affinity=clamp(relation.affinity+3);
                     relation.trust=clamp(relation.trust+4);
                     relation.tension=clamp(relation.tension-18);
-                    description=names+" reconciled at "+first.place.label+".";
+                    description=names+(coworkers?" cleared up a workplace disagreement at ":" reconciled at ")+first.place.label+".";
+                } else if(coworkers) {
+                    kind=relation.conversations<2?SocialLife.Kind.SMALL_TALK:SocialLife.Kind.FRIENDLY_CHAT;
+                    relation.affinity=clamp(relation.affinity+2+affinityBonus);
+                    relation.trust=clamp(relation.trust+2);
+                    relation.tension=clamp(relation.tension-2);
+                    description=workTopic(first,second,relation)+" at "+first.place.label+".";
                 } else if(relation.conversations<2) {
                     kind=SocialLife.Kind.SMALL_TALK;
                     relation.affinity=clamp(relation.affinity+2+affinityBonus);
