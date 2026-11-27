@@ -253,6 +253,7 @@ var _custody_active := false
 var _dialog_started_at := 0
 var _dialog_end_remaining := 0.0
 var _dialog_farewell := ""
+var _show_childhood_details := false
 var _action_title: Label
 var _action_choices: VBoxContainer
 
@@ -601,6 +602,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
         return
     if _rebirth_active():
+        if event is InputEventKey and event.pressed and not event.echo and not _child_can_walk() and event.keycode in [KEY_F,KEY_ESCAPE]:
+            if event.keycode==KEY_F:
+                _show_childhood_details=false
+                _render_actions()
+                _action_panel.visible=not _action_panel.visible
+            else:
+                _action_panel.hide()
+            Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
+            get_viewport().set_input_as_handled()
+            return
         if event is InputEventKey and event.pressed and not event.echo and _child_can_walk():
             if event.keycode == KEY_T and not _dialog_panel.visible:
                 _open_dialog()
@@ -7376,8 +7387,35 @@ func _render_actions() -> void:
                     var label_text := "%s (%s) + %s (%s) · %s" % [family.get("firstName",""),family.get("firstJob",""),family.get("secondName",""),family.get("secondJob",""),family.get("district","")]
                     _action_choices.add_child(_button(label_text,_garden_action.bind("rebirth-family-%s-%s" % [family.get("first",0),family.get("second",0)])))
                 _action_choices.add_child(_button("Start adult life instead",_garden_action.bind("rebirth-adult")))
+        elif int(rebirth.get("age",0))<6 and rebirth.get("earlyChildhood") is Dictionary and not _show_childhood_details:
+            _action_title.text=tr("My childhood")
+            info.text="%s · %s" % [rebirth.get("childName",""),tr("Age %s") % int(rebirth.get("age",0))]
+            _action_choices.add_child(info)
+            var early: Dictionary=rebirth.get("earlyChildhood",{})
+            var present: Array=early.get("parentsPresent",[])
+            var family:=Label.new()
+            family.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            family.text=tr("With you: %s") % (tr("No parent in the room") if present.is_empty() else ", ".join(PackedStringArray(present)))
+            _action_choices.add_child(family)
+            for activity in early.get("actions",[]):
+                var labels: Dictionary={"rest":"Rest","call":"Call a parent","play":"Play"}
+                _action_choices.add_child(_button(tr(str(labels.get(activity,activity))),_garden_action.bind("rebirth-early-"+str(activity))))
+            var days:=int(rebirth.get("extendedWaitDays",0))
+            if days>0:_action_choices.add_child(_button(tr("Grow up: %s days") % days,_garden_action.bind("rebirth-wait-extended")))
+            _action_choices.add_child(_button(tr("Advance one shared day"),_garden_action.bind("rebirth-wait")))
+            _action_choices.add_child(_button(tr("Character details"),func():
+                _show_childhood_details=true
+                _render_actions()))
+            _action_choices.add_child(_button(tr("Look around"),func():
+                _action_panel.hide()
+                Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)))
+            return
         else:
             _action_title.text = "Childhood · family life"
+            if int(rebirth.get("age",0))<6:
+                _action_choices.add_child(_button(tr("Back to childhood"),func():
+                    _show_childhood_details=false
+                    _render_actions()))
             info.text = "%s · Age %s\nParents: %s and %s\nHome: %s\nF: choices / local first-person exploration from age 3. School and home routines continue; afternoon outings unlock at age 6." % [rebirth.get("childName",""),rebirth.get("age",0),rebirth.get("parentA",""),rebirth.get("parentB",""),rebirth.get("district","")]
             _action_choices.add_child(info)
             var age := int(rebirth.get("age",0))
@@ -9898,6 +9936,9 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _render_hud_summary(snapshot)
     _sync_custody(player.get("justice",{}))
     var home = snapshot.get("rebirth",{}).get("homeOptions")
+    var early = snapshot.get("rebirth",{}).get("earlyChildhood")
+    if early is Dictionary and bool(early.get("atHome",false)):
+        home={"atHome":true}
     _set_apartment(home is Dictionary and bool(home.get("atHome",false)))
     if _apartment_active:
         _apartment.set_furniture_level(int(home.get("furnitureLevel",0)))

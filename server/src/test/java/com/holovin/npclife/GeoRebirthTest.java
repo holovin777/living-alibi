@@ -224,6 +224,26 @@ class GeoRebirthTest {
         assertEquals(RebirthLife.CHOICE,RebirthLife.phase(t));
         assertEquals(count,t.people.size());
     }
+    @Test void earlyChildhoodUsesActualPresentParentsAndFiniteSupplies(){
+        var s=new WorldState();var t=TownLife.create(s);
+        PopulationGenerator.add(t,20);
+        RebirthLife.enableRandomBirth(t,true);
+        assertTrue(InitialFamilyLife.start(t,s));
+        var child=RebirthLife.child(t);
+        var a=DemographyLife.byIndex(t,DemographyLife.get(t,child,"parent-a"));
+        var b=DemographyLife.byIndex(t,DemographyLife.get(t,child,"parent-b"));
+        for(var p:java.util.List.of(a,b)){p.place=p.home;p.destination=p.home;p.activity="AT_HOME";p.travelRemaining=0;p.food=3;p.water=3;}
+        child.food=0;child.water=0;
+        var view=EarlyChildhoodLife.view(t);
+        assertTrue(view.atHome());assertTrue(view.parentsPresent().contains(a.name));
+        assertTrue(view.actions().contains("play"));
+        EarlyChildhoodLife.act(t,"call");
+        assertEquals(1,child.food);assertEquals(2,a.food);
+        a.activity="SLEEPING";b.activity="SLEEPING";
+        assertFalse(EarlyChildhoodLife.view(t).actions().contains("play"));
+        child.age=6;
+        assertNull(EarlyChildhoodLife.view(t));
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

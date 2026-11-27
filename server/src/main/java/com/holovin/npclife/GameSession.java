@@ -1208,6 +1208,10 @@ public final class GameSession implements AutoCloseable {
                 var home=RebirthLife.homeAction(copy,state.day,action.substring("rebirth-home-".length()));
                 return applyInternal(copy,home.minutes(),home.message(),true);
             }
+            if(action.startsWith("rebirth-early-")){
+                var result=EarlyChildhoodLife.act(copy,action.substring("rebirth-early-".length()));
+                return applyInternal(copy,result.minutes(),result.message(),true);
+            }
             if(action.equals("rebirth-child-hour")){
                 var child=RebirthLife.child(copy);
                 if(!RebirthLife.linkedChild(copy,child)||child.age<6)throw new IllegalArgumentException("Available from age six.");
