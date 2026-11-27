@@ -342,6 +342,15 @@ func _process(delta: float) -> void:
         _avatar.position = _move_among_people(_avatar.position,
                 relative_motion * delta * speed, WALKER_RADIUS, null, _can_walk_roads())
         moved = before.distance_to(_avatar.position)
+        # A district change or a moving vehicle can leave the old spawn
+        # inside a collider. Recover only when a player actually tries to
+        # move and cannot stand at the current point.
+        if moved<0.0001 and not _can_stand(_avatar.position,WALKER_RADIUS,_can_walk_roads()):
+            var safe := _nearest_walkable_position(_avatar.position)
+            if safe.distance_squared_to(_avatar.position)>0.0001:
+                _avatar.position=safe
+                _reset_jump()
+                _reset_locomotion()
         if speed == CYCLE_SPEED:
             _bike_wheel_angle += moved/0.35
         if _can_walk_roads() and _jump_elapsed < 0.0:
@@ -2161,12 +2170,10 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         return _stairwell.can_stand(at,radius)
     if _apartment_active:
         return _apartment.can_stand(at,radius)
-    # Extra walkable garden space inside the existing 48 m park tile.
-    # Keep the road axes and inter-district triggers unchanged.
-    var extended_park := _current_place=="PARK" and absf(at.x)<=20.0-radius and at.z>=12.0 and at.z<=21.0-radius
-    var extended_centro := _current_place=="CENTRO" and absf(at.x)<=10.5-radius and at.z>=15.0 and at.z<=21.0-radius
-    if (absf(at.x) > 17.0 or absf(at.z) > 17.0) and not extended_park and not extended_centro:
-        if not allow_roads or _road_destination(at, 17.0).is_empty():
+    # The visible ground is 48 m wide. All unobstructed grass and
+    # paving within that tile are walkable; only the actual seam is a boundary.
+    if absf(at.x)>ROAD_EDGE-radius or absf(at.z)>ROAD_EDGE-radius:
+        if not allow_roads or _road_destination(at, ROAD_TRIGGER-1.0).is_empty():
             return false
     var p := Vector2(at.x, at.z)
     if _public_door_blocks(at,radius):return false
@@ -2273,6 +2280,21 @@ func _move_among_people(from: Vector3,motion: Vector3,radius: float,ignore: Node
                     at=detour
                     break
     return at
+
+# Search outward for a free position in the current scene. Do not move
+# between districts or through obstacles during ordinary walking.
+func _nearest_walkable_position(preferred: Vector3) -> Vector3:
+    var roads := _can_walk_roads()
+    if _can_stand(preferred,WALKER_RADIUS,roads):
+        return preferred
+    for ring in range(1,49):
+        var distance := float(ring)*0.5
+        for index in range(16):
+            var angle := TAU*float(index)/16.0
+            var candidate := preferred+Vector3(cos(angle)*distance,0,sin(angle)*distance)
+            if _can_stand(candidate,WALKER_RADIUS,roads) and _people_clear(candidate,candidate,WALKER_RADIUS,null):
+                return candidate
+    return preferred
 
 func _open_anchor(preferred: Vector3) -> Vector3:
     if _can_stand(preferred, WALKER_RADIUS):
@@ -10078,7 +10100,7 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _sync_bus_stops()
         _avatar.position = _bus_platform() if bus_arrival else (_truck_exit(new_place) if truck_arrival else (CAR_ARRIVAL if car_arrival else (_road_arrival if road_arrival else Vector3.ZERO)))
         if not _can_stand(_avatar.position, WALKER_RADIUS, true):
-            _avatar.position = Vector3.ZERO
+            _avatar.position = _nearest_walkable_position(_avatar.position)
         _tick_public_door(1.0)
         _locations.clear() # Previous-origin travel estimates are now stale.
         _follow_player()
@@ -10130,6 +10152,9 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     _refresh_held_item()
     _town_map.update_world(_current_place, _locations)
     _render_residents()
+    if not _drive_active() and not _custody_active and not _guest_sitting and not _can_stand(_avatar.position,WALKER_RADIUS,_can_walk_roads()):
+        _avatar.position=_nearest_walkable_position(_avatar.position)
+        _follow_player()
     if _dialog_panel.visible:
         var person := _dialog_person(_dialog_target)
         if person == null:
