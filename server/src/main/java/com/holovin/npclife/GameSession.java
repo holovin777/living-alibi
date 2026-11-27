@@ -53,7 +53,10 @@ public final class GameSession implements AutoCloseable {
         int firstNew=0;
         if(firstLaunch||population>previousTarget) {
             // One-time immigration, not an automatic respawn after deaths.
-            int missing=Math.max(0,population-(int)DemographyLife.living(town));
+            // Reserve room for initial newborns when the requested population
+            // is close to the hard cap. Never remove an existing resident.
+            int adultTarget=firstLaunch&&randomBirth?Math.min(population,PopulationGenerator.MAX_GENERATED-4):population;
+            int missing=Math.max(0,adultTarget-(int)DemographyLife.living(town));
             if(missing>0)firstNew=town.people.values().stream().mapToInt(c->c.generationIndex).max().orElse(0)+1;
             while(missing>0){
                 int batch=Math.min(20,missing);
@@ -67,7 +70,10 @@ public final class GameSession implements AutoCloseable {
         changed=StaffingLife.establish(town,state,population,firstNew)||changed;
         changed=FactoryNetworkLife.ensure(town)||changed;
         if(population>=24&&!NpcTransportLife.enabled(town)){town.industryStocks.put(NpcTransportLife.ENABLED,1);changed=true;}
-        if(randomBirth)changed=RebirthLife.enableRandomBirth(town,firstLaunch)||changed;
+        if(randomBirth){
+            changed=RebirthLife.enableRandomBirth(town,firstLaunch)||changed;
+            changed=InitialFamilyLife.start(town,state)||changed;
+        }
         // Old save files might contain a deceased visitor.
         changed=PassportLife.ensure(town,state)||changed;
         changed=RebirthLife.restoreIdentity(town)||changed;

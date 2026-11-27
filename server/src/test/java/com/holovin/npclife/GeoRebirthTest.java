@@ -188,16 +188,41 @@ class GeoRebirthTest {
     }
     @Test void productionBirthPolicySurvivesFirstLaunchAndRestart()throws Exception{
         var file=folder.resolve("natural-birth.db");
+        String id;PassportLife.View passport;int births;
         try(var game=new GameSession(file,12,true)){
-            assertEquals("CHOICE",game.snapshot().rebirth().phase());
-            assertTrue(game.snapshot().rebirth().pastLives().isEmpty());
-            assertNull(game.snapshot().player().passport());
+            var world=game.snapshot();
+            assertEquals("CHILDHOOD",world.rebirth().phase());
+            assertEquals(0,world.rebirth().age());
+            assertEquals(1,world.day());
+            assertTrue(world.rebirth().pastLives().isEmpty());
+            assertNotNull(world.rebirth().parentA());assertNotNull(world.rebirth().parentB());
+            id=world.rebirth().identity().residentId();
+            passport=world.player().passport();assertNotNull(passport);
+            births=world.demography().births();assertTrue(births>=1);
             assertThrows(IllegalArgumentException.class,()->game.gardenAction("rebirth-adult"));
         }
         try(var game=new GameSession(file,12,true)){
-            assertEquals("CHOICE",game.snapshot().rebirth().phase());
+            assertEquals("CHILDHOOD",game.snapshot().rebirth().phase());
+            assertEquals(id,game.snapshot().rebirth().identity().residentId());
+            assertEquals(passport,game.snapshot().player().passport());
+            assertEquals(births,game.snapshot().demography().births());
             assertTrue(game.snapshot().rebirth().pastLives().isEmpty());
         }
+    }
+    @Test void initialFamiliesDoNotAlterLaterLives(){
+        var s=new WorldState();var t=TownLife.create(s);
+        PopulationGenerator.add(t,20);
+        RebirthLife.enableRandomBirth(t,true);
+        assertTrue(InitialFamilyLife.start(t,s));
+        var child=RebirthLife.child(t);
+        int count=t.people.size();
+        assertFalse(InitialFamilyLife.start(t,s));
+        assertEquals(count,t.people.size());
+        child.alive=false;
+        assertTrue(RebirthLife.settleLinkedDeath(t,1,s.minute));
+        assertFalse(InitialFamilyLife.start(t,s));
+        assertEquals(RebirthLife.CHOICE,RebirthLife.phase(t));
+        assertEquals(count,t.people.size());
     }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
