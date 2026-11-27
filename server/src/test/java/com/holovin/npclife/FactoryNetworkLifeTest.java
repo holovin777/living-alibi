@@ -101,4 +101,31 @@ class FactoryNetworkLifeTest {
   assertEquals(8,FactoryQuality.wholesalePrice(t,p,10));
   assertEquals(1,FactoryQuality.wholesalePrice(t,p,1));
  }
+ @Test void outsideIndustrialContractRestoresStoppedPlantAndConservesFunds(){
+  var s=new WorldState();s.day=8;s.minute=600;var t=TownLife.create(s);
+  t.industryStocks.put(StaffingLife.ENABLED,1);FactoryNetworkLife.ensure(t);
+  t.player.place=TownLife.Place.WORKSHOP;t.player.money=100;
+  PlayerServiceBusiness.act(t,s,"register");PlayerServiceBusiness.act(t,s,"invest");PlayerServiceBusiness.act(t,s,"invest");
+  PlayerServiceBusiness.act(t,s,"rent");PlayerServiceBusiness.act(t,s,"tools");
+  var p=FactoryNetworkLife.PLANTS.stream().filter(x->x.id().equals("paper-mill")).findFirst().orElseThrow();
+  t.industryStocks.put(FactoryMaintenance.key(p,"condition"),20);
+  t.player.place=TownLife.Place.FACTORY;
+  assertThrows(IllegalArgumentException.class,()->IndustrialRepairLife.act(t,s,"inspect:"+p.id()));
+  VocationalLife.set(t,"mechanical:certificate",1);ApprenticeshipLife.set(t,"sessions",3);
+  IndustrialRepairLife.act(t,s,"inspect:"+p.id());
+  assertThrows(IllegalArgumentException.class,()->IndustrialRepairLife.act(t,s,"test"));
+  IndustrialRepairLife.act(t,s,"choose:"+IndustrialRepairLife.fault(IndustrialRepairLife.get(t,"fault")));
+  SupplyChainLife.set(t,IndustryLife.FACTORY_PARTS,1);
+  assertThrows(IllegalArgumentException.class,()->IndustrialRepairLife.act(t,s,"test"));
+  SupplyChainLife.set(t,IndustryLife.FACTORY_PARTS,2);
+  int funds=t.employerFunds.get(FactoryNetworkLife.account(p)),supplier=t.employerFunds.get("machinist");
+  IndustrialRepairLife.act(t,s,"test");
+  assertEquals(80,FactoryMaintenance.condition(t,p));assertTrue(FactoryMaintenance.operational(t,p));
+  assertEquals(0,SupplyChainLife.get(t,IndustryLife.FACTORY_PARTS));
+  assertEquals(funds-30,t.employerFunds.get(FactoryNetworkLife.account(p)).intValue());
+  assertEquals(supplier+10,t.employerFunds.get("machinist").intValue());
+  assertEquals(28,PlayerServiceBusiness.get(t,"cash"));assertEquals(1,PlayerServiceBusiness.get(t,"industrial-jobs"));
+  assertEquals(0,IndustrialRepairLife.get(t,"plant"));assertEquals(80,FactoryMaintenance.condition(t.copy(),p));
+  FactoryNetworkLife.change(t,"logs",2);assertTrue(FactoryNetworkLife.produce(t,p,s.day));
+ }
 }

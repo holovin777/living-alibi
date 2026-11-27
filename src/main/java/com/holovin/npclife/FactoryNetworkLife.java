@@ -104,18 +104,21 @@ final class FactoryNetworkLife {
             for(var p:PLANTS)FactoryMaintenance.service(t,s,p);
         }
         if(s.minute==780&&SupplyChainLife.once(t,"network-production",s.day)){
-            for(var p:PLANTS)if(SupplyChainLife.attending(t,p.site(),p.occupation()))produce(t,p,s.day);
+            for(var p:PLANTS)if(SupplyChainLife.attending(t,p.site(),p.occupation())){
+                if(!FactoryMaintenance.operational(t,p))IndustrialRepairLife.lostBatch(t,p);
+                else produce(t,p,s.day);
+            }
         }
         if(s.minute==900&&SupplyChainLife.once(t,"network-delivery",s.day)&&freight){
             for(var p:PLANTS)if(deliver(t,p))WorkplaceRewards.afterSale(t,s,p);
         }
     }
-    record PlantView(String id,String district,String output,int stock,int employees,int funds,int condition,boolean operational,int accepted,int rejected,int reputation){}
+    record PlantView(String id,String district,String output,int stock,int employees,int funds,int condition,boolean operational,int accepted,int rejected,int reputation,int lostBatches){}
     record View(boolean active,int forest,List<PlantView> plants){}
     static View view(TownLife.Town t){
         return new View(StaffingLife.enabled(t),SupplyChainLife.get(t,"factory-network:forest"),
             PLANTS.stream().map(p->new PlantView(p.id(),p.site().name(),p.output(),stock(t,p.output()),
                 (int)t.people.values().stream().filter(c->c.alive&&c.employed&&p.occupation().equals(c.occupation)&&c.workplace==p.site()).count(),
-                t.employerFunds.getOrDefault(account(p),0),FactoryMaintenance.condition(t,p),FactoryMaintenance.operational(t,p),FactoryQuality.accepted(t,p),FactoryQuality.rejected(t,p),FactoryQuality.reputation(t,p))).toList());
+                t.employerFunds.getOrDefault(account(p),0),FactoryMaintenance.condition(t,p),FactoryMaintenance.operational(t,p),FactoryQuality.accepted(t,p),FactoryQuality.rejected(t,p),FactoryQuality.reputation(t,p),t.industryStocks.getOrDefault(FactoryMaintenance.key(p,"lost-batches"),0))).toList());
     }
 }

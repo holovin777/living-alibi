@@ -7718,6 +7718,7 @@ func _render_actions() -> void:
                 _action_choices.add_child(_button("Load parts truck · paid delivery",_freight_action.bind("load")))
             _action_choices.add_child(_job_button("machinist","Apply: factory machinist"))
             _render_factory_report()
+            _render_industrial_repair()
         "CENTRO":
             var food_id := _centro_food_counter()
             if food_id.is_empty():
@@ -8001,6 +8002,7 @@ func _render_actions() -> void:
         "LOGISTICS_DEPOT":
             _render_logistics(logistics)
         "WORKSHOP":
+            _render_industrial_repair()
             _render_apprenticeship()
             _render_repair_business()
             _render_home_goods()
@@ -8436,8 +8438,33 @@ func _render_factory_report() -> void:
     for plant in report.get("plants",[]):
         var line := Label.new()
         line.text=tr("%s · Staff: %s · Stock: %s") % [tr(str(plant.get("id",""))),plant.get("employees",0),plant.get("stock",0)]
+        line.text+=" · "+tr("Condition")+": "+str(plant.get("condition",100))+"% · "+tr("Lost batches")+": "+str(plant.get("lostBatches",0))
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
+
+func _render_industrial_repair() -> void:
+    var report: Dictionary = _last_snapshot.get("industrialRepair",{})
+    var phase := int(report.get("phase",0))
+    if phase==0 and report.get("offers",[]).is_empty():return
+    var heading := Label.new()
+    heading.text=tr("Industrial emergency contracts")
+    _action_choices.add_child(heading)
+    for offer in report.get("offers",[]):
+        var line := Label.new()
+        line.text=str(offer.get("id",""))+" · "+str(offer.get("district",""))+" · "+str(offer.get("condition",0))+"% · "+str(offer.get("fee",0))+" EUR"
+        line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        _action_choices.add_child(line)
+        if bool(offer.get("canInspect",false)):
+            _action_choices.add_child(_button(tr("Inspect stopped equipment"),_garden_action.bind("industrial-repair:inspect:"+str(offer.get("id","")))))
+    if bool(report.get("canAct",false)):
+        if phase==1:
+            var reading := Label.new()
+            reading.text=tr(str(report.get("reading","")))
+            _action_choices.add_child(reading)
+            for part in ["drive","sensor","controller"]:
+                _action_choices.add_child(_button(tr(str(part)),_garden_action.bind("industrial-repair:choose:"+str(part))))
+        if phase==2:_action_choices.add_child(_button(tr("Repair and functional test")+" · 2 "+tr("spare parts"),_garden_action.bind("industrial-repair:test")))
+    if phase>0:_action_choices.add_child(_button(tr("Cancel industrial contract"),_garden_action.bind("industrial-repair:cancel")))
 
 func _render_apprenticeship() -> void:
     var report: Dictionary = _last_snapshot.get("apprenticeship",{})
@@ -8632,6 +8659,9 @@ func _render_home_goods() -> void:
         _action_choices.add_child(info)
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("industrial-repair:"):
+        if _current_place in ["FACTORY","WORKSHOP"] and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("apprentice:"):
         if _current_place=="WORKSHOP" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
         return
