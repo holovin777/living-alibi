@@ -7,6 +7,7 @@ const STEP_COUNT := 18
 const PITCH := 7.4
 const MIN_Z := -14.8
 const MAX_Z := 2.0
+var _dirt_marks: Array[MeshInstance3D] = []
 
 func _ready() -> void:
     name = "PublicStairwell"
@@ -50,6 +51,24 @@ func _ready() -> void:
     _box(Vector3(3.65,0.2,19.0),wall,Vector3(0,9.25,-7.0))
     _box(Vector3(1.3,2.2,0.12),Color("#77563e"),Vector3(0,1.1,1.99))
     _label("USCITA",Vector3(0,2.35,1.9),PI)
+    # Flat dust marks on common landings only, with stable positions.
+    for i in range(18):
+        var floor := floori(float(i)/6.0)
+        var x := -0.95+float(i%3)*0.86
+        var z := -float(floor)*PITCH+0.35+float((i%6)/3)*0.55
+        var mark := MeshInstance3D.new()
+        var patch := BoxMesh.new()
+        patch.size=Vector3(0.16+float(i%4)*0.06,0.004,0.10+float(i%3)*0.04)
+        mark.mesh=patch
+        var dirt_material := StandardMaterial3D.new()
+        dirt_material.albedo_color=Color("#847564")
+        dirt_material.roughness=1.0
+        mark.material_override=dirt_material
+        mark.position=Vector3(x,float(floor)*RISE+0.006,z)
+        mark.rotation.y=float(i)*0.7
+        add_child(mark)
+        mark.hide()
+        _dirt_marks.append(mark)
     # Number-only mailboxes preserve the privacy of the occupants.
     _label("POSTA",Vector3(-1.64,1.85,0.15),PI/2.0)
     for unit in range(1,7):
@@ -88,6 +107,11 @@ func set_lighting_working(working: bool) -> void:
     for child in get_children():
         if child is OmniLight3D:
             child.light_energy=1.4 if working else 0.22
+
+func set_dirt(dirt: int) -> void:
+    var count := floori(float(clampi(dirt,0,100))*float(_dirt_marks.size())/100.0)
+    for i in range(_dirt_marks.size()):
+        _dirt_marks[i].visible=i<count
 
 func can_stand(at: Vector3,radius: float) -> bool:
     return absf(at.x)<=1.35-radius and at.z>=MIN_Z+radius and at.z<=MAX_Z-radius

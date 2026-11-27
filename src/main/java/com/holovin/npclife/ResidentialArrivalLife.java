@@ -11,9 +11,10 @@ final class ResidentialArrivalLife {
     private static int tick(WorldState s){return Math.addExact(Math.multiplyExact(s.day-1,1440),s.minute)+1;}
 
     static void arrived(TownLife.Town t,TownLife.Citizen c,WorldState s){
-        if(c.alive&&c.place==c.home&&AddressLife.building(c)!=0)
+        if(c.alive&&c.place==c.home&&AddressLife.building(c)!=0){
             t.industryStocks.put(key(c),tick(s));
-        else t.industryStocks.remove(key(c));
+            if(AddressLife.building(c)==1)CondominiumLife.footTraffic(t);
+        } else t.industryStocks.remove(key(c));
     }
 
     static TownLife.Citizen nearby(TownLife.Town t,String id,int day,int minute){

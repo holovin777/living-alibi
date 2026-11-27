@@ -79,7 +79,64 @@ final class CondominiumLife {
         return c.generationIndex>0&&get(t,WORKER)==c.generationIndex&&hours(s)&&
                 assignedAvailable(t,c,s)&&ready(t,repairOrder(t));
     }
+    static final int CLEAN_PRICE=12,CLEAN_MINUTES=45,CLEAN_THRESHOLD=35;
+    private static final String DIRT=PREFIX+"dirt", DIRT_DAY=PREFIX+"dirt-day",
+            CLEANER=PREFIX+"cleaner", CLEAN_PROGRESS=PREFIX+"clean-progress", CLEANED=PREFIX+"cleaned";
+    static void footTraffic(TownLife.Town t){
+        set(t,DIRT,Math.min(100,get(t,DIRT)+1));
+    }
+    private static boolean cleanerAvailable(TownLife.Town t,TownLife.Citizen c,WorldState s){
+        return c!=null&&c.generationIndex>0&&c.alive&&c.age>=18&&c.age<65&&!c.employed&&
+                c.home!=TownLife.Place.NORTH_RESIDENCES&&!RebirthLife.linkedAdult(t,c)&&
+                !EmploymentLife.sick(c,s.day)&&!NpcJusticeLife.confined(t,c,s)&&
+                !PublicSafetyLife.alarmed(t,c,s.day,s.minute)&&
+                c.health>=50&&c.hunger<75&&c.thirst<75&&c.fatigue<75;
+    }
+    private static boolean cleaningAffordable(TownLife.Town t){
+        var services=TechnicalWorkLife.magnolia(t);
+        int reserved=services.liftWorking()&&services.lightingWorking()?0:REPAIR_PRICE;
+        return get(t,RESERVE)>=CLEAN_PRICE+reserved;
+    }
+    static boolean cleaningAssigned(TownLife.Town t,TownLife.Citizen c,WorldState s){
+        return c.generationIndex>0&&get(t,CLEANER)==c.generationIndex&&hours(s)&&
+                get(t,WORKER)==0&&cleanerAvailable(t,c,s)&&cleaningAffordable(t);
+    }
+    private static void clearCleaning(TownLife.Town t){
+        set(t,CLEANER,0);set(t,CLEAN_PROGRESS,0);
+    }
+    private static void cleanTick(TownLife.Town t,WorldState s){
+        if(get(t,CLEANER)>0){
+            var c=DemographyLife.byIndex(t,get(t,CLEANER));
+            if(c==null||!cleaningAssigned(t,c,s)){clearCleaning(t);return;}
+            if(c.travelRemaining>0||c.place!=TownLife.Place.NORTH_RESIDENCES||
+                    !"WORKING".equals(c.activity))return;
+            int minutes=get(t,CLEAN_PROGRESS)+1;
+            set(t,CLEAN_PROGRESS,minutes);
+            if(minutes<CLEAN_MINUTES)return;
+            int wallet=Math.addExact(c.money,CLEAN_PRICE);
+            int count=Math.addExact(get(t,CLEANED),1);
+            c.money=wallet;c.fatigue=Math.min(100,c.fatigue+4);
+            set(t,RESERVE,get(t,RESERVE)-CLEAN_PRICE);
+            set(t,DIRT,Math.max(0,get(t,DIRT)-60));
+            set(t,CLEANED,count);
+            clearCleaning(t);return;
+        }
+        if(!hours(s)||s.minute>840||s.minute%30!=0||get(t,DIRT)<CLEAN_THRESHOLD||
+                !cleaningAffordable(t))return;
+        // Paid occasional work for an unemployed adult; no permanent job invented.
+        var c=t.people.values().stream()
+                .filter(p->cleanerAvailable(t,p,s)&&p.travelRemaining==0&&
+                        p.currentSpace().equals(TownLife.publicSpace(p.place))&&
+                        !ConversationAvailability.urgent(p))
+                .sorted(java.util.Comparator.comparingInt((TownLife.Citizen p)->p.money).thenComparing(p->p.id))
+                .findFirst().orElse(null);
+        if(c!=null){set(t,CLEANER,c.generationIndex);set(t,CLEAN_PROGRESS,0);}
+    }
     static void tick(TownLife.Town t,WorldState s){
+        if(s.minute==0&&get(t,DIRT_DAY)<s.day){
+            set(t,DIRT_DAY,s.day);set(t,DIRT,Math.min(100,get(t,DIRT)+2));
+        }
+        if(get(t,CLEANER)>0){cleanTick(t,s);return;}
         if(get(t,WORKER)>0){
             var worker=DemographyLife.byIndex(t,get(t,WORKER));
             var order=repairOrder(t);
@@ -110,14 +167,14 @@ final class CondominiumLife {
         var lift=t.technicalOrders.get("magnolia-lift");
         var lighting=t.technicalOrders.get("magnolia-lighting");
         int choice=ready(t,lift)?1:ready(t,lighting)?2:0;
-        if(choice==0)return;
+        if(choice==0){cleanTick(t,s);return;}
         var worker=t.people.values().stream().filter(c->qualified(t,c,s)&&c.travelRemaining==0&&
                 c.place==TownLife.Place.WORKSHOP&&"WORKING".equals(c.activity))
                 .sorted(java.util.Comparator.comparing(c->c.id)).findFirst().orElse(null);
-        if(worker==null)return;
+        if(worker==null){cleanTick(t,s);return;}
         set(t,WORKER,worker.generationIndex);set(t,ORDER,choice);set(t,PROGRESS,0);
     }
-    record Report(int reserve,int arrears,int contribution,int periodDays,String maintenanceStatus,int repairProgress,int repairsCompleted){}
+    record Report(int reserve,int arrears,int contribution,int periodDays,String maintenanceStatus,int repairProgress,int repairsCompleted,int dirt,String cleaningStatus,int cleaningsCompleted){}
     static Report report(TownLife.Town t){
         String status;
         var order=repairOrder(t);
@@ -126,6 +183,10 @@ final class CondominiumLife {
         else if(get(t,RESERVE)<REPAIR_PRICE)status="WAITING_FUNDS";
         else if(!ready(t,t.technicalOrders.get("magnolia-lift"))&&!ready(t,t.technicalOrders.get("magnolia-lighting")))status="WAITING_ORDER_OR_STOCK";
         else status="WAITING_TECHNICIAN";
-        return new Report(get(t,RESERVE),get(t,ARREARS),CONTRIBUTION,MONTH,status,get(t,PROGRESS),get(t,COMPLETED));
+        String cleaning=get(t,CLEANER)>0?(get(t,CLEAN_PROGRESS)>0?"CLEANING_ACTIVE":"CLEANER_DISPATCHED"):
+                get(t,DIRT)<CLEAN_THRESHOLD?"CLEANING_NOT_DUE":
+                !cleaningAffordable(t)?"WAITING_FUNDS":"WAITING_CLEANER";
+        return new Report(get(t,RESERVE),get(t,ARREARS),CONTRIBUTION,MONTH,status,get(t,PROGRESS),get(t,COMPLETED),
+                get(t,DIRT),cleaning,get(t,CLEANED));
     }
 }

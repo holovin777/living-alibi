@@ -362,6 +362,9 @@ func _process(delta: float) -> void:
                 var status := str(condo.get("maintenanceStatus",""))
                 if not status.is_empty():
                     _stairwell_hint.text+="\n"+tr("Maintenance: %s") % tr(status)
+                if condo.has("dirt"):
+                    _stairwell_hint.text+="\n"+(tr("Dirt: %s/100 · %s") % [condo.get("dirt",0),tr(str(condo.get("cleaningStatus","")))])
+
         if not _nearest_resident().is_empty():
             _stairwell_hint.text+="\n"+tr("T or click: talk to a person")
         _tick_live_clock(delta)
@@ -8242,6 +8245,8 @@ func _sync_magnolia_services() -> void:
     if not is_instance_valid(_stairwell):return
     var services: Dictionary = _last_snapshot.get("magnoliaServices",{})
     _stairwell.set_lighting_working(bool(services.get("lightingWorking",true)))
+    var condo: Dictionary = _last_snapshot.get("condominium",{})
+    _stairwell.set_dirt(int(condo.get("dirt",0)))
 
 func _near_stairwell() -> bool:
     if _stairwell_active or _rebirth_active() or _drive_active() or _cycling() or _apartment_active or _current_place!="NORTH_RESIDENCES":

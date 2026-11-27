@@ -68,6 +68,7 @@ final class PopulationLife {
         boolean publicWater=needWater && UtilityLife.status(town).fountainWorking()
                 && town.cleanWater>0;
         boolean condominiumRepair=CondominiumLife.assigned(town,c,clock);
+        boolean condominiumCleaning=CondominiumLife.cleaningAssigned(town,c,clock);
         TownLife.Place desired;
         TownLife.Place manual=child?RebirthLife.childOuting(town,c,clock.day,minute):RebirthLife.manualDestination(town,c);
         if(RebirthLife.outsideHome(town,c)&&(sleeping||sick)){
@@ -75,7 +76,7 @@ final class PopulationLife {
         }
         if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;
-        else if(condominiumRepair)desired=TownLife.Place.NORTH_RESIDENCES;
+        else if(condominiumRepair||condominiumCleaning)desired=TownLife.Place.NORTH_RESIDENCES;
         else if(freightRun)desired=freightDestination;
         else if(!publicSafety&&!child&&!carrier&&!RebirthLife.linkedAdult(town,c)&&PublicSafetyLife.alarmed(town,c,clock.day,minute))desired=c.home;
         else if(sleeping)desired=c.home;
@@ -158,6 +159,7 @@ final class PopulationLife {
         else if(RebirthLife.outsideHome(town,c))c.activity="OUTSIDE_HOME";
         else if(RebirthLife.stayingHome(town,c)&&c.place==c.home)c.activity="AT_HOME";
         else if(retired)c.activity="RETIRED";
+        else if(condominiumCleaning&&c.place==TownLife.Place.NORTH_RESIDENCES)c.activity="WORKING";
         else if(!c.employed)c.activity=c.place==TownLife.Place.MARKET?"SHOPPING":"JOB_SEARCH";
         else if(condominiumRepair&&c.place==TownLife.Place.NORTH_RESIDENCES)c.activity="WORKING";
         else if(freightRun)c.activity="WORKING";
