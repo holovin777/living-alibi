@@ -107,7 +107,9 @@ func _exercise() -> void:
     world._follow_player()
 
     var layout = world._town_map
-    if not _check(layout.DISTRICTS.size() == 20
+    if not _check(layout.DISTRICTS.size() == 25
+            and layout.adjacent("CAFE","BORGO_SUD")
+            and layout.adjacent("GIARDINI","STAZIONE")
             and layout.world_center("PARK") == Vector3.ZERO
             and layout.adjacent("PARK", "SCHOOL")
             and not layout.adjacent("PARK", "QUARRY")

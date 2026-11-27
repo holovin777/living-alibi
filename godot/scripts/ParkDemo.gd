@@ -1469,6 +1469,8 @@ func _generate_chunk(place_id: String) -> void:
             _box(_scenery, Vector3(10.5, 0.12, 4.8), Color(0.45,0.34,0.23),
                     Vector3(-11.0, 0.10, 0.0))
             _tree(Vector3(12.0, 0.0, 7.0))
+        "BORGO_SUD", "PIAZZA_FONTANA", "GIARDINI", "STAZIONE", "VIA_TIGLI":
+            _build_southern_district(place_id)
         "WOODS":
             for p in [
                 Vector2(-11.0, -9.0), Vector2(-10.0, 7.0),
@@ -2233,6 +2235,53 @@ func _sync_construction_site() -> void:
 
 # Fictional Lombard residential block, with a real street-facing home entrance.
 # Keep the established guesthouse, rental room, construction site and road lanes intact.
+func _build_southern_district(id: String) -> void:
+    var district := Node3D.new()
+    district.name = "SouthernDistrict_"+id
+    _scenery.add_child(district)
+    # All four road axes stay open. Buildings are actual collision obstacles.
+    var stone := Color("#b8b0a0")
+    _box(district,Vector3(32,0.05,3.2),Color("#777d7a"),Vector3(0,0.02,0),"asphalt")
+    for z in [-2.8,2.8]:
+        _box(district,Vector3(32,0.06,1.5),stone,Vector3(0,0.035,z),"paving")
+    match id:
+        "BORGO_SUD","VIA_TIGLI":
+            var palettes := [Color("#c9a88d"),Color("#dbc8a4"),Color("#c1b7a5"),Color("#ce9682")]
+            var positions := [Vector3(-10,0,-8),Vector3(10,0,-8),Vector3(-10,0,9),Vector3(10,0,10)]
+            for i in range(4):
+                _lombardy_facade(district,"Casa"+str(i+1),positions[i],palettes[(i+1)%4] if id=="VIA_TIGLI" else palettes[i],2 if i%2==0 else 3)
+            for p in [Vector3(-5,0,5),Vector3(5,0,-5),Vector3(-14,0,3.5)]:
+                _tree(p)
+            _bench(district,Vector3(5,0,5.5))
+        "PIAZZA_FONTANA":
+            _box(district,Vector3(24,0.08,10),stone,Vector3(0,0.05,6),"paving")
+            _lombardy_facade(district,"PalazzoFontana",Vector3(-10,0,-8),Color("#c7a991"),3)
+            _lombardy_facade(district,"PalazzoLoggia",Vector3(10,0,-8),Color("#dfc6a1"),2)
+            _add_obstacle(Vector3(-7,0,7),Vector2(3.2,3.2))
+            _cylinder(district,1.6,0.5,Color("#a7a59a"),Vector3(-7,0.25,7))
+            _cylinder(district,1.3,0.08,Color("#609da7"),Vector3(-7,0.52,7))
+            _cylinder(district,0.22,1.1,Color("#a7a59a"),Vector3(-7,1,7))
+            _bench(district,Vector3(7,0,7))
+            _sign(district,"Piazza Fontana",Vector3(-7,2.4,7))
+        "GIARDINI":
+            for p in [Vector3(-10,0,-9),Vector3(-14,0,8),Vector3(11,0,-8),Vector3(11,0,9),Vector3(-7,0,12),Vector3(6,0,12)]:
+                _tree(p)
+            for p in [Vector3(-6,0,-5),Vector3(6,0,5),Vector3(-6,0,5)]:
+                _bench(district,p)
+            _box(district,Vector3(8,0.05,7),Color("#b7ad8e"),Vector3(8,0.02,9),"paving")
+            _sign(district,"Giardini Comunali",Vector3(-7,2.2,-6))
+        "STAZIONE":
+            _lombardy_facade(district,"StazioneFerroviaria",Vector3(-10,0,8),Color("#e0c79f"),2)
+            _box(district,Vector3(14,0.10,2),stone,Vector3(8,0.05,9),"paving")
+            for z in [11.0,12.1]:
+                _box(district,Vector3(13,0.10,0.08),Color("#646767"),Vector3(8,0.09,z))
+            for x in range(2,15):
+                _box(district,Vector3(0.20,0.06,1.7),Color("#756654"),Vector3(x,0.04,11.55))
+            _bench(district,Vector3(8,0,8))
+            _sign(district,"Stazione · Piazza",Vector3(-10,2.4,4.8))
+    for p in [Vector3(-4,0,-3.8),Vector3(4,0,3.8),Vector3(-13,0,-3.8)]:
+        _lamp(district,p)
+
 func _build_lombardy_neighborhood() -> void:
     var street := Node3D.new()
     street.name="ViaDelleMagnolie"
@@ -3673,10 +3722,10 @@ func _lamp(parent: Node3D, at: Vector3) -> void:
     _park_lamps.append(lamp)
 
 func _district_sign_name(id: String) -> String:
-    return str({"PARK":"Parco","MARKET":"Mercato","CAFE":"Bar Centrale","BAKERY":"Panetteria","LIBRARY":"Biblioteca","OFFICE":"Uffici","CLINIC":"Ambulatorio","SCHOOL":"Scuola","WORKSHOP":"Officina","NORTH_RESIDENCES":"Quartiere Nord","SOUTH_RESIDENCES":"Quartiere Sud","RIVER":"Fiume","WOODS":"Bosco","QUARRY":"Cava","FACTORY":"Fabbrica","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Cascina","FUEL_STATION":"Stazione di servizio","LOGISTICS_DEPOT":"Deposito logistico"}.get(id,id))
+    return str({"PARK":"Parco","MARKET":"Mercato","CAFE":"Bar Centrale","BAKERY":"Panetteria","LIBRARY":"Biblioteca","OFFICE":"Uffici","CLINIC":"Ambulatorio","SCHOOL":"Scuola","WORKSHOP":"Officina","NORTH_RESIDENCES":"Quartiere Nord","SOUTH_RESIDENCES":"Quartiere Sud","RIVER":"Fiume","WOODS":"Bosco","QUARRY":"Cava","FACTORY":"Fabbrica","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Cascina","FUEL_STATION":"Stazione di servizio","LOGISTICS_DEPOT":"Deposito logistico","BORGO_SUD":"Borgo Sud","PIAZZA_FONTANA":"Piazza Fontana","GIARDINI":"Giardini Comunali","STAZIONE":"Piazza Stazione","VIA_TIGLI":"Via dei Tigli"}.get(id,id))
 
 func _street_marker(place_id: String) -> void:
-    var street := str({"PARK":"Viale del Parco","MARKET":"Piazza del Mercato","CAFE":"Via del Caffè","BAKERY":"Via del Pane","LIBRARY":"Via dei Libri","OFFICE":"Via dell'Industria","CLINIC":"Via della Salute","SCHOOL":"Via Leonardo","WORKSHOP":"Via degli Artigiani","NORTH_RESIDENCES":"Via delle Magnolie","SOUTH_RESIDENCES":"Via del Glicine","RIVER":"Lungofiume","WOODS":"Via del Bosco","QUARRY":"Via della Cava","FACTORY":"Via delle Fabbriche","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Strada delle Risaie","FUEL_STATION":"Via della Stazione","LOGISTICS_DEPOT":"Via del Deposito"}.get(place_id,"Via del Borgo"))
+    var street := str({"PARK":"Viale del Parco","MARKET":"Piazza del Mercato","CAFE":"Via del Caffè","BAKERY":"Via del Pane","LIBRARY":"Via dei Libri","OFFICE":"Via dell'Industria","CLINIC":"Via della Salute","SCHOOL":"Via Leonardo","WORKSHOP":"Via degli Artigiani","NORTH_RESIDENCES":"Via delle Magnolie","SOUTH_RESIDENCES":"Via del Glicine","RIVER":"Lungofiume","WOODS":"Via del Bosco","QUARRY":"Via della Cava","FACTORY":"Via delle Fabbriche","CENTRO":"Piazza Centrale","PORTICI":"Via dei Portici","FARM":"Strada delle Risaie","FUEL_STATION":"Via della Stazione","LOGISTICS_DEPOT":"Via del Deposito","BORGO_SUD":"Via del Borgo Sud","PIAZZA_FONTANA":"Piazza Fontana","GIARDINI":"Viale dei Giardini","STAZIONE":"Piazza Stazione","VIA_TIGLI":"Via dei Tigli"}.get(place_id,"Via del Borgo"))
     var marker := Node3D.new()
     marker.name = "StreetMarker"
     _scenery.add_child(marker)
@@ -5428,7 +5477,12 @@ func _create_interface() -> void:
     travel_col.add_child(travel_label)
     _travel_choices = GridContainer.new()
     _travel_choices.columns = 2
-    travel_col.add_child(_travel_choices)
+    var travel_scroll := ScrollContainer.new()
+    travel_scroll.custom_minimum_size=Vector2(440,minf(510.0,maxf(220.0,get_viewport().get_visible_rect().size.y-100.0)))
+    travel_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+    travel_col.add_child(travel_scroll)
+    _travel_choices.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    travel_scroll.add_child(_travel_choices)
 
     _dialog_panel = PanelContainer.new()
     _dialog_panel.position = Vector2(480,15)

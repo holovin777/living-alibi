@@ -131,7 +131,8 @@ final class PlayerLife {
             TownLife.Place.CLINIC, TownLife.Place.SCHOOL, TownLife.Place.WORKSHOP,
             TownLife.Place.NORTH_RESIDENCES, TownLife.Place.SOUTH_RESIDENCES,
             TownLife.Place.RIVER, TownLife.Place.WOODS,
-            TownLife.Place.QUARRY, TownLife.Place.FACTORY, TownLife.Place.CENTRO, TownLife.Place.PORTICI, TownLife.Place.FARM, TownLife.Place.FUEL_STATION, TownLife.Place.LOGISTICS_DEPOT);
+            TownLife.Place.QUARRY, TownLife.Place.FACTORY, TownLife.Place.CENTRO, TownLife.Place.PORTICI, TownLife.Place.FARM, TownLife.Place.FUEL_STATION, TownLife.Place.LOGISTICS_DEPOT,
+             TownLife.Place.BORGO_SUD, TownLife.Place.PIAZZA_FONTANA, TownLife.Place.GIARDINI, TownLife.Place.STAZIONE, TownLife.Place.VIA_TIGLI);
 
     static List<TownLife.Place> publicPlaces() {return PUBLIC_PLACES;}
     static TownLife.Place destination(String input) {
@@ -152,7 +153,7 @@ final class PlayerLife {
         if(player.travelRemaining>0)
             throw new IllegalArgumentException("Already traveling to "+player.destination.label+".");
         if(player.place==place)return 0;
-        int walking=player.place==TownLife.Place.PARK||place==TownLife.Place.PARK?10:8;
+        int walking=TownLife.travelTime(player.place,place);
         return player.ownsBicycle&&player.cycling&&player.bicycleParked==null?(walking+1)/2:walking;
     }
     static int startTravel(Player player,TownLife.Place place) {

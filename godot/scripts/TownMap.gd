@@ -10,10 +10,11 @@ const DISTRICTS := {
     "WORKSHOP": Vector2i(4,1),
     "SOUTH_RESIDENCES": Vector2i(0,2), "PORTICI": Vector2i(1,2),
     "RIVER": Vector2i(2,2), "WOODS": Vector2i(3,2),
-    "QUARRY": Vector2i(4,2), "BAKERY": Vector2i(1,3), "CAFE": Vector2i(0,3), "FARM": Vector2i(2,3), "FUEL_STATION": Vector2i(4,3), "LOGISTICS_DEPOT": Vector2i(3,3)
+    "QUARRY": Vector2i(4,2), "BAKERY": Vector2i(1,3), "CAFE": Vector2i(0,3), "FARM": Vector2i(2,3), "FUEL_STATION": Vector2i(4,3), "LOGISTICS_DEPOT": Vector2i(3,3),
+    "BORGO_SUD": Vector2i(0,4), "PIAZZA_FONTANA": Vector2i(1,4), "GIARDINI": Vector2i(2,4), "STAZIONE": Vector2i(3,4), "VIA_TIGLI": Vector2i(4,4)
 }
 const LABELS := {
-    "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes", "CENTRO": "Centro storico", "PORTICI": "Via dei Portici", "FARM": "Cascina", "FUEL_STATION": "Fuel station", "LOGISTICS_DEPOT": "Logistics depot"
+    "NORTH_RESIDENCES": "North homes", "SOUTH_RESIDENCES": "South homes", "CENTRO": "Centro storico", "PORTICI": "Via dei Portici", "FARM": "Cascina", "FUEL_STATION": "Fuel station", "LOGISTICS_DEPOT": "Logistics depot", "BORGO_SUD": "Borgo Sud", "PIAZZA_FONTANA": "Piazza Fontana", "GIARDINI": "Giardini", "STAZIONE": "Stazione", "VIA_TIGLI": "Via dei Tigli"
 }
 const MOTOR_DISTRICTS := ["OFFICE","LIBRARY","WORKSHOP","FACTORY","QUARRY","FUEL_STATION","LOGISTICS_DEPOT"]
 const TILE_SPACING := 48.0
@@ -59,7 +60,7 @@ func update_world(place: String, locations: Array) -> void:
 
 func _point(id: String) -> Vector2:
     var cell: Vector2i = DISTRICTS[id]
-    return Vector2(60+cell.x*112, 53+cell.y*102)
+    return Vector2(60+cell.x*112, 35+cell.y*80)
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, size), Color("#263a34"))
@@ -75,7 +76,7 @@ func _draw() -> void:
         var center := _point(str(id))
         var rect := Rect2(center-Vector2(50,29),Vector2(100,58))
         var color := Color("#40564a")
-        if id in ["PARK","WOODS","FARM"]:
+        if id in ["PARK","WOODS","FARM","GIARDINI"]:
             color = Color("#47784e")
         elif id in ["CENTRO","PORTICI"]:
             color = Color("#947453")

@@ -141,7 +141,8 @@ final class RebirthLife {
             List.of("NORTH_RESIDENCES","CLINIC","SCHOOL","OFFICE","FACTORY"),
             List.of("MARKET","CENTRO","PARK","LIBRARY","WORKSHOP"),
             List.of("SOUTH_RESIDENCES","PORTICI","RIVER","WOODS","QUARRY"),
-            List.of("CAFE","BAKERY","FARM","LOGISTICS_DEPOT","FUEL_STATION"));
+            List.of("CAFE","BAKERY","FARM","LOGISTICS_DEPOT","FUEL_STATION"),
+            List.of("BORGO_SUD","PIAZZA_FONTANA","GIARDINI","STAZIONE","VIA_TIGLI"));
     static boolean adjacent(TownLife.Place a,TownLife.Place b){
         int ax=-1,ay=-1,bx=-1,by=-1;
         for(int y=0;y<ROAD_GRID.size();y++){

@@ -96,7 +96,8 @@ final class PopulationLife {
             // The same resident favors a location consistently for a given day.
             // Unlit parks lose visitors at dusk; they choose a covered cafe.
             int preference=Math.floorMod((int)(c.personalSeed^(clock.day*31L)),4);
-            if(preference==0)desired=TownLife.Place.CAFE;
+            if(c.generationIndex>48 && (clock.day+c.generationIndex)%2==0)desired=CityExpansionLife.leisure(c,clock.day);
+            else if(preference==0)desired=TownLife.Place.CAFE;
             else if(preference==1)desired=TownLife.Place.LIBRARY;
             else if(minute>=1080 && !UtilityLife.status(town).lightsWorking())
                 desired=TownLife.Place.CAFE;

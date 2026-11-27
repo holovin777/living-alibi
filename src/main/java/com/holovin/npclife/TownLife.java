@@ -15,7 +15,8 @@ final class TownLife {
         NORTH_RESIDENCES("North residences"), SOUTH_RESIDENCES("South residences"),
         OFFICE("Office"), CLINIC("Clinic"), SCHOOL("School"),
         WORKSHOP("Workshop"), LIBRARY("Library"),
-        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory"), CENTRO("Centro Storico"), PORTICI("Via dei Portici"), FARM("Cascina delle Risaie"), FUEL_STATION("Stazione di servizio"), LOGISTICS_DEPOT("Deposito Logistico");
+        RIVER("River"), WOODS("Woods"), QUARRY("Quarry"), FACTORY("Factory"), CENTRO("Centro Storico"), PORTICI("Via dei Portici"), FARM("Cascina delle Risaie"), FUEL_STATION("Stazione di servizio"), LOGISTICS_DEPOT("Deposito Logistico"),
+        BORGO_SUD("Borgo Sud"), PIAZZA_FONTANA("Piazza Fontana"), GIARDINI("Giardini Comunali"), STAZIONE("Piazza Stazione"), VIA_TIGLI("Via dei Tigli");
         final String label;
         Place(String label) { this.label=label; }
     }
@@ -445,7 +446,7 @@ final class TownLife {
     }
     static int travelTime(Place from,Place to) {
         // Coarse walking times; no route geometry yet.
-        return from==to?0:(from==Place.PARK||to==Place.PARK?10:8);
+        return CityExpansionLife.travelTime(from,to);
     }
     static void move(Town town,Citizen c,Place desired,WorldState clock,List<Event> events,List<Observation> observations) {
         if(c.travelRemaining>0) {
