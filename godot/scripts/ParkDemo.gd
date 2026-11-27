@@ -239,6 +239,13 @@ var _dialog_language: OptionButton
 var _dialog_history: RichTextLabel
 var _dialog_more_scroll: ScrollContainer
 var _spoken_dialog_enabled := true
+var _ambient_speech_label: Label
+var _ambient_speech_cooldown:=0.0
+var _ambient_speech_remaining:=0.0
+var _ambient_speech_seen: Dictionary={}
+var _ambient_speech_last: Dictionary={}
+var _ambient_speaker:=""
+var _ambient_line:=""
 var _hud_details: VBoxContainer
 var _hud_scroll: ScrollContainer
 var _interface_theme: Theme
@@ -288,6 +295,7 @@ func _process(delta: float) -> void:
         _tick_bus_preview(delta)
         return
     _tick_dialog_autonomy(delta)
+    _tick_ambient_speech(delta)
     _music.update_mix(delta,_dialog_panel.visible and _spoken_dialog_enabled)
     _tick_public_door(delta)
     if _phone_alert_remaining>0.0:
@@ -5757,7 +5765,7 @@ func _animate_residents(delta: float) -> void:
         var joke := _current_place=="OFFICE" and str(person.get_meta("resident_id",""))==_office_joker_id and _office_joke_hold>0.0
         var peer_speaking := bool(person.get_meta("peer_speaking",false))
         var peer_reaction := str(person.get_meta("peer_reaction",""))
-        _animate_resident_face(person,delta,now,(talking and reply_remaining>0.0) or joke or peer_speaking)
+        _animate_resident_face(person,delta,now,reply_remaining>0.0 or joke or peer_speaking)
         _resident_attention(person)
         _animate_resident_head(person,delta,now,talking or peer_chat,walking)
         _animate_resident_posture(person,delta,now,gait,walking,seated)
@@ -6074,6 +6082,11 @@ func _create_interface() -> void:
     _message.custom_minimum_size = Vector2(320.0, 0.0)
     preload("res://scripts/TownInterface.gd").secondary(_message)
     column.add_child(_message)
+    _ambient_speech_label=Label.new()
+    _ambient_speech_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _ambient_speech_label.custom_minimum_size=Vector2(320,0)
+    column.add_child(_ambient_speech_label)
+    _ambient_speech_label.hide()
 
     var buttons := GridContainer.new()
     buttons.columns = 2
@@ -6499,6 +6512,9 @@ func _open_dialog(preferred_id: String = "") -> void:
     if not _connected or _dialog_pending:
         return
     var id := preferred_id if not preferred_id.is_empty() else _nearest_resident()
+    if preferred_id.is_empty() and _ambient_speech_remaining>0.0:
+        var speaker:=_dialog_person(_ambient_speaker)
+        if speaker!=null and _avatar.position.distance_to(speaker.position)<2.5:id=_ambient_speaker
     if id.is_empty():
         _message.text = tr("Approach a resident to talk.")
         return
@@ -6519,6 +6535,10 @@ func _open_dialog(preferred_id: String = "") -> void:
             "You have spoken before." if int(person.get_meta("conversations",0)) > 0 else "You have not met.")
     if str(person.get_meta("activity",""))=="ASKING_FOR_HELP":
         _dialog_reply.text=_reply_translate("Excuse me, could you spare a little change?")
+    if id==_ambient_speaker and _ambient_speech_remaining>0.0:
+        _dialog_reply.text=_ambient_line
+        _ambient_speech_remaining=0.0
+        _ambient_speech_label.hide()
     _dialog_input.clear()
     _dialog_history.clear()
     _dialog_history.append_text(_dialog_reply.text+"\n")
@@ -6631,6 +6651,42 @@ func _set_dialog_voice(enabled: bool) -> void:
     _spoken_dialog_enabled = enabled
     if not enabled:
         DisplayServer.tts_stop()
+
+func _tick_ambient_speech(delta: float) -> void:
+    _ambient_speech_cooldown=maxf(0.0,_ambient_speech_cooldown-delta)
+    _ambient_speech_remaining=maxf(0.0,_ambient_speech_remaining-delta)
+    if not is_instance_valid(_ambient_speech_label):return
+    if _ambient_speech_remaining<=0.0:_ambient_speech_label.hide()
+    if not _connected or _ambient_speech_cooldown>0.0 or _dialog_panel.visible or _dialog_pending or _action_panel.visible or _travel_panel.visible or _map_panel.visible or _phone.visible or _intercom.visible or _drive_active() or _guest_active or _stairwell_active:return
+    if _spoken_dialog_enabled and DisplayServer.tts_is_speaking():return
+    var now:=Time.get_ticks_msec()
+    for offer in _last_snapshot.get("speechOffers",[]):
+        var id:=str(offer.get("id",""))
+        var resident_id:=str(offer.get("residentId",""))
+        var kind:=str(offer.get("kind",""))
+        if _ambient_speech_seen.has(id):continue
+        var cooldown_key:=resident_id+":"+kind
+        if now-int(_ambient_speech_last.get(cooldown_key,-120000))<60000:continue
+        var person:=_dialog_person(resident_id)
+        if person==null or not person.is_visible_in_tree() or _avatar.position.distance_to(person.position)>2.5:continue
+        if str(person.get_meta("activity","")) in ["SLEEPING","TRAVELING"]:continue
+        if _ambient_speech_seen.size()>1024:_ambient_speech_seen.clear()
+        _ambient_speech_seen[id]=true
+        _ambient_speech_last[cooldown_key]=now
+        _ambient_speaker=resident_id
+        var italian:=str(offer.get("textIt",""))
+        _ambient_line=italian if TranslationServer.get_locale().begins_with("it") else str(offer.get("text",""))
+        _ambient_speech_label.text=_ambient_line+" · T"
+        _ambient_speech_label.show()
+        _ambient_speech_remaining=8.0
+        _ambient_speech_cooldown=12.0
+        _begin_resident_reply(person,italian)
+        if _spoken_dialog_enabled:
+            var voices:=DisplayServer.tts_get_voices_for_language("it")
+            if not voices.is_empty():
+                var seed_value:=absi(resident_id.hash())
+                DisplayServer.tts_speak(italian,str(voices[seed_value%voices.size()]),75,0.90+float(seed_value%21)/100.0,1.0,0,false)
+        return
 
 func _speak_resident_reply(reply: String) -> void:
     if not _spoken_dialog_enabled or reply.is_empty():

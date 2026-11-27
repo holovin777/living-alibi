@@ -312,6 +312,26 @@ class GeoRebirthTest {
         assertTrue(EarlyChildhoodLife.atHome(c));
         assertEquals("NONE",ChildSearchLife.view(t,c,s).status());
     }
+    @Test void spontaneousParentSpeechUsesRealPresenceAndDoesNotForceAnAction(){
+        var s=new WorldState();var t=TownLife.create(s);
+        PopulationGenerator.add(t,20);
+        RebirthLife.enableRandomBirth(t,true);
+        assertTrue(InitialFamilyLife.start(t,s));
+        var c=RebirthLife.child(t);
+        var parent=ParentingLife.parents(t,c).getFirst();
+        parent.place=c.home;parent.destination=c.home;parent.homeUnit=c.homeUnit;parent.home=c.home;
+        parent.activity="AT_HOME";parent.travelRemaining=0;parent.health=100;parent.hunger=0;parent.thirst=0;parent.fatigue=0;
+        c.activity="AT_HOME";
+        var before=t.industryStocks.size();
+        var offers=SpontaneousSpeechLife.view(t,1,600);
+        assertTrue(offers.stream().anyMatch(o->o.residentId().equals(parent.id)&&o.kind().equals("FAMILY_GREETING")));
+        assertEquals(offers,SpontaneousSpeechLife.view(t,1,600));
+        assertEquals(before,t.industryStocks.size());
+        parent.activity="SLEEPING";
+        assertTrue(SpontaneousSpeechLife.view(t,1,600).stream().noneMatch(o->o.residentId().equals(parent.id)));
+        parent.activity="AT_HOME";parent.travelRemaining=3;
+        assertTrue(SpontaneousSpeechLife.view(t,1,600).stream().noneMatch(o->o.residentId().equals(parent.id)));
+    }
     @Test void nextLifeUsesExistingPhaseAndNeverRevivesShell()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

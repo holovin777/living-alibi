@@ -281,7 +281,7 @@ final class PlayerLife {
         // every typed NPC conversation fail with "The visitor is not alive".
         if(RebirthLife.active(town)) {
             TownLife.Citizen self=RebirthLife.child(town);
-            if(self==null||!self.alive||self.age<3||self.travelRemaining>0
+            if(self==null||!self.alive||(self.age<3&&!RebirthLife.freeChild(town,self))||self.travelRemaining>0
                     ||"SLEEPING".equals(self.activity))
                 throw new IllegalArgumentException("You cannot talk at this age or while asleep or traveling.");
             TownLife.Citizen person=town.get(residentId);
