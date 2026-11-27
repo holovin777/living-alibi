@@ -116,6 +116,36 @@ class WorkplaceDialogueTest {
         assertEquals(3,events.size());
     }
 
+    @Test void performanceUsesWorkPresenceAndNeedsWithoutPunishingAbsence() {
+        var t=new TownLife.Town();
+        var good=worker(t,"good","Programmer");
+        var tired=worker(t,"tired","Programmer");
+        var absent=worker(t,"absent","Programmer");
+        good.carefulness=80;tired.carefulness=80;
+        tired.fatigue=95;tired.hunger=90;tired.thirst=90;tired.health=60;
+        absent.activity="FREE_TIME";
+        EducationLife.set(t,good,"technical",80);
+        EducationLife.set(t,tired,"technical",80);
+        var s=new WorldState();s.day=40;s.minute=600;
+        WorkplacePerformance.tick(t,s);
+        WorkplacePerformance.tick(t,s);
+        var g=WorkplacePerformance.report(t,good);
+        var bad=WorkplacePerformance.report(t,tired);
+        assertEquals(1,g.samples());
+        assertTrue(g.quality()>bad.quality());
+        assertTrue(g.pace()>bad.pace());
+        assertEquals(0,WorkplacePerformance.report(t,absent).samples());
+        assertEquals(g,WorkplacePerformance.report(t.copy(),good));
+        good.jobChanges++;
+        assertEquals(0,WorkplacePerformance.report(t,good).samples());
+        s.minute=660;
+        WorkplacePerformance.tick(t,s);
+        assertEquals(1,WorkplacePerformance.report(t,good).samples());
+        good.sickUntilDay=40;s.minute=720;
+        WorkplacePerformance.tick(t,s);
+        assertEquals(1,WorkplacePerformance.report(t,good).samples());
+    }
+
     private static TownLife.Citizen worker(TownLife.Town town,String id,String role) {
         var person=new TownLife.Citizen(id,id,role,TownLife.Place.OFFICE);
         person.activity="WORKING";

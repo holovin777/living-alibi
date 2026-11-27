@@ -31,7 +31,8 @@ final class WorkplaceHierarchy {
     static TownLife.Citizen lead(TownLife.Town t,TownLife.Citizen c,int day) {
         var roster=team(t,c);
         if(roster.size()<2)return null;
-        return roster.stream().filter(p->tenure(p,day)>=30&&skill(t,p)>=60&&p.carefulness>=55)
+        return roster.stream().filter(p->tenure(p,day)>=30&&skill(t,p)>=60&&p.carefulness>=55
+                        &&(WorkplacePerformance.report(t,p).samples()<5||WorkplacePerformance.report(t,p).quality()>=55))
                 .sorted(Comparator.<TownLife.Citizen>comparingInt(p->skill(t,p)).reversed()
                     .thenComparing(Comparator.<TownLife.Citizen>comparingInt(p->tenure(p,day)).reversed())
                     .thenComparing(Comparator.<TownLife.Citizen>comparingInt(p->p.carefulness).reversed())
