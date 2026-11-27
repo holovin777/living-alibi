@@ -1159,6 +1159,12 @@ public final class GameSession implements AutoCloseable {
                 FamilyDoorLife.act(copy,state,action.endsWith("-lock"));
                 return applyInternal(copy,0,action.endsWith("-lock")?"Family door temporarily locked.":"Family door unlocked.",true);
             }
+            if(action.equals("rebirth-separate")){
+                var self=RebirthLife.requireAdult(copy);var partner=RebirthLife.partner(copy,self);
+                if(partner==null)throw new IllegalArgumentException("No current partner.");
+                RelationshipBoundaryLife.separate(copy,self,partner,state.day,state.minute);
+                return applyInternal(copy,0,"Your partnership ended. / La relazione è terminata.",true);
+            }
             if(action.equals("rebirth-wait-hour")||action.equals("rebirth-wait-adult-day")){
                 RebirthLife.requireAdult(copy);
                 return applyInternal(copy,action.equals("rebirth-wait-hour")?60:1440,"Advanced adult life.",true);

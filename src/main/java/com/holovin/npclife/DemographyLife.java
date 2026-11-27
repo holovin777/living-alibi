@@ -196,6 +196,7 @@ final class DemographyLife {
                 ArchiveLife.record(t,"death:"+c.id,day,360,"Population",c.name+" was recorded as deceased.");
             estate(t,c);
         }
+        RelationshipBoundaryLife.tick(t,clock,residents);
         PensionLife.tick(t,clock);
         if((day-1)%30!=0)return;
         var newborns=new java.util.ArrayList<TownLife.Citizen>();
@@ -204,7 +205,7 @@ final class DemographyLife {
             if(!parentAge(a))continue;
             for(int j=i+1;j<residents.size()&&get(t,a,"partner")==0;j++){
                 var candidate=residents.get(j);
-                if(!RebirthLife.linkedAdult(t,a)&&!RebirthLife.linkedAdult(t,candidate))pair(t,a,candidate,day);
+                if(RelationshipBoundaryLife.canAutoPair(t,a,candidate))pair(t,a,candidate,day);
             }
             var b=byIndex(t,get(t,a,"partner"));
             if(b!=null&&a.generationIndex<b.generationIndex&&automaticBirthAllowed(t,a,b)){

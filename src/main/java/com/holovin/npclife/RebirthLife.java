@@ -552,7 +552,7 @@ final class RebirthLife {
                          boolean livingTogether,boolean canMoveTogether,boolean canHaveChild,boolean canSupport,int supportAmount,FamilyBudgetLife.View budget){}
     static List<Conversation> proposals(TownLife.Town t,TownLife.Citizen c){
         if(!linkedAdult(t,c)||!awakePresent(c))return List.of();
-        return visible(t).stream().filter(p->awakePresent(p)&&DemographyLife.canPair(t,c,p))
+        return visible(t).stream().filter(p->awakePresent(p)&&!FirstLifeChoice.accountOwned(t,p)&&DemographyLife.canPair(t,c,p))
                 .map(p->new Conversation(p.id,p.name)).toList();
     }
     static TownLife.Citizen partner(TownLife.Town t,TownLife.Citizen c){

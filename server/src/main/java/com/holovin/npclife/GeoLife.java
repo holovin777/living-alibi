@@ -53,6 +53,7 @@ final class GeoLife {
         }else{
             add(result,"rebirth-wait-hour","Advance 1 hour / Avanza un'ora");
             add(result,"rebirth-wait-adult-day","Advance 1 day / Avanza un giorno");
+            if(RebirthLife.partner(t,c)!=null)add(result,"rebirth-separate","End partnership / Termina la relazione");
             var adult=RebirthLife.adultOptions(t,s.day);
             var home=RebirthLife.homeOptions(t,s.day,s.minute);
             if(adult!=null){
