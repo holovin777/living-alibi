@@ -17,7 +17,8 @@ final class PlayerRepairLife {
     }
     static boolean offer(TownLife.Town t,TownLife.Citizen c){
         return ResidentServiceLife.needsService(t,c)&&ResidentServiceLife.get(t,c,"queued-day")>0
-            &&!dispatched(t,c)&&c.money>=ResidentServiceLife.RESERVE+PlayerServiceBusiness.price(t);
+            &&!dispatched(t,c)&&c.money>=ResidentServiceLife.RESERVE+PlayerServiceBusiness.price(t)
+            &&(ResidentServiceLife.condition(t,c)>0||VocationalLife.certified(t,"mechanical")||VocationalLife.certified(t,"electrical"));
     }
     static void clear(TownLife.Town t){for(String f:List.of("customer","day","price","phase","fault"))set(t,f,0);}
     static void tick(TownLife.Town t,WorldState s){

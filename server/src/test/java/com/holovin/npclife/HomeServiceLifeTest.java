@@ -238,4 +238,29 @@ class HomeServiceLifeTest {
         assertEquals(0,t.technicalMaterials.get("spare-parts").intValue());
         assertEquals(0,PlayerRepairLife.get(t,"phase"));
     }
+    @Test void vocationalCertificateRequiresLessonsAndPassingExam(){
+        var s=new WorldState();s.day=8;s.minute=600;var t=TownLife.create(s);
+        t.player.place=SCHOOL;t.player.money=100;
+        int skill=t.player.engineeringSkill,school=t.employerFunds.get("school");
+        VocationalLife.act(t,s,"enroll:mechanical");
+        assertThrows(IllegalArgumentException.class,()->VocationalLife.act(t,s,"answer:0"));
+        for(int i=0;i<3;i++){s.day=8+i;VocationalLife.act(t,s,"lesson");
+            assertThrows(IllegalArgumentException.class,()->VocationalLife.act(t,s,"lesson"));}
+        assertEquals(85,t.player.money);assertEquals(school+15,t.employerFunds.get("school").intValue());
+        assertEquals(skill+3,t.player.engineeringSkill);
+        VocationalLife.act(t,s,"answer:1");VocationalLife.act(t,s,"answer:1");VocationalLife.act(t,s,"answer:2");
+        assertFalse(VocationalLife.certified(t,"mechanical"));
+        assertThrows(IllegalArgumentException.class,()->VocationalLife.act(t,s,"answer:0"));
+        s.day=11;
+        VocationalLife.act(t,s,"answer:0");VocationalLife.act(t,s,"answer:1");VocationalLife.act(t,s,"answer:2");
+        assertTrue(VocationalLife.certified(t.copy(),"mechanical"));
+        assertFalse(VocationalLife.certified(t,"electrical"));
+        var customer=new TownLife.Citizen("cert-client","Client","Retired",NORTH_RESIDENCES);
+        customer.age=70;customer.generationIndex=910;customer.money=200;t.people.put(customer.id,customer);
+        EducationLife.set(t,customer,"interior-laundry",1);ResidentServiceLife.set(t,customer,"wear",100);
+        ResidentServiceLife.set(t,customer,"queued-day",s.day);
+        assertTrue(PlayerRepairLife.offer(t,customer));
+        VocationalLife.set(t,"mechanical:certificate",0);
+        assertFalse(PlayerRepairLife.offer(t,customer));
+    }
 }

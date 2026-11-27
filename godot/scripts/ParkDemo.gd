@@ -8203,6 +8203,7 @@ func _render_actions() -> void:
             _action_choices.add_child(_job_button("engineer","Apply: engineer"))
             _action_choices.add_child(_job_button("investigator","Apply: investigator"))
         "SCHOOL":
+            _render_vocational()
             _action_choices.add_child(_button(tr("Study engineering · funded" if bool(_last_snapshot.get("jobCentre",{}).get("fundedLesson",false)) else "Study engineering · 10 EUR"),
                     _study.bind("engineering")))
         "LIBRARY":
@@ -8437,6 +8438,32 @@ func _render_factory_report() -> void:
         line.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         _action_choices.add_child(line)
 
+func _render_vocational() -> void:
+    var report: Dictionary = _last_snapshot.get("vocational",{})
+    if report.is_empty():return
+    var label := Label.new()
+    label.text=tr("Vocational school")+" · "+tr("Electrical")+": "+("✓" if bool(report.get("electrical",false)) else "–")+" · "+tr("Mechanical")+": "+("✓" if bool(report.get("mechanical",false)) else "–")
+    label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _action_choices.add_child(label)
+    if bool(report.get("canEnrollElectrical",false)):
+        _action_choices.add_child(_button(tr("Electrical course"),_garden_action.bind("vocational:enroll:electrical")))
+    if bool(report.get("canEnrollMechanical",false)):
+        _action_choices.add_child(_button(tr("Mechanical course"),_garden_action.bind("vocational:enroll:mechanical")))
+    if not str(report.get("course","")).is_empty():
+        var progress := Label.new()
+        progress.text=tr("Lessons")+": "+str(report.get("lessons",0))+"/3"
+        _action_choices.add_child(progress)
+    if bool(report.get("canLesson",false)):
+        _action_choices.add_child(_button(tr("Practical lesson")+" · 5 EUR / 60 min",_garden_action.bind("vocational:lesson")))
+    var choices: Array=report.get("choices",[])
+    if not choices.is_empty():
+        var prompt := Label.new()
+        prompt.text=tr(str(report.get("prompt","")))
+        prompt.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        _action_choices.add_child(prompt)
+        for i in range(choices.size()):
+            _action_choices.add_child(_button(tr(str(choices[i])),_garden_action.bind("vocational:answer:"+str(i))))
+
 func _render_personal_repair() -> void:
     var report: Dictionary = _last_snapshot.get("personalRepair",{})
     var phase := int(report.get("phase",0))
@@ -8582,6 +8609,9 @@ func _render_home_goods() -> void:
         _action_choices.add_child(info)
 
 func _garden_action(action: String) -> void:
+    if action.begins_with("vocational:"):
+        if _current_place=="SCHOOL" and _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
+        return
     if action.begins_with("personal-repair:"):
         if _near_kiosk() and _connected and not _api.is_busy():_api.garden_action(action)
         return
