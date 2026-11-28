@@ -779,6 +779,8 @@ func _sync_civilian(record,pos: Vector2) -> void:
     _sync_parked_vehicle(civilian_car,record,pos,Vector3(0,0.05,0))
     civilian_car.rotation.y=float(record.get("heading",0))
 
+const EmergencySound=preload("res://scripts/EmergencyAudio.gd")
+
 func _sync_commutes(records: Array) -> void:
     var seen: Dictionary={}
     for record in records:
@@ -798,7 +800,10 @@ func _sync_commutes(records: Array) -> void:
             car.position=goal
             commute_models[id]=car
         traffic.set_plate(commute_models[id],str(record.get("plate","")),str(record.get("kind","CAR")))
-        commute_goals[id]={"point":goal,"heading":float(record.get("heading",0)),"kind":str(record.get("kind","CAR"))}
+        var kind:=str(record.get("kind","CAR"))
+        var responding:=kind=="AMBULANCE" and not str(record.get("trip","")).ends_with(":arrived")
+        commute_goals[id]={"point":goal,"heading":float(record.get("heading",0)),"kind":kind,"responding":responding}
+        if kind=="AMBULANCE":EmergencySound.update(commute_models[id],kind,responding)
         if record.get("route",[]).size()>=2:
             if not commute_motion.has(id) or commute_motion[id].trip!=str(record.get("trip","")):
                 var motion=CommuteMotion.new()
@@ -861,6 +866,7 @@ func _sync_patrols(records: Array) -> void:
             car.position=goal
             patrol_models[id]=car
         patrol_goals[id]={"point":goal,"heading":float(record.get("heading",0)),"responding":bool(record.get("responding",false))}
+        EmergencySound.update(patrol_models[id],"POLICE",bool(record.get("responding",false)))
     for id in patrol_models.keys():
         if not seen.has(id):
             patrol_models[id].queue_free()

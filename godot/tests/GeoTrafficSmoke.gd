@@ -40,6 +40,11 @@ func _check(traffic,graph: Dictionary) -> void:
     traffic.set_plate(ambulance,"LA EMS1","AMBULANCE")
     if not ambulance.has_node("BeaconL") or not ambulance.has_node("BeaconR") or not ambulance.has_node("EmergencyLight") or ambulance.get_node("RegistrationPlate").text!="LA EMS1":
         ambulance.free();push_error("Ambulance model incomplete");quit(1);return
+    var sirens=preload("res://scripts/EmergencyAudio.gd")
+    var sound: AudioStreamPlayer3D=sirens.attach(ambulance,"AMBULANCE")
+    var wav: AudioStreamWAV=sound.stream
+    if wav.data.size()!=76800 or wav.loop_end!=38400 or wav.loop_mode!=AudioStreamWAV.LOOP_FORWARD or sirens.attach(ambulance,"AMBULANCE")!=sound or sirens.tone("POLICE").data==wav.data:
+        ambulance.free();push_error("Emergency audio synthesis failed");quit(1);return
     ambulance.free()
     var truck: Node3D=traffic._truck()
     if truck.get_child_count()<14:
