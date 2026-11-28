@@ -787,7 +787,9 @@ func _sync_commutes(records: Array) -> void:
         seen[id]=true
         if not commute_models.has(id):
             var car: Node3D
-            if str(record.get("kind",""))=="BUS":
+            if str(record.get("kind",""))=="AMBULANCE":
+                car=traffic._ambulance()
+            elif str(record.get("kind",""))=="BUS":
                 car=traffic._bus()
             else:
                 var palette: Array[Color]=[Color("#9b403d"),Color("#456b89"),Color("#d0ccc0"),Color("#64696b"),Color("#73805a")]
@@ -796,7 +798,7 @@ func _sync_commutes(records: Array) -> void:
             car.position=goal
             commute_models[id]=car
         traffic.set_plate(commute_models[id],str(record.get("plate","")),str(record.get("kind","CAR")))
-        commute_goals[id]={"point":goal,"heading":float(record.get("heading",0))}
+        commute_goals[id]={"point":goal,"heading":float(record.get("heading",0)),"kind":str(record.get("kind","CAR"))}
         if record.get("route",[]).size()>=2:
             if not commute_motion.has(id) or commute_motion[id].trip!=str(record.get("trip","")):
                 var motion=CommuteMotion.new()
@@ -817,6 +819,11 @@ func _animate_commutes(delta: float) -> void:
     for id in commute_models:
         var car: Node3D=commute_models[id]
         var goal: Dictionary=commute_goals[id]
+        if str(goal.get("kind",""))=="AMBULANCE":
+            var phase:=int(Time.get_ticks_msec()/180.0)%4
+            car.get_node("BeaconL").visible=phase==0
+            car.get_node("BeaconR").visible=phase==2
+            car.get_node("EmergencyLight").visible=phase==0 or phase==2
         if commute_motion.has(id):
             var motion=commute_motion[id]
             var dir: Vector2=motion.direction()

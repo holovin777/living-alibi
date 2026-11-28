@@ -57,6 +57,11 @@ final class AmbulanceLife {
         set(t,"origin",0);set(t,"due",0);set(t,"completed",Math.addExact(get(t,"completed"),1));
         return new Arrival("Ambulance delivered you to the clinic. Stabilization: health +"+gain+".",travel);
     }
+    static TownLife.Place pickup(TownLife.Town t){
+        int origin=get(t,"origin");
+        return origin>0&&origin<=TownLife.Place.values().length?TownLife.Place.values()[origin-1]:null;
+    }
+    static int dispatchId(TownLife.Town t){return get(t,"due");}
     record View(String status,int minutesRemaining,int completed){}
     static View view(TownLife.Town t,WorldState s){
         boolean active=get(t,"origin")!=0;

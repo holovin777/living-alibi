@@ -2,6 +2,26 @@ package com.holovin.npclife;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class AmbulanceLifeTest {
+    @Test void visibleAmbulanceFollowsMappedRoadAndHoldsAtPickup(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir)throws Exception{
+        var graph=dir.resolve("ambulance.tsv");
+        java.nio.file.Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nN\t3\t100\t100\nE\t1\t2\nE\t2\t3\nM\t1\t0\t0\nM\t2\t100\t0\nM\t3\t100\t100\nD\t1\t2\nD\t2\t3\nD\t3\t2\n");
+        var map=new GeoProjection(graph);
+        map.anchors.put(TownLife.Place.CLINIC,"1");map.anchors.put(TownLife.Place.PARK,"3");
+        var s=new WorldState();s.day=2;s.minute=600;
+        var t=TownLife.create(s);t.player.place=TownLife.Place.PARK;t.player.destination=t.player.place;
+        t.player.health=60;RoadAccidentLife.add(t,"injury",40);
+        t.employerFunds.put("city-maintenance",100);t.industryStocks.put(FuelLife.STOCK,20);
+        assertNull(map.ambulanceVehicle(t,s));
+        AmbulanceLife.call(t,s);
+        var start=map.ambulanceVehicle(t,s);assertEquals("AMBULANCE",start.kind());assertEquals(0,start.distance(),.001);
+        s.minute+=AmbulanceLife.responseMinutes(t.player.place)/2;
+        var middle=map.ambulanceVehicle(t,s);assertTrue(middle.distance()>0&&middle.distance()<200);
+        assertEquals(3,middle.route().size());
+        s.minute=600+AmbulanceLife.responseMinutes(t.player.place);
+        var arrived=map.ambulanceVehicle(t,s);assertEquals(100,arrived.x(),.001);assertEquals(100,arrived.z(),.001);assertEquals(200,arrived.distance(),.001);
+        assertNotEquals(start.trip(),arrived.trip());
+        AmbulanceLife.board(t,s);assertNull(map.ambulanceVehicle(t,s));
+    }
     @Test void dispatchUsesResourcesAndBoardingMovesPatientNotVehicle(){
         var s=new WorldState();s.day=2;s.minute=600;var t=TownLife.create(s);
         var origin=TownLife.Place.PARK;

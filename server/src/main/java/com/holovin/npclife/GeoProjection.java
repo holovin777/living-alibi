@@ -356,6 +356,21 @@ final class GeoProjection {
         }
         motorRoutes.put(key,Optional.ofNullable(result));return result;
     }
+    TrafficCar ambulanceVehicle(TownLife.Town t,WorldState s){
+        var pickup=AmbulanceLife.pickup(t);
+        if(pickup==null||!t.player.alive||JusticeLife.confined(t)||RebirthLife.active(t))return null;
+        var state=AmbulanceLife.view(t,s);
+        var route=motorRoute(TownLife.Place.CLINIC,pickup);
+        if(route==null)return null;
+        double fraction=Math.max(0,Math.min(1,1-state.minutesRemaining()/(double)AmbulanceLife.responseMinutes(pickup)));
+        var at=route.at(fraction);
+        var before=route.at(Math.max(0,fraction-.005));
+        var after=route.at(Math.min(1,fraction+.005));
+        double heading=Math.atan2(-(after.x-before.x),-(after.z-before.z));
+        // An arrived unit holds at the final reachable road node until boarding/cancellation.
+        String trip="ambulance:"+AmbulanceLife.dispatchId(t)+":"+pickup.name()+("ARRIVED".equals(state.status())?":arrived":"");
+        return new TrafficCar("ambulance-response",at.x,at.z,heading,"AMBULANCE",100,trip,route.points(),fraction*route.meters(),"LA EMS1");
+    }
     TrafficCar movingVehicle(TownLife.Town t,TownLife.Citizen c){
         int mode=NpcTransportLife.mode(t,c);if(!NpcTransportLife.enabled(t)||mode==NpcTransportLife.WALK)return null;
         var route=motorRoute(c.place,c.destination);if(route==null)return null;
@@ -547,6 +562,8 @@ final class GeoProjection {
             Point at=position(c);
             if(at.distance(player)<=140)nearby.add(new Actor(c.id,at.x,at.z,c.activity,talking.contains(c)&&(!rebirth||GeoLife.canTalk(t,c)),"STAND",0,GameSession.workVisual(c),GameSession.outfitVisual(c),GameSession.appearanceStage(c)));
         }
+        var ambulance=ambulanceVehicle(t,s);
+        if(ambulance!=null&&new Point(ambulance.x(),ambulance.z()).distance(player)<=220)traffic.put(ambulance.id(),ambulance);
         nearby.sort(Comparator.comparingDouble((Actor a)->new Point(a.x,a.z).distance(viewer)).thenComparing(Actor::id));
         var nearest=room==null?nearest(player):room;
         boolean canEnter=p.alive&&!confined&&!rebirth&&p.travelRemaining==0&&point(nearest).distance(player)<=18;
@@ -570,6 +587,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,(room==null?nearby.subList(0,Math.min(40,nearby.size())):inside).stream().map(a->a.withAppearance(t)).toList(),
             district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,room==null?ownedLight(t,player,"scooter"):null,room==null?ownedLight(t,player,"motorcycle"):null,p.carPlace==null?"":VehicleRegistrationLife.personal(t,"car"),DrivingSchoolLife.view(t),RoadPoliceLife.view(t),VehicleDocumentsLife.view(t,s),RoadAccidentLife.view(t),TowServiceLife.view(t,s),AmbulanceLife.view(t,s),JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,room==null?ownedLight(t,player,"scooter"):null,room==null?ownedLight(t,player,"motorcycle"):null,p.carPlace==null?"":VehicleRegistrationLife.personal(t,"car"),DrivingSchoolLife.view(t),RoadPoliceLife.view(t),VehicleDocumentsLife.view(t,s),RoadAccidentLife.view(t),TowServiceLife.view(t,s),AmbulanceLife.view(t,s),JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingInt((TrafficCar v)->v.kind().equals("AMBULANCE")?0:1).thenComparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
     }
 }

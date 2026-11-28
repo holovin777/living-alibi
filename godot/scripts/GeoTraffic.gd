@@ -91,12 +91,70 @@ func _car(paint: Color=Color.TRANSPARENT, imported: bool=true) -> Node3D:
         _box(root,Vector3(0.35,0.15,0.06),Vector3(x*0.83,0.72,1.8),Color("#9b2726"))
     return root
 
+func _ambulance() -> Node3D:
+    var root:=Node3D.new()
+    var white:=Color("#f0eee7")
+    var orange:=Color("#e36e31")
+    var glass:=Color("#415968")
+    _box(root,Vector3(2.08,0.74,4.75),Vector3(0,0.82,0),white)
+    _box(root,Vector3(2.0,1.02,1.68),Vector3(0,1.61,-1.48),white)
+    _box(root,Vector3(2.03,1.39,2.96),Vector3(0,1.76,0.91),white)
+    _box(root,Vector3(1.76,0.54,0.045),Vector3(0,1.79,-2.34),glass)
+    for side in [-1.0,1.0]:
+        var x: float=float(side)*1.045
+        _box(root,Vector3(0.035,0.26,4.65),Vector3(x,1.10,0),orange)
+        _box(root,Vector3(0.035,0.52,0.88),Vector3(x,1.81,-1.49),glass)
+        _box(root,Vector3(0.035,0.42,1.08),Vector3(x,1.92,0.91),glass)
+        _box(root,Vector3(0.037,0.44,0.13),Vector3(x,1.65,1.78),Color("#2871ad"))
+        _box(root,Vector3(0.037,0.13,0.44),Vector3(x,1.65,1.78),Color("#2871ad"))
+        for z in [-1.43,1.48]:
+            var wheel:=MeshInstance3D.new()
+            var tire:=CylinderMesh.new()
+            tire.top_radius=0.34
+            tire.bottom_radius=0.34
+            tire.height=0.23
+            tire.radial_segments=16
+            wheel.mesh=tire
+            wheel.rotation.z=PI/2
+            wheel.position=Vector3(x*0.88,0.34,float(z))
+            wheel.material_override=_mat(Color("#252729"))
+            root.add_child(wheel)
+        _box(root,Vector3(0.28,0.17,0.05),Vector3(x*0.74,0.91,-2.40),Color("#fff1d1"))
+        _box(root,Vector3(0.24,0.19,0.05),Vector3(x*0.78,0.95,2.40),Color("#b82927"))
+        var lamp:=_box(root,Vector3(0.52,0.16,0.26),Vector3(float(side)*0.45,2.53,-0.68),Color("#2785ef"))
+        lamp.name="BeaconL" if side<0 else "BeaconR"
+        var material:=StandardMaterial3D.new()
+        material.albedo_color=Color("#2785ef")
+        material.emission_enabled=true
+        material.emission=Color("#2785ef")
+        material.emission_energy_multiplier=2.5
+        lamp.material_override=material
+    _box(root,Vector3(1.60,0.24,0.04),Vector3(0,1.12,2.41),orange)
+    var sign:=Label3D.new()
+    sign.text="AMBULANZA"
+    sign.font_size=38
+    sign.pixel_size=0.0028
+    sign.outline_size=0
+    sign.modulate=Color("#1f5790")
+    sign.position=Vector3(0,2.24,2.415)
+    root.add_child(sign)
+    var light:=OmniLight3D.new()
+    light.name="EmergencyLight"
+    light.position=Vector3(0,2.58,-0.68)
+    light.light_color=Color("#398bff")
+    light.light_energy=2.0
+    light.omni_range=8.0
+    light.shadow_enabled=false
+    root.add_child(light)
+    return root
+
 func set_plate(vehicle: Node3D,number: String,kind: String="CAR") -> void:
     if number.is_empty():return
     var label: Label3D=vehicle.get_node_or_null("RegistrationPlate") as Label3D
     if label==null:
         var rear:=Vector3(0,0.62,2.0)
-        if kind=="BUS":rear=Vector3(0,0.92,3.84)
+        if kind=="AMBULANCE":rear=Vector3(0,0.68,2.43)
+        elif kind=="BUS":rear=Vector3(0,0.92,3.84)
         elif kind=="TRUCK":rear=Vector3(0,0.94,3.57)
         elif kind in ["SCOOTER","MOTORCYCLE"]:rear=Vector3(0,0.62,0.94)
         var plate:=_box(vehicle,Vector3(0.38,0.13,0.025),rear,Color("#f1f0e5"))
