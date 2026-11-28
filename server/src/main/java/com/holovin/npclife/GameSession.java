@@ -772,6 +772,7 @@ public final class GameSession implements AutoCloseable {
         }
         if(!Set.of("step","coast","brake").contains(command)||turn<-1||turn>1)throw new IllegalArgumentException("Unknown driving control.");
         long now=System.nanoTime();
+        if(now<geoDrive.checkUntil){geoDrive.lastStep=now;return drivePose(map,"Police document check / Controllo documenti.");}
         if(now-geoDrive.lastStep<400_000_000L)return drivePose(map,"");
         int fuel=driveResource(geoDrive,"fuel");
         int condition=driveResource(geoDrive,"condition");
@@ -807,8 +808,20 @@ public final class GameSession implements AutoCloseable {
         int remainder=(int)Math.round((next.meters%100)*1000);
         if(!next.stolen&&!next.lightKind.isEmpty())LightMotorLife.set(copy,next.lightKind,"remainder",remainder);
         else VehicleTheftLife.set(copy,next.stolen?"stolen-remainder":"owned-remainder",remainder);
-        apply(copy,0,"Driving.");geoDrive=next;
-        return drivePose(map,impact>0?"Collision: vehicle condition reduced.":next.waitingForSignal?"Waiting for green light.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
+        String checkMessage="";
+        // Criminal reports keep the existing dispatch/arrest path; ordinary inspections are administrative.
+        if(!next.stolen&&traveled>0.001&&RoadPoliceLife.due(copy,state)
+                &&map.patrols(town,state,next.position(map)).stream().anyMatch(patrol->!patrol.responding()&&new GeoProjection.Point(patrol.x(),patrol.z()).distance(next.position(map))<=12)){
+            String kind=next.lightKind.isEmpty()?"car":next.lightKind;
+            String plate=VehicleRegistrationLife.personal(copy,kind);
+            var check=RoadPoliceLife.check(copy,state,kind,next.lightKind.isEmpty()?copy.player.carCondition:LightMotorLife.get(copy,kind,"condition"),plate);
+            if(check.checked()){
+                next.speed=0;next.checkUntil=now+4_000_000_000L;
+                checkMessage=check.message();
+            }
+        }
+        apply(copy,0,checkMessage.isEmpty()?"Driving.":checkMessage);geoDrive=next;
+        return drivePose(map,!checkMessage.isEmpty()?checkMessage:impact>0?"Collision: vehicle condition reduced.":next.waitingForSignal?"Waiting for green light.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
     }
     private int driveResource(GeoDrive drive,String field){
         if(drive.stolen)return VehicleTheftLife.get(town,field);
@@ -950,6 +963,10 @@ public final class GameSession implements AutoCloseable {
                 default -> throw new IllegalArgumentException("Unknown workshop action.");
             };
             return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.equals("road-fine-pay")){
+            var copy=town.copy();String message=RoadPoliceLife.pay(copy,state);
+            apply(copy,5,message);return new GeoProjection.ActionResult(message,null);
         }
         if(action.startsWith("license:")){
             String[] command=action.split(":",3);

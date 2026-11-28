@@ -14,13 +14,13 @@ final class GeoDrive {
     boolean waitingForSignal;
     static final double MAX_SPEED=10.0; // legacy default, m/s
     static final double HIGHWAY_SPEED=20.0; // prototype safety/performance cap
-    long lastStep;
+    long lastStep,checkUntil;
     GeoDrive(boolean stolen,String from){this(stolen,false,from);}
     GeoDrive(boolean stolen,boolean bus,String from){this(stolen,bus,false,from);}
     GeoDrive(boolean stolen,boolean bus,boolean truck,String from){this(stolen,bus,truck,"",from);}
     GeoDrive(boolean stolen,boolean bus,boolean truck,String lightKind,String from){this.lightKind=lightKind;this.stolen=stolen;this.bus=bus;this.truck=truck;this.from=from;this.to=from;lastStep=System.nanoTime();}
     GeoDrive copy(){
-        var c=new GeoDrive(stolen,bus,truck,lightKind,from);c.to=to;c.progress=progress;c.meters=meters;c.speed=speed;c.lastStep=lastStep;return c;
+        var c=new GeoDrive(stolen,bus,truck,lightKind,from);c.to=to;c.progress=progress;c.meters=meters;c.speed=speed;c.lastStep=lastStep;c.checkUntil=checkUntil;return c;
     }
     GeoProjection.Point position(GeoProjection map){return map.motorNodes.get(from).lerp(map.motorNodes.get(to),progress);}
     double heading(GeoProjection map){
