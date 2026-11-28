@@ -91,6 +91,26 @@ func _car(paint: Color=Color.TRANSPARENT, imported: bool=true) -> Node3D:
         _box(root,Vector3(0.35,0.15,0.06),Vector3(x*0.83,0.72,1.8),Color("#9b2726"))
     return root
 
+func set_plate(vehicle: Node3D,number: String,kind: String="CAR") -> void:
+    if number.is_empty():return
+    var label: Label3D=vehicle.get_node_or_null("RegistrationPlate") as Label3D
+    if label==null:
+        var rear:=Vector3(0,0.62,2.0)
+        if kind=="BUS":rear=Vector3(0,0.92,3.84)
+        elif kind=="TRUCK":rear=Vector3(0,0.94,3.57)
+        elif kind in ["SCOOTER","MOTORCYCLE"]:rear=Vector3(0,0.62,0.94)
+        var plate:=_box(vehicle,Vector3(0.38,0.13,0.025),rear,Color("#f1f0e5"))
+        plate.name="RegistrationBacking"
+        label=Label3D.new()
+        label.name="RegistrationPlate"
+        label.position=rear+Vector3(0,0,0.020)
+        label.font_size=36
+        label.pixel_size=0.00145
+        label.outline_size=0
+        label.modulate=Color("#17202a")
+        vehicle.add_child(label)
+    label.text=number
+
 func _two_wheeler(scooter: bool) -> Node3D:
     var root:=Node3D.new()
     var paint:=Color("#8bb6ad") if scooter else Color("#9e3e35")

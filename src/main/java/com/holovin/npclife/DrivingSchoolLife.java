@@ -5,7 +5,7 @@ import java.util.List;
 /** Fictional driving qualification. No claim of real Italian licensing rules. */
 final class DrivingSchoolLife {
     private DrivingSchoolLife(){}
-    static final List<String> CATEGORIES=List.of("AM","A","B");
+    static final List<String> CATEGORIES=List.of("AM","A","B","C","D");
     static final int THEORY_SESSIONS=2, PRACTICE_SESSIONS=2;
     static final int THEORY_FEE=5, PRACTICE_FEE=8, ISSUE_FEE=4;
     record Question(String prompt,List<String> answers,int correct){}
@@ -20,7 +20,7 @@ final class DrivingSchoolLife {
     static int get(TownLife.Town t,String category,String field){return t.industryStocks.getOrDefault(key(t,category,field),0);}
     static void set(TownLife.Town t,String category,String field,int value){t.industryStocks.put(key(t,category,field),value);}
     static boolean valid(TownLife.Town t,String category){return get(t,category,"issued")>0;}
-    static String required(String kind){return switch(kind){case "scooter" -> "AM";case "motorcycle" -> "A";default -> "B";};}
+    static String required(String kind){return switch(kind){case "scooter" -> "AM";case "motorcycle" -> "A";case "truck" -> "C";case "bus" -> "D";default -> "B";};}
     static boolean allowed(TownLife.Town t,String kind){
         return valid(t,required(kind))||(kind.equals("scooter")&&(valid(t,"A")||valid(t,"B")));
     }
@@ -38,7 +38,7 @@ final class DrivingSchoolLife {
         var result=new java.util.ArrayList<Option>();
         if(!ready(t,s))return result;
         for(String c:CATEGORIES){
-            if(valid(t,c))continue;
+            if(valid(t,c)||((c.equals("C")||c.equals("D"))&&!valid(t,"B")))continue;
             int theory=get(t,c,"theory"),q=get(t,c,"question"),practice=get(t,c,"practice");
             boolean passed=get(t,c,"passed")>0;
             String prefix="license:"+c+":";

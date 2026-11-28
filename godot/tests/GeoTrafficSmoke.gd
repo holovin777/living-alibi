@@ -43,6 +43,10 @@ func _check(traffic,graph: Dictionary) -> void:
     var car: Node3D=traffic._car()
     if not car.has_node("ImportedVehicle"):
         car.free();push_error("Geographic car model missing");quit(1);return
+    traffic.set_plate(car,"LA R3")
+    traffic.set_plate(car,"LA R4")
+    if car.get_node("RegistrationPlate").text!="LA R4" or not car.has_node("RegistrationBacking"):
+        car.free();push_error("Registration plate failed");quit(1);return
     car.free()
     for i in range(120):traffic.update_traffic(Vector2.ZERO,0.1)
     if traffic.count("drive")<1 or traffic.count("walk")<1 or traffic.actors.size()>38:

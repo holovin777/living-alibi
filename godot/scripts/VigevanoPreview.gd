@@ -593,6 +593,7 @@ func _update_navigation() -> void:
         if residents.action_pending:hud.text+="\nJava is processing your action..."
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         _sync_parked_vehicle(owned_car,world.get("parkedCar"),pos,Vector3(2.5,0.05,0))
+        if owned_car.visible:traffic.set_plate(owned_car,str(world.get("ownedCarPlate","")))
         if driving:owned_car.hide()
         _sync_civilian(world.get("civilianCar"),pos)
         _sync_parked_vehicle(reserve_bus,world.get("parkedBus"),pos,Vector3(0,0.05,0))
@@ -783,6 +784,7 @@ func _sync_commutes(records: Array) -> void:
             add_child(car)
             car.position=goal
             commute_models[id]=car
+        traffic.set_plate(commute_models[id],str(record.get("plate","")),str(record.get("kind","CAR")))
         commute_goals[id]={"point":goal,"heading":float(record.get("heading",0))}
         if record.get("route",[]).size()>=2:
             if not commute_motion.has(id) or commute_motion[id].trip!=str(record.get("trip","")):
@@ -876,6 +878,9 @@ func _sync_parked_vehicle(node: Node3D,record,pos: Vector2,offset: Vector3) -> v
     var location:=Vector2(float(record["x"]),float(record["z"]))
     node.visible=pos.distance_to(location)<=110
     node.position=Vector3(location.x,0,location.y)+offset
+    var id:=str(record.get("id",""))
+    var kind: String="BUS" if id=="municipal-reserve-bus" else ("TRUCK" if id=="freight-reserve-truck" else ("SCOOTER" if id.ends_with("scooter") else ("MOTORCYCLE" if id.ends_with("motorcycle") else "CAR")))
+    if node.visible:traffic.set_plate(node,str(record.get("plate","")),kind)
 
 func _close_phone() -> void:
     phone_panel.hide()

@@ -73,16 +73,16 @@ final class GeoProjection {
         var w=WeatherLife.at(s.day,s.minute);
         return new Weather(w.season().name(),w.sky().name(),w.temperatureC(),w.raining(),w.snowing());
     }
-    record CivilianCar(String id,String district,int ownerIndex,double x,double z,double heading){}
-    record ParkedBus(String id,double x,double z,double heading){}
+    record CivilianCar(String id,String district,int ownerIndex,double x,double z,double heading,String plate){}
+    record ParkedBus(String id,double x,double z,double heading,String plate){}
     record Patrol(String id,double x,double z,double heading,boolean responding){}
-    record TrafficCar(String id,double x,double z,double heading,String kind,int condition,String trip,List<Point> route,double distance){}
+    record TrafficCar(String id,double x,double z,double heading,String kind,int condition,String trip,List<Point> route,double distance,String plate){}
     record ActionResult(String message,District arrival){}
     record View(int day,int minute,int population,int commuting,List<Actor> residents,
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,ParkedBus parkedBus,ParkedBus parkedTruck,ParkedBus parkedScooter,ParkedBus parkedMotorcycle,ParkedBus ownedScooter,ParkedBus ownedMotorcycle,List<DrivingSchoolLife.Progress> drivingLicenses,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,ParkedBus parkedBus,ParkedBus parkedTruck,ParkedBus parkedScooter,ParkedBus parkedMotorcycle,ParkedBus ownedScooter,ParkedBus ownedMotorcycle,String ownedCarPlate,List<DrivingSchoolLife.Progress> drivingLicenses,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -361,7 +361,7 @@ final class GeoProjection {
         double fraction=1.0-c.travelRemaining/(double)Math.max(1,TownLife.travelTime(c.place,c.destination));
         Point at=route.at(fraction),next=route.at(Math.min(1,fraction+.01)),prev=route.at(Math.max(0,fraction-.01));
         double heading=Math.atan2(-(next.x-prev.x),-(next.z-prev.z));
-        return new TrafficCar(mode==NpcTransportLife.CAR?"npc-car-"+c.generationIndex:"bus-"+c.place.name()+"-"+c.destination.name()+"-"+NpcTransportLife.get(t,c,"bus-departure"),at.x,at.z,heading,mode==NpcTransportLife.CAR?"CAR":"BUS",mode==NpcTransportLife.CAR?NpcTransportLife.get(t,c,"condition"):100,c.place.name()+":"+c.destination.name(),route.points(),Math.max(0,Math.min(1,fraction))*route.meters());
+        return new TrafficCar(mode==NpcTransportLife.CAR?"npc-car-"+c.generationIndex:"bus-"+c.place.name()+"-"+c.destination.name()+"-"+NpcTransportLife.get(t,c,"bus-departure"),at.x,at.z,heading,mode==NpcTransportLife.CAR?"CAR":"BUS",mode==NpcTransportLife.CAR?NpcTransportLife.get(t,c,"condition"):100,c.place.name()+":"+c.destination.name(),route.points(),Math.max(0,Math.min(1,fraction))*route.meters(),mode==NpcTransportLife.CAR?VehicleRegistrationLife.resident(c.generationIndex):"");
     }
     ParkedBus parkedBus(TownLife.Town t,Point player){return reserveVehicle(t,player,TownLife.Place.STAZIONE,"municipal-reserve-bus");}
     ParkedBus parkedTruck(TownLife.Town t,Point player){return reserveVehicle(t,player,TownLife.Place.WORKSHOP,"freight-reserve-truck");}
@@ -373,7 +373,7 @@ final class GeoProjection {
         var at=point(district);
         if(at.distance(player)>110)return null;
         double offset=kind.equals("scooter")?-4.0:5.0;
-        return new ParkedBus("owned-"+kind,at.x+offset,at.z+3.0,0);
+        return new ParkedBus("owned-"+kind,at.x+offset,at.z+3.0,0,VehicleRegistrationLife.personal(t,kind));
     }
     private ParkedBus reserveVehicle(TownLife.Town t,Point player,TownLife.Place depot,String vehicleId){
         if(VehicleTheftLife.active(t)||t.player.place!=depot)return null;
@@ -385,7 +385,7 @@ final class GeoProjection {
         double dx=next.x-road.x,dz=next.z-road.z,length=Math.hypot(dx,dz);
         if(length<0.05)return null;
         // A provisional depot bay adjacent to the mapped station road.
-        return new ParkedBus(vehicleId,road.x+dx/length*8-dz/length*3.5,road.z+dz/length*8+dx/length*3.5,Math.atan2(-dx,-dz));
+        return new ParkedBus(vehicleId,road.x+dx/length*8-dz/length*3.5,road.z+dz/length*8+dx/length*3.5,Math.atan2(-dx,-dz),VehicleRegistrationLife.reserve(vehicleId));
     }
     CivilianCar civilian(TownLife.Town t,Point player){
         if(VehicleTheftLife.active(t))return null;
@@ -400,7 +400,7 @@ final class GeoProjection {
         Point road=motorNodes.get(node),next=motorNodes.get(motorEdges.get(node).get(0));
         double heading=Math.atan2(-(next.x-road.x),-(next.z-road.z));
         // Render on the side of the mapped road. Exact parking bays are not available yet.
-        return new CivilianCar("npc-car-"+resident.generationIndex,district.name(),resident.generationIndex,road.x-2.5,road.z,heading);
+        return new CivilianCar("npc-car-"+resident.generationIndex,district.name(),resident.generationIndex,road.x-2.5,road.z,heading,VehicleRegistrationLife.resident(resident.generationIndex));
     }
     List<Patrol> patrols(TownLife.Town t,WorldState s,Point player){
         boolean responding="REPORTED".equals(JusticeLife.view(t,s).status());
@@ -563,6 +563,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,(room==null?nearby.subList(0,Math.min(40,nearby.size())):inside).stream().map(a->a.withAppearance(t)).toList(),
             district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,room==null?ownedLight(t,player,"scooter"):null,room==null?ownedLight(t,player,"motorcycle"):null,DrivingSchoolLife.view(t),JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,room==null?ownedLight(t,player,"scooter"):null,room==null?ownedLight(t,player,"motorcycle"):null,p.carPlace==null?"":VehicleRegistrationLife.personal(t,"car"),DrivingSchoolLife.view(t),JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
     }
 }

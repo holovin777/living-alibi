@@ -2,6 +2,31 @@ package com.holovin.npclife;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class DrivingSchoolLifeTest {
+    @Test void heavyCategoriesRequireBAndAreSeparate(){
+        var s=new WorldState();s.minute=600;var t=TownLife.create(s);
+        t.player.place=TownLife.Place.SCHOOL;t.player.destination=t.player.place;t.player.money=100;
+        assertThrows(IllegalArgumentException.class,()->DrivingSchoolLife.action(t,s,"C","lesson"));
+        DrivingSchoolLife.set(t,"B","issued",1);
+        DrivingSchoolLife.action(t,s,"C","lesson");
+        assertEquals(1,DrivingSchoolLife.get(t,"C","theory"));
+        assertFalse(DrivingSchoolLife.allowed(t,"truck"));
+        assertFalse(DrivingSchoolLife.allowed(t,"bus"));
+        DrivingSchoolLife.set(t,"C","issued",1);
+        assertTrue(DrivingSchoolLife.allowed(t,"truck"));
+        assertFalse(DrivingSchoolLife.allowed(t,"bus"));
+        DrivingSchoolLife.set(t,"D","issued",1);
+        assertTrue(DrivingSchoolLife.allowed(t,"bus"));
+    }
+    @Test void registrationNumbersAreStableAndSeparate(){
+        var t=TownLife.create(new WorldState());
+        String car=VehicleRegistrationLife.personal(t,"car");
+        assertEquals(car,VehicleRegistrationLife.personal(t.copy(),"car"));
+        assertNotEquals(car,VehicleRegistrationLife.personal(t,"scooter"));
+        assertNotEquals(car,VehicleRegistrationLife.resident(t.player.incarnation));
+        assertNotEquals(VehicleRegistrationLife.reserve("municipal-reserve-bus"),VehicleRegistrationLife.reserve("freight-reserve-truck"));
+        t.player.incarnation++;
+        assertNotEquals(car,VehicleRegistrationLife.personal(t,"car"));
+    }
     @Test void theoryPracticeIssueAndIncarnationScope(){
         var s=new WorldState();s.day=2;s.minute=600;
         var t=TownLife.create(s);t.player.money=100;
