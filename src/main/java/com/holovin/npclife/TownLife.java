@@ -782,8 +782,10 @@ final class TownLife {
         AgriFoodLife.tick(town,marco);
         FoodSupplyLife.tick(town,marco);
         ConstructionLife.tick(town,marco.day,marco.minute);
+        if(marco.day%3==0)IndustrialExpansionLife.tick(town,marco);
         if(marco.day%2==0){ResidentialDevelopmentLife.tick(town,marco);CommercialPropertyLife.tick(town,marco);}
         else{CommercialPropertyLife.tick(town,marco);ResidentialDevelopmentLife.tick(town,marco);}
+        if(marco.day%3!=0)IndustrialExpansionLife.tick(town,marco);
         FireRecoveryLife.tick(town,marco);
         HouseholdInsuranceLife.tick(town,marco);
         BusinessCreditLife.tick(town,marco);

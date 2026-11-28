@@ -32,6 +32,8 @@ final class GeoProperty {
         }
         for(var p:ResidentialDevelopmentLife.view(t))if(!p.owner().isEmpty()||p.stage()>0)
             projects.add(new CommercialSite("residential:"+p.id(),map.district(TownLife.Place.valueOf(p.district())),p.stage(),p.stage()<3&&!p.owner().isEmpty()));
+        for(var p:IndustrialExpansionLife.view(t))if(!p.owner().isEmpty()||p.stage()>0)
+            projects.add(new CommercialSite("industrial:"+p.id(),map.district(TownLife.Place.FACTORY),p.stage(),p.stage()<3&&!p.owner().isEmpty()));
         return new Scenery(yard,site,List.copyOf(projects));
     }
     static View view(TownLife.Town t,WorldState s,GeoProjection map,GeoProjection.Point at,TownLife.Place room){

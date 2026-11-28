@@ -14,7 +14,7 @@ final class NpcEnterpriseLife {
     static boolean owned(TownLife.Town t,String a){return owner(t,a)!=null;}
     static int count(TownLife.Town t,TownLife.Citizen c){
         return (int)BusinessSolvencyLife.accounts(t).stream().filter(a->owner(t,a)==c).count()
-            +(ITBusinessLife.registered(t,c)?1:0);
+            +(ITBusinessLife.registered(t,c)?1:0)+IndustrialExpansionLife.owned(t,c);
     }
     static boolean eligible(TownLife.Town t,TownLife.Citizen c,WorldState s){
         return c!=null&&c.alive&&c.generationIndex>0&&c.age>=25&&c.age<65

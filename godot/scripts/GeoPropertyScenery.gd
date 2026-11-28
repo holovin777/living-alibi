@@ -291,6 +291,10 @@ func _sync_commercial(projects: Array) -> void:
 func _commercial_site(root: Node3D,project: Dictionary) -> void:
     var stage:=clampi(int(project.get("stage",0)),0,3)
     var active: bool=bool(project.get("active",false))
+    var industrial: bool=str(project.get("id","")).begins_with("industrial:")
+    if industrial:
+        _industrial_site(root,stage,active,str(project.get("id","")).trim_prefix("industrial:"))
+        return
     var residential: bool=str(project.get("id","")).begins_with("residential:")
     if residential:
         _residential_site(root,stage,active,str(project.get("id","")).trim_prefix("residential:"))
@@ -336,3 +340,19 @@ func _residential_site(root: Node3D,stage: int,active: bool,id: String) -> void:
         for x in [-3.6,3.6]:_box(root,Vector3(x,0.7,3.25),Vector3(0.12,1.4,0.12),Color("#d1a147"))
         _box(root,Vector3(0,0.95,3.25),Vector3(7.2,0.12,0.12),Color("#d1a147"))
         _sign(root,Vector3(0,1.8,3.3),"CANTIERE · %s/3" % stage)
+
+func _industrial_site(root: Node3D,stage: int,active: bool,id: String) -> void:
+    _box(root,Vector3.ZERO,Vector3(10,0.10,8),Color("#93928b"))
+    if stage>=1:_box(root,Vector3(0,0.17,0),Vector3(8.0,0.3,6.5),Color("#a9acae"),true)
+    if stage>=2:
+        _box(root,Vector3(0,2.4,0),Vector3(7.8,4.3,6.2),Color("#b6bbb8"),true)
+        for x in [-2.7,0.0,2.7]:_box(root,Vector3(x,3.0,3.13),Vector3(1.4,0.65,0.07),Color("#657c86"))
+    if stage==3:
+        _box(root,Vector3(0,4.65,0),Vector3(8.2,0.3,6.6),Color("#757f81"))
+        _box(root,Vector3(0,1.65,3.14),Vector3(2.7,2.7,0.10),Color("#62696c"))
+        for x in [-3.0,3.0]:_box(root,Vector3(x,5.5,-2.0),Vector3(0.7,2.8,0.7),Color("#838e8c"))
+        _sign(root,Vector3(0,4.1,3.3),id.to_upper())
+    elif active:
+        _box(root,Vector3(-4.2,2.5,-3.2),Vector3(0.25,5,0.25),Color("#d2a147"))
+        _box(root,Vector3(-2.1,5,-3.2),Vector3(4.5,0.2,0.2),Color("#d2a147"))
+        _sign(root,Vector3(0,2.0,3.5),"CANTIERE INDUSTRIALE · %s/3" % stage)

@@ -33,12 +33,13 @@ final class StaffingLife {
         job("Clothing seller",PORTICI,2),job("Electronics seller",PORTICI,2),job("Furniture seller",WORKSHOP,2),
         job("Barista",CAFE,4),job("Baker",BAKERY,4),new Role("Miner",QUARRY,3,"miner",null,20),
         new Role("Factory machinist",FACTORY,3,"machinist",null,20),new Role("Transport driver",QUARRY,2,"miner",null,20),
-        job("Farm worker",FARM,4),job("Fuel station attendant",FUEL_STATION,2),job("Warehouse worker",LOGISTICS_DEPOT,3),job("Station attendant",STAZIONE,2),job(HouseholdInsuranceLife.ROLE,OFFICE,2),new Role(ConstructionCrewLife.ARCHITECT,WORKSHOP,1,null,"engineering",45),job(ConstructionCrewLife.BUILDER,WORKSHOP,3),job(ConstructionCrewLife.DRIVER,LOGISTICS_DEPOT,2));
+        job("Farm worker",FARM,4),job("Fuel station attendant",FUEL_STATION,2),job("Warehouse worker",LOGISTICS_DEPOT,3),job("Station attendant",STAZIONE,2),job(HouseholdInsuranceLife.ROLE,OFFICE,2),new Role(ConstructionCrewLife.ARCHITECT,WORKSHOP,1,null,"engineering",45),job(ConstructionCrewLife.BUILDER,WORKSHOP,3),job(ConstructionCrewLife.DRIVER,LOGISTICS_DEPOT,2),
+        job("Cement expansion operator",FACTORY,1),job("Materials expansion operator",FACTORY,1));
     static boolean enabled(TownLife.Town t){return t.industryStocks.getOrDefault(ENABLED,0)>0;}
     static Role role(String name){return ROLES.stream().filter(r->r.name().equals(name)).findFirst().orElse(null);}
     static boolean staffed(TownLife.Citizen c,Role r){return c.alive&&c.employed&&c.age>=18&&c.age<67&&r.name().equals(c.occupation)&&r.workplace()==c.workplace;}
     static long count(TownLife.Town t,Role r){return t.people.values().stream().filter(c->staffed(c,r)).count();}
-    static boolean funded(TownLife.Town t,Role r){return !BusinessSolvencyLife.suspended(t,BusinessSolvencyLife.account(r.name()))&&(r.fund()==null||t.employerFunds.getOrDefault(r.fund(),0)>=(r.name().equals("Journalist")?NewspaperLife.REPORTER_PAY:r.name().equals("Postal worker")?PostalLife.WAGE:r.name().equals("Security guard")?5:IndustryLife.HOURLY_WAGE));}
+    static boolean funded(TownLife.Town t,Role r){return IndustrialExpansionLife.available(t,r.name())&&!BusinessSolvencyLife.suspended(t,BusinessSolvencyLife.account(r.name()))&&(r.fund()==null||t.employerFunds.getOrDefault(r.fund(),0)>=(r.name().equals("Journalist")?NewspaperLife.REPORTER_PAY:r.name().equals("Postal worker")?PostalLife.WAGE:r.name().equals("Security guard")?5:IndustryLife.HOURLY_WAGE));}
     static boolean eligible(TownLife.Town t,TownLife.Citizen c,WorldState s){
         return c.alive&&c.generationIndex>0&&c.age>=25&&c.age<65&&!RelationshipBoundaryLife.controlled(t,c)
             &&!EmploymentLife.sick(c,s.day)&&!NpcJusticeLife.confined(t,c,s)
