@@ -4,6 +4,7 @@ const LEVEL=150.0
 var materials: Dictionary={}
 var task_board: Label3D
 var task_board_text:=""
+var fire_board: Label3D
 
 func _mat(color: Color) -> StandardMaterial3D:
     if not materials.has(color):
@@ -112,6 +113,7 @@ func build(record: Dictionary) -> void:
             _box(Vector3(x,0.65,z+0.29),Vector3(0.55,0.52,0.10),Color("#72887a"))
             _box(Vector3(x,0.62,z-0.65),Vector3(0.34,0.03,0.24),Color("#ebe0c7"),false)
     if kind=="OFFICE":_office()
+    if kind=="WORKSHOP":_fire_station()
     for x in [-3.5,3.5]:
         var lamp:=OmniLight3D.new()
         lamp.position=Vector3(x,2.9,0)
@@ -120,6 +122,39 @@ func build(record: Dictionary) -> void:
         add_child(lamp)
         _box(Vector3(x,3.12,0),Vector3(1.7,0.12,0.65),Color("#f5ecd5"),false)
     _sign(str(record.get("label","")),Vector3(0,2.9,-6.72))
+
+func _fire_station() -> void:
+    # Shared workshop wing; keep the existing exit and resident grid clear.
+    var red:=Color("#a92b2c")
+    var steel:=Color("#63717b")
+    for z in [-0.8,0.25,1.3,2.35]:
+        _box(Vector3(-6.42,1.03,z),Vector3(0.72,2.06,0.94),steel)
+        _box(Vector3(-6.02,1.03,z),Vector3(0.045,1.94,0.86),red,false)
+        _box(Vector3(-5.98,1.05,z+0.29),Vector3(0.07,0.13,0.07),Color("#c5c9ca"),false)
+    _box(Vector3(-6.4,0.28,4.15),Vector3(0.62,0.56,1.4),Color("#594b3b"))
+    for i in range(3):
+        var reel:=MeshInstance3D.new()
+        var mesh:=TorusMesh.new()
+        mesh.inner_radius=0.11
+        mesh.outer_radius=0.25
+        reel.mesh=mesh
+        reel.rotation.z=PI/2
+        reel.position=Vector3(-6.45,1.55,3.0+i*0.8)
+        reel.material_override=_mat(Color("#e1be66"))
+        add_child(reel)
+    _box(Vector3(6.54,1.45,2.1),Vector3(0.12,1.85,3.6),Color("#303940"),false)
+    fire_board=Label3D.new()
+    fire_board.rotation.y=-PI/2
+    fire_board.position=Vector3(6.45,1.5,2.1)
+    fire_board.font_size=40
+    fire_board.pixel_size=0.008
+    fire_board.modulate=Color("#f5ead5")
+    add_child(fire_board)
+    update_fire_board({})
+
+func update_fire_board(state: Dictionary) -> void:
+    if not is_instance_valid(fire_board):return
+    fire_board.text="VIGILI DEL FUOCO\nEquipment / Attrezzatura: %s%%\nCrew / Squadra: %s available · %s assigned\n%s\nF · Maintenance / Manutenzione" % [state.get("equipment",100),state.get("available",0),state.get("assigned",0),state.get("status","NONE")]
 
 func _office() -> void:
     # Real Java office workers occupy the existing back-row stations. The

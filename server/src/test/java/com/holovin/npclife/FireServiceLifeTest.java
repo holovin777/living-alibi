@@ -2,6 +2,21 @@ package com.holovin.npclife;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class FireServiceLifeTest {
+    @Test void equipmentBlocksDispatchAndServiceConsumesPartsAndFunds(){
+        var s=new WorldState();s.day=2;s.minute=600;var t=TownLife.create(s);
+        t.player.place=FireServiceLife.DEPOT;t.player.destination=t.player.place;t.player.engineeringSkill=3;t.player.money=0;
+        t.employerFunds.put("city-maintenance",100);t.employerFunds.put("technician",0);
+        t.technicalMaterials.put("spare-parts",2);t.industryStocks.put(FuelLife.STOCK,20);
+        WaterNetworkLife.set(t,"enabled",1);WaterNetworkLife.set(t,"treated",8);
+        FireServiceLife.set(t,"equipment",30);
+        FireServiceLife.start(t,s,TownLife.Place.FACTORY);FireServiceLife.report(t);
+        assertFalse(FireServiceLife.dispatch(t,s));assertEquals("WAITING_EQUIPMENT",FireServiceLife.view(t,s).status());
+        FireServiceLife.playerService(t,s);
+        assertEquals(65,FireServiceLife.equipment(t));assertEquals(1,t.technicalMaterials.get("spare-parts").intValue());
+        assertEquals(5,t.player.money);assertEquals(91,t.employerFunds.get("city-maintenance").intValue());
+        assertTrue(FireServiceLife.dispatch(t,s));assertEquals(53,FireServiceLife.equipment(t));
+        assertFalse(FireServiceLife.canService(t,s));
+    }
     @Test void staffedWorldRequiresAvailableCrew(){
         var s=new WorldState();s.day=2;s.minute=600;var t=TownLife.create(s);
         t.industryStocks.put(StaffingLife.ENABLED,1);

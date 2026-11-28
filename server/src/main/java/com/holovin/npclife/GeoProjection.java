@@ -500,6 +500,7 @@ final class GeoProjection {
         for(String id:List.of("bread","water","pizza","gelato","grape-juice"))
             if(FoodLife.quantity(p,id,false)>0)result.add(new Choice("consume:"+id,"Consume / Consuma "+RetailLife.product(id).label()));
         if(point(p.place).distance(player)>18)return result;
+        if(FireServiceLife.canService(t,s))result.add(new Choice("fire-equipment-service","Service fire equipment / Manutenzione attrezzatura · earn €5 · 30 min"));
         if(FireServiceLife.canReport(t))result.add(new Choice("fire-report","Report fire / Segnala incendio"));
         if(AmbulanceLife.canCall(t,s))result.add(new Choice("ambulance-call","Request ambulance / Chiama ambulanza"));
         if(AmbulanceLife.canBoard(t,s))result.add(new Choice("ambulance-board","Board ambulance / Sali in ambulanza"));

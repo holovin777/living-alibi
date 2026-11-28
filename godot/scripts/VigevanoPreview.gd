@@ -559,7 +559,9 @@ func _update_navigation() -> void:
     var pos:=Vector2(walker.position.x,walker.position.z)
     _sync_entrance_signs(residents.world.get("entrances",[]) if room.is_empty() and residents.connected else [],pos)
     if not room.is_empty():
-        if is_instance_valid(interior_node):interior_node.update_work_board(residents.world.get("work",{}))
+        if is_instance_valid(interior_node):
+            interior_node.update_work_board(residents.world.get("work",{}))
+            interior_node.update_fire_board(residents.world.get("fireService",{}))
         hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions · P phone\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
         if bool(residents.world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions · E: leave home"
         if _near_office_computer() and residents.world.get("work",{}).get("workspace") is Dictionary:hud.text+="\nBorgo Digital · E: use computer"
