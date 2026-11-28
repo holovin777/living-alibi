@@ -55,6 +55,8 @@ const WorkPanel=preload("res://scripts/GeoWorkPanel.gd")
 const PropertyPanel=preload("res://scripts/GeoPropertyPanel.gd")
 const PropertyScenery=preload("res://scripts/GeoPropertyScenery.gd")
 var property_scenery: Node3D
+const FireVisual=preload("res://scripts/GeoFireVisual.gd")
+var fire_visual: Node3D
 var phone_panel: PanelContainer
 var action_list: VBoxContainer
 var owned_car: Node3D
@@ -437,6 +439,12 @@ func _physics_process(delta: float) -> void:
             for control in chunk.get_node("RoadControls").get_children():
                 Signals.update(control,second)
     property_scenery.animate(delta)
+    if not is_instance_valid(fire_visual):
+        fire_visual=FireVisual.new()
+        add_child(fire_visual)
+    var incident=residents.world.get("fireVisual")
+    fire_visual.sync(incident if incident is Dictionary else {},walker.position,room.is_empty() and residents.connected)
+    fire_visual.animate(delta)
     _animate_patrols(delta)
     _animate_commutes(delta)
     impact_flash=maxf(0.0,impact_flash-delta*2.0)

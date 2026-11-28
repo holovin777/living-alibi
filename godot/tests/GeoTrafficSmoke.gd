@@ -46,6 +46,16 @@ func _check(traffic,graph: Dictionary) -> void:
     if wav.data.size()!=76800 or wav.loop_end!=38400 or wav.loop_mode!=AudioStreamWAV.LOOP_FORWARD or sirens.attach(ambulance,"AMBULANCE")!=sound or sirens.tone("POLICE").data==wav.data:
         ambulance.free();push_error("Emergency audio synthesis failed");quit(1);return
     ambulance.free()
+    var effect=preload("res://scripts/GeoFireVisual.gd").new()
+    root.add_child(effect)
+    effect.sync({"id":"test","x":10,"z":12,"intensity":0.8},Vector3.ZERO,true)
+    effect.animate(1.0)
+    if not effect.visible or effect.position.x!=10 or effect.flames.size()!=7 or effect.smoke.size()!=12 or effect.intensity<=0:
+        effect.free();push_error("Fire visual failed");quit(1);return
+    effect.sync({},Vector3.ZERO,true)
+    if effect.visible:
+        effect.free();push_error("Fire visual did not clear");quit(1);return
+    effect.free()
     var fire: Node3D=traffic._fire_engine()
     traffic.set_plate(fire,"LA FIRE1","FIRE")
     if not fire.has_node("BeaconL") or not fire.has_node("BeaconR") or not fire.has_node("EmergencyLight"):
