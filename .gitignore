@@ -29,3 +29,6 @@
 # Backups and logs
 *.backup
 *.log
+
+# Optional downloaded vehicle assets (see CREDITS.md)
+/godot/assets/vehicles/realistic/

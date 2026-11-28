@@ -2,6 +2,7 @@ extends Node3D
 ## Bounded local traffic preview. Actors follow connected, directed OSM edges.
 ## No authoritative identities, schedules, or collision physics yet.
 const RoadGraph=preload("res://scripts/GeoRoadGraph.gd")
+const VehicleModels=preload("res://scripts/VehicleModels.gd")
 const CAR_MODELS: Array[PackedScene]=[
     preload("res://assets/vehicles/sedan.glb"),
     preload("res://assets/vehicles/hatchback_sports.glb"),
@@ -64,10 +65,7 @@ func _car(paint: Color=Color.TRANSPARENT, imported: bool=true) -> Node3D:
     var root:=Node3D.new()
     if imported:
         var index:=rng.randi_range(0,CAR_MODELS.size()-1) if paint.a==0 else posmod(str(paint).hash(),CAR_MODELS.size())
-        var model:=CAR_MODELS[index].instantiate() as Node3D
-        model.name="ImportedVehicle"
-        model.rotation.y=PI
-        model.scale=Vector3(1.18,1.20,1.32)
+        var model:=VehicleModels.build(index,CAR_MODELS[index],paint)
         root.add_child(model)
         return root
     var color: Color=car_colors[rng.randi_range(0,car_colors.size()-1)] if paint.a==0 else paint
@@ -192,6 +190,9 @@ func set_plate(vehicle: Node3D,number: String,kind: String="CAR") -> void:
     var label: Label3D=vehicle.get_node_or_null("RegistrationPlate") as Label3D
     if label==null:
         var rear:=Vector3(0,0.62,2.0)
+        var model:=vehicle.get_node_or_null("ImportedVehicle")
+        if model!=null and model.has_meta("rear_z"):
+            rear.z=float(model.get_meta("rear_z"))+0.02
         if kind=="AMBULANCE":rear=Vector3(0,0.68,2.43)
         elif kind=="BUS":rear=Vector3(0,0.92,3.84)
         elif kind in ["TRUCK","FIRE"]:rear=Vector3(0,0.94,3.57)

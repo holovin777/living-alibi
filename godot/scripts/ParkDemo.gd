@@ -2845,6 +2845,7 @@ func _build_motor_court() -> void:
     service_car.position = Vector3(12.5,0,12)
     _add_obstacle(service_car.position,Vector2(1.85,3.6))
 
+const VehicleModels=preload("res://scripts/VehicleModels.gd")
 const CAR_MODELS := [
     preload("res://assets/vehicles/sedan.glb"),
     preload("res://assets/vehicles/hatchback_sports.glb"),
@@ -2859,17 +2860,14 @@ func _make_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
     var index := posmod(style,CAR_MODELS.size())
     car.set_meta("body_style",style)
     car.set_meta("vehicle_kind",["sedan","hatchback","van","suv"][index])
-    var model := CAR_MODELS[index].instantiate() as Node3D
-    model.name="ImportedVehicle"
+    var model := VehicleModels.build(index,CAR_MODELS[index],paint)
     car.add_child(model)
-    model.rotation.y=PI
-    model.scale=Vector3(1.18,1.20,1.32)
     _mark_imported_wheels(model)
     return car
 
 func _mark_imported_wheels(node: Node3D) -> void:
     var n := str(node.name).to_lower().replace("_","-")
-    if n.begins_with("wheel-front-") or n.begins_with("wheel-back-"):
+    if n.begins_with("wheel-front-") or n.begins_with("wheel-back-") or n in ["wheel-fl","wheel-fr","wheel-rl","wheel-rr"]:
         node.set_meta("rolling_wheel",true)
     for child in node.get_children():
         if child is Node3D:_mark_imported_wheels(child)

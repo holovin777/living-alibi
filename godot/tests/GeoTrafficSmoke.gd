@@ -75,6 +75,9 @@ func _check(traffic,graph: Dictionary) -> void:
     var car: Node3D=traffic._car()
     if not car.has_node("ImportedVehicle"):
         car.free();push_error("Geographic car model missing");quit(1);return
+    var model:=car.get_node("ImportedVehicle") as Node3D
+    if not model.has_meta("realistic_vehicle") or model.scale.x<=0.0:
+        car.free();push_error("Vehicle pack integration missing");quit(1);return
     traffic.set_plate(car,"LA R3")
     traffic.set_plate(car,"LA R4")
     if car.get_node("RegistrationPlate").text!="LA R4" or not car.has_node("RegistrationBacking"):
