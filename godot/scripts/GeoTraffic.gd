@@ -90,7 +90,7 @@ func _car(paint: Color=Color.TRANSPARENT, imported: bool=true) -> Node3D:
     return root
 
 func _fire_engine() -> Node3D:
-    var root:=_truck()
+    var root:=_truck(false)
     for child in root.get_children():
         if child is MeshInstance3D and child.mesh is BoxMesh and child.mesh.size.y>2.0:
             child.material_override=_mat(Color("#c72929"))
@@ -196,7 +196,8 @@ func set_plate(vehicle: Node3D,number: String,kind: String="CAR") -> void:
         if kind=="AMBULANCE":rear=Vector3(0,0.68,2.43)
         elif kind=="BUS":
             rear=Vector3(0,0.92,float(model.get_meta("rear_z"))+0.02 if model!=null and model.has_meta("rear_z") else 3.84)
-        elif kind in ["TRUCK","FIRE"]:rear=Vector3(0,0.94,3.57)
+        elif kind in ["TRUCK","FIRE"]:
+            rear=Vector3(0,0.94,float(model.get_meta("rear_z"))+0.02 if model!=null and model.has_meta("rear_z") else 3.57)
         elif kind in ["SCOOTER","MOTORCYCLE"]:rear=Vector3(0,0.62,0.94)
         var plate:=_box(vehicle,Vector3(0.38,0.13,0.025),rear,Color("#f1f0e5"))
         plate.name="RegistrationBacking"
@@ -241,8 +242,13 @@ func _two_wheeler(scooter: bool) -> Node3D:
     if scooter:_box(root,Vector3(0.46,0.58,0.20),Vector3(0,0.76,-0.48),paint)
     return root
 
-func _truck() -> Node3D:
+func _truck(imported: bool=true) -> Node3D:
     var root:=Node3D.new()
+    if imported:
+        var model:=VehicleModels.box_truck()
+        if model!=null:
+            root.add_child(model)
+            return root
     var paint:=Color("#c5c9cb")
     var glass:=Color("#435a67")
     _box(root,Vector3(2.36,0.32,7.20),Vector3(0,0.72,0),Color("#41464b"))
@@ -384,7 +390,9 @@ func _pose(actor: Dictionary,graph,delta: float) -> void:
     var side:=Vector2(-dir.y,dir.x)
     var lane:=0.8 if actor["mode"]=="drive" else 1.25
     var pos:=a.lerp(b,clampf(float(actor["progress"]),0.0,1.0))+side*lane
+    var distance:=Vector2(node.position.x,node.position.z).distance_to(pos) if delta>0.0 else 0.0
     node.position=Vector3(pos.x,0.05,pos.y)
+    if actor["mode"]=="drive" and distance>0.0:VehicleModels.roll_tree(node,distance)
     node.rotation.y=atan2(-dir.x,-dir.y)
     if actor["mode"]=="walk":
         actor["phase"]=float(actor["phase"])+delta*7.0

@@ -42,14 +42,15 @@ PY
 tmp=""
 trap 'if [[ -n "$tmp" ]]; then rm -f -- "$tmp"; fi' EXIT
 failed=0
-for name in sport-sedan hot-hatchback luxury-suv city-van minibus; do
+for name in sport-sedan hot-hatchback luxury-suv city-van minibus city-bus box-truck; do
     file="$DEST/$name.glb"
     if [[ -f "$file" ]] && validate "$file"; then
         continue
     fi
     case "$name" in
         city-van) url="https://vinish-models.pages.dev/vans/city-van.glb" ;;
-        minibus) url="https://vinish-models.pages.dev/buses/minibus.glb" ;;
+        minibus|city-bus) url="https://vinish-models.pages.dev/buses/$name.glb" ;;
+        box-truck) url="https://vinish-models.pages.dev/trucks/$name.glb" ;;
         *) url="https://models.vinish.dev/realistic-cars/$name.glb" ;;
     esac
     tmp="$(mktemp "$DEST/.$name.XXXXXX")"

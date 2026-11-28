@@ -14,3 +14,5 @@ Additional models: "City Van" and "Minibus" by vinish.dev (https://vinish.dev/fr
 https://vinish.dev/free-3d-models/vans
 https://vinish.dev/free-3d-models/buses
 Runtime changes: uniform scaling, rotation, optional paint and cabin distance culling; minibus sliding door pose. The old note about vans no longer applies to the installed City Van model.
+
+City Bus and Box Truck by vinish.dev, CC BY 4.0: https://vinish.dev/free-3d-models/buses and https://vinish.dev/free-3d-models/trucks. Runtime changes: orientation, uniform scale, wheel and door poses, LOD, optional paint.

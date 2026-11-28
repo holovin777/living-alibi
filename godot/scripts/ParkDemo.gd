@@ -1800,6 +1800,7 @@ func _generate_chunk(place_id: String) -> void:
 func _build_bus_stop(place_id: String) -> void:
     # A real through lane with sufficient clearance for the entire bus.
     # Prefer the park's existing north street; elsewhere test clear corridors.
+    var large_available:=ResourceLoader.exists("res://assets/vehicles/realistic/city-bus.glb","PackedScene")
     var candidates: Array[Dictionary]=[]
     var offsets := [-16.0,16.0,0.0,-6.0,6.0,-10.0,10.0,-19.0,19.0]
     for offset in offsets:
@@ -1814,6 +1815,14 @@ func _build_bus_stop(place_id: String) -> void:
         if TownLayout.outer(place_id) and absf(at.z if horizontal else at.x)<5.5:continue
         var lane := Rect2(-24.0,at.z-1.55,48.0,3.1) if horizontal else Rect2(at.x-1.55,-24.0,3.1,48.0)
         var platform := Rect2(at.x-3.7,at.z-3.6,7.4,2.1) if horizontal else Rect2(at.x+1.5,at.z-3.7,2.1,7.4)
+        # Only use the large exterior where the extended platform is clear.
+        var long_platform:=Rect2(at.x-6.3,at.z-3.6,12.6,2.1) if horizontal else Rect2(at.x+1.5,at.z-6.3,2.1,12.6)
+        var large:=large_available and Rect2(-23.8,-23.8,47.6,47.6).encloses(long_platform)
+        if large:
+            for obstacle in _obstacles:
+                if long_platform.intersects(obstacle.grow(0.12)):
+                    large=false
+                    break
         if not Rect2(-23.8,-23.8,47.6,47.6).encloses(platform):continue
         var blocked := false
         for obstacle in _obstacles:
@@ -1830,6 +1839,7 @@ func _build_bus_stop(place_id: String) -> void:
         if place_id in RACK_DISTRICTS or TownLayout.outer(place_id):
             reserved.append(Rect2(RACK_POSITION.x-1,RACK_POSITION.z-1,2,2))
         for area in reserved:
+            if large and long_platform.intersects(area):large=false
             if lane.intersects(area) or platform.intersects(area):
                 blocked=true
                 break
@@ -1847,13 +1857,14 @@ func _build_bus_stop(place_id: String) -> void:
         _scenery.add_child(stop)
         # The lane is parameterized along the bus's local Z direction.
         var along_axis: float=at.x if horizontal else at.z
-        stop.set_meta("entry_z",27.0-along_axis)
-        stop.set_meta("exit_z",-27.0-along_axis)
+        stop.set_meta("entry_z",(31.0 if large else 27.0)-along_axis)
+        stop.set_meta("exit_z",(-31.0 if large else -27.0)-along_axis)
+        stop.set_meta("bus_half_length",6.1 if large else 2.8)
         stop.set_meta("bus_initialized",false)
         stop.set_meta("bus_state","hidden")
-        _box(stop,Vector3(2.9,0.045,7.2),Color("#454b4d"),Vector3(0,0.03,0),"asphalt")
-        _box(stop,Vector3(1.6,0.08,6.8),Color("#c9c1ad"),Vector3(2.3,0.035,0),"paving")
-        for z in [-3.3,3.3]:
+        _box(stop,Vector3(2.9,0.045,12.6 if large else 7.2),Color("#454b4d"),Vector3(0,0.03,0),"asphalt")
+        _box(stop,Vector3(1.6,0.08,12.4 if large else 6.8),Color("#c9c1ad"),Vector3(2.3,0.035,0),"paving")
+        for z in ([-6.1,6.1] if large else [-3.3,3.3]):
             _box(stop,Vector3(2.6,0.02,0.10),Color("#e4ca71"),Vector3(0,0.065,z))
         _box(stop,Vector3(0.1,2.8,0.1),Color("#697378"),Vector3(3.2,1.4,2.8))
         _physical_sign(stop,"BUS · Fermata",Vector3(3.2,2.75,2.8),0.0,1.7)
@@ -1867,7 +1878,8 @@ func _build_bus_stop(place_id: String) -> void:
         var bus := Node3D.new()
         bus.name="Bus"
         stop.add_child(bus)
-        var imported_bus:=VehicleModels.minibus(2.2,5.5)
+        var imported_bus:=VehicleModels.city_bus() if large else VehicleModels.minibus(2.2,5.5)
+        if imported_bus==null and large:imported_bus=VehicleModels.minibus(2.2,5.5)
         if imported_bus!=null:
             bus.add_child(imported_bus)
             _mark_imported_wheels(imported_bus)
@@ -1951,12 +1963,13 @@ func _advance_buses(delta: float) -> void:
         var target := 0.0 if state=="approaching" else float(stop.get_meta("exit_z"))
         var blocked := false
         if root_node==_scenery:
+            var half_length:=float(stop.get_meta("bus_half_length",2.8))
             var centre: Vector3=stop.position+stop.basis*bus.position
             var forward: Vector3=-stop.basis.z.normalized()
             var right: Vector3=stop.basis.x.normalized()
             for at in _traffic_people():
                 var relative: Vector3=at-centre
-                if relative.dot(forward)>=-2.8 and relative.dot(forward)<=5.5 and absf(relative.dot(right))<1.5:
+                if relative.dot(forward)>=-half_length and relative.dot(forward)<=half_length+2.7 and absf(relative.dot(right))<1.5:
                     blocked=true
                     break
             if not blocked:
@@ -1965,14 +1978,14 @@ func _advance_buses(delta: float) -> void:
                         var car: Node3D=record["node"]
                         if not car.visible:continue
                         var relative: Vector3=car.position-centre
-                        if relative.dot(forward)>=-3.0 and relative.dot(forward)<=6.5 and absf(relative.dot(right))<2.2:
+                        if relative.dot(forward)>=-half_length-0.2 and relative.dot(forward)<=half_length+3.7 and absf(relative.dot(right))<2.2:
                             blocked=true
                             break
                     if blocked:break
         if blocked:continue
         var before:=bus.position.z
         bus.position.z=move_toward(bus.position.z,target,4.0*clampf(delta,0.0,0.1))
-        _animate_car_wheels(bus,absf(before-bus.position.z)/maxf(delta,0.001),delta)
+        VehicleModels.roll_tree(bus,absf(before-bus.position.z),0.46)
         if is_equal_approx(bus.position.z,target):
             if state=="approaching":
                 stop.set_meta("bus_state","parked")
@@ -2693,6 +2706,10 @@ func _make_freight_truck(parent: Node3D,caption: String,paint: Color) -> Node3D:
     var truck := Node3D.new()
     truck.name = caption
     parent.add_child(truck)
+    var imported:=VehicleModels.box_truck(2.3,4.7,paint)
+    if imported!=null:
+        truck.add_child(imported)
+        return truck
     _box(truck,Vector3(2.1,0.55,4.7),Color("#48494a"),Vector3(0,0.67,0))
     _box(truck,Vector3(2.1,1.65,1.65),paint,Vector3(0,1.51,-1.43))
     _box(truck,Vector3(1.78,0.65,0.06),Color("#577782"),Vector3(0,1.85,-2.27))
@@ -2951,7 +2968,7 @@ func _animate_car_wheels(car: Node3D,speed: float,delta: float) -> void:
     for part in car.get_children():
         if part is Node3D:
             if part.has_meta("rolling_wheel"):
-                part.rotation.x=fposmod(part.rotation.x+speed*delta/0.36,TAU)
+                VehicleModels.roll_wheel(part,speed*delta)
             else:
                 _animate_car_wheels(part,speed,delta)
 

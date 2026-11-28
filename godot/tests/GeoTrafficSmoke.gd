@@ -69,10 +69,19 @@ func _check(traffic,graph: Dictionary) -> void:
         fire.free();push_error("Fire engine model incomplete");quit(1);return
     fire.free()
     var truck: Node3D=traffic._truck()
-    if truck.get_child_count()<14:
+    if not truck.has_node("ImportedVehicle") and truck.get_child_count()<14:
         truck.free();push_error("Truck exterior incomplete");quit(1);return
     truck.free()
     var models=preload("res://scripts/VehicleModels.gd")
+    var wheel:=Node3D.new()
+    wheel.name="Wheel_FR"
+    wheel.rotation.y=PI
+    models.mark_wheels(wheel)
+    var initial:=wheel.basis
+    models.roll_wheel(wheel,0.36)
+    if not wheel.has_meta("wheel_rest") or not wheel.basis.is_equal_approx(initial*Basis(Vector3.RIGHT,-1.0)):
+        wheel.free();push_error("Imported wheel orientation failed");quit(1);return
+    wheel.free()
     var detail:=MeshInstance3D.new()
     detail.name="seat_test"
     models.configure_lod(detail)
