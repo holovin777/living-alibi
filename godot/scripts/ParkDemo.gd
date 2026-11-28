@@ -9840,7 +9840,7 @@ func _sync_family_entrance(home) -> void:
         return
     var approach := candidates[posmod(unit.hash(),candidates.size())] as Marker3D
     # Match named market properties when their facade is already available.
-    var preferred := "CasaTiglio" if unit.ends_with("home-market-tiglio") else "CasaOlmo" if unit.ends_with("home-market-olmo") else ""
+    var preferred := "CasaTiglio" if unit.ends_with("home-market-tiglio") else "CasaOlmo" if unit.ends_with("home-market-olmo") else "CasaMagnolia" if unit.is_empty() else ""
     if not preferred.is_empty():
         for candidate in candidates:
             if str(candidate.get_parent().name)==preferred:
@@ -10481,7 +10481,10 @@ func _on_world_updated(snapshot: Dictionary) -> void:
     if walking_transition and is_instance_valid(_home_entrance) and not road_arrival:
         _reset_jump()
         _reset_locomotion()
-        _avatar.position=_home_entrance.position
+        _avatar.position=_nearest_walkable_position(_home_entrance.position)
+        _action_panel.hide()
+        _travel_panel.hide()
+        Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
     _sync_guest_room()
     _sync_home_goods()
     _sync_garden()

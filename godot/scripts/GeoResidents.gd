@@ -98,7 +98,8 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
             office_remark=remark
             remark_time=6.0
     var next_room: Dictionary=parsed["interior"] if parsed.get("interior") is Dictionary else {}
-    if str(next_room.get("id",""))!=str(room.get("id","")) or next_room.get("x")!=room.get("x") or next_room.get("z")!=room.get("z"):
+    var room_changed: bool=str(next_room.get("id",""))!=str(room.get("id","")) or next_room.get("x")!=room.get("x") or next_room.get("z")!=room.get("z")
+    if room_changed:
         room=next_room
         for record in people.values():record["node"].queue_free()
         people.clear()
@@ -107,7 +108,7 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
         var place: Dictionary=parsed["playerDistrict"]
         var life: Dictionary=parsed.get("life",{})
         var next_key:=str(life.get("phase","ADULT"))+":"+str(life.get("name",""))+":"+str(place.get("id",""))
-        if room.is_empty() and (first or (next_key!=life_key and (bool(parsed.get("rebirth",false)) or not life_key.begins_with("ADULT:")))):
+        if room.is_empty() and not room_changed and (first or (next_key!=life_key and (bool(parsed.get("rebirth",false)) or not life_key.begins_with("ADULT:")))):
             first_snapshot.emit(Vector2(float(place["x"]),float(place["z"])))
         first=false
         life_key=next_key

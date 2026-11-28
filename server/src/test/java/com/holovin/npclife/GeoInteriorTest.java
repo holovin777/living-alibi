@@ -5,6 +5,19 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 class GeoInteriorTest {
     @TempDir Path folder;
+    @Test void linkedAdultPublicRoomIsExplicitNotForced()throws Exception{
+        var graph=folder.resolve("linked-roads.tsv");
+        Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");
+        var map=new GeoProjection(graph);var s=new WorldState();var t=TownLife.create(s);
+        var c=PopulationGenerator.add(t,1).getFirst();c.age=30;c.activity="FREE_TIME";
+        c.place=TownLife.Place.BAKERY;c.destination=c.place;c.travelRemaining=0;c.home=TownLife.Place.NORTH_RESIDENCES;
+        t.player.place=c.place;
+        t.industryStocks.put(RebirthLife.PHASE,RebirthLife.LINKED_ADULT);
+        t.industryStocks.put(RebirthLife.CHILD,c.generationIndex);
+        assertNull(map.view(t,s,map.point(c.place)).interior());
+        assertNotNull(map.view(t,s,map.point(c.place),null,c.place).interior());
+        assertNull(map.view(t,s,map.point(c.place)).interior());
+    }
     @Test void publicRoomShowsOnlyPresentResidents()throws Exception{
         var graph=folder.resolve("roads.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\n");

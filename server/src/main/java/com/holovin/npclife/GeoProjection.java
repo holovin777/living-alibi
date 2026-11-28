@@ -583,7 +583,7 @@ final class GeoProjection {
         var linked=RebirthLife.child(t);
         boolean linkedHome=rebirth&&GeoLife.atHome(linked);
         if(rebirth){
-            room=linked!=null&&linked.alive&&linked.travelRemaining==0&&(linkedHome||hasInterior(linked.place))?linked.place:null;
+            room=linked!=null&&linked.alive&&linked.travelRemaining==0&&(linkedHome||room==linked.place&&hasInterior(linked.place))?linked.place:null;
             if(!GeoLife.canWalk(t,s)||point(p.place).distance(player)>24)player=point(p.place);
         }
         final Point viewer=player;
@@ -620,7 +620,7 @@ final class GeoProjection {
         if(ambulance!=null&&new Point(ambulance.x(),ambulance.z()).distance(player)<=220)traffic.put(ambulance.id(),ambulance);
         nearby.sort(Comparator.comparingDouble((Actor a)->new Point(a.x,a.z).distance(viewer)).thenComparing(Actor::id));
         var nearest=room==null?nearest(player):room;
-        boolean canEnter=p.alive&&!confined&&!rebirth&&p.travelRemaining==0&&point(nearest).distance(player)<=18;
+        boolean canEnter=!confined&&point(nearest).distance(player)<=18&&(rebirth?GeoLife.canWalk(t,s)&&RebirthLife.linkedAdult(t,linked)&&nearest==linked.place&&(hasInterior(nearest)||nearest==linked.home):p.alive&&p.travelRemaining==0);
         var visiblePatrols=new ArrayList<>(patrols(t,s,player));
         if(response!=null){visiblePatrols.removeIf(patrol->patrol.id().equals(response.id()));visiblePatrols.add(0,response);}
         if(visiblePatrols.size()>6)visiblePatrols.subList(6,visiblePatrols.size()).clear();

@@ -97,6 +97,8 @@ const InteriorScene=preload("res://scripts/GeoInterior.gd")
 var interior_node: Node3D
 var room: Dictionary={}
 var room_exit:=Vector2.ZERO
+var safe_spawn_pending:=false
+var safe_spawn_origin:=Vector2.ZERO
 var linked_age:=-1
 
 func _ready() -> void:
@@ -428,6 +430,9 @@ func _input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
     if not ready_to_walk:return
+    if safe_spawn_pending:
+        safe_spawn_pending=false
+        _resolve_street_spawn()
     mountain_horizon.position=Vector3(walker.position.x,0,walker.position.z)
     mountain_horizon.visible=room.is_empty() and daylight.light_energy>0.13
     var direction := Vector3.ZERO
@@ -1192,6 +1197,7 @@ func _change_interior(next_room: Dictionary) -> void:
     room=next_room
     walker.velocity=Vector3.ZERO
     if not room.is_empty():
+        safe_spawn_pending=false
         room_exit=Vector2(float(room["x"]),float(room["z"]))
         interior_node=InteriorScene.new()
         add_child(interior_node)
@@ -1217,15 +1223,51 @@ func _change_interior(next_room: Dictionary) -> void:
         for node in chunks.values():node.show()
         var place: Dictionary=residents.world.get("playerDistrict",{})
         if not place.is_empty():room_exit=Vector2(float(place["x"]),float(place["z"]))
-        walker.position=Vector3(room_exit.x,1.05,room_exit.y)
-        _stream()
+        _schedule_street_spawn(room_exit)
+        actions_panel.hide()
+        city_map.hide()
+        chat.hide()
+        Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
     _update_navigation()
 
 func _sync_spawn(point: Vector2) -> void:
+    if not room.is_empty():return
+    _schedule_street_spawn(point)
+    _update_navigation()
+
+func _schedule_street_spawn(point: Vector2) -> void:
+    safe_spawn_origin=point
+    safe_spawn_pending=true
     walker.position=Vector3(point.x,1.05,point.y)
     walker.velocity=Vector3.ZERO
     _stream()
-    _update_navigation()
+
+# Run after streamed collision bodies enter the physics world.
+func _resolve_street_spawn() -> void:
+    if not room.is_empty():return
+    var capsule:=CapsuleShape3D.new()
+    capsule.radius=0.34
+    capsule.height=1.8
+    var query:=PhysicsShapeQueryParameters3D.new()
+    query.shape=capsule
+    query.exclude=[walker.get_rid()]
+    query.collision_mask=walker.collision_mask
+    var candidates: Array[Vector2]=[safe_spawn_origin]
+    for ring in range(1,21):
+        for step in range(16):
+            var angle:=TAU*float(step)/16.0
+            candidates.append(safe_spawn_origin+Vector2(cos(angle),sin(angle))*float(ring))
+    var road_id:=roads.nearest(safe_spawn_origin)
+    if road_id>=0:candidates.append(roads.coordinates[road_id])
+    for candidate in candidates:
+        var at:=Vector3(candidate.x,1.05,candidate.y)
+        query.transform=Transform3D(Basis.IDENTITY,at)
+        if get_world_3d().direct_space_state.intersect_shape(query,1).is_empty():
+            walker.position=at
+            walker.velocity=Vector3.ZERO
+            _stream()
+            return
+    hud.text+="\nNo clear exit nearby / Nessuna uscita libera"
 
 func _send_chat(message: String) -> void:
     chat.hide()

@@ -846,7 +846,10 @@ public final class GameSession implements AutoCloseable {
     synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z)throws SQLException{
         var target=geoDrive==null?new GeoProjection.Point(x,z):geoDrive.position(map);
         updateGeoResponse(map,target);
-        if(JusticeLife.confined(town)||RebirthLife.active(town)||!town.player.alive||geoInterior!=null&&town.player.place!=geoInterior)geoInterior=null;
+        if(RebirthLife.active(town)){
+            var linked=RebirthLife.child(town);
+            if(!GeoLife.canWalk(town,state)||linked==null||geoInterior!=linked.place)geoInterior=null;
+        }else if(JusticeLife.confined(town)||!town.player.alive||geoInterior!=null&&town.player.place!=geoInterior)geoInterior=null;
         if(geoInterior!=null&&GeoProjection.residential(geoInterior)&&!GeoProjection.ownHome(town,state)&&!IntercomLife.insideVisit(town,state.day,state.minute))geoInterior=null;
         return map.view(town,state,target,geoResponse==null?null:geoResponse.view(map),geoInterior);
     }
@@ -876,10 +879,20 @@ public final class GameSession implements AutoCloseable {
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
         if(RebirthLife.active(town)){
             var c=RebirthLife.child(town);
-            if(!GeoLife.canWalk(town,state)||!RebirthLife.linkedAdult(town,c)||!GeoLife.atHome(c))throw new IllegalArgumentException("Use F for permitted travel.");
+            if(!GeoLife.canWalk(town,state)||!RebirthLife.linkedAdult(town,c))throw new IllegalArgumentException("Use F for permitted travel.");
             var door=map.point(c.place);
-            if(Math.hypot(x-door.x(),z-(door.z()+5.6))>3)throw new IllegalArgumentException("Approach the exit door.");
-            gardenAction("rebirth-home-exit");return;
+            if(GeoLife.atHome(c)||geoInterior==c.place){
+                if(Math.hypot(x-door.x(),z-(door.z()+5.6))>3)throw new IllegalArgumentException("Approach the exit door.");
+                if(GeoLife.atHome(c))gardenAction("rebirth-home-exit");
+                geoInterior=null;return;
+            }
+            var requested=PlayerLife.destination(destination);
+            if(requested!=c.place||Math.hypot(x-door.x(),z-door.z())>18)
+                throw new IllegalArgumentException("Approach a building in your current district. Use F for travel.");
+            if(c.place==c.home){gardenAction("rebirth-home-go");return;}
+            if(!GeoProjection.hasInterior(requested)||FireRecoveryLife.closed(town,requested))
+                throw new IllegalArgumentException("This building is closed or has no interior.");
+            geoInterior=requested;return;
         }
         PlayerLife.requireAlive(town.player);
         if(geoInterior!=null){
@@ -923,7 +936,9 @@ public final class GameSession implements AutoCloseable {
                 throw new IllegalArgumentException("Approach an office computer to work.");
 
             var result=gardenAction(action);
-            geoInterior=null;geoDrive=null;
+            var linked=RebirthLife.child(town);
+            if(linked==null||linked.place!=geoInterior||linked.travelRemaining>0||GeoLife.atHome(linked))geoInterior=null;
+            geoDrive=null;
             return new GeoProjection.ActionResult(result.message(),null);
         }
         if("phone-fire-report".equals(action)){
