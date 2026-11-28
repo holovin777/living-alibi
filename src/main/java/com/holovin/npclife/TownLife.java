@@ -739,6 +739,7 @@ final class TownLife {
         ConvictionLife.tick(town,marco);
         FuneralLife.tick(town,marco);
         HomeMarketLife.tick(town,marco.day,marco.minute);
+        EnterpriseGovernanceLife.tick(town,marco);
         BusinessSolvencyLife.tick(town,marco);
         BusinessOwnershipLife.tick(town,marco);
         EmploymentLife.tick(town,marco,truth,observations);

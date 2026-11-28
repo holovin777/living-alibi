@@ -75,7 +75,7 @@ final class StaffingLife {
         int budget=4;
         for(var r:ROLES){
             if(budget==0)return;
-            if(!funded(t,r)||count(t,r)>=BusinessManagementLife.target(t,r))continue;
+            if(!funded(t,r)||EnterpriseGovernanceLife.delegated(t,BusinessSolvencyLife.account(r.name()))||count(t,r)>=BusinessManagementLife.target(t,r))continue;
             var c=t.people.values().stream().filter(x->!x.employed&&eligible(t,x,s)
                 &&EducationLife.get(t,x,EducationLife.subject(r.name()))>=r.skill()
                 &&(r.diploma()==null||EducationLife.get(t,x,"diploma-"+r.diploma())>0)

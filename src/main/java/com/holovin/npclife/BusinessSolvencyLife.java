@@ -38,6 +38,7 @@ final class BusinessSolvencyLife {
         int due=BusinessManagementLife.wage(t,a),paid=Math.min(due,Math.max(0,t.employerFunds.getOrDefault(a,0)));
         t.employerFunds.merge(a,-paid,Integer::sum);
         c.money=Math.addExact(c.money,paid);
+        EnterpriseGovernanceLife.recordPayroll(t,a,paid);
         if(paid<due)set(t,a,"debt:"+c.id,Math.addExact(debt(t,a,c),due-paid));
         return true;
     }
@@ -48,6 +49,7 @@ final class BusinessSolvencyLife {
             int due=debt(t,a,c),paid=Math.min(due,Math.max(0,t.employerFunds.getOrDefault(a,0)));
             if(paid<=0)continue;
             t.employerFunds.merge(a,-paid,Integer::sum);c.money=Math.addExact(c.money,paid);
+            EnterpriseGovernanceLife.recordPayroll(t,a,paid);
             set(t,a,"debt:"+c.id,due-paid);
         }
     }

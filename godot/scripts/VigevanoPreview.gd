@@ -391,7 +391,7 @@ func _input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
             return
         if event.keycode==KEY_E:
-            if _near_office_computer() and residents.world.get("work",{}).get("workspace") is Dictionary:
+            if _near_office_computer() and _has_office_workspace():
                 _open_actions(true)
                 get_viewport().set_input_as_handled()
                 return
@@ -564,7 +564,7 @@ func _update_navigation() -> void:
             interior_node.update_fire_board(residents.world.get("fireService",{}))
         hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions · P phone\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
         if bool(residents.world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions · E: leave home"
-        if _near_office_computer() and residents.world.get("work",{}).get("workspace") is Dictionary:hud.text+="\nBorgo Digital · E: use computer"
+        if _near_office_computer() and _has_office_workspace():hud.text+="\nBorgo Digital · E: use computer"
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         return
     city_map.player=pos
@@ -977,6 +977,12 @@ func _life_summary() -> String:
     if str(life.get("phase",""))=="CHOICE":return "Awaiting a new life / In attesa di una nuova vita"
     return "%s · age %s · %s · school days %s" % [life.get("name",""),life.get("age",0),life.get("activity",""),life.get("schoolDays",0)]
 
+func _has_office_workspace() -> bool:
+    if residents.world.get("work",{}).get("workspace") is Dictionary:return true
+    for firm in residents.world.get("businessOwnership",[]):
+        if bool(firm.get("owned",false)):return true
+    return false
+
 func _near_office_computer() -> bool:
     if str(room.get("id",""))!="OFFICE":return false
     var at:=Vector2(walker.position.x,walker.position.z)-room_exit
@@ -1023,7 +1029,7 @@ func _open_actions(work_only: bool=false) -> void:
         action_list.remove_child(child)
         child.queue_free()
     var title:=Label.new()
-    title.text="Borgo Digital · Workstation" if work_only else ("Life / Vita" if bool(residents.world.get("rebirth",false)) else "Actions / Azioni")
+    title.text="Office computer / Computer ufficio" if work_only else ("Life / Vita" if bool(residents.world.get("rebirth",false)) else "Actions / Azioni")
     action_list.add_child(title)
     var info:=Label.new()
     info.text="Java validates availability, money and time."
@@ -1081,6 +1087,21 @@ func _open_actions(work_only: bool=false) -> void:
         hint.text="Use E at an office computer / Usa il PC in ufficio"
         hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         action_list.add_child(hint)
+    if work_only:
+        for firm in residents.world.get("businessOwnership",[]):
+            if not bool(firm.get("owned",false)):continue
+            var management: Dictionary=firm.get("management",{})
+            var gov: Dictionary=management.get("governance",{})
+            WorkPanel.label(action_list,"%s · Cash / Cassa €%s\nDirector / Direttore: %s · Staff / Organico %s/%s · €%s/h" % [firm.get("account",""),firm.get("cash",0),management.get("director",""),management.get("employees",0),management.get("target",0),management.get("hourlyWage",0)])
+            WorkPanel.label(action_list,"Department head / Caporeparto: %s\nAccountant / Contabile: %s\nHR / Risorse umane: %s" % [gov.get("departmentHead",""),gov.get("accountant",""),gov.get("hr","")])
+            var decisions: Dictionary={"FREEZE_HIRING":"Freeze hiring / Blocco assunzioni","RECRUIT":"Recruit / Assumere","MAINTAIN":"Maintain staff / Mantieni organico","PENDING":"Pending / In attesa"}
+            WorkPanel.label(action_list,"Decision / Decisione: %s · Day / Giorno %s" % [decisions.get(gov.get("decision","PENDING"),""),gov.get("decisionDay",0)])
+            if int(gov.get("auditDay",0))>0:
+                WorkPanel.label(action_list,"Audit / Controllo · Day / Giorno %s · Cash / Cassa €%s · Arrears / Arretrati €%s" % [gov.get("auditDay",0),gov.get("auditCash",0),gov.get("auditArrears",0)])
+            var outcomes: Dictionary={"SCHEDULED":"Scheduled / Programmato","HIRED":"Hired / Assunto","REJECTED":"Not hired / Non assunto","NONE":"None / Nessuno"}
+            WorkPanel.label(action_list,"Interview / Colloquio: %s · %s · Day / Giorno %s" % [gov.get("candidate",""),outcomes.get(gov.get("interviewResult","NONE"),""),maxi(int(gov.get("appointmentDay",0)),int(gov.get("interviewDay",0)))])
+            for report in gov.get("reports",[]):
+                WorkPanel.label(action_list,"Day / Giorno %s · 06:30–06:30\nCash / Cassa €%s → €%s · Net cash / Flusso netto €%s\nPayroll / Stipendi €%s · Arrears / Arretrati €%s · Bank debt / Debito bancario €%s" % [report.get("day",0),report.get("openingCash",0),report.get("closingCash",0),report.get("netCashChange",0),report.get("payrollPaid",0),report.get("wageDebt",0),report.get("bankDebt",0)])
     var enterprise=residents.world.get("enterprise")
     if enterprise is Dictionary and bool(enterprise.get("yours",false)):
         var summary:=Label.new()
@@ -1106,7 +1127,8 @@ func _open_actions(work_only: bool=false) -> void:
             WorkPanel.label(action_list,"CARRIER / TRASPORTI\nCash €%s · truck condition %s/100 · operating net €%s\nDriver: %s" % [logistics.get("cash",0),logistics.get("condition",0),accounts.get("operatingNet",0),str(logistics.get("driverName",""))])
             var second: Dictionary=logistics.get("secondTruck",{})
             if bool(second.get("purchased",false)):WorkPanel.label(action_list,"Truck 2 · condition %s/100 · driver %s · deliveries %s" % [second.get("condition",0),str(second.get("driverName","")),second.get("completed",0)])
-    for action in ([] if work_only else residents.world.get("actions",[])):
+    for action in residents.world.get("actions",[]):
+        if work_only and not str(action.get("id","")).begins_with("firm:"):continue
         var button:=Button.new()
         button.text=str(action.get("label",""))
         button.pressed.connect(_perform_action.bind(str(action.get("id",""))))

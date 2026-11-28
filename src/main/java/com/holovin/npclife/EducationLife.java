@@ -69,6 +69,7 @@ final class EducationLife {
     }
     static boolean availableRole(TownLife.Town t,TownLife.Citizen c,String job){
         if(BusinessSolvencyLife.suspended(t,BusinessSolvencyLife.account(job))||!BusinessManagementLife.accepts(t,job))return false;
+        if(EnterpriseGovernanceLife.delegated(t,BusinessSolvencyLife.account(job))&&!RelationshipBoundaryLife.controlled(t,c))return false;
         String f=subject(job);
         int minimum=switch(job){case "Doctor" -> 65;case "Engineer","Programmer","Detective" -> 45;case "Teacher","Nurse","Journalist","Police officer" -> 35;case "Librarian","Mechanic","Factory machinist" -> 20;default -> 0;};
         if(get(t,c,f)<minimum)return false;

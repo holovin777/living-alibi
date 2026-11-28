@@ -64,8 +64,8 @@ final class BusinessManagementLife {
         if(options(t,s,a).stream().noneMatch(o->o.id().equals(action)))throw new IllegalArgumentException("Management action unavailable.");
         var r=role(a);
         switch(action){
-            case "director" -> {var c=candidate(t,a,s);set(t,a,"director",c.generationIndex);return "Appointed "+c.name+" as working director of "+a+".";}
-            case "remove-director" -> set(t,a,"director",0);
+            case "director" -> {var c=candidate(t,a,s);EnterpriseGovernanceLife.clearManagement(t,a);set(t,a,"director",c.generationIndex);return "Appointed "+c.name+" as working director of "+a+".";}
+            case "remove-director" -> {set(t,a,"director",0);EnterpriseGovernanceLife.clearManagement(t,a);}
             case "raise" -> set(t,a,"raise",get(t,a,"raise")+1);
             case "lower" -> set(t,a,"raise",get(t,a,"raise")-1);
             case "more" -> set(t,a,"target",target(t,r)+2);
@@ -80,10 +80,10 @@ final class BusinessManagementLife {
         }
         return "Updated management of "+a+".";
     }
-    static void clear(TownLife.Town t,String a){for(String f:List.of("director","raise","target"))set(t,a,f,0);}
-    record View(String account,String director,int employees,int target,int hourlyWage){}
+    static void clear(TownLife.Town t,String a){for(String f:List.of("director","raise","target"))set(t,a,f,0);EnterpriseGovernanceLife.clearManagement(t,a);}
+    record View(String account,String director,int employees,int target,int hourlyWage,EnterpriseGovernanceLife.View governance){}
     static View view(TownLife.Town t,String a){
         var c=director(t,a);var r=role(a);
-        return new View(a,c==null?"":c.name,members(t,a).size(),r==null?0:target(t,r),wage(t,a));
+        return new View(a,c==null?"":c.name,members(t,a).size(),r==null?0:target(t,r),wage(t,a),EnterpriseGovernanceLife.view(t,a));
     }
 }
