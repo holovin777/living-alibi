@@ -224,6 +224,7 @@ final class PopulationLife {
             c.activity="WORKING";
             if(minute%60==0){
                 if(fireStaff)FireServiceLife.pay(town,c);
+                else if(HouseholdInsuranceLife.agent(c)){ /* commission is paid only on a real policy sale */ }
                 else if(SecurityLife.guard(c))SecurityLife.pay(town,c);
                 else if(PostalLife.postalWorker(c))PostalLife.pay(town,c);
                 else if(foodWorker)RetailLife.foodShift(town,c,clock,events,observations);

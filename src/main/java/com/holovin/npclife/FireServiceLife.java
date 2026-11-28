@@ -70,7 +70,7 @@ final class FireServiceLife {
     static boolean start(TownLife.Town t,WorldState s,TownLife.Place p){
         if(site(t)!=null||!SITES.contains(p))return false;
         set(t,"site",SITES.indexOf(p)+1);set(t,"started",now(s));set(t,"reported",0);set(t,"arrive",0);set(t,"end",0);
-        add(t,"incidents",1);HomeInsuranceLife.incidentStarted(t,s,p);return true;
+        add(t,"incidents",1);HomeInsuranceLife.incidentStarted(t,s,p);HouseholdInsuranceLife.incidentStarted(t,s,p);return true;
     }
     static boolean report(TownLife.Town t){
         if(site(t)==null||get(t,"reported")!=0)return false;
@@ -120,7 +120,7 @@ final class FireServiceLife {
             FireRecoveryLife.damage(t,site(t),20);add(t,"uncontrolled",1);clear(t);
         }
     }
-    private static void clear(TownLife.Town t){HomeInsuranceLife.incidentEnded(t);for(String k:List.of("site","started","reported","arrive","end","crew-1","crew-2"))set(t,k,0);}
+    private static void clear(TownLife.Town t){HomeInsuranceLife.incidentEnded(t);HouseholdInsuranceLife.incidentEnded(t);for(String k:List.of("site","started","reported","arrive","end","crew-1","crew-2"))set(t,k,0);}
     record View(String district,String status,int minutesRemaining,int incidents,int extinguished,int uncontrolled,int damage,int employed,int available,int assigned,int equipment,int services,int evacuating,int sheltered,int evacuatedTotal){}
     static View view(TownLife.Town t,WorldState s){
         var p=site(t);int arrival=get(t,"arrive");
