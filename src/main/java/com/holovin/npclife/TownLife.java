@@ -713,6 +713,7 @@ final class TownLife {
         RetailLife.tick(town,marco.minute);
         FarmLife.tick(town,marco.day,marco.minute);
         FuelLife.tick(town,marco.day,marco.minute);
+        ReserveFleetLife.tick(town,marco);
         StallSupplyLife.tick(town,marco.day,marco.minute);
         BankLife.tick(town,marco.day,marco.minute);
         TechnicalWorkLife.tick(town,marco.day,marco.minute);

@@ -45,6 +45,33 @@ class GeoDriveTest {
         assertEquals(3,drive.advance(map,0,5,17),.001);
         assertFalse(drive.waitingForSignal);
     }
+    @Test void reserveMaintenanceConsumesFundsAndSuppliesOnlyOncePerDay(){
+        var s=new WorldState();var t=TownLife.create(s);
+        s.day=2;s.minute=480;
+        t.industryStocks.put("reserve:bus:fuel",2);
+        t.industryStocks.put("reserve:bus:condition",40);
+        t.industryStocks.put(FuelLife.STOCK,4);
+        t.technicalMaterials.put("spare-parts",1);
+        t.employerFunds.put("city-maintenance",30);
+        int garage=t.employerFunds.getOrDefault("technician",0);
+        int station=t.employerFunds.getOrDefault(FuelLife.ACCOUNT,0);
+        ReserveFleetLife.tick(t,s);
+        assertEquals(70,VehicleTheftLife.reserveCondition(t,"bus"));
+        assertEquals(6,VehicleTheftLife.reserveFuel(t,"bus"));
+        assertEquals(0,FuelLife.stock(t));
+        assertEquals(0,t.technicalMaterials.get("spare-parts").intValue());
+        assertEquals(7,t.employerFunds.get("city-maintenance").intValue());
+        assertEquals(garage+15,t.employerFunds.get("technician").intValue());
+        assertEquals(station+8,t.employerFunds.get(FuelLife.ACCOUNT).intValue());
+        t.industryStocks.put(FuelLife.STOCK,3);
+        ReserveFleetLife.tick(t,s);
+        assertEquals(6,VehicleTheftLife.reserveFuel(t,"bus"));
+        s.day++;
+        t.employerFunds.put("city-maintenance",0);
+        ReserveFleetLife.tick(t,s);
+        assertEquals(6,VehicleTheftLife.reserveFuel(t,"bus"));
+        assertEquals(3,FuelLife.stock(t));
+    }
     @Test void truckHasIndependentPersistentReserveCondition(){
         var t=TownLife.create(new WorldState());
         t.player.place=TownLife.Place.WORKSHOP;t.player.destination=t.player.place;
