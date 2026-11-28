@@ -712,14 +712,18 @@ public final class GameSession implements AutoCloseable {
             geoDrive=null;throw new IllegalArgumentException("Driving unavailable.");
         }
         if(command.equals("status"))return drivePose(map,"");
-        if(command.equals("start")||command.equals("steal")){
+        if(command.equals("start")||command.equals("steal")||command.equals("steal-bus")){
             if(geoDrive!=null)throw new IllegalArgumentException("Already driving.");
             var p=town.player;TransportLife.ready(p);
             if(p.ownsBicycle&&p.bicycleParked==null)throw new IllegalArgumentException("Park your bicycle first.");
             if(IntercomLife.insideVisit(town,state.day,state.minute))throw new IllegalArgumentException("Leave the apartment first.");
-            boolean stolen=command.equals("steal");
+            boolean bus=command.equals("steal-bus");
+            boolean stolen=bus||command.equals("steal");
             var civilian=map.civilian(town,point);
-            if(stolen){
+            if(bus){
+                var parked=map.parkedBus(town,point);
+                if(parked==null||Math.hypot(parked.x()-x,parked.z()-z)>5)throw new IllegalArgumentException("Approach the municipal reserve bus at the station.");
+            }else if(stolen){
                 if(civilian==null||!civilian.district().equals(p.place.name())||Math.hypot(civilian.x()-x,civilian.z()-z)>5)
                     throw new IllegalArgumentException("Approach a civilian car in your current district.");
             }else if(!map.carNear(town,point))throw new IllegalArgumentException("Approach your own parked car.");
@@ -727,12 +731,15 @@ public final class GameSession implements AutoCloseable {
             if(node==null||map.motorNodes.get(node).distance(point)>30)throw new IllegalArgumentException("No motor road nearby.");
             if(stolen){
                 var copy=town.copy();var clock=state.copy();var truth=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
-                var owner=copy.people.values().stream().filter(c->c.generationIndex==civilian.ownerIndex()).findFirst().orElseThrow();
-                VehicleTheftLife.take(copy,clock,owner,truth,observations);
-                applyInternal(copy,1,"Civilian car reported stolen.",false,clock,truth,observations);
+                if(bus)VehicleTheftLife.takeBus(copy,clock,truth,observations);
+                else{
+                    var owner=copy.people.values().stream().filter(c->c.generationIndex==civilian.ownerIndex()).findFirst().orElseThrow();
+                    VehicleTheftLife.take(copy,clock,owner,truth,observations);
+                }
+                applyInternal(copy,1,bus?"Municipal bus reported stolen.":"Civilian car reported stolen.",false,clock,truth,observations);
                 if(JusticeLife.confined(town))return drivePose(map,"Police detained you.");
             }else if(p.carFuel<1||p.carCondition<3)throw new IllegalArgumentException("Car needs fuel or service.");
-            geoDrive=new GeoDrive(stolen,node);
+            geoDrive=new GeoDrive(stolen,bus,node);
             geoDrive.to=map.motorEdges.get(node).get(0);
             geoDrive.meters=VehicleTheftLife.get(town,stolen?"stolen-remainder":"owned-remainder")/1000.0;
             return drivePose(map,stolen?"Stolen vehicle reported to police.":"In your car.");
@@ -747,7 +754,7 @@ public final class GameSession implements AutoCloseable {
             apply(copy,0,"Parked.");
             geoDrive=null;
             var park=map.point(destination);
-            return new GeoDrive.Pose(false,false,park.x(),park.z(),0,town.player.carFuel,town.player.carCondition,0,0,"Parked at "+destination.label+".");
+            return new GeoDrive.Pose(false,false,park.x(),park.z(),0,town.player.carFuel,town.player.carCondition,0,0,"CAR","Parked at "+destination.label+".");
         }
         if(!Set.of("step","coast","brake").contains(command)||turn<-1||turn>1)throw new IllegalArgumentException("Unknown driving control.");
         long now=System.nanoTime();
@@ -762,7 +769,7 @@ public final class GameSession implements AutoCloseable {
         int oldUnits=(int)(next.meters/100);
         double traveled=next.advance(map,turn,budget);
         if(traveled+0.001<budget)next.speed=0;
-        else next.speed=Math.min(next.speed,map.speedLimit(next.from,next.to)/3.6);
+        else next.speed=Math.min(next.speed,next.vehicleLimit(map.speedLimit(next.from,next.to))/3.6);
         if(next.waitingForSignal&&traveled<0.001){geoDrive=next;return drivePose(map,"Waiting for green light.");}
         int units=(int)(next.meters/100)-oldUnits;
         int impact=0;
@@ -784,11 +791,11 @@ public final class GameSession implements AutoCloseable {
         return drivePose(map,impact>0?"Collision: vehicle condition reduced.":next.waitingForSignal?"Waiting for green light.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
     }
     private GeoDrive.Pose drivePose(GeoProjection map,String message){
-        if(geoDrive==null)return new GeoDrive.Pose(false,false,0,0,0,town.player.carFuel,town.player.carCondition,0,0,message);
+        if(geoDrive==null)return new GeoDrive.Pose(false,false,0,0,0,town.player.carFuel,town.player.carCondition,0,0,"CAR",message);
         var p=geoDrive.position(map);
         return new GeoDrive.Pose(true,geoDrive.stolen,p.x(),p.z(),geoDrive.heading(map),
             geoDrive.stolen?VehicleTheftLife.get(town,"fuel"):town.player.carFuel,
-            geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,geoDrive.speed*3.6,map.speedLimit(geoDrive.from,geoDrive.to),message);
+            geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,geoDrive.speed*3.6,(int)geoDrive.vehicleLimit(map.speedLimit(geoDrive.from,geoDrive.to)),geoDrive.bus?"BUS":"CAR",message);
     }
     synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z)throws SQLException{
         var target=geoDrive==null?new GeoProjection.Point(x,z):geoDrive.position(map);

@@ -91,6 +91,33 @@ func _car(paint: Color=Color.TRANSPARENT, imported: bool=true) -> Node3D:
         _box(root,Vector3(0.35,0.15,0.06),Vector3(x*0.83,0.72,1.8),Color("#9b2726"))
     return root
 
+func _bus() -> Node3D:
+    var root:=Node3D.new()
+    var paint:=Color("#d7a53c")
+    var glass:=Color("#435a67")
+    _box(root,Vector3(2.38,2.38,7.5),Vector3(0,1.58,0),paint)
+    _box(root,Vector3(2.27,1.05,0.06),Vector3(0,2.15,-3.78),glass)
+    _box(root,Vector3(2.27,0.85,0.06),Vector3(0,2.25,3.78),glass)
+    _box(root,Vector3(2.40,0.18,7.52),Vector3(0,2.82,0),Color("#e4ded0"))
+    for side in [-1.0,1.0]:
+        var x: float=float(side)*1.20
+        for i in range(5):
+            _box(root,Vector3(0.05,0.93,1.17),Vector3(x,2.13,-2.88+float(i)*1.32),glass)
+        for z in [-2.45,2.45]:
+            var wheel:=MeshInstance3D.new()
+            var tire:=CylinderMesh.new()
+            tire.top_radius=0.46
+            tire.bottom_radius=0.46
+            tire.height=0.30
+            wheel.mesh=tire
+            wheel.rotation.z=PI/2
+            wheel.position=Vector3(x*0.90,0.46,float(z))
+            wheel.material_override=_mat(Color("#252729"))
+            root.add_child(wheel)
+        _box(root,Vector3(0.32,0.15,0.07),Vector3(x*0.74,0.83,-3.78),Color("#fff1d1"))
+        _box(root,Vector3(0.32,0.18,0.07),Vector3(x*0.74,0.83,3.78),Color("#ac342d"))
+    return root
+
 func _person(profile: Dictionary={},identity: String="") -> Node3D:
     var root:=Node3D.new()
     var skins := [Color("#8e5a41"),Color("#b9845f"),Color("#c69574"),Color("#d8aa87"),Color("#edc4a6")]

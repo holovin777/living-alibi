@@ -45,6 +45,26 @@ class GeoDriveTest {
         assertEquals(3,drive.advance(map,0,5,17),.001);
         assertFalse(drive.waitingForSignal);
     }
+    @Test void reserveBusCustodyAndRecoveryAreSeparate()throws Exception{
+        var s=new WorldState();var t=TownLife.create(s);
+        t.player.place=TownLife.Place.STAZIONE;t.player.destination=t.player.place;
+        t.player.carPlace=TownLife.Place.WORKSHOP;t.player.carFuel=4;t.player.carCondition=80;
+        VehicleTheftLife.takeBus(t,s,new ArrayList<>(),new ArrayList<>());
+        assertTrue(VehicleTheftLife.bus(t));
+        assertEquals(1,JusticeLife.thefts(t));
+        assertThrows(IllegalArgumentException.class,()->VehicleTheftLife.takeBus(t,s,new ArrayList<>(),new ArrayList<>()));
+        var drive=new GeoDrive(true,true,"1");
+        drive.controlBudget("step",0.65,20);
+        assertEquals(1.04,drive.speed,.001);
+        assertTrue(drive.copy().bus);
+        for(int i=0;i<30;i++)drive.controlBudget("step",0.65,20);
+        assertEquals(15,drive.speed,.001);
+        VehicleTheftLife.recover(t);
+        assertFalse(VehicleTheftLife.bus(t));
+        assertFalse(VehicleTheftLife.active(t));
+        assertEquals(4,t.player.carFuel);
+        assertEquals(TownLife.Place.WORKSHOP,t.player.carPlace);
+    }
     @Test void directedRoadAndTheftAreSeparateFromLegalCar()throws Exception{
         var graph=dir.resolve("graph.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\nM\t1\t0\t0\nM\t2\t100\t0\nD\t1\t2\n");

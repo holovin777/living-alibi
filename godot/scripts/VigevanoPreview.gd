@@ -60,6 +60,8 @@ var action_list: VBoxContainer
 var owned_car: Node3D
 var parked_bike: Node3D
 var civilian_car: Node3D
+var reserve_bus: Node3D
+var driving_bus:=false
 var civilian_id:=""
 var patrol_models: Dictionary={}
 var patrol_goals: Dictionary={}
@@ -166,6 +168,9 @@ func _ready() -> void:
     civilian_car=traffic._car()
     add_child(civilian_car)
     civilian_car.hide()
+    reserve_bus=traffic._bus()
+    add_child(reserve_bus)
+    reserve_bus.hide()
     drive_audio=DriveSound.new()
     add_child(drive_audio)
     driving_body=Cockpit.new()
@@ -328,6 +333,8 @@ func _input(event: InputEvent) -> void:
         if event.keycode==KEY_G and residents.connected and room.is_empty() and not bool(residents.world.get("rebirth",false)):
             if owned_car.visible and walker.position.distance_to(owned_car.position)<5:
                 residents.drive_command("start",pos)
+            elif reserve_bus.visible and walker.position.distance_to(reserve_bus.position)<5:
+                residents.drive_command("steal-bus",pos)
             elif civilian_car.visible and walker.position.distance_to(civilian_car.position)<5:
                 residents.drive_command("steal",pos)
             return
@@ -412,7 +419,7 @@ func _physics_process(delta: float) -> void:
         linked_age=age
         head.position.y=0.18 if age>=0 and age<6 else (0.35 if age>=6 and age<13 else (0.52 if age>=13 and age<18 else 0.65))
     if driving:
-        head.position=Vector3(-0.33,0.30,0.20)
+        head.position=Vector3(-0.48,1.05,0.28) if driving_bus else Vector3(-0.33,0.30,0.20)
         _drive_frame(delta)
         return
     if city_map.visible or chat.visible or actions_panel.visible or phone_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or (linked and not bool(life.get("canWalk",false))))):
@@ -551,12 +558,15 @@ func _update_navigation() -> void:
         _sync_parked_vehicle(owned_car,world.get("parkedCar"),pos,Vector3(2.5,0.05,0))
         if driving:owned_car.hide()
         _sync_civilian(world.get("civilianCar"),pos)
+        _sync_parked_vehicle(reserve_bus,world.get("parkedBus"),pos,Vector3(0,0.05,0))
+        if reserve_bus.visible:reserve_bus.rotation.y=float(world["parkedBus"].get("heading",0))
+        if driving:reserve_bus.hide()
         _sync_patrols(world.get("patrols",[]))
         _sync_commutes(world.get("traffic",[]))
         hud.text+="\nJava traffic: %s" % commute_models.size()
         if property_scenery.missing_yard or property_scenery.missing_site:hud.text+="\nPlot visual unavailable: no clear mapped space. F actions still work."
         if driving:civilian_car.hide()
-        hud.text+="\nG: enter own car / steal nearby civilian car"
+        hud.text+="\nG: own car / steal nearby car or reserve bus at station"
         if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Road target %s km/h · Fuel %s · Condition %s" % [residents.driving.get("speedLimitKmh",36),residents.driving.get("fuel",0),residents.driving.get("condition",0)]
         var justice: Dictionary=world.get("justice",{})
         if str(justice.get("status",""))=="REPORTED":hud.text+="\nPolice report · possible detention in %s game min" % justice.get("minutesRemaining",0)
@@ -569,6 +579,7 @@ func _update_navigation() -> void:
         district_sign.hide()
         owned_car.hide()
         civilian_car.hide()
+        reserve_bus.hide()
         _sync_patrols([])
         _sync_commutes([])
         parked_bike.hide()
@@ -583,6 +594,8 @@ func _drive_pose(pose: Dictionary) -> void:
     driving=bool(pose.get("active",false))
     driving_body.visible=driving
     if driving:
+        driving_bus=str(pose.get("vehicleKind","CAR"))=="BUS"
+        driving_body.scale=Vector3(1.40,1.55,1.30) if driving_bus else Vector3.ONE
         server_drive_speed=float(pose.get("speedKmh",0))
         drive_goal=Vector3(float(pose["x"]),1.05,float(pose["z"]))
         drive_heading=float(pose.get("heading",0))
@@ -595,6 +608,7 @@ func _drive_pose(pose: Dictionary) -> void:
             driving_body.rotation.y=drive_heading
             owned_car.hide()
             civilian_car.hide()
+            reserve_bus.hide()
     elif was_driving:
         _reset_driving_view()
         walker.position=Vector3(float(pose["x"]),1.05,float(pose["z"]))
@@ -602,6 +616,8 @@ func _drive_pose(pose: Dictionary) -> void:
         _stream()
 
 func _reset_driving_view() -> void:
+    driving_bus=false
+    driving_body.scale=Vector3.ONE
     head.position=Vector3(0,0.65,0)
     head.rotation=Vector3.ZERO
     linked_age=-999 # next walking frame restores the age-specific camera
@@ -665,10 +681,7 @@ func _sync_commutes(records: Array) -> void:
         if not commute_models.has(id):
             var car: Node3D
             if str(record.get("kind",""))=="BUS":
-                car=Node3D.new()
-                traffic._box(car,Vector3(2.2,2.2,6.4),Vector3(0,1.3,0),Color("#e3ad45"))
-                traffic._box(car,Vector3(2.24,0.8,5.8),Vector3(0,1.9,0),Color("#405767"))
-                traffic._box(car,Vector3(2.25,0.25,6.5),Vector3(0,2.45,0),Color("#e3ad45"))
+                car=traffic._bus()
             else:
                 var palette: Array[Color]=[Color("#9b403d"),Color("#456b89"),Color("#d0ccc0"),Color("#64696b"),Color("#73805a")]
                 car=traffic._car(palette[posmod(id.hash(),palette.size())])
@@ -956,6 +969,7 @@ func _change_interior(next_room: Dictionary) -> void:
         district_sign.hide()
         owned_car.hide()
         civilian_car.hide()
+        reserve_bus.hide()
         parked_bike.hide()
         _sync_patrols([])
         _sync_commutes([])
