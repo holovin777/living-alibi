@@ -46,6 +46,11 @@ func _check(traffic,graph: Dictionary) -> void:
     if wav.data.size()!=76800 or wav.loop_end!=38400 or wav.loop_mode!=AudioStreamWAV.LOOP_FORWARD or sirens.attach(ambulance,"AMBULANCE")!=sound or sirens.tone("POLICE").data==wav.data:
         ambulance.free();push_error("Emergency audio synthesis failed");quit(1);return
     ambulance.free()
+    var fire: Node3D=traffic._fire_engine()
+    traffic.set_plate(fire,"LA FIRE1","FIRE")
+    if not fire.has_node("BeaconL") or not fire.has_node("BeaconR") or not fire.has_node("EmergencyLight"):
+        fire.free();push_error("Fire engine model incomplete");quit(1);return
+    fire.free()
     var truck: Node3D=traffic._truck()
     if truck.get_child_count()<14:
         truck.free();push_error("Truck exterior incomplete");quit(1);return

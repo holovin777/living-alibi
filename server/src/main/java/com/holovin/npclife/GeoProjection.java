@@ -59,6 +59,7 @@ final class GeoProjection {
                 actions.add(new Choice("phone-reply:2:"+m.residentId(),"Not today / Non oggi"));
             }
         }
+        if(FireServiceLife.canReport(t))actions.add(new Choice("phone-fire-report","Report fire / Chiama vigili del fuoco"));
         if(AmbulanceLife.canCall(t,s))actions.add(new Choice("phone-ambulance","Call ambulance / Chiama ambulanza"));
         var contacts=AddressLife.contacts(t);
         var locations=new LinkedHashMap<String,District>();
@@ -83,7 +84,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,ParkedBus parkedBus,ParkedBus parkedTruck,ParkedBus parkedScooter,ParkedBus parkedMotorcycle,ParkedBus ownedScooter,ParkedBus ownedMotorcycle,String ownedCarPlate,List<DrivingSchoolLife.Progress> drivingLicenses,RoadPoliceLife.View roadPolice,List<VehicleDocumentsLife.Document> vehicleDocuments,RoadAccidentLife.View roadAccidents,TowServiceLife.View towService,AmbulanceLife.View ambulance,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,ParkedBus parkedBus,ParkedBus parkedTruck,ParkedBus parkedScooter,ParkedBus parkedMotorcycle,ParkedBus ownedScooter,ParkedBus ownedMotorcycle,String ownedCarPlate,List<DrivingSchoolLife.Progress> drivingLicenses,RoadPoliceLife.View roadPolice,List<VehicleDocumentsLife.Document> vehicleDocuments,RoadAccidentLife.View roadAccidents,TowServiceLife.View towService,AmbulanceLife.View ambulance,FireServiceLife.View fireService,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -356,6 +357,15 @@ final class GeoProjection {
         }
         motorRoutes.put(key,Optional.ofNullable(result));return result;
     }
+    TrafficCar fireVehicle(TownLife.Town t,WorldState s){
+        var site=FireServiceLife.site(t);var state=FireServiceLife.view(t,s);
+        if(site==null||!Set.of("EN_ROUTE","FIGHTING").contains(state.status()))return null;
+        var route=motorRoute(FireServiceLife.DEPOT,site);if(route==null)return null;
+        double fraction=state.status().equals("FIGHTING")?1:Math.max(0,Math.min(1,1-state.minutesRemaining()/(double)FireServiceLife.responseMinutes(site)));
+        var at=route.at(fraction);var before=route.at(Math.max(0,fraction-.005));var after=route.at(Math.min(1,fraction+.005));
+        return new TrafficCar("fire-response",at.x,at.z,Math.atan2(-(after.x-before.x),-(after.z-before.z)),"FIRE",100,
+            "fire:"+FireServiceLife.get(t,"started")+(state.status().equals("FIGHTING")?":arrived":""),route.points(),fraction*route.meters(),"LA FIRE1");
+    }
     TrafficCar ambulanceVehicle(TownLife.Town t,WorldState s){
         var pickup=AmbulanceLife.pickup(t);
         if(pickup==null||!t.player.alive||JusticeLife.confined(t)||RebirthLife.active(t))return null;
@@ -481,6 +491,7 @@ final class GeoProjection {
         for(String id:List.of("bread","water","pizza","gelato","grape-juice"))
             if(FoodLife.quantity(p,id,false)>0)result.add(new Choice("consume:"+id,"Consume / Consuma "+RetailLife.product(id).label()));
         if(point(p.place).distance(player)>18)return result;
+        if(FireServiceLife.canReport(t))result.add(new Choice("fire-report","Report fire / Segnala incendio"));
         if(AmbulanceLife.canCall(t,s))result.add(new Choice("ambulance-call","Request ambulance / Chiama ambulanza"));
         if(AmbulanceLife.canBoard(t,s))result.add(new Choice("ambulance-board","Board ambulance / Sali in ambulanza"));
         if(p.place==TownLife.Place.PARK)result.add(new Choice("fountain","Drink at fountain / Fontana"));
@@ -562,6 +573,8 @@ final class GeoProjection {
             Point at=position(c);
             if(at.distance(player)<=140)nearby.add(new Actor(c.id,at.x,at.z,c.activity,talking.contains(c)&&(!rebirth||GeoLife.canTalk(t,c)),"STAND",0,GameSession.workVisual(c),GameSession.outfitVisual(c),GameSession.appearanceStage(c)));
         }
+        var fire=fireVehicle(t,s);
+        if(fire!=null&&new Point(fire.x(),fire.z()).distance(player)<=220)traffic.put(fire.id(),fire);
         var ambulance=ambulanceVehicle(t,s);
         if(ambulance!=null&&new Point(ambulance.x(),ambulance.z()).distance(player)<=220)traffic.put(ambulance.id(),ambulance);
         nearby.sort(Comparator.comparingDouble((Actor a)->new Point(a.x,a.z).distance(viewer)).thenComparing(Actor::id));
@@ -587,6 +600,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,(room==null?nearby.subList(0,Math.min(40,nearby.size())):inside).stream().map(a->a.withAppearance(t)).toList(),
             district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,room==null?ownedLight(t,player,"scooter"):null,room==null?ownedLight(t,player,"motorcycle"):null,p.carPlace==null?"":VehicleRegistrationLife.personal(t,"car"),DrivingSchoolLife.view(t),RoadPoliceLife.view(t),VehicleDocumentsLife.view(t,s),RoadAccidentLife.view(t),TowServiceLife.view(t,s),AmbulanceLife.view(t,s),JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingInt((TrafficCar v)->v.kind().equals("AMBULANCE")?0:1).thenComparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,room==null?ownedLight(t,player,"scooter"):null,room==null?ownedLight(t,player,"motorcycle"):null,p.carPlace==null?"":VehicleRegistrationLife.personal(t,"car"),DrivingSchoolLife.view(t),RoadPoliceLife.view(t),VehicleDocumentsLife.view(t,s),RoadAccidentLife.view(t),TowServiceLife.view(t,s),AmbulanceLife.view(t,s),FireServiceLife.view(t,s),JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingInt((TrafficCar v)->Set.of("AMBULANCE","FIRE").contains(v.kind())?0:1).thenComparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
     }
 }

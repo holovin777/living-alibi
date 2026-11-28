@@ -15,6 +15,8 @@ static func tone(kind: String) -> AudioStreamWAV:
         if kind=="AMBULANCE":
             # Two alternating pitches with smoothed transitions.
             frequency=735.0+145.0*tanh(6.0*sin(TAU*t/1.2))
+        elif kind=="FIRE":
+            frequency=660.0+210.0*sin(TAU*t/1.2)
         else:
             # Distinct police sweep.
             frequency=850.0+260.0*sin(TAU*t/2.4)

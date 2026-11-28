@@ -628,6 +628,8 @@ func _update_navigation() -> void:
         if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Road target %s km/h · Fuel %s · Condition %s" % [residents.driving.get("speedLimitKmh",36),residents.driving.get("fuel",0),residents.driving.get("condition",0)]
         for doc in world.get("vehicleDocuments",[]):
             hud.text+="\n%s · %s · RC %s d · Revisione %s d" % [doc.get("kind",""),doc.get("plate",""),doc.get("insuranceDays",0),doc.get("inspectionDays",0)]
+        var fire: Dictionary=world.get("fireService",{})
+        if str(fire.get("status","NONE"))!="NONE":hud.text+="\nFire / Incendio: %s · %s · %s min" % [fire.get("district",""),fire.get("status",""),fire.get("minutesRemaining",0)]
         var ambulance: Dictionary=world.get("ambulance",{})
         if str(ambulance.get("status",""))=="EN_ROUTE":hud.text+="\nAmbulance / Ambulanza: %s min · Stay in district" % ambulance.get("minutesRemaining",0)
         elif str(ambulance.get("status",""))=="ARRIVED":hud.text+="\nAmbulance arrived / Arrivata · F to board near district marker"
@@ -789,7 +791,9 @@ func _sync_commutes(records: Array) -> void:
         seen[id]=true
         if not commute_models.has(id):
             var car: Node3D
-            if str(record.get("kind",""))=="AMBULANCE":
+            if str(record.get("kind",""))=="FIRE":
+                car=traffic._fire_engine()
+            elif str(record.get("kind",""))=="AMBULANCE":
                 car=traffic._ambulance()
             elif str(record.get("kind",""))=="BUS":
                 car=traffic._bus()
@@ -801,9 +805,9 @@ func _sync_commutes(records: Array) -> void:
             commute_models[id]=car
         traffic.set_plate(commute_models[id],str(record.get("plate","")),str(record.get("kind","CAR")))
         var kind:=str(record.get("kind","CAR"))
-        var responding:=kind=="AMBULANCE" and not str(record.get("trip","")).ends_with(":arrived")
+        var responding:=kind in ["AMBULANCE","FIRE"] and not str(record.get("trip","")).ends_with(":arrived")
         commute_goals[id]={"point":goal,"heading":float(record.get("heading",0)),"kind":kind,"responding":responding}
-        if kind=="AMBULANCE":EmergencySound.update(commute_models[id],kind,responding)
+        if kind in ["AMBULANCE","FIRE"]:EmergencySound.update(commute_models[id],kind,responding)
         if record.get("route",[]).size()>=2:
             if not commute_motion.has(id) or commute_motion[id].trip!=str(record.get("trip","")):
                 var motion=CommuteMotion.new()
@@ -824,7 +828,7 @@ func _animate_commutes(delta: float) -> void:
     for id in commute_models:
         var car: Node3D=commute_models[id]
         var goal: Dictionary=commute_goals[id]
-        if str(goal.get("kind",""))=="AMBULANCE":
+        if str(goal.get("kind","")) in ["AMBULANCE","FIRE"]:
             var phase:=int(Time.get_ticks_msec()/180.0)%4
             car.get_node("BeaconL").visible=phase==0
             car.get_node("BeaconR").visible=phase==2

@@ -91,6 +91,45 @@ func _car(paint: Color=Color.TRANSPARENT, imported: bool=true) -> Node3D:
         _box(root,Vector3(0.35,0.15,0.06),Vector3(x*0.83,0.72,1.8),Color("#9b2726"))
     return root
 
+func _fire_engine() -> Node3D:
+    var root:=_truck()
+    for child in root.get_children():
+        if child is MeshInstance3D and child.mesh is BoxMesh and child.mesh.size.y>2.0:
+            child.material_override=_mat(Color("#c72929"))
+    for side in [-1.0,1.0]:
+        var x: float=float(side)*1.24
+        _box(root,Vector3(0.035,1.25,3.65),Vector3(x,1.90,1.12),Color("#a2abb0"))
+        for i in range(6):
+            _box(root,Vector3(0.043,0.025,3.62),Vector3(x,1.35+i*0.19,1.12),Color("#667078"))
+        var beacon:=_box(root,Vector3(0.47,0.18,0.28),Vector3(float(side)*0.55,3.04,-2.30),Color("#2987f4"))
+        beacon.name="BeaconL" if side<0 else "BeaconR"
+        var mat:=StandardMaterial3D.new()
+        mat.albedo_color=Color("#2987f4")
+        mat.emission_enabled=true
+        mat.emission=Color("#2987f4")
+        mat.emission_energy_multiplier=2.5
+        beacon.material_override=mat
+    for x in [-0.34,0.34]:
+        _box(root,Vector3(0.08,0.09,3.8),Vector3(float(x),3.48,1.10),Color("#b9c4c9"))
+    for i in range(10):
+        _box(root,Vector3(0.75,0.09,0.07),Vector3(0,3.48,-0.65+i*0.38),Color("#b9c4c9"))
+    var light:=OmniLight3D.new()
+    light.name="EmergencyLight"
+    light.position=Vector3(0,3.2,-2.3)
+    light.light_color=Color("#398bff")
+    light.light_energy=2.0
+    light.omni_range=8.0
+    light.shadow_enabled=false
+    root.add_child(light)
+    var sign:=Label3D.new()
+    sign.text="VIGILI DEL FUOCO"
+    sign.font_size=40
+    sign.pixel_size=0.0024
+    sign.modulate=Color.WHITE
+    sign.position=Vector3(0,3.0,3.49)
+    root.add_child(sign)
+    return root
+
 func _ambulance() -> Node3D:
     var root:=Node3D.new()
     var white:=Color("#f0eee7")
@@ -155,7 +194,7 @@ func set_plate(vehicle: Node3D,number: String,kind: String="CAR") -> void:
         var rear:=Vector3(0,0.62,2.0)
         if kind=="AMBULANCE":rear=Vector3(0,0.68,2.43)
         elif kind=="BUS":rear=Vector3(0,0.92,3.84)
-        elif kind=="TRUCK":rear=Vector3(0,0.94,3.57)
+        elif kind in ["TRUCK","FIRE"]:rear=Vector3(0,0.94,3.57)
         elif kind in ["SCOOTER","MOTORCYCLE"]:rear=Vector3(0,0.62,0.94)
         var plate:=_box(vehicle,Vector3(0.38,0.13,0.025),rear,Color("#f1f0e5"))
         plate.name="RegistrationBacking"

@@ -925,6 +925,11 @@ public final class GameSession implements AutoCloseable {
             geoInterior=null;geoDrive=null;
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if("phone-fire-report".equals(action)){
+            if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action)))throw new IllegalArgumentException("Fire report unavailable.");
+            var copy=town.copy();String message=FireServiceLife.playerReport(copy);apply(copy,1,message);
+            return new GeoProjection.ActionResult(message,null);
+        }
         if("phone-ambulance".equals(action)){
             if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action))||geoInterior!=null)throw new IllegalArgumentException("Ambulance call unavailable here.");
             var copy=town.copy();String message=AmbulanceLife.call(copy,state);
@@ -976,6 +981,10 @@ public final class GameSession implements AutoCloseable {
                 default -> throw new IllegalArgumentException("Unknown workshop action.");
             };
             return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.equals("fire-report")){
+            var copy=town.copy();String message=FireServiceLife.playerReport(copy);apply(copy,1,message);
+            return new GeoProjection.ActionResult(message,null);
         }
         if(action.equals("ambulance-call")){
             var copy=town.copy();String message=AmbulanceLife.call(copy,state);
