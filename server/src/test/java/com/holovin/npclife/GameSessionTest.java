@@ -4240,7 +4240,8 @@ class GameSessionTest {
     void ordinaryVisitorCanBecomeMinerOrMachinistAndSurveyNewOre() throws Exception {
         Path mine=directory.resolve("visitor-miner.db");
         try(var game=new GameSession(mine)) {
-            assertEquals(11,game.jobs().size());
+            assertEquals(12,game.jobs().size());
+            assertTrue(game.jobs().stream().anyMatch(j->j.id().equals("firefighter")));
             game.move("quarry");
             game.applyJob("miner");
             game.waitMinutes(30);
@@ -4321,7 +4322,8 @@ class GameSessionTest {
             assertEquals(50,visitor.money());
             assertNull(visitor.jobId());
             assertEquals(0,visitor.engineeringSkill());
-            assertEquals(11,game.jobs().size());
+            assertEquals(12,game.jobs().size());
+            assertTrue(game.jobs().stream().anyMatch(j->j.id().equals("firefighter")));
 
             assertThrows(IllegalArgumentException.class,
                     ()->game.applyJob("shop-assistant"));

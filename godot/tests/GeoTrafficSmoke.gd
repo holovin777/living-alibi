@@ -52,6 +52,13 @@ func _check(traffic,graph: Dictionary) -> void:
     effect.animate(1.0)
     if not effect.visible or effect.position.x!=10 or effect.flames.size()!=7 or effect.smoke.size()!=12 or effect.intensity<=0:
         effect.free();push_error("Fire visual failed");quit(1);return
+    effect.sync({"id":"test","x":10,"z":12,"intensity":0.4,"fighting":true},Vector3.ZERO,true)
+    effect.animate(0.2)
+    if effect.spray.size()!=24 or not effect.spray[0].visible:
+        effect.free();push_error("Suppression spray missing");quit(1);return
+    effect.sync({"id":"test","x":10,"z":12,"intensity":0.4,"fighting":false},Vector3.ZERO,true)
+    if effect.spray[0].visible:
+        effect.free();push_error("Suppression spray did not stop");quit(1);return
     effect.sync({},Vector3.ZERO,true)
     if effect.visible:
         effect.free();push_error("Fire visual did not clear");quit(1);return

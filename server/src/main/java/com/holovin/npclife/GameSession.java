@@ -983,6 +983,10 @@ public final class GameSession implements AutoCloseable {
             };
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.equals("fire-duty-gear")){
+            var copy=town.copy();String message=FireDutyLife.issueGear(copy,state);apply(copy,5,message);
+            return new GeoProjection.ActionResult(message,null);
+        }
         if(action.equals("fire-duty-standby")){
             var copy=town.copy();String message=FireDutyLife.standby(copy,state);apply(copy,1,message);
             return new GeoProjection.ActionResult(message,null);

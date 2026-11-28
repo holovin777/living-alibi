@@ -11,6 +11,13 @@ class FireDutyLifeTest {
         FireTrainingLife.train(t,s);t.employerFunds.put("city-maintenance",100);
         CareerLife.apply(t,FireTrainingLife.JOB,s.day);
         t.industryStocks.put(FuelLife.STOCK,20);t.cleanWater=8;
+        assertFalse(FireDutyLife.canStandby(t,s));
+        t.technicalMaterials.put("spare-parts",2);
+        int budget=t.employerFunds.get("city-maintenance");
+        FireDutyLife.issueGear(t,s);
+        assertEquals(100,FireDutyLife.gear(t));assertEquals(1,t.technicalMaterials.get("spare-parts").intValue());
+        assertEquals(budget-4,t.employerFunds.get("city-maintenance").intValue());
+        assertFalse(FireDutyLife.canIssueGear(t,s));
         FireDutyLife.standby(t,s);assertFalse(FireDutyLife.canJoin(t,s));
         FireServiceLife.start(t,s,TownLife.Place.FACTORY);FireServiceLife.report(t);
         assertTrue(FireServiceLife.dispatch(t,s));
@@ -24,5 +31,6 @@ class FireDutyLifeTest {
         assertEquals(cash+3,t.player.money);assertEquals(funds-3,t.employerFunds.get(FireServiceLife.ACCOUNT).intValue());
         assertFalse(FireDutyLife.canAssist(t,s));
         assertEquals(1,FireDutyLife.view(t.copy(),s).completed());
+        assertEquals(85,FireDutyLife.view(t.copy(),s).gearCondition());
     }
 }

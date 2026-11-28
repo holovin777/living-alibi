@@ -3,6 +3,8 @@ extends Node3D
 var flames: Array[MeshInstance3D]=[]
 var smoke: Array[MeshInstance3D]=[]
 var light: OmniLight3D
+var spray: Array[MeshInstance3D]=[]
+var fighting:=false
 var elapsed:=0.0
 var intensity:=0.0
 var target:=0.0
@@ -43,6 +45,23 @@ func _ready() -> void:
         puff.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         add_child(puff)
         smoke.append(puff)
+    var droplet_mesh:=SphereMesh.new()
+    droplet_mesh.radius=0.065
+    droplet_mesh.height=0.13
+    droplet_mesh.radial_segments=6
+    droplet_mesh.rings=3
+    var water:=StandardMaterial3D.new()
+    water.albedo_color=Color(0.67,0.85,0.96,0.7)
+    water.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+    water.roughness=0.22
+    for i in range(24):
+        var drop:=MeshInstance3D.new()
+        drop.mesh=droplet_mesh
+        drop.material_override=water
+        drop.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        drop.hide()
+        add_child(drop)
+        spray.append(drop)
     light=OmniLight3D.new()
     light.light_color=Color("#ff732d")
     light.omni_range=11
@@ -70,6 +89,8 @@ func sync(record: Dictionary,viewer: Vector3,outdoors: bool) -> void:
         elapsed=0.0
     position=point
     target=clampf(float(record.get("intensity",0)),0.0,1.0)
+    fighting=bool(record.get("fighting",false))
+    for drop in spray:drop.visible=fighting
     show()
 
 func animate(delta: float) -> void:
@@ -91,6 +112,13 @@ func animate(delta: float) -> void:
         puff.position=Vector3(f*f*5.0+sin(i*2.4)*0.45,1.6+f*15.0,sin(f*4.0+i)*0.6)
         puff.scale=Vector3.ONE*size
         puff.visible=size>0.02
+    if fighting:
+        # Lightweight stylized suppression spray, not physical hydraulics.
+        for i in range(spray.size()):
+            var f:=fposmod(elapsed*1.8+float(i)/spray.size(),1.0)
+            var side:=1.0 if i%2==0 else -1.0
+            spray[i].position=Vector3(side*4.5*(1.0-f),1.0+sin(f*PI)*1.8,side*0.8*(1.0-f)+sin(i*2.1)*0.10)
+            spray[i].scale=Vector3.ONE*(0.8+f*0.6)
     light.position=Vector3(0,1.4,0)
     light.light_energy=intensity*(2.3+0.35*sin(elapsed*11.0))
     light.visible=intensity>0.02

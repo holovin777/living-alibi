@@ -12,15 +12,29 @@ final class FireDutyLife {
         return p.alive&&!RebirthLife.active(t)&&!JusticeLife.confined(t)&&p.travelRemaining==0&&!p.cycling
             &&FireTrainingLife.JOB.equals(p.jobId)&&FireTrainingLife.qualified(t)&&p.health>=60&&p.fatigue<85;
     }
+    static int gear(TownLife.Town t){return get(t,"gear");}
+    static boolean canIssueGear(TownLife.Town t,WorldState s){
+        return ready(t)&&t.player.place==FireServiceLife.DEPOT&&gear(t)<60
+            &&t.technicalMaterials.getOrDefault("spare-parts",0)>0
+            &&t.employerFunds.getOrDefault("city-maintenance",0)>=4;
+    }
+    static String issueGear(TownLife.Town t,WorldState s){
+        if(!canIssueGear(t,s))throw new IllegalArgumentException("Protective kit unavailable: check qualification, station stock and budget.");
+        t.technicalMaterials.merge("spare-parts",-1,Integer::sum);
+        t.employerFunds.merge("city-maintenance",-4,Integer::sum);
+        t.employerFunds.merge("technician",4,Math::addExact);
+        set(t,"gear",100);
+        return "Issued protective kit / Casco, giacca, guanti e stivali. Condition 100%.";
+    }
     static boolean canStandby(TownLife.Town t,WorldState s){
-        return ready(t)&&t.player.place==FireServiceLife.DEPOT&&get(t,"until")<=FireServiceLife.now(s);
+        return ready(t)&&gear(t)>=60&&t.player.place==FireServiceLife.DEPOT&&get(t,"until")<=FireServiceLife.now(s);
     }
     static String standby(TownLife.Town t,WorldState s){
         if(!canStandby(t,s))throw new IllegalArgumentException("Standby unavailable.");
         set(t,"until",FireServiceLife.now(s)+120);
         return "Ready for dispatch / In pronta disponibilita for 120 game minutes.";
     }
-    static boolean onStandby(TownLife.Town t,WorldState s){return ready(t)&&t.player.place==FireServiceLife.DEPOT&&get(t,"until")>FireServiceLife.now(s);}
+    static boolean onStandby(TownLife.Town t,WorldState s){return ready(t)&&gear(t)>=60&&t.player.place==FireServiceLife.DEPOT&&get(t,"until")>FireServiceLife.now(s);}
     static boolean canJoin(TownLife.Town t,WorldState s){
         int incident=FireServiceLife.get(t,"started");
         return onStandby(t,s)&&incident>0&&get(t,"joined")!=incident
@@ -37,7 +51,7 @@ final class FireDutyLife {
     }
     static boolean canAssist(TownLife.Town t,WorldState s){
         int incident=FireServiceLife.get(t,"started");
-        return ready(t)&&incident>0&&get(t,"joined")==incident&&get(t,"assisted")!=incident
+        return ready(t)&&gear(t)>=60&&incident>0&&get(t,"joined")==incident&&get(t,"assisted")!=incident
             &&t.player.place==FireServiceLife.site(t)&&"FIGHTING".equals(FireServiceLife.view(t,s).status());
     }
     static Journey assist(TownLife.Town t,WorldState s){
@@ -45,6 +59,7 @@ final class FireDutyLife {
         set(t,"assisted",FireServiceLife.get(t,"started"));
         set(t,"completed",Math.addExact(get(t,"completed"),1));
         t.player.fatigue=Math.min(100,t.player.fatigue+5);
+        set(t,"gear",Math.max(0,gear(t)-15));
         int now=FireServiceLife.now(s);
         FireServiceLife.set(t,"end",Math.max(now+1,FireServiceLife.get(t,"end")-5));
         int bonus=Math.min(BONUS,Math.max(0,t.employerFunds.getOrDefault(FireServiceLife.ACCOUNT,0)));
@@ -52,9 +67,9 @@ final class FireDutyLife {
         t.player.money=Math.addExact(t.player.money,bonus);
         return new Journey("Crew support completed / Supporto squadra completato. EUR "+bonus+" bonus.",5);
     }
-    record View(boolean standby,boolean assigned,int completed){}
+    record View(boolean standby,boolean assigned,int completed,int gearCondition){}
     static View view(TownLife.Town t,WorldState s){
         int active=FireServiceLife.get(t,"started");
-        return new View(onStandby(t,s),active>0&&get(t,"joined")==active,get(t,"completed"));
+        return new View(onStandby(t,s),active>0&&get(t,"joined")==active,get(t,"completed"),gear(t));
     }
 }

@@ -357,14 +357,14 @@ final class GeoProjection {
         }
         motorRoutes.put(key,Optional.ofNullable(result));return result;
     }
-    record FireVisual(String id,double x,double z,double intensity){}
+    record FireVisual(String id,double x,double z,double intensity,boolean fighting){}
     FireVisual fireVisual(TownLife.Town t,WorldState s){
         var place=FireServiceLife.site(t);if(place==null)return null;
         var state=FireServiceLife.view(t,s);
         var at=point(place);
         double intensity=state.status().equals("FIGHTING")?Math.max(.12,state.minutesRemaining()/15.0):Math.min(1,.35+Math.max(0,FireServiceLife.now(s)-FireServiceLife.get(t,"started"))/45.0);
         // Provisional district marker beside the public anchor, not a real building footprint.
-        return new FireVisual("fire-"+FireServiceLife.get(t,"started"),at.x+6,at.z+6,intensity);
+        return new FireVisual("fire-"+FireServiceLife.get(t,"started"),at.x+6,at.z+6,intensity,state.status().equals("FIGHTING"));
     }
     TrafficCar fireVehicle(TownLife.Town t,WorldState s){
         var site=FireServiceLife.site(t);var state=FireServiceLife.view(t,s);
@@ -500,6 +500,7 @@ final class GeoProjection {
         for(String id:List.of("bread","water","pizza","gelato","grape-juice"))
             if(FoodLife.quantity(p,id,false)>0)result.add(new Choice("consume:"+id,"Consume / Consuma "+RetailLife.product(id).label()));
         if(point(p.place).distance(player)>18)return result;
+        if(FireDutyLife.canIssueGear(t,s))result.add(new Choice("fire-duty-gear","Collect / replace protective kit · Ritira DPI · 5 min"));
         if(FireDutyLife.canStandby(t,s))result.add(new Choice("fire-duty-standby","Emergency standby / Pronta disponibilita · 120 min"));
         if(FireDutyLife.canJoin(t,s))result.add(new Choice("fire-duty-join","Join responding crew / Parti con la squadra"));
         if(FireDutyLife.canAssist(t,s))result.add(new Choice("fire-duty-assist","Support crew / Supporta la squadra · 5 min"));
