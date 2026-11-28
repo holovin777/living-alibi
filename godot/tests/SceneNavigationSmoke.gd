@@ -573,6 +573,23 @@ func _exercise() -> void:
     if not _check(sample_car.has_meta("body_style") and sample_car.get_child_count()>20,
             "traffic uses detailed compact vehicle models"):
         return
+    var car_record: Dictionary=traffic["cars"][0]
+    var saved_car: Dictionary=world._save_traffic_car(car_record)
+    var restored_car: Dictionary=world._restore_traffic_car(saved_car)
+    var restored_node: Node3D=restored_car["node"]
+    if not _check(restored_node.get_meta("traffic_id")==sample_car.get_meta("traffic_id")
+            and restored_node.get_meta("vehicle_kind")==sample_car.get_meta("vehicle_kind")
+            and restored_car["distance"]==car_record["distance"],
+            "streamed traffic preserves car identity, body style and road position"):return
+    var rolling_parts: Array[Node3D]=[]
+    for part in restored_node.get_children():
+        if part is Node3D and part.has_meta("rolling_wheel"):
+            rolling_parts.append(part)
+    if not _check(rolling_parts.size()==4,"car has four animated wheel rims"):return
+    var rim_angle: float=rolling_parts[0].rotation.x
+    world._animate_car_wheels(restored_node,4.0,0.1)
+    if not _check(not is_equal_approx(rim_angle,rolling_parts[0].rotation.x),"wheel rims rotate while driving"):return
+    restored_node.queue_free()
     var inbound: Dictionary = traffic["cars"][1]
     inbound["delay"] = 0.0
     inbound["distance"] = 14.9
