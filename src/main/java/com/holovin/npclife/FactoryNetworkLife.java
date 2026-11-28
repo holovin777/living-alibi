@@ -59,10 +59,13 @@ final class FactoryNetworkLife {
         return true;
     }
     static boolean produce(TownLife.Town t,Plant p){return produce(t,p,0);}
-    static boolean produce(TownLife.Town t,Plant p,int day){
+    static boolean produce(TownLife.Town t,Plant p,int day){return produce(t,p,day,false);}
+    static boolean produce(TownLife.Town t,Plant p,int day,boolean contractual){
         if(BusinessSolvencyLife.suspended(t,account(p))||!FactoryMaintenance.operational(t,p)||!GridDistributionLife.power(t,p.site()))return false;
         if(stock(t,p.output())+p.units()>12||p.inputs().entrySet().stream().anyMatch(e->stock(t,e.getKey())<e.getValue()))return false;
-        int cost=p.inputs().entrySet().stream().filter(e->!supplier(e.getKey()).equals(SUPPLIER)).mapToInt(e->2*e.getValue()).sum();
+        if(contractual&&p.inputs().entrySet().stream().anyMatch(e->!imported(e.getKey())&&!ProcurementLife.ordered(t,p,e.getKey(),day)))return false;
+        int cost=p.inputs().entrySet().stream().filter(e->!supplier(e.getKey()).equals(SUPPLIER))
+            .mapToInt(e->contractual?ProcurementLife.quote(t,p,e.getKey(),e.getValue(),day):2*e.getValue()).sum();
         boolean gas=GasNetworkLife.active(t)&&GasNetworkLife.heatPlant(p);
         int gasCost=gas?GasNetworkLife.PRICE:0;
         if(t.employerFunds.getOrDefault(account(p),0)<cost+gasCost||!EnergyLife.canBuy(t,account(p),cost+gasCost)
@@ -70,7 +73,11 @@ final class FactoryNetworkLife {
         if(!EnergyLife.buy(t,account(p)))return false;
         if(gas&&!GasNetworkLife.buy(t,account(p)))throw new IllegalStateException("Gas purchase failed after validation.");
         for(var e:p.inputs().entrySet()){
-            if(!supplier(e.getKey()).equals(SUPPLIER))SupplyChainLife.pay(t,account(p),supplier(e.getKey()),2*e.getValue());
+            if(!supplier(e.getKey()).equals(SUPPLIER)){
+                int amount=contractual?ProcurementLife.quote(t,p,e.getKey(),e.getValue(),day):2*e.getValue();
+                if(!SupplyChainLife.pay(t,account(p),supplier(e.getKey()),amount))throw new IllegalStateException("Validated purchase failed.");
+                if(contractual)ProcurementLife.settled(t,p,e.getKey(),e.getValue(),amount,day);
+            }
             change(t,e.getKey(),-e.getValue());
         }
         int accepted=FactoryQuality.inspect(t,p,day);
@@ -109,17 +116,29 @@ final class FactoryNetworkLife {
             String k="factory-network:forest";SupplyChainLife.set(t,k,Math.min(80,SupplyChainLife.get(t,k)+1));
         }
         boolean freight=SupplyChainLife.attending(t,LOGISTICS_DEPOT,"Warehouse worker")&&SupplyChainLife.attending(t,QUARRY,"Transport driver");
-        if(s.minute==600&&SupplyChainLife.once(t,"materials-import",s.day)&&freight){
-            for(var p:PLANTS)for(String item:p.inputs().keySet())if(imported(item))procure(t,item,p);
+        if(s.minute==600&&SupplyChainLife.once(t,"materials-import",s.day)){
+            for(var p:PLANTS)ProcurementLife.plan(t,s,p);
+            if(freight)for(var p:PLANTS)for(String item:p.inputs().keySet())
+                if(imported(item)&&ProcurementLife.ordered(t,p,item,s.day)&&procure(t,item,p))
+                    ProcurementLife.settled(t,p,item,2,4,s.day);
         }
         if(s.minute==660&&SupplyChainLife.once(t,"logging",s.day)&&freight&&SupplyChainLife.attending(t,WOODS,"Forestry worker"))harvest(t);
         if(s.minute==720){
             for(var p:PLANTS)FactoryMaintenance.service(t,s,p);
         }
         if(s.minute==780&&SupplyChainLife.once(t,"network-production",s.day)){
-            for(var p:PLANTS)if(!FireRecoveryLife.closed(t,p.site())&&SupplyChainLife.attending(t,p.site(),p.occupation())){
-                if(!FactoryMaintenance.operational(t,p))IndustrialRepairLife.lostBatch(t,p);
-                else produce(t,p,s.day);
+            var priority=new ArrayList<>(PLANTS);
+            // Rotate equal upstream timber buyers rather than always granting the sawmill first choice.
+            if(s.day%2==0)Collections.swap(priority,0,1);
+            for(var p:priority){
+                if(!FireRecoveryLife.closed(t,p.site())&&SupplyChainLife.attending(t,p.site(),p.occupation())){
+                    if(!FactoryMaintenance.operational(t,p))IndustrialRepairLife.lostBatch(t,p);
+                    else{
+                        ProcurementLife.plan(t,s,p);
+                        produce(t,p,s.day,true);
+                    }
+                }
+                ProcurementLife.finish(t,p,s.day);
             }
         }
         if(s.minute==900&&SupplyChainLife.once(t,"network-delivery",s.day)&&freight){

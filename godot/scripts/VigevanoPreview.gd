@@ -1100,6 +1100,11 @@ func _open_actions(work_only: bool=false) -> void:
                 WorkPanel.label(action_list,"Audit / Controllo · Day / Giorno %s · Cash / Cassa €%s · Arrears / Arretrati €%s" % [gov.get("auditDay",0),gov.get("auditCash",0),gov.get("auditArrears",0)])
             var outcomes: Dictionary={"SCHEDULED":"Scheduled / Programmato","HIRED":"Hired / Assunto","REJECTED":"Not hired / Non assunto","NONE":"None / Nessuno"}
             WorkPanel.label(action_list,"Interview / Colloquio: %s · %s · Day / Giorno %s" % [gov.get("candidate",""),outcomes.get(gov.get("interviewResult","NONE"),""),maxi(int(gov.get("appointmentDay",0)),int(gov.get("interviewDay",0)))])
+            var order_states: Dictionary={"ORDERED":"Ordered / Ordinato","PAID":"Paid / Pagato","NO_FUNDS":"No funds / Fondi insufficienti","UNFULFILLED":"Unfulfilled / Inevaso"}
+            for order in management.get("procurement",[]):
+                WorkPanel.label(action_list,"Purchase / Acquisto: %s ×%s · €%s · %s\nSupplier / Fornitore: %s · Day / Giorno %s" % [order.get("item",""),order.get("quantity",0),order.get("amount",0),order_states.get(order.get("status",""),""),order.get("supplier",""),order.get("day",0)])
+                if int(order.get("invoiceDay",0))>0:
+                    WorkPanel.label(action_list,"Paid invoice / Fattura pagata · Day / Giorno %s · %s units · €%s" % [order.get("invoiceDay",0),order.get("invoiceQuantity",0),order.get("invoiceAmount",0)])
             for report in gov.get("reports",[]):
                 WorkPanel.label(action_list,"Day / Giorno %s · 06:30–06:30\nCash / Cassa €%s → €%s · Net cash / Flusso netto €%s\nPayroll / Stipendi €%s · Arrears / Arretrati €%s · Bank debt / Debito bancario €%s" % [report.get("day",0),report.get("openingCash",0),report.get("closingCash",0),report.get("netCashChange",0),report.get("payrollPaid",0),report.get("wageDebt",0),report.get("bankDebt",0)])
     var enterprise=residents.world.get("enterprise")
