@@ -7,6 +7,7 @@ final class GeoDrive {
     record Pose(boolean active,boolean stolen,double x,double z,double heading,int fuel,int condition,double speedKmh,int speedLimitKmh,String vehicleKind,String message){}
     final boolean stolen;
     final boolean bus;
+    final boolean truck;
     String from,to;
     double progress,meters,speed;
     boolean waitingForSignal;
@@ -14,9 +15,10 @@ final class GeoDrive {
     static final double HIGHWAY_SPEED=20.0; // prototype safety/performance cap
     long lastStep;
     GeoDrive(boolean stolen,String from){this(stolen,false,from);}
-    GeoDrive(boolean stolen,boolean bus,String from){this.stolen=stolen;this.bus=bus;this.from=from;this.to=from;lastStep=System.nanoTime();}
+    GeoDrive(boolean stolen,boolean bus,String from){this(stolen,bus,false,from);}
+    GeoDrive(boolean stolen,boolean bus,boolean truck,String from){this.stolen=stolen;this.bus=bus;this.truck=truck;this.from=from;this.to=from;lastStep=System.nanoTime();}
     GeoDrive copy(){
-        var c=new GeoDrive(stolen,bus,from);c.to=to;c.progress=progress;c.meters=meters;c.speed=speed;c.lastStep=lastStep;return c;
+        var c=new GeoDrive(stolen,bus,truck,from);c.to=to;c.progress=progress;c.meters=meters;c.speed=speed;c.lastStep=lastStep;return c;
     }
     GeoProjection.Point position(GeoProjection map){return map.motorNodes.get(from).lerp(map.motorNodes.get(to),progress);}
     double heading(GeoProjection map){
@@ -40,14 +42,14 @@ final class GeoDrive {
     }
     /** Bound elapsed time so pauses or network stalls cannot teleport the car. */
     double controlBudget(String command,double elapsed){return controlBudget(command,elapsed,MAX_SPEED);}
-    double vehicleLimit(double roadLimit){return Math.min(roadLimit,bus?54:72);}
+    double vehicleLimit(double roadLimit){return Math.min(roadLimit,truck?60:bus?54:72);}
     double controlBudget(String command,double elapsed,double limit){
         limit=Math.max(0,Math.min(vehicleLimit(72)/3.6,limit));
         speed=Math.min(speed,limit);
         double dt=Math.max(0,Math.min(0.8,elapsed));
         if(elapsed>1.5)speed=0;
         double initial=speed;
-        double acceleration=switch(command){case "step" -> bus?1.6:3.0;case "brake" -> bus?-5.0:-8.0;default -> -1.8;};
+        double acceleration=switch(command){case "step" -> truck?1.2:bus?1.6:3.0;case "brake" -> truck?-4.0:bus?-5.0:-8.0;default -> -1.8;};
         speed=Math.max(0,Math.min(limit,speed+acceleration*dt));
         if(acceleration<0&&initial+acceleration*dt<0)dt=initial/-acceleration;
         return (initial+speed)*0.5*dt;

@@ -31,6 +31,10 @@ func _check(traffic,graph: Dictionary) -> void:
         cabin.queue_free();push_error("Cabin instruments failed");quit(1);return
     cabin.queue_free()
     traffic.configure(graph)
+    var truck: Node3D=traffic._truck()
+    if truck.get_child_count()<14:
+        truck.free();push_error("Truck exterior incomplete");quit(1);return
+    truck.free()
     var car: Node3D=traffic._car()
     if not car.has_node("ImportedVehicle"):
         car.free();push_error("Geographic car model missing");quit(1);return

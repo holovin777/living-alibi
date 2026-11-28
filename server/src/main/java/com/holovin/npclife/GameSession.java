@@ -712,15 +712,19 @@ public final class GameSession implements AutoCloseable {
             geoDrive=null;throw new IllegalArgumentException("Driving unavailable.");
         }
         if(command.equals("status"))return drivePose(map,"");
-        if(command.equals("start")||command.equals("steal")||command.equals("steal-bus")){
+        if(command.equals("start")||command.equals("steal")||command.equals("steal-bus")||command.equals("steal-truck")){
             if(geoDrive!=null)throw new IllegalArgumentException("Already driving.");
             var p=town.player;TransportLife.ready(p);
             if(p.ownsBicycle&&p.bicycleParked==null)throw new IllegalArgumentException("Park your bicycle first.");
             if(IntercomLife.insideVisit(town,state.day,state.minute))throw new IllegalArgumentException("Leave the apartment first.");
             boolean bus=command.equals("steal-bus");
-            boolean stolen=bus||command.equals("steal");
+            boolean truck=command.equals("steal-truck");
+            boolean stolen=bus||truck||command.equals("steal");
             var civilian=map.civilian(town,point);
-            if(bus){
+            if(truck){
+                var parked=map.parkedTruck(town,point);
+                if(parked==null||Math.hypot(parked.x()-x,parked.z()-z)>5)throw new IllegalArgumentException("Approach the reserve truck at the workshop.");
+            }else if(bus){
                 var parked=map.parkedBus(town,point);
                 if(parked==null||Math.hypot(parked.x()-x,parked.z()-z)>5)throw new IllegalArgumentException("Approach the municipal reserve bus at the station.");
             }else if(stolen){
@@ -731,15 +735,16 @@ public final class GameSession implements AutoCloseable {
             if(node==null||map.motorNodes.get(node).distance(point)>30)throw new IllegalArgumentException("No motor road nearby.");
             if(stolen){
                 var copy=town.copy();var clock=state.copy();var truth=new ArrayList<TownLife.Event>();var observations=new ArrayList<TownLife.Observation>();
-                if(bus)VehicleTheftLife.takeBus(copy,clock,truth,observations);
+                if(truck)VehicleTheftLife.takeTruck(copy,clock,truth,observations);
+                else if(bus)VehicleTheftLife.takeBus(copy,clock,truth,observations);
                 else{
                     var owner=copy.people.values().stream().filter(c->c.generationIndex==civilian.ownerIndex()).findFirst().orElseThrow();
                     VehicleTheftLife.take(copy,clock,owner,truth,observations);
                 }
-                applyInternal(copy,1,bus?"Municipal bus reported stolen.":"Civilian car reported stolen.",false,clock,truth,observations);
+                applyInternal(copy,1,truck?"Freight truck reported stolen.":bus?"Municipal bus reported stolen.":"Civilian car reported stolen.",false,clock,truth,observations);
                 if(JusticeLife.confined(town))return drivePose(map,"Police detained you.");
             }else if(p.carFuel<1||p.carCondition<3)throw new IllegalArgumentException("Car needs fuel or service.");
-            geoDrive=new GeoDrive(stolen,bus,node);
+            geoDrive=new GeoDrive(stolen,bus,truck,node);
             geoDrive.to=map.motorEdges.get(node).get(0);
             geoDrive.meters=VehicleTheftLife.get(town,stolen?"stolen-remainder":"owned-remainder")/1000.0;
             return drivePose(map,stolen?"Stolen vehicle reported to police.":"In your car.");
@@ -795,7 +800,7 @@ public final class GameSession implements AutoCloseable {
         var p=geoDrive.position(map);
         return new GeoDrive.Pose(true,geoDrive.stolen,p.x(),p.z(),geoDrive.heading(map),
             geoDrive.stolen?VehicleTheftLife.get(town,"fuel"):town.player.carFuel,
-            geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,geoDrive.speed*3.6,(int)geoDrive.vehicleLimit(map.speedLimit(geoDrive.from,geoDrive.to)),geoDrive.bus?"BUS":"CAR",message);
+            geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,geoDrive.speed*3.6,(int)geoDrive.vehicleLimit(map.speedLimit(geoDrive.from,geoDrive.to)),geoDrive.truck?"TRUCK":geoDrive.bus?"BUS":"CAR",message);
     }
     synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z)throws SQLException{
         var target=geoDrive==null?new GeoProjection.Point(x,z):geoDrive.position(map);

@@ -45,6 +45,23 @@ class GeoDriveTest {
         assertEquals(3,drive.advance(map,0,5,17),.001);
         assertFalse(drive.waitingForSignal);
     }
+    @Test void truckHasIndependentPersistentReserveCondition(){
+        var t=TownLife.create(new WorldState());
+        t.player.place=TownLife.Place.WORKSHOP;t.player.destination=t.player.place;
+        VehicleTheftLife.takeTruck(t,new WorldState(),new ArrayList<>(),new ArrayList<>());
+        assertTrue(VehicleTheftLife.truck(t));
+        assertFalse(VehicleTheftLife.bus(t));
+        VehicleTheftLife.set(t,"fuel",9);VehicleTheftLife.set(t,"condition",70);
+        VehicleTheftLife.recover(t);
+        assertEquals(9,VehicleTheftLife.reserveFuel(t,"truck"));
+        assertEquals(70,VehicleTheftLife.reserveCondition(t,"truck"));
+        assertEquals(12,VehicleTheftLife.reserveFuel(t,"bus"));
+        var drive=new GeoDrive(true,false,true,"1");
+        drive.controlBudget("step",0.5,20);
+        assertEquals(0.6,drive.speed,.001);
+        assertEquals(60,drive.vehicleLimit(72),.001);
+        assertTrue(drive.copy().truck);
+    }
     @Test void reserveBusCustodyAndRecoveryAreSeparate()throws Exception{
         var s=new WorldState();var t=TownLife.create(s);
         t.player.place=TownLife.Place.STAZIONE;t.player.destination=t.player.place;
