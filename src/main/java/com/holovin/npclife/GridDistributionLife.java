@@ -52,7 +52,9 @@ final class GridDistributionLife {
         EnergyLife.set(t,"grid-day",s.day);
         for(var f:FEEDERS){
             repair(t,s,f);
-            if(power(t,f.site()))EnergyLife.set(t,key(f,"condition"),Math.max(0,condition(t,f)-2));
+            boolean upgraded=f.id().equals("north")&&InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.NORTH)
+                ||f.id().equals("south")&&InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.SOUTH);
+            if(power(t,f.site()))EnergyLife.set(t,key(f,"condition"),Math.max(0,condition(t,f)-(upgraded?1:2)));
             if(!power(t,f.site()))EnergyLife.add(t,key(f,"outage-days"),1);
         }
     }

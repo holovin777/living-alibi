@@ -1090,6 +1090,8 @@ func _open_actions(work_only: bool=false) -> void:
         hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         action_list.add_child(hint)
     if str(room.get("id",""))=="OFFICE":
+        for infra in residents.world.get("infrastructureProjects",[]):
+            WorkPanel.label(action_list,"%s · %s/3 · €%s/%s\nPressure / Pressione: %s days" % [infra.get("id",""),infra.get("stage",0),infra.get("spent",0),infra.get("totalCost",0),infra.get("pressureDays",0)])
         for plant in residents.world.get("industrialProjects",[]):
             WorkPanel.label(action_list,"%s · %s · %s/3\nShortage days / Giorni di carenza: %s · Stock / Scorte: %s · Sold / Venduti: %s" % [plant.get("id",""),plant.get("owner",""),plant.get("stage",0),plant.get("shortageDays",0),plant.get("stock",0),plant.get("sold",0)])
         for home_plot in residents.world.get("residentialPlots",[]):

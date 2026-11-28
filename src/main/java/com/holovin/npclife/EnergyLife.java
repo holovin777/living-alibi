@@ -13,6 +13,7 @@ final class EnergyLife {
         new Station("solar","Solar plant operator",TownLife.Place.FARM,12),
         new Station("hydro","Hydropower operator",TownLife.Place.RIVER,8),
         new Station("thermal","Thermal plant operator",TownLife.Place.FACTORY,10));
+    static int capacity(TownLife.Town t){return CAPACITY+(InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.SOLAR)?12:0);}
     static int get(TownLife.Town t,String f){return t.industryStocks.getOrDefault("energy:"+f,0);}
     static void set(TownLife.Town t,String f,int n){t.industryStocks.put("energy:"+f,n);}
     static void add(TownLife.Town t,String f,int n){set(t,f,Math.addExact(get(t,f),n));}
@@ -35,7 +36,8 @@ final class EnergyLife {
     static int potential(TownLife.Town t,WorldState s,Station p){
         if(p.id().equals("solar")){
             int day=Math.floorMod(s.day-1,365);
-            return day<60||day>=305?6:12;
+            int base=day<60||day>=305?6:12;
+            return base+(InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.SOLAR)?base/2:0);
         }
         if(p.id().equals("hydro")){
             var river=t.naturalResources.get("river-water");
@@ -56,8 +58,8 @@ final class EnergyLife {
         boolean thermal=p.id().equals("thermal");
         // Thermal backup only runs if renewable output and stored energy are insufficient.
         boolean gas=thermal&&GasNetworkLife.active(t)&&GasNetworkLife.available(t);
-        if(thermal&&(get(t,"battery")>=PRIORITY+FactoryNetworkLife.PLANTS.size()||!gas&&FuelLife.stock(t)<1))return;
-        int units=Math.min(CAPACITY-get(t,"battery"),potential(t,s,p));
+        if(thermal&&(get(t,"battery")>=InfrastructureDevelopmentLife.priority(t)+FactoryNetworkLife.PLANTS.size()||!gas&&FuelLife.stock(t)<1))return;
+        int units=Math.min(capacity(t)-get(t,"battery"),potential(t,s,p));
         if(units<=0||cash(t)<WAGE+(thermal?(gas?GasNetworkLife.PRICE:FuelLife.PRICE):0))return;
         if(gas){if(!GasNetworkLife.buy(t,ACCOUNT))return;}
         else if(thermal){
@@ -73,8 +75,9 @@ final class EnergyLife {
         ensure(t);set(t,"day",s.day);set(t,"generated",0);set(t,"industrial-used",0);
         for(var p:STATIONS)generate(t,s,p);
         // Public network has priority over factory batches. Daily payment is a municipal service purchase.
-        boolean supply=get(t,"battery")>=PRIORITY&&SupplyChainLife.pay(t,"city-maintenance",ACCOUNT,PRIORITY*PRICE);
-        if(supply)add(t,"battery",-PRIORITY);
+        int priority=InfrastructureDevelopmentLife.priority(t);
+        boolean supply=get(t,"battery")>=priority&&SupplyChainLife.pay(t,"city-maintenance",ACCOUNT,priority*PRICE);
+        if(supply)add(t,"battery",-priority);
         set(t,"public-power",supply?1:0);
         if(!supply)add(t,"outage-days",1);
         GridDistributionLife.tick(t,s);
@@ -90,8 +93,8 @@ final class EnergyLife {
     record StationView(String id,String district,int capacity,int condition,int generated,int workers){}
     record View(boolean active,int stored,int capacity,int generated,int industrialUsed,boolean publicPower,int outageDays,int funds,List<StationView> stations,List<GridDistributionLife.FeederView> feeders){}
     static View view(TownLife.Town t){
-        return new View(enabled(t),get(t,"battery"),CAPACITY,get(t,"generated"),get(t,"industrial-used"),publicPower(t),get(t,"outage-days"),cash(t),
-            STATIONS.stream().map(p->new StationView(p.id(),p.site().name(),p.capacity(),condition(t,p),get(t,p.id()+":generated"),
+        return new View(enabled(t),get(t,"battery"),capacity(t),get(t,"generated"),get(t,"industrial-used"),publicPower(t),get(t,"outage-days"),cash(t),
+            STATIONS.stream().map(p->new StationView(p.id(),p.site().name(),p.capacity()+(p.id().equals("solar")&&InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.SOLAR)?6:0),condition(t,p),get(t,p.id()+":generated"),
                 (int)t.people.values().stream().filter(c->c.alive&&c.employed&&p.role().equals(c.occupation)&&c.workplace==p.site()).count())).toList(),GridDistributionLife.view(t));
     }
 }

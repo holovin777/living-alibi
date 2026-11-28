@@ -291,6 +291,10 @@ func _sync_commercial(projects: Array) -> void:
 func _commercial_site(root: Node3D,project: Dictionary) -> void:
     var stage:=clampi(int(project.get("stage",0)),0,3)
     var active: bool=bool(project.get("active",false))
+    var utility: bool=str(project.get("id","")).begins_with("utility:")
+    if utility:
+        _utility_site(root,stage,active,str(project.get("id","")).trim_prefix("utility:"))
+        return
     var industrial: bool=str(project.get("id","")).begins_with("industrial:")
     if industrial:
         _industrial_site(root,stage,active,str(project.get("id","")).trim_prefix("industrial:"))
@@ -356,3 +360,25 @@ func _industrial_site(root: Node3D,stage: int,active: bool,id: String) -> void:
         _box(root,Vector3(-4.2,2.5,-3.2),Vector3(0.25,5,0.25),Color("#d2a147"))
         _box(root,Vector3(-2.1,5,-3.2),Vector3(4.5,0.2,0.2),Color("#d2a147"))
         _sign(root,Vector3(0,2.0,3.5),"CANTIERE INDUSTRIALE · %s/3" % stage)
+
+func _utility_site(root: Node3D,stage: int,active: bool,id: String) -> void:
+    if stage<3:
+        _industrial_site(root,stage,active,id)
+        return
+    _box(root,Vector3.ZERO,Vector3(9,0.12,7),Color("#939b8e"))
+    if id.begins_with("solar"):
+        for x in [-2.7,0.0,2.7]:
+            for z in [-1.5,1.5]:
+                _box(root,Vector3(x,0.7,z),Vector3(0.15,1.4,0.15),Color("#81898b"))
+                var panel:=_box(root,Vector3(x,1.45,z),Vector3(2.4,0.12,2.1),Color("#304d73"))
+                panel.rotation.x=0.35
+    elif id.ends_with("substation"):
+        for x in [-2.0,2.0]:
+            _box(root,Vector3(x,1.0,0),Vector3(2.6,2.0,2.4),Color("#758d86"),true)
+            for z in [-0.7,0.7]:_box(root,Vector3(x,2.4,z),Vector3(0.2,0.8,0.2),Color("#c4c3b5"))
+        for x in [-4.1,4.1]:_box(root,Vector3(x,0.8,0),Vector3(0.15,1.6,6.6),Color("#a3a8a6"))
+    else:
+        for x in [-2.0,2.0]:
+            _box(root,Vector3(x,0.55,0),Vector3(3.2,1.1,4.8),Color("#a2b0b5"),true)
+            _box(root,Vector3(x,1.15,0),Vector3(2.9,0.08,4.5),Color("#557f91"))
+    _sign(root,Vector3(0,2.8,3.4),id.to_upper())

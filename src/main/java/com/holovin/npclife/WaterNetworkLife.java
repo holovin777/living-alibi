@@ -7,6 +7,8 @@ final class WaterNetworkLife {
     private WaterNetworkLife(){}
     static final String ACCOUNT="water-utility", WATER_ROLE="Water treatment operator", SEWER_ROLE="Wastewater operator";
     static final int CAPACITY=48, SEWER_CAPACITY=32, WAGE=4;
+    static int capacity(TownLife.Town t){return CAPACITY+(InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.WATER)?24:0);}
+    static int sewerCapacity(TownLife.Town t){return SEWER_CAPACITY+(InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.SEWER)?16:0);}
     static String key(String f){return "water-network:"+f;}
     static int get(TownLife.Town t,String f){return t.industryStocks.getOrDefault(key(f),0);}
     static void set(TownLife.Town t,String f,int n){t.industryStocks.put(key(f),n);}
@@ -40,12 +42,12 @@ final class WaterNetworkLife {
     static void generate(TownLife.Town t,WorldState s){
         var river=t.naturalResources.get("river-water");
         if(river==null)return;
-        int n=Math.min(16,Math.min(river.stock,CAPACITY-get(t,"treated")));
+        int n=Math.min(InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.WATER)?24:16,Math.min(river.stock,capacity(t)-get(t,"treated")));
         if(n<=0||!operate(t,worker(t,s,WATER_ROLE,TownLife.Place.RIVER),"water",TownLife.Place.RIVER))return;
         river.stock-=n;add(t,"treated",n);add(t,"produced",n);
     }
     static void process(TownLife.Town t,WorldState s){
-        int n=Math.min(12,get(t,"sewage"));
+        int n=Math.min(InfrastructureDevelopmentLife.complete(t,InfrastructureDevelopmentLife.SEWER)?18:12,get(t,"sewage"));
         if(n<=0||!operate(t,worker(t,s,SEWER_ROLE,TownLife.Place.FACTORY),"sewer",TownLife.Place.FACTORY))return;
         add(t,"sewage",-n);add(t,"processed",n);
         var river=t.naturalResources.get("river-water");
@@ -53,7 +55,7 @@ final class WaterNetworkLife {
     }
     static void discharge(TownLife.Town t){
         if(!active(t))return;
-        if(get(t,"sewage")<SEWER_CAPACITY)add(t,"sewage",1);else add(t,"overflow",1);
+        if(get(t,"sewage")<sewerCapacity(t))add(t,"sewage",1);else add(t,"overflow",1);
     }
     static int fountain(TownLife.Town t,int requested){
         int n=Math.min(requested,Math.min(get(t,"treated"),UtilityLife.TANK_CAPACITY-t.cleanWater));
@@ -79,7 +81,8 @@ final class WaterNetworkLife {
         if(!StaffingLife.enabled(t)||s.minute!=700||get(t,"day")>=s.day)return;
         ensure(t);set(t,"day",s.day);
         process(t,s);generate(t,s);
-        int n=Math.min(4,Math.min(get(t,"treated"),SEWER_CAPACITY-get(t,"sewage")));
+        int demand=4+InfrastructureDevelopmentLife.homes(t,TownLife.Place.NORTH_RESIDENCES)+InfrastructureDevelopmentLife.homes(t,TownLife.Place.SOUTH_RESIDENCES);
+        int n=Math.min(demand,Math.min(get(t,"treated"),sewerCapacity(t)-get(t,"sewage")));
         n=Math.min(n,t.employerFunds.getOrDefault("city-maintenance",0));
         if(n>0&&GridDistributionLife.power(t,TownLife.Place.PARK)&&SupplyChainLife.pay(t,"city-maintenance",ACCOUNT,n)){
             add(t,"treated",-n);add(t,"sewage",n);add(t,"domestic-used",n);
@@ -91,7 +94,7 @@ final class WaterNetworkLife {
     record View(boolean active,int treated,int capacity,int sewage,int sewerCapacity,int waterCondition,int sewerCondition,
         int produced,int processed,int sold,int domesticUsed,int emptyReservoirDays,int overflow,int funds){}
     static View view(TownLife.Town t){
-        return new View(active(t),get(t,"treated"),CAPACITY,get(t,"sewage"),SEWER_CAPACITY,condition(t,"water"),condition(t,"sewer"),
+        return new View(active(t),get(t,"treated"),capacity(t),get(t,"sewage"),sewerCapacity(t),condition(t,"water"),condition(t,"sewer"),
             get(t,"produced"),get(t,"processed"),get(t,"sold"),get(t,"domestic-used"),get(t,"empty-reservoir-days"),get(t,"overflow"),cash(t));
     }
 }
