@@ -964,6 +964,11 @@ public final class GameSession implements AutoCloseable {
             };
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.startsWith("vehicle-docs:")){
+            String[] command=action.split(":",3);
+            var copy=town.copy();String message=VehicleDocumentsLife.action(copy,state,command[1],command[2]);
+            apply(copy,15,message);return new GeoProjection.ActionResult(message,null);
+        }
         if(action.equals("road-fine-pay")){
             var copy=town.copy();String message=RoadPoliceLife.pay(copy,state);
             apply(copy,5,message);return new GeoProjection.ActionResult(message,null);

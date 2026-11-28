@@ -626,6 +626,8 @@ func _update_navigation() -> void:
         hud.text+="\nPatente / License: "+(" · ".join(categories) if not categories.is_empty() else "None / Nessuna")
         hud.text+="\nG: enter nearby vehicle / steal parked reserve"
         if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Road target %s km/h · Fuel %s · Condition %s" % [residents.driving.get("speedLimitKmh",36),residents.driving.get("fuel",0),residents.driving.get("condition",0)]
+        for doc in world.get("vehicleDocuments",[]):
+            hud.text+="\n%s · %s · RC %s d · Revisione %s d" % [doc.get("kind",""),doc.get("plate",""),doc.get("insuranceDays",0),doc.get("inspectionDays",0)]
         var road_police: Dictionary=world.get("roadPolice",{})
         if int(road_police.get("outstanding",0))>0:hud.text+="\nTraffic fines / Multe: €%s · F at municipal office" % road_police["outstanding"]
         var justice: Dictionary=world.get("justice",{})

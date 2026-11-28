@@ -28,7 +28,7 @@ final class LightMotorLife {
             case "buy" -> {
                 MotorLife.workshop(t.player,minute);
                 if(parked(t,kind)!=null)throw new IllegalArgumentException("You already own this vehicle type.");
-                MotorLife.pay(t,price(kind));park(t,kind,t.player.place);
+                MotorLife.pay(t,price(kind));VehicleDocumentsLife.clear(t,kind);park(t,kind,t.player.place);
                 set(t,kind,"fuel",capacity(kind)/2);set(t,kind,"condition",80);set(t,kind,"remainder",0);
                 return "Bought a used "+kind+" for "+price(kind)+" EUR.";
             }
@@ -37,7 +37,7 @@ final class LightMotorLife {
                 int value=Math.max(1,price(kind)*get(t,kind,"condition")/200);
                 if(t.employerFunds.getOrDefault("technician",0)<value)throw new IllegalArgumentException("Dealer has insufficient funds.");
                 t.employerFunds.merge("technician",-value,Integer::sum);t.player.money=Math.addExact(t.player.money,value);
-                park(t,kind,null);set(t,kind,"fuel",0);set(t,kind,"condition",0);set(t,kind,"remainder",0);
+                park(t,kind,null);VehicleDocumentsLife.clear(t,kind);set(t,kind,"fuel",0);set(t,kind,"condition",0);set(t,kind,"remainder",0);
                 return "Sold "+kind+" for "+value+" EUR.";
             }
             case "refuel" -> {

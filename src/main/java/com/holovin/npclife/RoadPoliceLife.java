@@ -3,7 +3,7 @@ package com.holovin.npclife;
 /** Fictional roadside administrative checks, independent of criminal custody. */
 final class RoadPoliceLife {
     private RoadPoliceLife(){}
-    static final int LICENSE_FINE=35, CONDITION_FINE=20, CHECK_INTERVAL=30;
+    static final int LICENSE_FINE=35, CONDITION_FINE=20, INSURANCE_FINE=25, INSPECTION_FINE=15, CHECK_INTERVAL=30;
     private static String key(TownLife.Town t,String field){return "road-police:"+t.player.incarnation+":"+field;}
     static int get(TownLife.Town t,String field){return t.industryStocks.getOrDefault(key(t,field),0);}
     private static void set(TownLife.Town t,String field,int n){t.industryStocks.put(key(t,field),n);}
@@ -22,6 +22,10 @@ final class RoadPoliceLife {
         String reason="";
         if(!DrivingSchoolLife.allowed(t,kind)){fine+=LICENSE_FINE;reason="Missing category "+DrivingSchoolLife.required(kind);}
         if(condition<25){fine+=CONDITION_FINE;reason+=(reason.isEmpty()?"":"; ")+"Unsafe vehicle condition";}
+        if(VehicleDocumentsLife.parked(t,kind)!=null){
+            if(!VehicleDocumentsLife.insured(t,s,kind)){fine+=INSURANCE_FINE;reason+=(reason.isEmpty()?"":"; ")+"Missing insurance";}
+            if(!VehicleDocumentsLife.inspected(t,s,kind)){fine+=INSPECTION_FINE;reason+=(reason.isEmpty()?"":"; ")+"Missing inspection";}
+        }
         if(fine==0)return new Result(true,0,"Police check "+plate+": documents and condition accepted.");
         set(t,"violations",Math.addExact(get(t,"violations"),1));
         set(t,"outstanding",Math.addExact(get(t,"outstanding"),fine));
