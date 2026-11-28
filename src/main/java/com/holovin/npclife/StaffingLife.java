@@ -23,7 +23,7 @@ final class StaffingLife {
         job("Textile worker",FACTORY,1),job("Printer",FACTORY,1),job("Garment worker",FACTORY,1),
         job("Carpenter",WORKSHOP,2),job("Electronics assembler",FACTORY,2),job("Device assembler",FACTORY,1),job("Watch assembler",FACTORY,1),
         new Role("Doctor",CLINIC,3,null,"medicine",65),job("Nurse",CLINIC,5),job("Pharmacist",CLINIC,2),
-        job("Teacher",SCHOOL,6),job("Police officer",OFFICE,5),new Role("Detective",OFFICE,2,null,"investigation",45),
+        job("Teacher",SCHOOL,6),job("Police officer",OFFICE,5),job(FireServiceLife.ROLE,WORKSHOP,9),new Role("Detective",OFFICE,2,null,"investigation",45),
         job("Mechanic",WORKSHOP,5),job("Electrician",WORKSHOP,3),job("Plumber",WORKSHOP,3),job("Heating technician",WORKSHOP,3),
         new Role("Engineer",WORKSHOP,3,null,"engineering",45),new Role("Programmer",OFFICE,3,null,"programming",45),
         job("Office clerk",OFFICE,5),job("Bank clerk",OFFICE,3),new Role("Postal worker",OFFICE,2,PostalLife.ACCOUNT,null,20),

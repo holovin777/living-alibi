@@ -2,6 +2,16 @@ package com.holovin.npclife;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class FireServiceLifeTest {
+    @Test void staffedWorldRequiresAvailableCrew(){
+        var s=new WorldState();s.day=2;s.minute=600;var t=TownLife.create(s);
+        t.industryStocks.put(StaffingLife.ENABLED,1);
+        t.employerFunds.put("city-maintenance",100);t.industryStocks.put(FuelLife.STOCK,20);
+        WaterNetworkLife.set(t,"enabled",1);WaterNetworkLife.set(t,"treated",8);
+        FireServiceLife.start(t,s,TownLife.Place.FACTORY);FireServiceLife.report(t);
+        assertFalse(FireServiceLife.dispatch(t,s));
+        assertEquals("WAITING_CREW",FireServiceLife.view(t,s).status());
+        assertEquals(8,WaterNetworkLife.get(t,"treated"));assertEquals(20,FuelLife.stock(t));
+    }
     @Test void visualFadesWithSuppressionAndClears(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir)throws Exception{
         var graph=dir.resolve("fire.tsv");
         java.nio.file.Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\nM\t1\t0\t0\nM\t2\t100\t0\nD\t1\t2\nD\t2\t1\n");

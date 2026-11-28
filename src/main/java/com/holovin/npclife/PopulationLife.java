@@ -58,9 +58,11 @@ final class PopulationLife {
         boolean freightRun=carrier && freightDestination!=null && !sick;
         boolean journalist=NewspaperLife.reporter(c);
         boolean foodWorker=RetailLife.foodRole(c.occupation);
+        boolean fireStaff=FireServiceLife.firefighter(c);
+        boolean fireWorking=fireStaff&&(FireServiceLife.scheduled(c,minute)||FireServiceLife.assigned(town,c));
         boolean publicSafety=PoliceLife.staff(c);
-        boolean working=!child&&!retired&&c.employed && !PlayerServiceBusiness.ROLE.equals(c.occupation) && !sick && (publicSafety?PoliceLife.scheduled(c,clock.day,minute):(foodWorker?(clock.day-1)%7!=0:workday)) &&
-                (publicSafety?true:itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):foodWorker?(minute>=660&&minute<1140):
+        boolean working=!child&&!retired&&c.employed && !PlayerServiceBusiness.ROLE.equals(c.occupation) && !sick && (fireStaff?fireWorking:publicSafety?PoliceLife.scheduled(c,clock.day,minute):(foodWorker?(clock.day-1)%7!=0:workday)) &&
+                (fireStaff||publicSafety?true:itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):foodWorker?(minute>=660&&minute<1140):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
         boolean marketOpen=minute>=420 && minute<1200;
         boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,clock.day,minute)!=null);
@@ -89,6 +91,7 @@ final class PopulationLife {
         if(ChildhoodPrologue.active(town,c)&&manual==null)desired=c.home;
         else if(sick)desired=!sleeping&&manual==TownLife.Place.CLINIC?TownLife.Place.CLINIC:c.home;
         else if(manual!=null)desired=manual;
+        else if(fireWorking)desired=FireServiceLife.destination(town,c);
         else if(search!=null)desired=search;
         else if(homeService)desired=TownLife.Place.SOUTH_RESIDENCES;
         else if(residentService!=null)desired=residentService;
@@ -194,7 +197,7 @@ final class PopulationLife {
         if(search!=null&&manual==null)c.activity="SEARCHING_FOR_CHILD";
         else if(RebirthLife.childOutsideHome(town,c))c.activity="OUTSIDE_HOME";
         else if(RebirthLife.freeChild(town,c)&&manual!=null)c.activity="FREE_TIME";
-        else if(sleeping)c.activity="SLEEPING";
+        else if(sleeping&&!fireWorking)c.activity="SLEEPING";
         else if(sick)c.activity="SICK_LEAVE";
         else if(child)c.activity=c.place==TownLife.Place.SCHOOL?"STUDYING":c.place==c.home?"AT_HOME":
                 c.place==TownLife.Place.LIBRARY?"READING":c.place==TownLife.Place.PARK?"PLAYING":"FREE_TIME";
@@ -212,10 +215,11 @@ final class PopulationLife {
         else if(residentService!=null&&c.place==residentService)c.activity="WORKING";
         else if(freightRun)c.activity="WORKING";
         else if(journalist&&working&&c.place==NewspaperLife.assignment(clock.day,minute))c.activity="WORKING";
-        else if(working && (c.place==c.workplace||publicSafety&&c.place==PoliceLife.assignment(town,c,clock.day,minute))){
+        else if(working && (c.place==c.workplace||fireStaff&&c.place==FireServiceLife.destination(town,c)||publicSafety&&c.place==PoliceLife.assignment(town,c,clock.day,minute))){
             c.activity="WORKING";
             if(minute%60==0){
-                if(SecurityLife.guard(c))SecurityLife.pay(town,c);
+                if(fireStaff)FireServiceLife.pay(town,c);
+                else if(SecurityLife.guard(c))SecurityLife.pay(town,c);
                 else if(PostalLife.postalWorker(c))PostalLife.pay(town,c);
                 else if(foodWorker)RetailLife.foodShift(town,c,clock,events,observations);
                 else if(!ITStaffLife.OCCUPATION.equals(c.occupation) && !TechnicalWorkLife.linkedEngineer(town,c) && !SoftwareLife.linkedProgrammer(town,c) && !journalist && !stallEmployee && !MarketStallLife.OCCUPATION.equals(c.occupation) && !LogisticsLife.OCCUPATION.equals(c.occupation) && !BusinessLife.payHourly(town,c,clock,events,observations) &&

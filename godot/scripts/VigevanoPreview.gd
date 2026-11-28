@@ -637,7 +637,7 @@ func _update_navigation() -> void:
         for doc in world.get("vehicleDocuments",[]):
             hud.text+="\n%s · %s · RC %s d · Revisione %s d" % [doc.get("kind",""),doc.get("plate",""),doc.get("insuranceDays",0),doc.get("inspectionDays",0)]
         var fire: Dictionary=world.get("fireService",{})
-        if str(fire.get("status","NONE"))!="NONE":hud.text+="\nFire / Incendio: %s · %s · %s min" % [fire.get("district",""),fire.get("status",""),fire.get("minutesRemaining",0)]
+        if str(fire.get("status","NONE"))!="NONE":hud.text+="\nFire / Incendio: %s · %s · %s min · Crew %s" % [fire.get("district",""),fire.get("status",""),fire.get("minutesRemaining",0),fire.get("assigned",0)]
         var ambulance: Dictionary=world.get("ambulance",{})
         if str(ambulance.get("status",""))=="EN_ROUTE":hud.text+="\nAmbulance / Ambulanza: %s min · Stay in district" % ambulance.get("minutesRemaining",0)
         elif str(ambulance.get("status",""))=="ARRIVED":hud.text+="\nAmbulance arrived / Arrivata · F to board near district marker"

@@ -193,6 +193,7 @@ func _appearance(record: Dictionary,person: Dictionary) -> void:
         "TECHNICIAN":cloth=Color("#4b6681")
         "HIGH_VIS":cloth=Color("#e0ad42")
         "BAKER_APRON","CAFE_APRON":cloth=Color("#b9aa91")
+        "FIREFIGHTER":cloth=Color("#373c43")
         "POLICE":cloth=Color("#294569")
     if cloth.a>0:traffic._box(equipment,Vector3(0.43,0.50,0.26),Vector3(0,1.04,0),cloth)
     if outfit=="BACKPACK":traffic._box(equipment,Vector3(0.29,0.35,0.16),Vector3(0,1.03,0.19),Color("#5d727c"))

@@ -180,6 +180,7 @@ public final class GameSession implements AutoCloseable {
         if(c.place==TownLife.Place.SCHOOL&&c.age>=6&&c.age<18&&"STUDYING".equals(c.activity))return "BACKPACK";
         if(!"WORKING".equals(c.activity))return "";
         String role=c.occupation==null?"":c.occupation;
+        if(FireServiceLife.firefighter(c))return "FIREFIGHTER";
         if(PoliceLife.officer(c))return "POLICE";
         if(PoliceLife.detective(c))return "DETECTIVE";
         if(PostalLife.postalWorker(c))return "POSTAL";
