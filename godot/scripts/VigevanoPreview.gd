@@ -17,7 +17,7 @@ const WeatherVisual=preload("res://scripts/GeoWeather.gd")
 var precipitation: Node3D
 var lamp_pool: Array[OmniLight3D]=[]
 const ACTIVE_LAMPS=8
-var road_material: StandardMaterial3D
+var road_material: Material
 var rail_material: StandardMaterial3D
 var ready_to_walk := false
 const RoadGraph=preload("res://scripts/GeoRoadGraph.gd")
@@ -141,7 +141,7 @@ func _ready() -> void:
     civilian_car=traffic._car()
     add_child(civilian_car)
     civilian_car.hide()
-    driving_body=traffic._car()
+    driving_body=traffic._car(Color("#55585a"),false)
     add_child(driving_body)
     driving_body.hide()
     impact_overlay=ColorRect.new()
@@ -167,7 +167,9 @@ func _ready() -> void:
     chunk_size=float(city.get("chunk_size",128))
     wall_material=_material(Color("#cbb49b"))
     roof_material=_material(Color("#925f4d"))
-    road_material=_material(Color("#64696a"))
+    var asphalt:=ShaderMaterial.new()
+    asphalt.shader=preload("res://shaders/GeoAsphalt.gdshader")
+    road_material=asphalt
     rail_material=_material(Color("#8f8578"))
     var world_environment := WorldEnvironment.new()
     var environment := Environment.new()
@@ -599,7 +601,7 @@ func _sync_patrols(records: Array) -> void:
         var goal:=Vector3(float(record["x"]),0.05,float(record["z"]))
         seen[id]=true
         if not patrol_models.has(id):
-            var car: Node3D=traffic._car(Color("#254a84"))
+            var car: Node3D=traffic._car(Color("#254a84"),false)
             add_child(car)
             traffic._box(car,Vector3(1.60,0.13,2.6),Vector3(0,0.96,0),Color("#d9e3ec"))
             var lamp: MeshInstance3D=traffic._box(car,Vector3(0.9,0.17,0.26),Vector3(0,1.61,0),Color("#3688ee"))
@@ -962,7 +964,7 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     if not detail_materials.has("waterway"):detail_materials["waterway"]=Architecture.material("waterway")
     _surface(node,water,detail_materials["waterway"],false)
 
-func _surface(parent: Node3D,vertices: PackedVector3Array,material: StandardMaterial3D,collision: bool,visual: bool=true) -> void:
+func _surface(parent: Node3D,vertices: PackedVector3Array,material: Material,collision: bool,visual: bool=true) -> void:
     if vertices.is_empty():return
     var builder := SurfaceTool.new()
     builder.begin(Mesh.PRIMITIVE_TRIANGLES)

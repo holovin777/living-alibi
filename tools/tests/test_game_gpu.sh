@@ -18,11 +18,14 @@ if configure_game_gpu; then exit 1; fi
 if [[ "$(uname -s)" == Linux ]]; then
     # Simulate prime-run without requiring an NVIDIA device on CI.
     prime-run() { :; }
+    unset LIVING_ALIBI_GPU
+    configure_game_gpu
+    [[ "${GODOT_COMMAND[*]}" == *"prime-run /example/godot --rendering-method gl_compatibility" ]]
     LIVING_ALIBI_GPU=auto
     configure_game_gpu
     [[ "${GODOT_COMMAND[*]}" == *"prime-run /example/godot --rendering-method gl_compatibility" ]]
     unset -f prime-run
-    LIVING_ALIBI_GPU=nvidia
+    unset LIVING_ALIBI_GPU
     configure_game_gpu
     [[ "${GODOT_COMMAND[*]}" == *prime-run* || "${GODOT_COMMAND[*]}" == *__NV_PRIME_RENDER_OFFLOAD=1* ]]
 fi

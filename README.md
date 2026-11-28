@@ -34,7 +34,7 @@ Your world is saved in `data/world.db`. **Do not delete this file to install upd
 
 ## Graphics — NVIDIA / hybrid laptops
 
-Both Linux launchers prefer NVIDIA PRIME offload when `prime-run` or a working `nvidia-smi` is detected. Only the interactive Godot process is offloaded; Java and asset import run normally. Compatibility (OpenGL) remains the default, with bounded directional shadows in geographic mode when NVIDIA is requested. Verify the device in Godot's startup output or `nvidia-smi`; requesting PRIME does not guarantee the driver is correctly configured.
+Both Linux launchers request NVIDIA PRIME offload by default. They use `prime-run` when available, otherwise the equivalent NVIDIA environment variables without changing system configuration. Set `LIVING_ALIBI_GPU=auto` for detection or `LIVING_ALIBI_GPU=system` to opt out. Only the interactive Godot process is offloaded; Java and asset import run normally. Compatibility (OpenGL) remains the default, with bounded directional shadows in geographic mode when NVIDIA is requested. Verify the device in Godot's startup output or `nvidia-smi`; requesting PRIME does not guarantee the driver is correctly configured.
 
 ```bash
 LIVING_ALIBI_GPU=nvidia bash play-vigevano.sh --wide

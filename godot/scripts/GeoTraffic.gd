@@ -2,6 +2,12 @@ extends Node3D
 ## Bounded local traffic preview. Actors follow connected, directed OSM edges.
 ## No authoritative identities, schedules, or collision physics yet.
 const RoadGraph=preload("res://scripts/GeoRoadGraph.gd")
+const CAR_MODELS: Array[PackedScene]=[
+    preload("res://assets/vehicles/sedan.glb"),
+    preload("res://assets/vehicles/hatchback_sports.glb"),
+    preload("res://assets/vehicles/van.glb"),
+    preload("res://assets/vehicles/suv.glb")
+]
 const MAX_CARS=14
 const MAX_PEOPLE=24
 const SPAWN_MIN=25.0
@@ -49,8 +55,16 @@ func _box(parent: Node3D,dimensions: Vector3,at: Vector3,color: Color) -> MeshIn
     parent.add_child(part)
     return part
 
-func _car(paint: Color=Color.TRANSPARENT) -> Node3D:
+func _car(paint: Color=Color.TRANSPARENT, imported: bool=true) -> Node3D:
     var root:=Node3D.new()
+    if imported:
+        var index:=rng.randi_range(0,CAR_MODELS.size()-1) if paint.a==0 else posmod(str(paint).hash(),CAR_MODELS.size())
+        var model:=CAR_MODELS[index].instantiate() as Node3D
+        model.name="ImportedVehicle"
+        model.rotation.y=PI
+        model.scale=Vector3(1.18,1.20,1.32)
+        root.add_child(model)
+        return root
     var color: Color=car_colors[rng.randi_range(0,car_colors.size()-1)] if paint.a==0 else paint
     _box(root,Vector3(1.65,0.62,3.55),Vector3(0,0.65,0),color)
     _box(root,Vector3(1.42,0.53,1.83),Vector3(0,1.16,0.15),Color("#394e59"))

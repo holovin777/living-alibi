@@ -12,6 +12,10 @@ func _initialize() -> void:
 
 func _check(traffic,graph: Dictionary) -> void:
     traffic.configure(graph)
+    var car: Node3D=traffic._car()
+    if not car.has_node("ImportedVehicle"):
+        car.free();push_error("Geographic car model missing");quit(1);return
+    car.free()
     for i in range(120):traffic.update_traffic(Vector2.ZERO,0.1)
     if traffic.count("drive")<1 or traffic.count("walk")<1 or traffic.actors.size()>38:
         push_error("traffic population failed");quit(1);return

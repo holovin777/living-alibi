@@ -18,6 +18,12 @@ func _initialize() -> void:
         if Architecture.material(kind)==null:
             quit(1)
             return
+    var highway=Architecture.new()
+    highway.road({"a":[0,0],"b":[20,0],"width":8,"kind":"trunk"})
+    if highway.batches.get("mark",PackedVector3Array()).size()!=12 or highway.batches.has("pavement"):
+        push_error("Highway edge marking geometry invalid")
+        quit(1)
+        return
     var capped=Architecture.new()
     capped.windows_count=Architecture.MAX_WINDOWS
     capped.facade({"id":"1","kind":"apartments","height":9.6,"points":[[0,0],[12,0],[12,10],[0,10]]})

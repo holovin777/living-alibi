@@ -96,7 +96,16 @@ func road(record: Dictionary) -> void:
     var width:=float(record["width"])
     var kind:=str(record.get("kind",""))
     var sidewalk:=str(record.get("sidewalk",""))
-    if kind in ["motorway","trunk","motorway_link","trunk_link","track","footway","path","cycleway","steps","pedestrian","service","living_street"]:return
+    if kind in ["motorway","trunk","motorway_link","trunk_link"]:
+        # Roadside white edge lines on major paved roads. No invented sidewalks.
+        if width>=3.0 and str(record.get("surface","")) not in ["gravel","ground","dirt","unpaved"]:
+            for sign_value in [-1.0,1.0]:
+                var edge:=side*float(sign_value)*(width*0.5-0.18)
+                var start:=a+edge+Vector3.UP*0.012
+                var end:=b+edge+Vector3.UP*0.012
+                _quad("mark",start-side*0.065,end-side*0.065,end+side*0.065,start+side*0.065)
+        return
+    if kind in ["track","footway","path","cycleway","steps","pedestrian","service","living_street"]:return
     if width<4.5:return
     for sign_value in [-1.0,1.0]:
         var sign_num: float=sign_value

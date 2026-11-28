@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Source after selecting GODOT. Only the interactive renderer uses PRIME.
-# auto: prefer NVIDIA if available; nvidia: explicitly request offload;
+# Linux defaults to NVIDIA; auto detects it, system opts out.
 # system: use the normal display GPU. No driver installation or sudo.
 configure_game_gpu() {
     GODOT_COMMAND=("$GODOT")
-    local mode="${LIVING_ALIBI_GPU:-auto}"
+    local default_mode=system
+    if [[ "$(uname -s)" == Linux ]]; then default_mode=nvidia; fi
+    local mode="${LIVING_ALIBI_GPU:-$default_mode}"
     local selected=system
     case "$mode" in
         auto)
@@ -28,7 +30,8 @@ configure_game_gpu() {
         else
             GODOT_COMMAND=(env "LIVING_ALIBI_SHADOWS=${LIVING_ALIBI_SHADOWS:-1}" __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only "$GODOT")
         fi
-        echo "Graphics: NVIDIA PRIME requested. Verify the renderer in the Godot startup log."
+        echo "Graphics: NVIDIA PRIME requested (Linux default). Verify NVIDIA in the Godot startup log."
+        echo "No driver installation is performed. LIVING_ALIBI_GPU=system opts out."
     else
         echo "Graphics: system default GPU. Set LIVING_ALIBI_GPU=nvidia to request NVIDIA."
     fi
