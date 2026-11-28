@@ -15,7 +15,7 @@ REGIONS = {"central": BBOX, "wide": WIDE_BBOX}
 CHUNK = 128
 SOURCE = "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright"
 SCHEMA = 2
-DETAIL_VERSION = 7
+DETAIL_VERSION = 8
 WATER_WIDTH = {"river": 30, "canal": 5, "stream": 2, "ditch": 1, "drain": 1.5}
 ROAD_WIDTH = {"motorway": 12, "trunk": 10, "primary": 8, "secondary": 7,
               "tertiary": 6, "residential": 5, "service": 3, "living_street": 4,
@@ -32,7 +32,7 @@ def project(lat, lon):
 
 def download(path, bounds=BBOX):
     bbox = ",".join(map(str, bounds))
-    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});way["landuse"~"^(farmland|meadow|forest|orchard|vineyard|grass)$"]({bbox});way["natural"~"^(wood|grassland|water)$"]({bbox});way["leisure"="park"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox}););out body;>;out skel qt;'
+    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});way["landuse"~"^(farmland|meadow|forest|orchard|vineyard|grass)$"]({bbox});way["natural"~"^(wood|grassland|water)$"]({bbox});way["leisure"="park"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox});node["highway"~"^(traffic_signals|crossing)$"]({bbox}););out body;>;out skel qt;'
     req = urllib.request.Request("https://overpass-api.de/api/interpreter",
                                  data=urllib.parse.urlencode({"data": query}).encode(),
                                  headers={"User-Agent": "LivingAlibi/0.1 local OSM import"})
@@ -133,9 +133,10 @@ def convert(source, output, bounds=BBOX, region="central"):
     best = float("inf")
     graph_nodes = {}
     graph_edges = []
+    junction_tags = {}
 
     def chunk(key):
-        return chunks.setdefault(key, {"buildings": [], "roads": [], "rail": [], "trees": [], "benches": [], "water": [], "land": []})
+        return chunks.setdefault(key, {"buildings": [], "roads": [], "rail": [], "trees": [], "benches": [], "water": [], "land": [], "controls": []})
 
     def add(kind, feature, point):
         key = f"{math.floor(point[0]/CHUNK)},{math.floor(point[1]/CHUNK)}"
@@ -162,6 +163,9 @@ def convert(source, output, bounds=BBOX, region="central"):
                 chunk(f"{x},{y}")["land"].append(way_id)
 
     for n in root.findall("node"):
+        tags = {t.attrib["k"]: t.attrib["v"] for t in n.findall("tag")}
+        if tags.get("highway") in ("traffic_signals", "crossing"):
+            junction_tags[n.attrib["id"]] = tags
         if n.attrib["id"] in nodes and any(t.attrib.get("k") == "natural" and t.attrib.get("v") == "tree" for t in n.findall("tag")):
             point = nodes[n.attrib["id"]]
             add("trees", {"id": n.attrib["id"], "point": point}, point)
@@ -236,7 +240,7 @@ def convert(source, output, bounds=BBOX, region="central"):
                         continue
                     graph_nodes[a_id], graph_nodes[b_id] = nodes[a_id], nodes[b_id]
                     graph_edges.append({"a": a_id, "b": b_id, "meters": round(distance, 2),
-                                        "name": name, "walk": walk,
+                                        "name": name, "walk": walk, "width": road_width(tags),
                                         "speed_ab": driving_limit(tags, "forward"),
                                         "speed_ba": driving_limit(tags, "backward"),
                                         "drive_ab": drive and direction != "-1",
@@ -265,9 +269,30 @@ def convert(source, output, bounds=BBOX, region="central"):
                         d = math.hypot(*center)
                         if d < best:
                             spawn, best = center, d
+    signals = {}
+    approaches = {}
+    for e in graph_edges:
+        for a, b, flag in (("a","b","drive_ab"),("b","a","drive_ba")):
+            if e.get(flag) and e[b] in junction_tags:
+                approaches.setdefault(e[b], {})[e[a]] = e["width"]
+    counts["signals"] = 0
+    counts["crossings"] = 0
+    for node_id, incoming in approaches.items():
+        tags = junction_tags[node_id]
+        point = nodes[node_id]
+        if tags["highway"] == "traffic_signals":
+            offset = int(node_id) % 34
+            signals[node_id] = offset
+            counts["signals"] += 1
+            for source, width in incoming.items():
+                add("controls", {"kind":"signal","point":point,"from":nodes[source],"width":width,"offset":offset}, point)
+        elif tags.get("crossing") not in ("unmarked", "no"):
+            source = max(incoming, key=lambda n: (incoming[n], math.dist(nodes[n], point)))
+            add("controls", {"kind":"crossing","point":point,"from":nodes[source],"width":incoming[source]}, point)
+            counts["crossings"] += 1
     if not counts["buildings"] or not counts["roads"] or spawn is None:
         raise ValueError("Extract must contain buildings and walkable roads")
-    result = {"schema": SCHEMA, "detail_version": DETAIL_VERSION, "graph": {"nodes": graph_nodes, "edges": graph_edges}, "origin": list(ORIGIN), "bounds": list(bounds), "region": region,
+    result = {"schema": SCHEMA, "detail_version": DETAIL_VERSION, "graph": {"nodes": graph_nodes, "edges": graph_edges, "signals": signals}, "origin": list(ORIGIN), "bounds": list(bounds), "region": region,
               "chunk_size": CHUNK, "attribution": SOURCE, "counts": counts,
               "spawn": spawn, "chunks": chunks, "land": land}
     output.parent.mkdir(parents=True, exist_ok=True)

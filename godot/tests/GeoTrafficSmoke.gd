@@ -12,6 +12,9 @@ func _initialize() -> void:
     _check.call_deferred(traffic,graph)
 
 func _check(traffic,graph: Dictionary) -> void:
+    var signals=preload("res://scripts/GeoSignals.gd")
+    if signals.phase(0,0,Vector2(0,1))!=2 or signals.phase(0,0,Vector2(1,0))!=0 or signals.phase(0,17,Vector2(1,0))!=2 or signals.phase(0,12,Vector2(0,1))!=1:
+        push_error("Signal phase mismatch");quit(1);return
     var cabin=Cockpit.new()
     root.add_child(cabin)
     cabin.update_instruments(32.0,1.0,0.2)

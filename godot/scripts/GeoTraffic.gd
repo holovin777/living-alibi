@@ -8,6 +8,8 @@ const CAR_MODELS: Array[PackedScene]=[
     preload("res://assets/vehicles/van.glb"),
     preload("res://assets/vehicles/suv.glb")
 ]
+const Signals=preload("res://scripts/GeoSignals.gd")
+var signal_nodes: Dictionary={}
 const MAX_CARS=14
 const MAX_PEOPLE=24
 const SPAWN_MIN=25.0
@@ -36,6 +38,9 @@ var materials: Dictionary={}
 func configure(graph: Dictionary) -> void:
     motor.build(graph,"drive")
     foot.build(graph,"walk")
+    signal_nodes.clear()
+    for raw_id in graph.get("signals",{}):
+        if motor.ids.has(raw_id):signal_nodes[motor.ids[raw_id]]=int(graph["signals"][raw_id])
     rng.seed=7217
 
 func _mat(color: Color) -> StandardMaterial3D:
@@ -201,6 +206,12 @@ func _advance(actor: Dictionary,player: Vector2,delta: float) -> void:
         b=graph.coordinates[actor["to"]]
         var length:=maxf(a.distance_to(b),0.05)
         var available: float=length*(1.0-float(actor["progress"]))
+        if actor["mode"]=="drive" and signal_nodes.has(actor["to"]):
+            var stop_distance:=minf(3.0,length*0.8)
+            if available>=stop_distance-0.001 and Signals.phase(signal_nodes[actor["to"]],Signals.seconds(),b-a)!=2:
+                var move:=minf(remaining,maxf(0.0,available-stop_distance))
+                actor["progress"]=float(actor["progress"])+move/length
+                break
         if remaining<available:
             actor["progress"]=float(actor["progress"])+remaining/length
             break

@@ -31,6 +31,7 @@ def export(source, destination):
     motor_ids = sorted({n for edge in motor for n in edge})
     rows.extend("M\t%s\t%.2f\t%.2f" % (n,*graph["nodes"][n]) for n in motor_ids)
     rows.extend("D\t%s\t%s\t%d" % (*edge, motor[edge]) for edge in sorted(motor))
+    rows.extend("S\t%s\t%d" % (n, int(offset)) for n, offset in graph.get("signals", {}).items() if n in motor_ids)
     seen = set()
     for chunk in city["chunks"].values():
         for b in chunk["buildings"]:

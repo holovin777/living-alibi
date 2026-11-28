@@ -21,6 +21,8 @@ var daylight: DirectionalLight3D
 var sky_environment: Environment
 var sky_material: ProceduralSkyMaterial
 var mountain_horizon: Node3D
+const Signals=preload("res://scripts/GeoSignals.gd")
+var last_signal_second: int=-1
 var headlamps: Array[SpotLight3D]=[]
 const WeatherVisual=preload("res://scripts/GeoWeather.gd")
 var precipitation: Node3D
@@ -376,6 +378,12 @@ func _physics_process(delta: float) -> void:
     mountain_horizon.visible=room.is_empty() and daylight.light_energy>0.13
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
+    var second:=Signals.seconds()
+    if second!=last_signal_second:
+        last_signal_second=second
+        for chunk in chunks.values():
+            for control in chunk.get_node("RoadControls").get_children():
+                Signals.update(control,second)
     property_scenery.animate(delta)
     _animate_patrols(delta)
     _animate_commutes(delta)
@@ -1004,6 +1012,10 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     var node := Node3D.new()
     add_child(node)
     chunks[key]=node
+    var controls:=Node3D.new()
+    controls.name="RoadControls"
+    node.add_child(controls)
+    for record in data.get("controls",[]):Signals.create(controls,record)
     var detail=Architecture.new()
     _build_land(node,key,data,detail)
     var walls := PackedVector3Array()

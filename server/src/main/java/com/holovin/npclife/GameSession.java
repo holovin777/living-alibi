@@ -763,6 +763,7 @@ public final class GameSession implements AutoCloseable {
         double traveled=next.advance(map,turn,budget);
         if(traveled+0.001<budget)next.speed=0;
         else next.speed=Math.min(next.speed,map.speedLimit(next.from,next.to)/3.6);
+        if(next.waitingForSignal&&traveled<0.001){geoDrive=next;return drivePose(map,"Waiting for green light.");}
         int units=(int)(next.meters/100)-oldUnits;
         int impact=0;
         if(traveled>0.01&&now-geoLastImpact>2_000_000_000L){
@@ -780,7 +781,7 @@ public final class GameSession implements AutoCloseable {
         }
         VehicleTheftLife.set(copy,next.stolen?"stolen-remainder":"owned-remainder",(int)Math.round((next.meters%100)*1000));
         apply(copy,0,"Driving.");geoDrive=next;
-        return drivePose(map,impact>0?"Collision: vehicle condition reduced.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
+        return drivePose(map,impact>0?"Collision: vehicle condition reduced.":next.waitingForSignal?"Waiting for green light.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
     }
     private GeoDrive.Pose drivePose(GeoProjection map,String message){
         if(geoDrive==null)return new GeoDrive.Pose(false,false,0,0,0,town.player.carFuel,town.player.carCondition,0,0,message);

@@ -22,7 +22,7 @@ class ImportTest(unittest.TestCase):
             self.assertEqual(4, len(buildings[0]["points"]))
             self.assertAlmostEqual(0, result["spawn"][1])
             self.assertEqual(2, result["schema"])
-            self.assertEqual(7, result["detail_version"])
+            self.assertEqual(8, result["detail_version"])
             self.assertEqual(1, result["counts"]["benches"])
             self.assertEqual(1, result["counts"]["trees"])
             self.assertGreater(result["counts"]["water_segments"], 0)
@@ -37,6 +37,9 @@ class ImportTest(unittest.TestCase):
             self.assertTrue(all(r["bridge"] and not r["tunnel"] for r in roads))
             graph = result["graph"]
             self.assertEqual({"5", "6"}, set(graph["nodes"]))
+            self.assertEqual({"6": 6}, graph["signals"])
+            self.assertEqual(1, result["counts"]["crossings"])
+            self.assertEqual(1, result["counts"]["signals"])
             edge = graph["edges"][0]
             self.assertTrue(edge["walk"] and edge["drive_ab"] and edge["drive_ba"])
             self.assertGreater(edge["meters"], 50)

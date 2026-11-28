@@ -8,6 +8,7 @@ final class GeoDrive {
     final boolean stolen;
     String from,to;
     double progress,meters,speed;
+    boolean waitingForSignal;
     static final double MAX_SPEED=10.0; // legacy default, m/s
     static final double HIGHWAY_SPEED=20.0; // prototype safety/performance cap
     long lastStep;
@@ -48,7 +49,9 @@ final class GeoDrive {
         if(acceleration<0&&initial+acceleration*dt<0)dt=initial/-acceleration;
         return (initial+speed)*0.5*dt;
     }
-    double advance(GeoProjection map,int turn,double budget){
+    double advance(GeoProjection map,int turn,double budget){return advance(map,turn,budget,System.currentTimeMillis()/1000);}
+    double advance(GeoProjection map,int turn,double budget,long seconds){
+        waitingForSignal=false;
         double traveled=0;
         for(int i=0;i<24&&budget>0.001;i++){
             if(from.equals(to)||progress>=1){
@@ -57,7 +60,16 @@ final class GeoDrive {
             }
             double length=map.motorNodes.get(from).distance(map.motorNodes.get(to));
             if(length<0.01){progress=1;continue;}
-            double step=Math.min(budget,length*(1-progress));
+            double available=length*(1-progress);
+            double stop=Math.min(3,length*0.8);
+            if(available>=stop-0.001&&!map.signalGreen(from,to,seconds)){
+                double allowed=Math.max(0,available-stop);
+                if(budget>=allowed){
+                    progress=Math.min(1,progress+allowed/length);
+                    traveled+=allowed;waitingForSignal=true;speed=0;break;
+                }
+            }
+            double step=Math.min(budget,available);
             progress=Math.min(1,progress+step/length);
             traveled+=step;budget-=step;
         }

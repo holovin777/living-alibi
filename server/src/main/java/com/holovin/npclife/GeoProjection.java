@@ -99,6 +99,13 @@ final class GeoProjection {
     final Map<String,Point> motorNodes=new TreeMap<>();
     final Map<String,List<String>> motorEdges=new TreeMap<>();
     final Map<String,Integer> motorSpeed=new HashMap<>();
+    final Map<String,Integer> signalOffsets=new HashMap<>();
+    boolean signalGreen(String from,String to,long seconds){
+        if(!signalOffsets.containsKey(to))return true;
+        Point a=motorNodes.get(from),b=motorNodes.get(to);
+        int t=Math.floorMod(seconds+signalOffsets.get(to)+(Math.abs(b.x-a.x)>Math.abs(b.z-a.z)?17:0),34);
+        return t<12;
+    }
     int speedLimit(String from,String to){return motorSpeed.getOrDefault(from+"\t"+to,36);}
     final EnumMap<TownLife.Place,String> anchors=new EnumMap<>(TownLife.Place.class);
     private final Map<Integer,District> residentialEntrances=new LinkedHashMap<>();
@@ -117,6 +124,7 @@ final class GeoProjection {
         }
         for(String row:rows){
             String[] p=row.split("\t");
+            if(p[0].equals("S")&&motorNodes.containsKey(p[1]))signalOffsets.put(p[1],Integer.parseInt(p[2]));
             if(p[0].equals("D")&&motorNodes.containsKey(p[1])&&motorNodes.containsKey(p[2])){
                 motorEdges.get(p[1]).add(p[2]);
                 int limit=p.length>=4?Math.max(5,Math.min(72,Integer.parseInt(p[3]))):36;

@@ -34,6 +34,17 @@ class GeoDriveTest {
         drive.controlBudget("step",0.65,map.speedLimit("2","1")/3.6);
         assertEquals(20/3.6,drive.speed,.001);
     }
+    @Test void signalStopsCarBeforeJunction()throws Exception{
+        var graph=dir.resolve("signal.tsv");
+        Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\nM\t1\t0\t0\nM\t2\t100\t0\nD\t1\t2\nS\t2\t0\n");
+        var map=new GeoProjection(graph);
+        var drive=new GeoDrive(false,"1");
+        assertEquals(97,drive.advance(map,0,100,0),.001);
+        assertTrue(drive.waitingForSignal);
+        assertEquals(0,drive.advance(map,0,5,0),.001);
+        assertEquals(3,drive.advance(map,0,5,17),.001);
+        assertFalse(drive.waitingForSignal);
+    }
     @Test void directedRoadAndTheftAreSeparateFromLegalCar()throws Exception{
         var graph=dir.resolve("graph.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\nM\t1\t0\t0\nM\t2\t100\t0\nD\t1\t2\n");
