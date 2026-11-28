@@ -96,7 +96,7 @@ func road(record: Dictionary) -> void:
     var width:=float(record["width"])
     var kind:=str(record.get("kind",""))
     var sidewalk:=str(record.get("sidewalk",""))
-    if kind in ["motorway","trunk","track","footway","path","cycleway","steps","pedestrian","service","living_street"]:return
+    if kind in ["motorway","trunk","motorway_link","trunk_link","track","footway","path","cycleway","steps","pedestrian","service","living_street"]:return
     if width<4.5:return
     for sign_value in [-1.0,1.0]:
         var sign_num: float=sign_value
@@ -108,7 +108,7 @@ func road(record: Dictionary) -> void:
             var outer:=side*sign_num*(width*0.5+1.05)
             _quad("pavement",a+inner+Vector3.UP*0.035,b+inner+Vector3.UP*0.035,b+outer+Vector3.UP*0.035,a+outer+Vector3.UP*0.035)
             _quad("curb",a+inner,b+inner,b+inner+Vector3.UP*0.035,a+inner+Vector3.UP*0.035)
-    if width>=6.0 and str(record.get("oneway","no")) not in ["yes","1","true","-1"]:
+    if width>=6.0 and str(record.get("oneway","no")) not in ["yes","1","true","-1"] and str(record.get("junction",""))!="roundabout" and str(record.get("surface","")) not in ["sett","cobblestone","paving_stones","gravel","dirt","ground","unpaved"]:
         for i in range(ceili(length/7.0)):
             var start:=a+direction*(i*7.0)+Vector3.UP*0.012
             var end:=a+direction*minf(length,i*7.0+2.5)+Vector3.UP*0.012
@@ -143,7 +143,7 @@ func tree(record: Dictionary) -> void:
 
 static func material(kind: String) -> StandardMaterial3D:
     var mat:=StandardMaterial3D.new()
-    var colors: Dictionary={"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
+    var colors: Dictionary={"stone_road":Color("#8b8378"),"dirt_road":Color("#9b896b"),"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
     mat.albedo_color=PALETTE[int(kind.trim_prefix("wall_"))] if kind.begins_with("wall_") else colors.get(kind,Color.WHITE)
     mat.cull_mode=BaseMaterial3D.CULL_DISABLED
     mat.roughness=0.87

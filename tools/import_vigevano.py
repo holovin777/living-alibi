@@ -10,14 +10,18 @@ import xml.etree.ElementTree as ET
 
 ORIGIN = (45.3173, 8.8579)
 BBOX = (45.3100, 8.8480, 45.3240, 8.8700)
+WIDE_BBOX = (45.2850, 8.8150, 45.3450, 8.9150)
+REGIONS = {"central": BBOX, "wide": WIDE_BBOX}
 CHUNK = 128
 SOURCE = "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright"
 SCHEMA = 2
-DETAIL_VERSION = 2
+DETAIL_VERSION = 3
 ROAD_WIDTH = {"motorway": 12, "trunk": 10, "primary": 8, "secondary": 7,
               "tertiary": 6, "residential": 5, "service": 3, "living_street": 4,
               "pedestrian": 5, "footway": 1.8, "path": 1.5, "cycleway": 2.0,
-              "unclassified": 4.5, "track": 3, "steps": 1.5}
+              "unclassified": 4.5, "track": 3, "steps": 1.5,
+              "motorway_link": 5, "trunk_link": 5, "primary_link": 5,
+              "secondary_link": 4.5, "tertiary_link": 4.5}
 
 
 def project(lat, lon):
@@ -25,8 +29,8 @@ def project(lat, lon):
             round((ORIGIN[0]-lat)*111132, 2)]
 
 
-def download(path):
-    bbox = ",".join(map(str, BBOX))
+def download(path, bounds=BBOX):
+    bbox = ",".join(map(str, bounds))
     query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox}););out body;>;out skel qt;'
     req = urllib.request.Request("https://overpass-api.de/api/interpreter",
                                  data=urllib.parse.urlencode({"data": query}).encode(),
@@ -37,8 +41,9 @@ def download(path):
         with urllib.request.urlopen(req, timeout=120) as response, tmp.open("wb") as out:
             while block := response.read(65536):
                 out.write(block)
-        if ET.parse(tmp).getroot().tag != "osm":
-            raise ValueError("Overpass did not return OSM XML")
+        root = ET.parse(tmp).getroot()
+        if root.tag != "osm" or root.find("remark") is not None or root.find("way") is None:
+            raise ValueError("Overpass returned an incomplete or invalid extract; old cache retained")
         tmp.replace(path)
     finally:
         tmp.unlink(missing_ok=True)
@@ -62,7 +67,7 @@ def height(tags):
 
 def access(tags):
     """Basic access flags. Detailed conditional access/turn restrictions are not parsed."""
-    kind = tags.get("highway")
+    kind = tags.get("highway", "").removesuffix("_link")
     public = tags.get("access") not in ("no", "private")
     foot = tags.get("foot")
     motor = tags.get("motor_vehicle", tags.get("motorcar", tags.get("vehicle")))
@@ -73,11 +78,28 @@ def access(tags):
     if foot in ("no", "private"): walk = False
     if motor in ("yes", "designated", "permissive"): drive = True
     if motor in ("no", "private"): drive = False
-    direction = tags.get("oneway", "yes" if tags.get("junction") == "roundabout" else "no")
+    direction = tags.get("oneway", "yes" if tags.get("junction") == "roundabout" or kind == "motorway" else "no")
     return walk, drive, direction
 
 
-def convert(source, output):
+def road_width(tags):
+    kind = tags["highway"]
+    try:
+        width = float(tags.get("width", "").strip().removesuffix("m").strip())
+        if math.isfinite(width) and 0.8 <= width <= 30:
+            return width
+    except ValueError:
+        pass
+    try:
+        lanes = int(tags.get("lanes", ""))
+        if 1 <= lanes <= 8 and access(tags)[1]:
+            return max(2.8, lanes * (3.4 if kind in ("motorway", "trunk") else 3.0))
+    except ValueError:
+        pass
+    return ROAD_WIDTH[kind]
+
+
+def convert(source, output, bounds=BBOX, region="central"):
     root = ET.parse(source).getroot()
     if root.tag != "osm":
         raise ValueError("Expected an OSM XML document")
@@ -145,9 +167,10 @@ def convert(source, output):
                     bb = [a[k]+(b[k]-a[k])*(i+1)/pieces for k in (0,1)]
                     center = [(aa[k]+bb[k])/2 for k in (0,1)]
                     add("rail" if rail else "roads", {"id": way.attrib["id"], "a": aa, "b": bb,
-                        "name": name, "width": 1.8 if rail else ROAD_WIDTH[tags["highway"]],
+                        "name": name, "width": 1.8 if rail else road_width(tags),
                         "kind": tags.get("highway", ""), "sidewalk": tags.get("sidewalk", ""),
-                        "oneway": tags.get("oneway", "no")}, center)
+                        "oneway": "no" if rail else access(tags)[2],
+                        "surface": tags.get("surface", ""), "junction": tags.get("junction", "")}, center)
                     counts["rail_segments" if rail else "roads"] += 1
                     if not rail and access(tags)[0] and tags.get("highway") != "steps":
                         d = math.hypot(*center)
@@ -155,7 +178,7 @@ def convert(source, output):
                             spawn, best = center, d
     if not counts["buildings"] or not counts["roads"] or spawn is None:
         raise ValueError("Extract must contain buildings and walkable roads")
-    result = {"schema": SCHEMA, "detail_version": DETAIL_VERSION, "graph": {"nodes": graph_nodes, "edges": graph_edges}, "origin": list(ORIGIN), "bounds": list(BBOX),
+    result = {"schema": SCHEMA, "detail_version": DETAIL_VERSION, "graph": {"nodes": graph_nodes, "edges": graph_edges}, "origin": list(ORIGIN), "bounds": list(bounds), "region": region,
               "chunk_size": CHUNK, "attribution": SOURCE, "counts": counts,
               "spawn": spawn, "chunks": chunks}
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -169,11 +192,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=Path("data/vigevano.osm"))
     parser.add_argument("--output", type=Path, default=Path("data/vigevano.json"))
-    parser.add_argument("--download", action="store_true", help="Fetch the central Vigevano extract once")
+    parser.add_argument("--download", action="store_true", help="Fetch the selected Vigevano extract once")
+    parser.add_argument("--region", choices=REGIONS, default="central")
     args = parser.parse_args()
     if args.download:
-        download(args.input)
-    result = convert(args.input, args.output)
+        download(args.input, REGIONS[args.region])
+    result = convert(args.input, args.output, REGIONS[args.region], args.region)
     print(f"Imported {result['counts']} across {len(result['chunks'])} chunks -> {args.output}")
 
 

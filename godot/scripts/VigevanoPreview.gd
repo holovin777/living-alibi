@@ -202,7 +202,11 @@ func _ready() -> void:
     ground.add_child(plane)
     var ground_visual := MeshInstance3D.new()
     var floor_mesh := PlaneMesh.new()
-    floor_mesh.size=Vector2(5000,5000)
+    var extent := Vector2(2500,2500)
+    for raw in city.get("graph",{}).get("nodes",{}).values():
+        var point: Array=raw
+        extent=extent.max(Vector2(absf(float(point[0])),absf(float(point[1])))+Vector2(512,512))
+    floor_mesh.size=extent*2.0
     ground_visual.mesh=floor_mesh
     ground_visual.material_override=_material(Color("#a4a98c"))
     add_child(ground_visual)
@@ -905,6 +909,8 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     var walls := PackedVector3Array()
     var roofs := PackedVector3Array()
     var roads := PackedVector3Array()
+    var stone_roads := PackedVector3Array()
+    var dirt_roads := PackedVector3Array()
     var rails := PackedVector3Array()
     for feature in data.get("buildings",[]):
         var points: Array=feature["points"]
@@ -924,7 +930,14 @@ func _build_chunk(key: String,data: Dictionary) -> void:
             roofs.append(_point(points[i],h))
         detail.facade(feature)
     for record in data.get("roads",[]):
-        _strip(roads,record,0.025)
+        var surface:=str(record.get("surface",""))
+        var kind:=str(record.get("kind",""))
+        if surface in ["paving_stones","sett","cobblestone","unhewn_cobblestone"]:
+            _strip(stone_roads,record,0.026)
+        elif surface in ["gravel","fine_gravel","ground","dirt","earth","grass","unpaved","compacted","sand"] or (surface.is_empty() and kind in ["track","path"]):
+            _strip(dirt_roads,record,0.024)
+        else:
+            _strip(roads,record,0.025)
         detail.road(record)
     for record in data.get("trees",[]):detail.tree(record)
     for record in data.get("benches",[]):detail.bench(record)
@@ -936,6 +949,10 @@ func _build_chunk(key: String,data: Dictionary) -> void:
         _surface(node,detail.batches[kind],detail_materials[kind],false)
     _surface(node,roofs,roof_material,false)
     _surface(node,roads,road_material,false)
+    for kind in ["stone_road","dirt_road"]:
+        if not detail_materials.has(kind):detail_materials[kind]=Architecture.material(kind)
+    _surface(node,stone_roads,detail_materials["stone_road"],false)
+    _surface(node,dirt_roads,detail_materials["dirt_road"],false)
     _surface(node,rails,rail_material,false)
 
 func _surface(parent: Node3D,vertices: PackedVector3Array,material: StandardMaterial3D,collision: bool,visual: bool=true) -> void:

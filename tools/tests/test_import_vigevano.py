@@ -22,7 +22,7 @@ class ImportTest(unittest.TestCase):
             self.assertEqual(4, len(buildings[0]["points"]))
             self.assertAlmostEqual(0, result["spawn"][1])
             self.assertEqual(2, result["schema"])
-            self.assertEqual(2, result["detail_version"])
+            self.assertEqual(3, result["detail_version"])
             self.assertEqual(1, result["counts"]["benches"])
             self.assertEqual(1, result["counts"]["trees"])
             roads = [r for c in result["chunks"].values() for r in c["roads"]]
@@ -36,6 +36,19 @@ class ImportTest(unittest.TestCase):
         self.assertEqual((True,False,"no"), module.access({"highway":"footway"}))
         self.assertEqual((False,False,"no"), module.access({"highway":"residential","access":"private"}))
         self.assertEqual((True,True,"-1"), module.access({"highway":"residential","oneway":"-1"}))
+    def test_road_details(self):
+        self.assertEqual((False, True, "yes"), module.access({"highway":"motorway_link"}))
+        self.assertEqual((True, True, "yes"), module.access({"highway":"residential","junction":"roundabout"}))
+        self.assertEqual(7.2, module.road_width({"highway":"primary","width":"7.2 m"}))
+        self.assertEqual(6.0, module.road_width({"highway":"primary","lanes":"2"}))
+        self.assertEqual(5, module.road_width({"highway":"residential","width":"NaN"}))
+        with tempfile.TemporaryDirectory() as d:
+            result = module.convert(ROOT/"tools/tests/vigevano_fixture.osm", Path(d)/"wide.json", module.WIDE_BBOX, "wide")
+            self.assertEqual("wide", result["region"])
+            self.assertEqual(list(module.WIDE_BBOX), result["bounds"])
+            self.assertEqual(list(module.ORIGIN), result["origin"])
+            self.assertTrue(all("surface" in r and "junction" in r for c in result["chunks"].values() for r in c["roads"]))
+
     def test_project_origin(self):
         self.assertEqual([0.0,0.0], module.project(*module.ORIGIN))
 
