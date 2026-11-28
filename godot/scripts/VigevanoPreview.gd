@@ -912,6 +912,8 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     var stone_roads := PackedVector3Array()
     var dirt_roads := PackedVector3Array()
     var rails := PackedVector3Array()
+    var water := PackedVector3Array()
+    for record in data.get("water",[]):_strip(water,record,0.012)
     for feature in data.get("buildings",[]):
         var points: Array=feature["points"]
         var h := float(feature["height"])
@@ -954,6 +956,8 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     _surface(node,stone_roads,detail_materials["stone_road"],false)
     _surface(node,dirt_roads,detail_materials["dirt_road"],false)
     _surface(node,rails,rail_material,false)
+    if not detail_materials.has("waterway"):detail_materials["waterway"]=Architecture.material("waterway")
+    _surface(node,water,detail_materials["waterway"],false)
 
 func _surface(parent: Node3D,vertices: PackedVector3Array,material: StandardMaterial3D,collision: bool,visual: bool=true) -> void:
     if vertices.is_empty():return

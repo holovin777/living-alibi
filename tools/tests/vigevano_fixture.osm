@@ -11,4 +11,9 @@
 <node id="8" lat="45.3173" lon="8.8582"><tag k="natural" v="tree"/></node>
 <way id="10"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="1"/><tag k="building" v="yes"/><tag k="building:levels" v="3"/></way>
 <way id="20"><nd ref="5"/><nd ref="6"/><tag k="highway" v="residential"/><tag k="name" v="Test road"/></way>
+<node id="9" lat="45.3170" lon="8.8575"/>
+<node id="11" lat="45.3170" lon="8.8588"/>
+<way id="30"><nd ref="9"/><nd ref="11"/><tag k="waterway" v="canal"/><tag k="width" v="4"/></way>
+<way id="31"><nd ref="9"/><nd ref="11"/><tag k="natural" v="tree_row"/></way>
+<way id="32"><nd ref="5"/><nd ref="6"/><tag k="waterway" v="ditch"/><tag k="tunnel" v="culvert"/></way>
 </osm>

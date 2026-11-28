@@ -15,7 +15,8 @@ REGIONS = {"central": BBOX, "wide": WIDE_BBOX}
 CHUNK = 128
 SOURCE = "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright"
 SCHEMA = 2
-DETAIL_VERSION = 3
+DETAIL_VERSION = 4
+WATER_WIDTH = {"river": 30, "canal": 5, "stream": 2, "ditch": 1, "drain": 1.5}
 ROAD_WIDTH = {"motorway": 12, "trunk": 10, "primary": 8, "secondary": 7,
               "tertiary": 6, "residential": 5, "service": 3, "living_street": 4,
               "pedestrian": 5, "footway": 1.8, "path": 1.5, "cycleway": 2.0,
@@ -31,7 +32,7 @@ def project(lat, lon):
 
 def download(path, bounds=BBOX):
     bbox = ",".join(map(str, bounds))
-    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox}););out body;>;out skel qt;'
+    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox}););out body;>;out skel qt;'
     req = urllib.request.Request("https://overpass-api.de/api/interpreter",
                                  data=urllib.parse.urlencode({"data": query}).encode(),
                                  headers={"User-Agent": "LivingAlibi/0.1 local OSM import"})
@@ -106,7 +107,7 @@ def convert(source, output, bounds=BBOX, region="central"):
     nodes = {n.attrib["id"]: project(float(n.attrib["lat"]), float(n.attrib["lon"]))
              for n in root.findall("node") if "lat" in n.attrib and "lon" in n.attrib}
     chunks = {}
-    counts = {"buildings": 0, "roads": 0, "rail_segments": 0, "trees": 0, "benches": 0, "skipped": 0}
+    counts = {"buildings": 0, "roads": 0, "rail_segments": 0, "trees": 0, "benches": 0, "water_segments": 0, "tree_row_trees": 0, "skipped": 0}
     spawn = None
     best = float("inf")
     graph_nodes = {}
@@ -114,7 +115,7 @@ def convert(source, output, bounds=BBOX, region="central"):
 
     def add(kind, feature, point):
         key = f"{math.floor(point[0]/CHUNK)},{math.floor(point[1]/CHUNK)}"
-        chunks.setdefault(key, {"buildings": [], "roads": [], "rail": [], "trees": [], "benches": []})[kind].append(feature)
+        chunks.setdefault(key, {"buildings": [], "roads": [], "rail": [], "trees": [], "benches": [], "water": []})[kind].append(feature)
 
     for n in root.findall("node"):
         if n.attrib["id"] in nodes and any(t.attrib.get("k") == "natural" and t.attrib.get("v") == "tree" for t in n.findall("tag")):
@@ -134,6 +135,39 @@ def convert(source, output, bounds=BBOX, region="central"):
             continue
         points = [nodes[r] for r in refs]
         name = tags.get("name", "")
+        waterway = tags.get("waterway")
+        if waterway in WATER_WIDTH and tags.get("tunnel") not in ("yes", "culvert") and tags.get("covered") != "yes":
+            try:
+                width = float(tags.get("width", "").strip().removesuffix("m").strip())
+                if not math.isfinite(width) or not .3 <= width <= 300:
+                    raise ValueError("invalid water width")
+            except ValueError:
+                width = WATER_WIDTH[waterway]
+            for a, b in zip(points, points[1:]):
+                distance = math.dist(a, b)
+                if distance < .05:
+                    continue
+                pieces = max(1, math.ceil(distance/24))
+                for i in range(pieces):
+                    aa = [a[k]+(b[k]-a[k])*i/pieces for k in (0,1)]
+                    bb = [a[k]+(b[k]-a[k])*(i+1)/pieces for k in (0,1)]
+                    center = [(aa[k]+bb[k])/2 for k in (0,1)]
+                    add("water", {"a": aa, "b": bb, "width": width, "kind": waterway, "name": name}, center)
+                    counts["water_segments"] += 1
+        if tags.get("natural") == "tree_row":
+            carry = 4.0
+            index = 0
+            for a, b in zip(points, points[1:]):
+                length = math.dist(a, b)
+                if length < .05:
+                    continue
+                while carry < length:
+                    point = [a[k]+(b[k]-a[k])*carry/length for k in (0,1)]
+                    add("trees", {"id": f"row-{way.attrib['id']}-{index}", "point": point}, point)
+                    counts["tree_row_trees"] += 1
+                    index += 1
+                    carry += 8.0
+                carry -= length
         if tags.get("building") not in (None, "no") and refs[0] == refs[-1] and len(refs) >= 4:
             points = points[:-1]
             if len({tuple(p) for p in points}) < 3:

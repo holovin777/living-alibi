@@ -55,19 +55,6 @@ jobs:
             target/godot-bin/game.log; then
             exit 1
           fi
-      - name: Verify park, market, school and workshop scene transitions
-        run: |
-          set -euo pipefail
-          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 \
-            --headless --path godot --script res://tests/SceneNavigationSmoke.gd \
-            2>&1 | tee target/godot-bin/navigation.log
-          grep -q 'SceneNavigationSmoke: ALL CHECKS PASSED' \
-            target/godot-bin/navigation.log
-          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' \
-            target/godot-bin/navigation.log; then
-            exit 1
-          fi
-
       - name: Check offline OSM importer and geographic scene
         run: |
           set -euo pipefail
@@ -141,3 +128,16 @@ jobs:
           target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 --headless --path godot --script res://tests/GeoPropertyScenerySmoke.gd 2>&1 | tee target/godot-bin/geo-property-scenery.log
           grep -q 'GeoPropertyScenerySmoke: ALL CHECKS PASSED' target/godot-bin/geo-property-scenery.log
           if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' target/godot-bin/geo-property-scenery.log; then exit 1; fi
+
+      - name: Verify park, market, school and workshop scene transitions
+        run: |
+          set -euo pipefail
+          target/godot-bin/Godot_v4.6.1-stable_linux.x86_64 \
+            --headless --path godot --script res://tests/SceneNavigationSmoke.gd \
+            2>&1 | tee target/godot-bin/navigation.log
+          grep -q 'SceneNavigationSmoke: ALL CHECKS PASSED' \
+            target/godot-bin/navigation.log
+          if grep -Ei 'SCRIPT ERROR|Parse Error|Failed loading resource|ERROR:.*script' \
+            target/godot-bin/navigation.log; then
+            exit 1
+          fi

@@ -135,18 +135,41 @@ func bench(record: Dictionary) -> void:
     _box("bark",at+Vector3.UP*0.50,Vector3(1.65,0.09,0.49),tangent,normal)
     _box("bark",at+Vector3.UP*0.83+normal*0.22,Vector3(1.65,0.29,0.09),tangent,normal)
 
+func _foliage(kind: String,at: Vector3,radius: Vector3) -> void:
+    var rings:=6
+    var sides:=10
+    if not batches.has(kind):batches[kind]=PackedVector3Array()
+    var vertices: PackedVector3Array=batches[kind]
+    for ring in range(rings):
+        var lower: float=-PI/2.0+PI*ring/rings
+        var upper: float=-PI/2.0+PI*(ring+1)/rings
+        for i in range(sides):
+            var a:=TAU*i/sides
+            var b:=TAU*(i+1)/sides
+            var p:=at+Vector3(cos(lower)*cos(a),sin(lower),cos(lower)*sin(a))*radius
+            var q:=at+Vector3(cos(lower)*cos(b),sin(lower),cos(lower)*sin(b))*radius
+            var r:=at+Vector3(cos(upper)*cos(b),sin(upper),cos(upper)*sin(b))*radius
+            var s:=at+Vector3(cos(upper)*cos(a),sin(upper),cos(upper)*sin(a))*radius
+            if ring>0:vertices.append_array(PackedVector3Array([p,q,r]))
+            if ring<rings-1:vertices.append_array(PackedVector3Array([p,r,s]))
+    batches[kind]=vertices
+
 func tree(record: Dictionary) -> void:
     var at:=Vector3(float(record["point"][0]),0,float(record["point"][1]))
     _box("bark",at+Vector3.UP*1.4,Vector3(0.26,2.8,0.26),Vector3.RIGHT,Vector3.BACK)
-    _box("leaves",at+Vector3.UP*3.1,Vector3(2.6,2.7,2.6),Vector3.RIGHT,Vector3.BACK)
-    _box("leaves_light",at+Vector3(-0.4,4.1,0.2),Vector3(1.9,1.3,1.8),Vector3.RIGHT,Vector3.BACK)
+    var variation:=float(posmod(str(record.get("id","")).hash(),7))*0.08+0.85
+    _foliage("leaves",at+Vector3.UP*3.1,Vector3(1.35,1.6,1.35)*variation)
+    _foliage("leaves_light",at+Vector3(-0.4,4.0,0.2),Vector3(1.0,0.95,0.95)*variation)
 
 static func material(kind: String) -> StandardMaterial3D:
     var mat:=StandardMaterial3D.new()
-    var colors: Dictionary={"stone_road":Color("#8b8378"),"dirt_road":Color("#9b896b"),"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
+    var colors: Dictionary={"waterway":Color("#467b80"),"stone_road":Color("#8b8378"),"dirt_road":Color("#9b896b"),"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
     mat.albedo_color=PALETTE[int(kind.trim_prefix("wall_"))] if kind.begins_with("wall_") else colors.get(kind,Color.WHITE)
     mat.cull_mode=BaseMaterial3D.CULL_DISABLED
     mat.roughness=0.87
+    if kind=="waterway":
+        mat.roughness=0.22
+        mat.metallic=0.12
     if kind=="lamp":
         mat.emission_enabled=true
         mat.emission=Color("#ffcf88")
