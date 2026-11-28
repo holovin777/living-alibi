@@ -43,6 +43,18 @@ func _initialize() -> void:
     sign_road["bridge"]=true
     if Architecture.street_sign_candidate(sign_road):
         push_error("Street plate placed on a bridge");quit(1);return
+    var house=Architecture.new()
+    var rectangle={"id":"house","kind":"house","height":6.4,"points":[[0,0],[12,0],[12,8],[0,8]]}
+    var pitched: PackedVector3Array=house.pitched_roof(rectangle)
+    if pitched.size()!=12 or pitched[2].y<=6.4:
+        push_error("Missing raised roof ridge");quit(1);return
+    rectangle["points"]=[[0,0],[12,0],[9,8],[0,8]]
+    if not house.pitched_roof(rectangle).is_empty():
+        push_error("Irregular roof must use footprint fallback");quit(1);return
+    var shop=Architecture.new()
+    shop.facade({"id":"shop","kind":"retail","height":6.4,"points":[[0,0],[12,0],[12,8],[0,8]]})
+    if not shop.batches.has("shop_glass") or not (shop.batches.has("awning_red") or shop.batches.has("awning_green")):
+        push_error("Storefront detail missing");quit(1);return
     var capped=Architecture.new()
     capped.windows_count=Architecture.MAX_WINDOWS
     capped.facade({"id":"1","kind":"apartments","height":9.6,"points":[[0,0],[12,0],[12,10],[0,10]]})

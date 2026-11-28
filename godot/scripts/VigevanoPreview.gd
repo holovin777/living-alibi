@@ -962,6 +962,9 @@ func _update_daylight() -> void:
     if detail_materials.has("lamp"):
         var lamp: StandardMaterial3D=detail_materials["lamp"]
         lamp.emission_energy_multiplier=0.10 if sun_amount>0.20 else 2.0
+    if detail_materials.has("shop_glass"):
+        var shop_glass: StandardMaterial3D=detail_materials["shop_glass"]
+        shop_glass.emission_energy_multiplier=0.42 if sun_amount<0.20 else 0.08
     _local_lights(sun_amount<=0.20 and room.is_empty())
     var season:=str(weather.get("season","SPRING"))
     var foliage:=Color("#657e4c")
@@ -1026,12 +1029,16 @@ func _build_chunk(key: String,data: Dictionary) -> void:
             _quad(walls,a,b,b+Vector3.UP*h,a+Vector3.UP*h)
             # Both faces are solid, including on the exterior irrespective of OSM winding.
             _quad(walls,b,a,a+Vector3.UP*h,b+Vector3.UP*h)
-        for i in triangles:
-            if Architecture.roof_kind(str(feature.get("kind","yes")))=="flat":
-                flat_roofs.append(_point(points[i],h))
-            else:
-                roofs.append(_point(points[i],h))
         detail.facade(feature)
+        var pitched: PackedVector3Array=detail.pitched_roof(feature)
+        if not pitched.is_empty():
+            roofs.append_array(pitched)
+        else:
+            for i in triangles:
+                if Architecture.roof_kind(str(feature.get("kind","yes")))=="flat":
+                    flat_roofs.append(_point(points[i],h))
+                else:
+                    roofs.append(_point(points[i],h))
     for record in data.get("roads",[]):
         var surface:=str(record.get("surface",""))
         var kind:=str(record.get("kind",""))

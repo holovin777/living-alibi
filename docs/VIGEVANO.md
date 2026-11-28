@@ -83,3 +83,6 @@ Mapped bridge tags now produce concrete edge strips and metal parapets; the exis
 
 ### Textured buildings and street names
 The geographic renderer shares five original mipmapped procedural textures for plaster, clay roof tiles, stone paving, wood and grass. Roof finishes are inferred from building type, not surveyed roof shape/material. Up to four decorative two-sided street-name plates per streamed tile use real OSM names but approximate locations, no regulatory meaning or collision. Geometry and map cache schema are unchanged. No new assets need downloading. Visual quality and frame rate still need local testing.
+
+### Gabled roofs and shop fronts
+Small nearly rectangular residential footprints receive a procedural raised ridge and gable walls. Irregular/large polygons retain their existing roof triangulation. Explicit retail/commercial buildings receive decorative glazed storefronts, frames and awnings on a qualifying first facade; the glazing changes brightness with daylight. Neither building shape nor window placement is a surveyed reconstruction; roof height is estimated above the existing wall height. Shopfronts are opaque scenery, not new accessible shops or actual opening hours. No new collision or assets, traffic signals or intersections in this commit.

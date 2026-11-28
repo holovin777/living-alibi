@@ -47,6 +47,7 @@ func facade(feature: Dictionary) -> void:
     var floors:=clampi(roundi(h/3.2),1,12)
     var floor_height:=h/floors
     var residential:=type in ["yes","residential","apartments","house","terrace","detached"]
+    var commercial:=type in ["retail","commercial","supermarket","shop"]
     for i in range(points.size()):
         var p: Array=points[i]
         var q: Array=points[(i+1)%points.size()]
@@ -58,9 +59,12 @@ func facade(feature: Dictionary) -> void:
         var normal:=Vector3(tangent.z,0,-tangent.x) if signed_area>=0 else Vector3(-tangent.z,0,tangent.x)
         _quad(wall_key,a,b,b+Vector3.UP*h,a+Vector3.UP*h)
         if length<3.2 or floor_height<2.0 or type in ["garage","garages","shed","roof","ruins","church","chapel","industrial","warehouse"]:continue
+        var storefront:=commercial and i==0 and length>=5.0 and floor_height>=2.6 and windows_count<MAX_WINDOWS
+        if storefront:_shopfront(a,b,tangent,normal,floor_height,id_hash)
         var columns:=clampi(floori(length/3.0),1,14)
         var door_column:=columns/2
         for floor_index in range(floors):
+            if storefront and floor_index==0:continue
             for column in range(columns):
                 if windows_count>=MAX_WINDOWS:break
                 var middle:=a.lerp(b,(column+0.5)/columns)+normal*0.04
@@ -85,6 +89,57 @@ func facade(feature: Dictionary) -> void:
                         for rail in range(5):
                             _box("iron",deck+normal*0.42+tangent*(rail-2)*0.38+Vector3.UP*0.48,Vector3(0.035,0.82,0.035),tangent,normal)
                     windows_count+=1
+
+func _shopfront(a: Vector3,b: Vector3,tangent: Vector3,normal: Vector3,floor_height: float,id_hash: int) -> void:
+    var length:=a.distance_to(b)
+    var middle: Vector3=(a+b)*0.5+normal*0.07
+    var width:=minf(length-0.7,10.0)
+    var glass_height:=minf(1.95,floor_height-0.65)
+    var center:=middle+Vector3.UP*(glass_height*0.5+0.26)
+    _rect("shop_frame",center,tangent,width,glass_height+0.16)
+    var bays:=clampi(floori(width/1.6),2,6)
+    var bay_width:=width/float(bays)
+    for i in range(bays):
+        var at:=center+tangent*((float(i)+0.5)*bay_width-width*0.5)+normal*0.025
+        _rect("shop_glass",at,tangent,bay_width-0.10,glass_height)
+        _rect("shop_frame",at+normal*0.02,tangent,bay_width-0.09,0.045)
+    var door_at:=center+normal*0.055
+    _rect("shop_frame",door_at,tangent,0.95,glass_height)
+    _rect("shop_glass",door_at+normal*0.02,tangent,0.79,glass_height-0.12)
+    _rect("iron",door_at+normal*0.045+tangent*0.30,tangent,0.035,0.24)
+    var awning_at:=middle+Vector3.UP*minf(floor_height-0.15,2.62)+normal*0.53
+    var awning_kind: String="awning_red" if posmod(id_hash,2)==0 else "awning_green"
+    _box(awning_kind,awning_at,Vector3(width,0.10,1.04),tangent,normal)
+    _box(awning_kind,awning_at+normal*0.50-Vector3.UP*0.10,Vector3(width,0.18,0.06),tangent,normal)
+    windows_count+=bays
+
+# Only nearly rectangular houses receive a gable. Irregular footprints retain the
+# original triangulated roof rather than extending outside the mapped polygon.
+func pitched_roof(feature: Dictionary) -> PackedVector3Array:
+    var out:=PackedVector3Array()
+    var points: Array=feature["points"]
+    var kind:=str(feature.get("kind","yes"))
+    if points.size()!=4 or kind not in ["house","detached","terrace","residential","yes"]:return out
+    var h:=float(feature["height"])
+    if h<3.0 or h>13.0:return out
+    var corners: Array[Vector3]=[]
+    for p in points:corners.append(Vector3(float(p[0]),h,float(p[1])))
+    var e:=corners[1]-corners[0]
+    var f:=corners[3]-corners[0]
+    if e.length()<3 or f.length()<3 or e.length()>35 or f.length()>35:return out
+    if absf(e.normalized().dot(f.normalized()))>0.06 or (corners[0]+e+f).distance_to(corners[2])>0.25:return out
+    if f.length()>e.length():
+        var first: Vector3=corners.pop_front()
+        corners.append(first)
+    var rise:=clampf(corners[0].distance_to(corners[3])*0.23,0.65,2.8)
+    var r0: Vector3=(corners[0]+corners[3])*0.5+Vector3.UP*rise
+    var r1: Vector3=(corners[1]+corners[2])*0.5+Vector3.UP*rise
+    out.append_array(PackedVector3Array([corners[0],corners[1],r1,corners[0],r1,r0,corners[3],r0,r1,corners[3],r1,corners[2]]))
+    var wall_key: String="wall_%d" % posmod(str(feature.get("id","")).hash(),PALETTE.size())
+    var verts: PackedVector3Array=batches.get(wall_key,PackedVector3Array())
+    verts.append_array(PackedVector3Array([corners[0],r0,corners[3],corners[1],corners[2],r1]))
+    batches[wall_key]=verts
+    return out
 
 func road(record: Dictionary) -> void:
     var a:=Vector3(float(record["a"][0]),0.045,float(record["a"][1]))
@@ -206,10 +261,15 @@ static func street_sign_candidate(record: Dictionary) -> bool:
 
 static func material(kind: String) -> StandardMaterial3D:
     var mat:=StandardMaterial3D.new()
-    var colors: Dictionary={"bridge_concrete":Color("#a4a39a"),"waterway":Color("#467b80"),"stone_road":Color("#8b8378"),"dirt_road":Color("#9b896b"),"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
+    var colors: Dictionary={"shop_frame":Color("#424c4b"),"shop_glass":Color("#586b70"),"awning_red":Color("#963e37"),"awning_green":Color("#486b53"),"bridge_concrete":Color("#a4a39a"),"waterway":Color("#467b80"),"stone_road":Color("#8b8378"),"dirt_road":Color("#9b896b"),"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
     mat.albedo_color=PALETTE[int(kind.trim_prefix("wall_"))] if kind.begins_with("wall_") else colors.get(kind,Color.WHITE)
     mat.cull_mode=BaseMaterial3D.CULL_DISABLED
     mat.roughness=0.87
+    if kind=="shop_glass":
+        mat.roughness=0.25
+        mat.emission_enabled=true
+        mat.emission=Color("#e4c69d")
+        mat.emission_energy_multiplier=0.08
     if kind=="waterway":
         mat.roughness=0.22
         mat.metallic=0.12
