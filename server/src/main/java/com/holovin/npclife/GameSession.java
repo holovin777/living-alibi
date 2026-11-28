@@ -925,6 +925,11 @@ public final class GameSession implements AutoCloseable {
             geoInterior=null;geoDrive=null;
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if("phone-ambulance".equals(action)){
+            if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action))||geoInterior!=null)throw new IllegalArgumentException("Ambulance call unavailable here.");
+            var copy=town.copy();String message=AmbulanceLife.call(copy,state);
+            apply(copy,1,message);return new GeoProjection.ActionResult(message,null);
+        }
         if(action!=null&&action.startsWith("phone-")){
             if(map.phone(town,state).actions().stream().noneMatch(a->a.id().equals(action)))
                 throw new IllegalArgumentException("Phone action unavailable.");
@@ -971,6 +976,15 @@ public final class GameSession implements AutoCloseable {
                 default -> throw new IllegalArgumentException("Unknown workshop action.");
             };
             return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.equals("ambulance-call")){
+            var copy=town.copy();String message=AmbulanceLife.call(copy,state);
+            apply(copy,1,message);return new GeoProjection.ActionResult(message,null);
+        }
+        if(action.equals("ambulance-board")){
+            var copy=town.copy();var result=AmbulanceLife.board(copy,state);
+            apply(copy,result.minutes(),result.message());geoInterior=null;
+            return new GeoProjection.ActionResult(result.message(),map.district(town.player.place));
         }
         if(action.startsWith("tow:")){
             var copy=town.copy();String message=TowServiceLife.request(copy,state,action.substring(4));

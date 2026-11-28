@@ -99,6 +99,8 @@ func _render() -> void:
         return
     match current_tab:
         "Calls":
+            for action in data.get("actions",[]):
+                if str(action.get("id",""))=="phone-ambulance":_button(str(action.get("label","")),func():requested_action.emit("phone-ambulance"))
             if report.get("calls",[]).is_empty() and report.get("dialContacts",[]).is_empty():_label("No calls or shared numbers yet.")
             for call in report.get("calls",[]):
                 _label(str(call.get("name",""))+" · "+str(call.get("status",""))+"\n"+str(call.get("text","")))
