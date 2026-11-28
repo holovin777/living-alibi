@@ -38,6 +38,9 @@ var city_map: Control
 var route_status := ""
 var street_timer := 0.0
 var street_name := ""
+var movement_notice := ""
+var blocked_seconds:=0.0
+const Movement=preload("res://scripts/GeoMovement.gd")
 var route_destination := Vector2.ZERO
 var has_destination := false
 const Traffic=preload("res://scripts/GeoTraffic.gd")
@@ -327,6 +330,8 @@ func _ready() -> void:
     walker.position=Vector3(float(spawn[0]),1.05,float(spawn[1]))
     _stream()
     ready_to_walk=true
+    _schedule_street_spawn(Vector2(walker.position.x,walker.position.z))
+    Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
     print("VigevanoPreview: loaded ",city.get("counts",{})," active chunks=",chunks.size())
 
 func _material(color: Color) -> StandardMaterial3D:
@@ -474,18 +479,20 @@ func _physics_process(delta: float) -> void:
         head.position=Vector3(0,0.55,0.32) if not driving_light.is_empty() else (Vector3(-0.48,1.05,0.28) if driving_bus or driving_truck else Vector3(-0.33,0.30,0.20))
         _drive_frame(delta)
         return
-    if city_map.visible or chat.visible or actions_panel.visible or phone_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or (linked and not bool(life.get("canWalk",false))))):
+    movement_notice=Movement.block_reason(city_map.visible,chat.visible,actions_panel.visible,phone_panel.visible,shared_mode,residents.has_snapshot,residents.world)
+    if not movement_notice.is_empty():
         walker.velocity.x=0
         walker.velocity.z=0
+        blocked_seconds=0.0
         street_timer+=delta
         if street_timer>=0.5:
             street_timer=0
             _update_navigation()
         return
-    if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):direction.z-=1
-    if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):direction.z+=1
-    if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):direction.x-=1
-    if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):direction.x+=1
+    if Input.is_physical_key_pressed(KEY_W) or Input.is_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):direction.z-=1
+    if Input.is_physical_key_pressed(KEY_S) or Input.is_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):direction.z+=1
+    if Input.is_physical_key_pressed(KEY_A) or Input.is_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):direction.x-=1
+    if Input.is_physical_key_pressed(KEY_D) or Input.is_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):direction.x+=1
     direction=walker.basis*direction.normalized()
     var cycling:=room.is_empty() and bool(residents.world.get("cycling",false))
     var speed := 8.0 if cycling else (7.0 if Input.is_physical_key_pressed(KEY_SHIFT) else 4.5)
@@ -497,13 +504,21 @@ func _physics_process(delta: float) -> void:
                 var center:=Vector2(float(district["x"]),float(district["z"]))
                 var current:=Vector2(walker.position.x,walker.position.z)
                 var predicted:=current+Vector2(direction.x,direction.z)*speed*delta
-                if predicted.distance_to(center)>float(life.get("radius",24)) and predicted.distance_to(center)>current.distance_to(center):direction=Vector3.ZERO
+                if Movement.outside_limit(life,center,current,predicted):
+                    direction=Vector3.ZERO
+                    movement_notice="Childhood boundary / Limite infanzia · F: permitted travel / spostamenti"
     walker.velocity.x=direction.x*speed
     walker.velocity.z=direction.z*speed
     if not walker.is_on_floor():walker.velocity.y-=9.8*delta
     elif not cycling and Input.is_physical_key_pressed(KEY_SPACE):walker.velocity.y=4.3
     else:walker.velocity.y=0
+    var before:=walker.position
     walker.move_and_slide()
+    if direction.length_squared()>0.01 and Vector2(before.x,before.z).distance_to(Vector2(walker.position.x,walker.position.z))<0.005:
+        blocked_seconds+=delta
+        if blocked_seconds>0.7:movement_notice="Obstacle / Ostacolo · try another direction / cambia direzione"
+    else:
+        blocked_seconds=0.0
     _stream()
     street_timer+=delta
     if street_timer>=0.5:
@@ -572,6 +587,8 @@ func _update_navigation() -> void:
         hud.text=str(room.get("label",""))+" · INTERIOR / INTERNO\nWASD · E near exit · T talk · F actions · P phone\nDay %s · %02d:%02d · inside %s · €%s" % [residents.day,int(residents.minute/60),residents.minute%60,residents.people.size(),residents.world.get("money",0)]
         if bool(residents.world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: life actions · E: leave home"
         if _near_office_computer() and _has_office_workspace():hud.text+="\nBorgo Digital · E: use computer"
+        if not movement_notice.is_empty():hud.text+="\n"+movement_notice
+        if shared_mode and not residents.connected:hud.text+="\nReconnecting / Riconnessione..."
         if not residents.last_message.is_empty():hud.text+="\n"+residents.last_message
         return
     city_map.player=pos
@@ -586,6 +603,9 @@ func _update_navigation() -> void:
             route_status="Walking route: %.0f m along streets" % RoadGraph.length(path)
     city_map.queue_redraw()
     hud.text="VIGEVANO · "+(street_name if not street_name.is_empty() else "Geographic preview")+"\nWASD · Space jump · M map · Esc cursor | chunks %s/9" % chunks.size()
+    hud.text+="\nPosition / Posizione: %.0f, %.0f · M: map / mappa" % [pos.x,pos.y]
+    if not movement_notice.is_empty():hud.text+="\n"+movement_notice
+    if shared_mode and not residents.connected:hud.text+="\nReconnecting / Riconnessione..."
     if residents.connected:
         var world: Dictionary=residents.world
         var district: Dictionary=world.get("playerDistrict",{})
@@ -597,7 +617,7 @@ func _update_navigation() -> void:
                 var expected: String="SOUTH_RESIDENCES" if str(door["id"])=="3" else "NORTH_RESIDENCES"
                 hud.text+="\n"+str(door["label"])+" · "+("F: known contacts / Citofono" if str(district.get("id",""))==expected else "E at residential district first / Entra nel quartiere")
         if bool(world.get("confined",false)):hud.text+="\nOpen regular game to continue custody."
-        if bool(world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · Local walking · F: travel/life"
+        if bool(world.get("rebirth",false)):hud.text+="\n"+_life_summary()+" · F: travel/life"
         var phone: Dictionary=world.get("phone",{})
         var report: Dictionary=phone.get("report",{})
         for call in report.get("calls",[]):

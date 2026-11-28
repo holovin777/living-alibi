@@ -4,6 +4,7 @@ var people: Dictionary={}
 var http: HTTPRequest
 var elapsed:=1.0
 var connected:=false
+var has_snapshot:=false
 var population:=0
 var commuting:=0
 var day:=1
@@ -32,7 +33,7 @@ func configure(source: Node3D, use_server: bool) -> void:
     enabled=use_server
     if not enabled:return
     http=HTTPRequest.new()
-    http.timeout=3.0
+    http.timeout=12.0
     add_child(http)
     http.request_completed.connect(_received)
     action_http=HTTPRequest.new()
@@ -89,6 +90,7 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
         _offline()
         return
     connected=true
+    has_snapshot=true
     traffic.set_java_population(true)
     world=parsed
     for remark in parsed.get("officeRemarks",[]):
@@ -263,7 +265,6 @@ func _offline() -> void:
     connected=false
     remark_time=0
     if is_instance_valid(remark_label):remark_label.hide()
-    world.clear()
+    # Retain the last authoritative life/room state during a transient failure.
+    # Do not unlock custody or childhood restrictions or erase nearby actors.
     traffic.set_java_population(enabled)
-    for record in people.values():record["node"].queue_free()
-    people.clear()

@@ -11,7 +11,7 @@ final class GeoLife {
         var b=c==null?null:DemographyLife.byIndex(t,DemographyLife.get(t,c,"parent-b"));
         return new View(switch(phase){case RebirthLife.CHOICE->"CHOICE";case RebirthLife.CHILDHOOD->"CHILDHOOD";case RebirthLife.LINKED_ADULT->"LINKED_ADULT";default->"ADULT";},
             c==null?null:c.name,c==null?0:c.age,c==null?"":c.activity,c==null?t.player.money:c.money,RebirthLife.maxWaitDays(t),
-            c==null?0:EducationLife.get(t,c,"school-days"),c!=null&&EducationLife.get(t,c,"graduate")>0,a==null?null:a.name,b==null?null:b.name,canWalk(t,s),24,GenealogyLife.relatives(t,c),ChildhoodLife.view(t,c),ChildSearchLife.view(t,c,s),PassportLife.view(t,s),ConvictionLife.view(t,c),PsychologyLife.view(t,c),SubstanceLife.view(t,c,s),ClinicalLife.view(t,c,s),AthleticsLife.view(t,c,s),CultureLife.view(t,c));
+            c==null?0:EducationLife.get(t,c,"school-days"),c!=null&&EducationLife.get(t,c,"graduate")>0,a==null?null:a.name,b==null?null:b.name,canWalk(t,s),c!=null&&RebirthLife.linkedAdult(t,c)?0:24,GenealogyLife.relatives(t,c),ChildhoodLife.view(t,c),ChildSearchLife.view(t,c,s),PassportLife.view(t,s),ConvictionLife.view(t,c),PsychologyLife.view(t,c),SubstanceLife.view(t,c,s),ClinicalLife.view(t,c,s),AthleticsLife.view(t,c,s),CultureLife.view(t,c));
     }
     static List<GeoProjection.Choice> choices(TownLife.Town t,WorldState s,GeoProjection map){
         var result=new ArrayList<GeoProjection.Choice>();

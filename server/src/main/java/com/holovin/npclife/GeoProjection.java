@@ -584,7 +584,7 @@ final class GeoProjection {
         boolean linkedHome=rebirth&&GeoLife.atHome(linked);
         if(rebirth){
             room=linked!=null&&linked.alive&&linked.travelRemaining==0&&(linkedHome||room==linked.place&&hasInterior(linked.place))?linked.place:null;
-            if(!GeoLife.canWalk(t,s)||point(p.place).distance(player)>24)player=point(p.place);
+            if(!GeoLife.canWalk(t,s)||(!RebirthLife.linkedAdult(t,linked)&&point(p.place).distance(player)>24))player=point(p.place);
         }
         final Point viewer=player;
         var talking=new HashSet<>(rebirth?RebirthLife.visible(t):PlayerLife.visible(t));
