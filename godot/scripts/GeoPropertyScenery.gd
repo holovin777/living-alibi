@@ -291,6 +291,10 @@ func _sync_commercial(projects: Array) -> void:
 func _commercial_site(root: Node3D,project: Dictionary) -> void:
     var stage:=clampi(int(project.get("stage",0)),0,3)
     var active: bool=bool(project.get("active",false))
+    var residential: bool=str(project.get("id","")).begins_with("residential:")
+    if residential:
+        _residential_site(root,stage,active,str(project.get("id","")).trim_prefix("residential:"))
+        return
     _box(root,Vector3.ZERO,Vector3(8,0.08,7),Color("#a7977d"))
     if stage>=1:_box(root,Vector3(0,0.17,0),Vector3(6.2,0.3,5.4),Color("#a9acae"),true)
     if stage>=2:
@@ -313,3 +317,22 @@ func _commercial_site(root: Node3D,project: Dictionary) -> void:
         for x in [-3.6,3.6]:_box(root,Vector3(x,0.6,3.25),Vector3(0.12,1.2,0.12),yellow)
         _box(root,Vector3(0,0.85,3.25),Vector3(7.2,0.12,0.12),yellow)
         _sign(root,Vector3(0,2.0,3.3),"CANTIERE · %s/3" % stage)
+
+func _residential_site(root: Node3D,stage: int,active: bool,id: String) -> void:
+    _box(root,Vector3.ZERO,Vector3(8,0.08,7),Color("#8a9b70") if stage==3 else Color("#a7977d"))
+    if stage>=1:_box(root,Vector3(0,0.18,0),Vector3(6,0.35,5.2),Color("#a9acae"),true)
+    if stage>=2:
+        _box(root,Vector3(0,1.85,0),Vector3(5.7,3.0,4.9),Color("#e0c6a4"),true)
+        for x in [-1.8,1.8]:
+            _box(root,Vector3(x,2.0,2.47),Vector3(1.0,1.25,0.07),Color("#6d929a"))
+            for side in [-0.65,0.65]:_box(root,Vector3(x+side,2.0,2.53),Vector3(0.27,1.35,0.09),Color("#637a55"))
+    if stage==3:
+        for side in [-1.0,1.0]:
+            var roof:=_box(root,Vector3(side*1.55,3.85,0),Vector3(3.4,0.20,5.5),Color("#a85d49"))
+            roof.rotation.z=-side*0.35
+        _box(root,Vector3(0,1.35,2.47),Vector3(0.95,2.05,0.10),Color("#76563d"))
+        _sign(root,Vector3(0,3.3,2.7),id.to_upper())
+    elif active:
+        for x in [-3.6,3.6]:_box(root,Vector3(x,0.7,3.25),Vector3(0.12,1.4,0.12),Color("#d1a147"))
+        _box(root,Vector3(0,0.95,3.25),Vector3(7.2,0.12,0.12),Color("#d1a147"))
+        _sign(root,Vector3(0,1.8,3.3),"CANTIERE · %s/3" % stage)

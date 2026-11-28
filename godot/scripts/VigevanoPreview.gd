@@ -1090,6 +1090,8 @@ func _open_actions(work_only: bool=false) -> void:
         hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         action_list.add_child(hint)
     if str(room.get("id",""))=="OFFICE":
+        for home_plot in residents.world.get("residentialPlots",[]):
+            WorkPanel.label(action_list,"%s · Owner / Proprietario: %s · %s/3\nUtilities / Utenze: %s · Residents / Abitanti: %s" % [home_plot.get("id",""),home_plot.get("owner",""),home_plot.get("stage",0),"OK" if home_plot.get("connected",false) else "Pending / In attesa",home_plot.get("residents",0)])
         for plot in residents.world.get("commercialPlots",[]):
             WorkPanel.label(action_list,"%s · Owner / Proprietario: %s\nConstruction / Costruzione %s/%s · Weekly rent / Affitto €%s\nTenant / Inquilino: %s · Until / Fino al giorno %s" % [plot.get("id",""),plot.get("owner",""),plot.get("stage",0),plot.get("stages",3),plot.get("weeklyRent",0),plot.get("tenant",""),plot.get("leaseUntil",0)])
         for entry in residents.world.get("businessOwnership",[]):

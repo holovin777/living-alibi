@@ -17,6 +17,7 @@ final class ConstructionCrewLife {
             .min(Comparator.comparing(c->c.id)).orElse(null);
     }
     static boolean complete(TownLife.Town t,WorldState s,TownLife.Citizen owner,int stage){
+        if(t.industryStocks.getOrDefault("construction-crew:last-day",0)>=s.day)return false;
         var builder=worker(t,s,BUILDER,owner);
         var driver=worker(t,s,DRIVER,owner);
         var architect=stage==0?worker(t,s,ARCHITECT,owner):null;
@@ -33,6 +34,7 @@ final class ConstructionCrewLife {
         t.employerFunds.merge(FactoryNetworkLife.supplier("building-material"),CommercialPropertyLife.MATERIAL,Math::addExact);
         t.industryStocks.merge(IndustryLife.FACTORY_STEEL,-1,Integer::sum);
         FactoryNetworkLife.change(t,"building-material",-1);
+        t.industryStocks.put("construction-crew:last-day",s.day);
         return true;
     }
 }
