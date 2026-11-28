@@ -983,6 +983,19 @@ public final class GameSession implements AutoCloseable {
             };
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.equals("fire-duty-standby")){
+            var copy=town.copy();String message=FireDutyLife.standby(copy,state);apply(copy,1,message);
+            return new GeoProjection.ActionResult(message,null);
+        }
+        if(action.equals("fire-duty-join")){
+            var copy=town.copy();var journey=FireDutyLife.join(copy,state);
+            apply(copy,journey.minutes(),journey.message());geoInterior=null;
+            return new GeoProjection.ActionResult(journey.message(),map.district(town.player.place));
+        }
+        if(action.equals("fire-duty-assist")){
+            var copy=town.copy();var result=FireDutyLife.assist(copy,state);
+            apply(copy,result.minutes(),result.message());return new GeoProjection.ActionResult(result.message(),null);
+        }
         if(action.equals("fire-training")){
             var copy=town.copy();String message=FireTrainingLife.train(copy,state);apply(copy,30,message);
             return new GeoProjection.ActionResult(message,null);
