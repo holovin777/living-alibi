@@ -642,6 +642,8 @@ func _update_navigation() -> void:
         if str(world.get("jobId",""))=="firefighter":hud.text+="\nFire duty / Servizio: kit %s%% · %s" % [duty.get("gearCondition",0),"Assigned / In missione" if duty.get("assigned",false) else "Standby / Disponibile" if duty.get("standby",false) else "Off duty / Riposo"]
         for damaged in world.get("fireRecovery",[]):
             if str(damaged.get("id",""))==str(district.get("id","")):hud.text+="\nRestoration / Ripristino: %s%% · %s" % [damaged.get("condition",100),"Closed / Chiuso" if damaged.get("closed",false) else "Open / Aperto"]
+        var insurance: Dictionary=world.get("homeInsurance",{})
+        if bool(insurance.get("owned",false)) or int(insurance.get("pending",0))>0:hud.text+="\nHome insurance / Assicurazione: %s days · €%s pending" % [insurance.get("days",0),insurance.get("pending",0)]
         var housing: Dictionary=world.get("fireHousing",{})
         if int(housing.get("accommodated",0))+int(housing.get("waiting",0))>0:hud.text+="\nTemporary shelter / Alloggio: %s/%s assigned · %s waiting" % [housing.get("accommodated",0),housing.get("capacity",24),housing.get("waiting",0)]
         var fire: Dictionary=world.get("fireService",{})

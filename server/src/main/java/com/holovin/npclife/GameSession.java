@@ -983,6 +983,10 @@ public final class GameSession implements AutoCloseable {
             };
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.equals("home-insurance-buy")||action.equals("home-insurance-collect")){
+            var copy=town.copy();String message=action.endsWith("-buy")?HomeInsuranceLife.buy(copy,state):HomeInsuranceLife.collect(copy,state);
+            apply(copy,15,message);return new GeoProjection.ActionResult(message,null);
+        }
         if(action.equals("fire-recovery-repair")){
             var copy=town.copy();String message=FireRecoveryLife.playerRepair(copy,state,copy.player.place);apply(copy,60,message);
             return new GeoProjection.ActionResult(message,null);

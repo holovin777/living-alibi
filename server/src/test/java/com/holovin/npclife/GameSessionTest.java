@@ -4351,7 +4351,7 @@ class GameSessionTest {
             assertEquals("SCHOOL",restarted.snapshot().player().placeId());
             assertEquals("shop-assistant",restarted.snapshot().player().jobId());
             assertEquals(1,restarted.snapshot().player().engineeringSkill());
-            assertEquals(11,restarted.jobs().size(),"job board remains stable");
+            assertEquals(12,restarted.jobs().size(),"job board remains stable");
         }
     }
 

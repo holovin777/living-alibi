@@ -12,7 +12,9 @@ final class FireRecoveryLife {
     static boolean closed(TownLife.Town t,TownLife.Place p){return p!=null&&FireServiceLife.SITES.contains(p)&&(FireServiceLife.site(t)==p||condition(t,p)<CLOSED_BELOW);}
     static void damage(TownLife.Town t,TownLife.Place p,int amount){
         if(!FireServiceLife.SITES.contains(p)||amount<=0)return;
-        t.industryStocks.put(key(p,"condition"),Math.max(0,condition(t,p)-amount));
+        int before=condition(t,p),after=Math.max(0,before-amount);
+        t.industryStocks.put(key(p,"condition"),after);
+        HomeInsuranceLife.damage(t,p,before-after);
     }
     static boolean resources(TownLife.Town t,TownLife.Place p){
         return FireServiceLife.SITES.contains(p)&&FireServiceLife.site(t)!=p&&condition(t,p)<100
