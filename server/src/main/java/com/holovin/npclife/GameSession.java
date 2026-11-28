@@ -788,11 +788,12 @@ public final class GameSession implements AutoCloseable {
         if(next.waitingForSignal&&traveled<0.001){geoDrive=next;return drivePose(map,"Waiting for green light.");}
         int units=(int)(next.meters/100)-oldUnits;
         int impact=0;
+        double impactSpeed=0;
         if(traveled>0.01&&now-geoLastImpact>2_000_000_000L){
             var parked=map.civilian(town,previousPosition);
             boolean collision=parked!=null&&GeoResponse.contact(previousPosition,next.position(map),new GeoProjection.Point(parked.x(),parked.z()));
             if(next.stolen&&town.player.carPlace!=null){var own=map.point(town.player.carPlace);collision|=GeoResponse.contact(previousPosition,next.position(map),new GeoProjection.Point(own.x()+2.5,own.z()));}
-            if(collision){impact=8;next.speed=0;geoLastImpact=now;}
+            if(collision){impactSpeed=Math.max(geoDrive.speed,next.speed)*3.6;impact=RoadAccidentLife.damage(impactSpeed);next.speed=0;geoLastImpact=now;}
         }
         var copy=town.copy();var destination=map.nearest(next.position(map));
         copy.player.place=destination;copy.player.destination=destination;copy.player.cycling=false;
@@ -808,9 +809,15 @@ public final class GameSession implements AutoCloseable {
         int remainder=(int)Math.round((next.meters%100)*1000);
         if(!next.stolen&&!next.lightKind.isEmpty())LightMotorLife.set(copy,next.lightKind,"remainder",remainder);
         else VehicleTheftLife.set(copy,next.stolen?"stolen-remainder":"owned-remainder",remainder);
+        String accidentMessage="";
+        if(impact>0){
+            String kind=next.truck?"truck":next.bus?"bus":next.lightKind.isEmpty()?"car":next.lightKind;
+            int actualDamage=Math.min(impact,Math.max(0,condition-3*units));
+            accidentMessage=RoadAccidentLife.record(copy,state,kind,next.stolen,actualDamage,impactSpeed).message();
+        }
         String checkMessage="";
         // Criminal reports keep the existing dispatch/arrest path; ordinary inspections are administrative.
-        if(!next.stolen&&traveled>0.001&&RoadPoliceLife.due(copy,state)
+        if(impact==0&&!next.stolen&&traveled>0.001&&RoadPoliceLife.due(copy,state)
                 &&map.patrols(town,state,next.position(map)).stream().anyMatch(patrol->!patrol.responding()&&new GeoProjection.Point(patrol.x(),patrol.z()).distance(next.position(map))<=12)){
             String kind=next.lightKind.isEmpty()?"car":next.lightKind;
             String plate=VehicleRegistrationLife.personal(copy,kind);
@@ -820,8 +827,8 @@ public final class GameSession implements AutoCloseable {
                 checkMessage=check.message();
             }
         }
-        apply(copy,0,checkMessage.isEmpty()?"Driving.":checkMessage);geoDrive=next;
-        return drivePose(map,!checkMessage.isEmpty()?checkMessage:impact>0?"Collision: vehicle condition reduced.":next.waitingForSignal?"Waiting for green light.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
+        apply(copy,0,!accidentMessage.isEmpty()?accidentMessage:checkMessage.isEmpty()?"Driving.":checkMessage);geoDrive=next;
+        return drivePose(map,!checkMessage.isEmpty()?checkMessage:impact>0?accidentMessage:next.waitingForSignal?"Waiting for green light.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
     }
     private int driveResource(GeoDrive drive,String field){
         if(drive.stolen)return VehicleTheftLife.get(town,field);
@@ -963,6 +970,10 @@ public final class GameSession implements AutoCloseable {
                 default -> throw new IllegalArgumentException("Unknown workshop action.");
             };
             return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.equals("accident-treatment")){
+            var copy=town.copy();String message=RoadAccidentLife.treat(copy,state);
+            apply(copy,30,message);return new GeoProjection.ActionResult(message,null);
         }
         if(action.startsWith("vehicle-docs:")){
             String[] command=action.split(":",3);
