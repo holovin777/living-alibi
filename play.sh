@@ -71,15 +71,19 @@ if [[ ! -f "$ROOT/godot/project.godot" || ! -f "$ROOT/server/pom.xml" ]]; then
     exit 1
 fi
 
+# Import new GLB resources after git pull even with an existing cache.
+prepare_godot_assets() {
+    echo "Checking Godot asset imports..."
+    "$GODOT" --headless --path "$ROOT/godot" --import
+}
+
 if [[ "$MODE" == "--client-only" ]]; then
     if ! curl -fsS --max-time 5 http://127.0.0.1:8080/api/v1/world >/dev/null; then
         echo "No game server. Start it or open the SSH tunnel." >&2
         exit 1
     fi
     export LIVING_ALIBI_REMOTE=1
-    if [[ ! -d "$ROOT/godot/.godot" ]]; then
-        "$GODOT" --headless --path "$ROOT/godot" --editor --quit
-    fi
+    prepare_godot_assets
     exec "$GODOT" --path "$ROOT/godot"
 fi
 
@@ -155,11 +159,7 @@ if [[ "$READY" != true ]]; then
     exit 1
 fi
 
-# Godot needs to build its local import cache on the very first run.
-if [[ ! -d "$ROOT/godot/.godot" ]]; then
-    echo "Preparing Godot assets on first launch..."
-    "$GODOT" --headless --path "$ROOT/godot" --editor --quit
-fi
+prepare_godot_assets
 
 echo "Opening Living Alibi..."
 echo "WASD/arrows = walk; click scene = mouse look; first-person only; Esc = cursor."

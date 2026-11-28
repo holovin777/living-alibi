@@ -5,6 +5,27 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 class GeoRebirthTest {
     @TempDir Path folder;
+    @Test void linkedAdultMotorEconomyUsesCitizenSavingsNotDeadVisitor(){
+        var s=new WorldState();s.day=1;s.minute=600;
+        var t=TownLife.create(s);var c=PopulationGenerator.add(t,1).getFirst();
+        c.age=25;c.money=250;c.place=TownLife.Place.WORKSHOP;c.destination=c.place;
+        c.home=TownLife.Place.NORTH_RESIDENCES;c.activity="FREE_TIME";c.travelRemaining=0;
+        // Match the same persisted phase and identity keys used by rebirth.
+        t.industryStocks.put("rebirth:phase",RebirthLife.LINKED_ADULT);
+        t.industryStocks.put("rebirth:child",c.generationIndex);
+        t.player.alive=false;t.player.money=0;
+        assertSame(c,GameSession.beginLinkedMotorAction(t,s.day));
+        MotorLife.buy(t,s.minute);
+        GameSession.endLinkedMotorAction(t,c);
+        assertEquals(70,c.money);assertFalse(t.player.alive);assertEquals(0,t.player.money);
+        assertEquals(TownLife.Place.WORKSHOP,t.player.carPlace);
+        assertSame(c,GameSession.beginLinkedMotorAction(t,s.day));
+        assertEquals(3,MotorLife.drive(t.player,TownLife.Place.LIBRARY));
+        GameSession.endLinkedMotorAction(t,c);
+        assertEquals(5,t.player.carFuel);assertEquals(77,t.player.carCondition);
+        c.age=12;
+        assertThrows(IllegalArgumentException.class,()->GameSession.beginLinkedMotorAction(t,s.day));
+    }
     @Test void familyChoiceShowsRealHouseholdAndDoesNotChangeWorld(){
         var s=new WorldState();var t=TownLife.create(s);
         var pair=PopulationGenerator.add(t,2);
