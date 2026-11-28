@@ -37,7 +37,7 @@ final class GeoProjection {
             return new PhoneView(report,List.of(),null,List.of(),null,List.copyOf(actions),Map.of(),digital);
         }
         var jobs=CareerLife.offers().stream().map(j->new PhoneJob(j.id(),j.title(),district(j.workplace()),j.subject(),
-            j.requiredSkill(),CareerLife.skill(t.player,j.subject()),j.wage(),t.employerFunds.getOrDefault(j.id(),0)>=j.wage())).toList();
+            j.requiredSkill(),CareerLife.skill(t,j.subject()),j.wage(),t.employerFunds.getOrDefault(CareerLife.payrollAccount(j.id()),0)>=j.wage())).toList();
         var actions=new ArrayList<Choice>();
         if(t.player.travelRemaining==0&&!t.player.cycling){
             for(var c:report.dialContacts()){
@@ -500,6 +500,7 @@ final class GeoProjection {
         for(String id:List.of("bread","water","pizza","gelato","grape-juice"))
             if(FoodLife.quantity(p,id,false)>0)result.add(new Choice("consume:"+id,"Consume / Consuma "+RetailLife.product(id).label()));
         if(point(p.place).distance(player)>18)return result;
+        if(FireTrainingLife.canTrain(t,s))result.add(new Choice("fire-training","Firefighter course / Corso vigile del fuoco · "+FireTrainingLife.MODULES.get(FireTrainingLife.completed(t))+" · €5 · 30 min"));
         if(FireServiceLife.canService(t,s))result.add(new Choice("fire-equipment-service","Service fire equipment / Manutenzione attrezzatura · earn €5 · 30 min"));
         if(FireServiceLife.canReport(t))result.add(new Choice("fire-report","Report fire / Segnala incendio"));
         if(AmbulanceLife.canCall(t,s))result.add(new Choice("ambulance-call","Request ambulance / Chiama ambulanza"));

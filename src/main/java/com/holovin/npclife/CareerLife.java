@@ -23,6 +23,7 @@ final class CareerLife {
             new Offer(SecurityLife.JOB,"Security guard",TownLife.Place.MARKET,"none",0,24,240),
             new Offer("shop-assistant","Market assistant",TownLife.Place.MARKET,
                     "none",0,24,480),
+            new Offer(FireTrainingLife.JOB,"Firefighter",FireServiceLife.DEPOT,FireTrainingLife.SUBJECT,3,FireTrainingLife.WAGE,0),
             new Offer("technician","Workshop technician",TownLife.Place.WORKSHOP,
                     "engineering",3,38,760),
             new Offer("engineer","Junior engineer",TownLife.Place.OFFICE,
@@ -40,6 +41,8 @@ final class CareerLife {
     );
 
     static List<Offer> offers() {return OFFERS;}
+    static String payrollAccount(String job){return FireTrainingLife.JOB.equals(job)?"city-maintenance":job;}
+    static int skill(TownLife.Town t,String subject){return FireTrainingLife.SUBJECT.equals(subject)?FireTrainingLife.completed(t):skill(t.player,subject);}
 
     static void ensureEmployers(TownLife.Town town) {
         for(var offer:OFFERS)
@@ -109,10 +112,10 @@ final class CareerLife {
         requirePresent(p,vacancy.workplace);
         if(vacancy.id.equals(p.jobId))
             throw new IllegalArgumentException("You already hold this job.");
-        if(skill(p,vacancy.subject)<vacancy.requiredSkill)
+        if(skill(town,vacancy.subject)<vacancy.requiredSkill)
             throw new IllegalArgumentException("Study "+vacancy.subject+" first: "+
                     vacancy.requiredSkill+" skill required.");
-        if(town.employerFunds.getOrDefault(vacancy.id,0)<vacancy.wage)
+        if(town.employerFunds.getOrDefault(payrollAccount(vacancy.id),0)<vacancy.wage)
             throw new IllegalArgumentException("Employer cannot fund another shift right now.");
         EmploymentContractLife.clearVisitor(town);
         p.jobId=vacancy.id;
@@ -168,14 +171,15 @@ final class CareerLife {
             throw new IllegalArgumentException(
                     "Inspect and complete an actual city work order before this technical shift.");
         if(NewspaperLife.JOB.equals(vacancy.id)&&!NewspaperLife.filed(town,day))throw new IllegalArgumentException("Interview a resident and file a public news dispatch before working.");
-        int funds=town.employerFunds.getOrDefault(vacancy.id,0);
+        if(FireTrainingLife.JOB.equals(vacancy.id)&&(!FireTrainingLife.qualified(town)||p.health<60||p.fatigue>=85))throw new IllegalArgumentException("Fire shift requires qualification and adequate health and rest.");
+        int funds=town.employerFunds.getOrDefault(payrollAccount(vacancy.id),0);
         if(funds<vacancy.wage)
             throw new IllegalArgumentException("Employer has insufficient payroll funds.");
         // Industrial roles must produce real physical goods during the shift.
         // A copied town is committed only after this and the rest of the action succeed.
-        String industrialOutput=vacancy.id.equals("farm-worker")?FarmLife.playerShift(town):IndustryLife.playerShift(town,vacancy.id);
+        String industrialOutput=FireTrainingLife.JOB.equals(vacancy.id)?"Station readiness shift completed.":vacancy.id.equals("farm-worker")?FarmLife.playerShift(town):IndustryLife.playerShift(town,vacancy.id);
         // One conserved transfer: employer cash -> player cash.
-        town.employerFunds.put(vacancy.id,funds-vacancy.wage);
+        town.employerFunds.put(payrollAccount(vacancy.id),funds-vacancy.wage);
         int net=EmploymentContractLife.recordPay(town,day,vacancy.wage);
         p.lastWorkDay=day;
         if(SecurityLife.JOB.equals(p.jobId))SecurityLife.visitorShift(town,day,minute);

@@ -473,7 +473,7 @@ public final class GameSession implements AutoCloseable {
         return CareerLife.offers().stream()
                 .map(v->new JobView(v.id(),v.title(),v.workplace().name(),v.subject(),
                         v.requiredSkill(),v.wage(),
-                        town.employerFunds.getOrDefault(v.id(),0))).toList();
+                        town.employerFunds.getOrDefault(CareerLife.payrollAccount(v.id()),0))).toList();
     }
 
     public synchronized ActionView applyJob(String jobId) throws SQLException {
@@ -982,6 +982,10 @@ public final class GameSession implements AutoCloseable {
                 default -> throw new IllegalArgumentException("Unknown workshop action.");
             };
             return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.equals("fire-training")){
+            var copy=town.copy();String message=FireTrainingLife.train(copy,state);apply(copy,30,message);
+            return new GeoProjection.ActionResult(message,null);
         }
         if(action.equals("fire-equipment-service")){
             var copy=town.copy();String message=FireServiceLife.playerService(copy,state);apply(copy,30,message);
