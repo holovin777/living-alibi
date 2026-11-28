@@ -71,3 +71,6 @@ The geographic driving camera now sits on the left inside a lightweight dashboar
 
 ### Driving speed and cabin sound
 The geographic server now maintains a bounded speed (maximum 36 km/h), acceleration, coasting and braking; W accelerates and Space/S brakes. Server responses expose speedKmh. A long pause resets speed and bounds movement, and dead ends/collisions stop the speed model. Both scenes use a lightweight synthesized engine and tire loop with pitch/volume related to speed; it is not a recording of a real vehicle. The older scene retains its own driving mechanics. No gear ratios, reverse in geographic mode, grip or suspension physics yet.
+
+### Road-dependent speed targets (detail version 5)
+Numeric OSM maxspeed and directional tags are carried through JSON and TSV to Java. Missing or symbolic tags use conservative road-class estimates. The game caps speed at 72 km/h; older TSV rows without a speed retain 36 km/h. Speed targets are not an authoritative traffic-law database, and deceleration at a road change is simplified. The dashboard shows simulated automatic gear bands D1–D5 with corresponding engine pitch changes, not physical gear ratios. Existing cached OSM can be reconverted locally. Fuel/wear balance, reversing, terrain and free steering are unchanged.

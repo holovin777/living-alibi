@@ -522,7 +522,7 @@ func _update_navigation() -> void:
         if property_scenery.missing_yard or property_scenery.missing_site:hud.text+="\nPlot visual unavailable: no clear mapped space. F actions still work."
         if driving:civilian_car.hide()
         hud.text+="\nG: enter own car / steal nearby civilian car"
-        if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Fuel %s · Condition %s" % [residents.driving.get("fuel",0),residents.driving.get("condition",0)]
+        if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Road target %s km/h · Fuel %s · Condition %s" % [residents.driving.get("speedLimitKmh",36),residents.driving.get("fuel",0),residents.driving.get("condition",0)]
         var justice: Dictionary=world.get("justice",{})
         if str(justice.get("status",""))=="REPORTED":hud.text+="\nPolice report · possible detention in %s game min" % justice.get("minutesRemaining",0)
         _sync_parked_vehicle(parked_bike,world.get("parkedBicycle"),pos,Vector3(-2,0.05,0))
@@ -585,7 +585,7 @@ func _drive_frame(delta: float) -> void:
         var location: Dictionary=residents.world.get("playerDistrict",{})
         if not location.is_empty():_sync_spawn(Vector2(float(location["x"]),float(location["z"])))
         return
-    walker.position=walker.position.move_toward(drive_goal,delta*12.0)
+    walker.position=walker.position.move_toward(drive_goal,delta*maxf(12.0,server_drive_speed/3.6*1.2))
     walker.rotation.y=lerp_angle(walker.rotation.y,drive_heading,minf(delta*5.0,1.0))
     driving_body.position=walker.position-Vector3(0,1.0,0)
     driving_body.rotation.y=walker.rotation.y

@@ -22,10 +22,23 @@ class GeoDriveTest {
         assertTrue(drive.controlBudget("step",60)<1);
         assertEquals(drive.speed,drive.copy().speed,.001);
     }
+    @Test void roadSpeedTargetsAreBounded()throws Exception{
+        var graph=dir.resolve("speeds.tsv");
+        Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\nM\t1\t0\t0\nM\t2\t100\t0\nD\t1\t2\t72\nD\t2\t1\t20\n");
+        var map=new GeoProjection(graph);
+        assertEquals(72,map.speedLimit("1","2"));
+        assertEquals(20,map.speedLimit("2","1"));
+        var drive=new GeoDrive(false,"1");
+        for(int i=0;i<20;i++)drive.controlBudget("step",0.65,map.speedLimit("1","2")/3.6);
+        assertEquals(20,drive.speed,.001);
+        drive.controlBudget("step",0.65,map.speedLimit("2","1")/3.6);
+        assertEquals(20/3.6,drive.speed,.001);
+    }
     @Test void directedRoadAndTheftAreSeparateFromLegalCar()throws Exception{
         var graph=dir.resolve("graph.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\nM\t1\t0\t0\nM\t2\t100\t0\nD\t1\t2\n");
         var map=new GeoProjection(graph);
+        assertEquals(36,map.speedLimit("1","2"));
         var drive=new GeoDrive(false,"1");
         assertEquals(8,drive.advance(map,0,8),.01);
         assertEquals(8,drive.position(map).x(),.01);

@@ -747,7 +747,7 @@ public final class GameSession implements AutoCloseable {
             apply(copy,0,"Parked.");
             geoDrive=null;
             var park=map.point(destination);
-            return new GeoDrive.Pose(false,false,park.x(),park.z(),0,town.player.carFuel,town.player.carCondition,0,"Parked at "+destination.label+".");
+            return new GeoDrive.Pose(false,false,park.x(),park.z(),0,town.player.carFuel,town.player.carCondition,0,0,"Parked at "+destination.label+".");
         }
         if(!Set.of("step","coast","brake").contains(command)||turn<-1||turn>1)throw new IllegalArgumentException("Unknown driving control.");
         long now=System.nanoTime();
@@ -757,11 +757,12 @@ public final class GameSession implements AutoCloseable {
         if(fuel<1||condition<3){geoDrive.speed=0;geoDrive.lastStep=now;return drivePose(map,"No fuel or service required. Exit the car.");}
         var next=geoDrive.copy();next.lastStep=now;
         var previousPosition=geoDrive.position(map);
-        double budget=next.controlBudget(command,(now-geoDrive.lastStep)/1e9);
+        double budget=next.controlBudget(command,(now-geoDrive.lastStep)/1e9,map.speedLimit(next.from,next.to)/3.6);
         if(budget<0.001){geoDrive=next;return drivePose(map,"");}
         int oldUnits=(int)(next.meters/100);
         double traveled=next.advance(map,turn,budget);
         if(traveled+0.001<budget)next.speed=0;
+        else next.speed=Math.min(next.speed,map.speedLimit(next.from,next.to)/3.6);
         int units=(int)(next.meters/100)-oldUnits;
         int impact=0;
         if(traveled>0.01&&now-geoLastImpact>2_000_000_000L){
@@ -782,11 +783,11 @@ public final class GameSession implements AutoCloseable {
         return drivePose(map,impact>0?"Collision: vehicle condition reduced.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
     }
     private GeoDrive.Pose drivePose(GeoProjection map,String message){
-        if(geoDrive==null)return new GeoDrive.Pose(false,false,0,0,0,town.player.carFuel,town.player.carCondition,0,message);
+        if(geoDrive==null)return new GeoDrive.Pose(false,false,0,0,0,town.player.carFuel,town.player.carCondition,0,0,message);
         var p=geoDrive.position(map);
         return new GeoDrive.Pose(true,geoDrive.stolen,p.x(),p.z(),geoDrive.heading(map),
             geoDrive.stolen?VehicleTheftLife.get(town,"fuel"):town.player.carFuel,
-            geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,geoDrive.speed*3.6,message);
+            geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,geoDrive.speed*3.6,map.speedLimit(geoDrive.from,geoDrive.to),message);
     }
     synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z)throws SQLException{
         var target=geoDrive==null?new GeoProjection.Point(x,z):geoDrive.position(map);

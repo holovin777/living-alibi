@@ -98,6 +98,8 @@ final class GeoProjection {
     final Map<String,List<String>> edges=new TreeMap<>();
     final Map<String,Point> motorNodes=new TreeMap<>();
     final Map<String,List<String>> motorEdges=new TreeMap<>();
+    final Map<String,Integer> motorSpeed=new HashMap<>();
+    int speedLimit(String from,String to){return motorSpeed.getOrDefault(from+"\t"+to,36);}
     final EnumMap<TownLife.Place,String> anchors=new EnumMap<>(TownLife.Place.class);
     private final Map<Integer,District> residentialEntrances=new LinkedHashMap<>();
     final Map<String,Route> routes=new LinkedHashMap<>(128,.75f,true){
@@ -115,7 +117,11 @@ final class GeoProjection {
         }
         for(String row:rows){
             String[] p=row.split("\t");
-            if(p[0].equals("D")&&motorNodes.containsKey(p[1])&&motorNodes.containsKey(p[2]))motorEdges.get(p[1]).add(p[2]);
+            if(p[0].equals("D")&&motorNodes.containsKey(p[1])&&motorNodes.containsKey(p[2])){
+                motorEdges.get(p[1]).add(p[2]);
+                int limit=p.length>=4?Math.max(5,Math.min(72,Integer.parseInt(p[3]))):36;
+                motorSpeed.merge(p[1]+"\t"+p[2],limit,Math::min);
+            }
             if(p[0].equals("E")&&nodes.containsKey(p[1])&&nodes.containsKey(p[2])){
                 edges.get(p[1]).add(p[2]);edges.get(p[2]).add(p[1]);
             }

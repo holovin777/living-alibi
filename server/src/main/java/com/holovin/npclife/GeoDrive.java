@@ -4,11 +4,12 @@ import java.util.*;
 
 /** Road-constrained manual driving. Java advances the car along legal directed edges. */
 final class GeoDrive {
-    record Pose(boolean active,boolean stolen,double x,double z,double heading,int fuel,int condition,double speedKmh,String message){}
+    record Pose(boolean active,boolean stolen,double x,double z,double heading,int fuel,int condition,double speedKmh,int speedLimitKmh,String message){}
     final boolean stolen;
     String from,to;
     double progress,meters,speed;
-    static final double MAX_SPEED=10.0; // m/s; urban prototype
+    static final double MAX_SPEED=10.0; // legacy default, m/s
+    static final double HIGHWAY_SPEED=20.0; // prototype safety/performance cap
     long lastStep;
     GeoDrive(boolean stolen,String from){this.stolen=stolen;this.from=from;this.to=from;lastStep=System.nanoTime();}
     GeoDrive copy(){
@@ -35,12 +36,15 @@ final class GeoDrive {
         return options.stream().min(cmp.thenComparing(n->n)).orElse(null);
     }
     /** Bound elapsed time so pauses or network stalls cannot teleport the car. */
-    double controlBudget(String command,double elapsed){
+    double controlBudget(String command,double elapsed){return controlBudget(command,elapsed,MAX_SPEED);}
+    double controlBudget(String command,double elapsed,double limit){
+        limit=Math.max(0,Math.min(HIGHWAY_SPEED,limit));
+        speed=Math.min(speed,limit);
         double dt=Math.max(0,Math.min(0.8,elapsed));
         if(elapsed>1.5)speed=0;
         double initial=speed;
         double acceleration=switch(command){case "step" -> 3.0;case "brake" -> -8.0;default -> -1.8;};
-        speed=Math.max(0,Math.min(MAX_SPEED,speed+acceleration*dt));
+        speed=Math.max(0,Math.min(limit,speed+acceleration*dt));
         if(acceleration<0&&initial+acceleration*dt<0)dt=initial/-acceleration;
         return (initial+speed)*0.5*dt;
     }

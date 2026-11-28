@@ -1,6 +1,7 @@
 extends Node
 ## Original procedural cabin audio: no external files, network or licensed samples.
 const RATE=16000
+const Cabin=preload("res://scripts/GeoCockpit.gd")
 var engine: AudioStreamPlayer
 var tires: AudioStreamPlayer
 
@@ -44,7 +45,10 @@ func update_drive(active: bool,speed_kmh: float,accelerating: bool,delta: float)
         return
     if not engine.playing:engine.play()
     var load_factor:=clampf(absf(speed_kmh)/65.0,0,1)
-    var pitch:=0.85+load_factor*1.05+(0.16 if accelerating else 0.0)
+    var gear:=Cabin.gear_for_speed(absf(speed_kmh))
+    var bands: Array[float]=[0.0,15.0,30.0,48.0,65.0,88.0]
+    var rev:=clampf((absf(speed_kmh)-bands[gear-1])/(bands[gear]-bands[gear-1]),0.0,1.0)
+    var pitch:=0.85+rev*0.75+(0.16 if accelerating else 0.0)
     engine.pitch_scale=lerpf(engine.pitch_scale,pitch,minf(1,delta*5))
     engine.volume_db=lerpf(engine.volume_db,-26.0+load_factor*8.0+(2.0 if accelerating else 0.0),minf(1,delta*5))
     if speed_kmh>1.5:

@@ -22,7 +22,7 @@ class ImportTest(unittest.TestCase):
             self.assertEqual(4, len(buildings[0]["points"]))
             self.assertAlmostEqual(0, result["spawn"][1])
             self.assertEqual(2, result["schema"])
-            self.assertEqual(4, result["detail_version"])
+            self.assertEqual(5, result["detail_version"])
             self.assertEqual(1, result["counts"]["benches"])
             self.assertEqual(1, result["counts"]["trees"])
             self.assertGreater(result["counts"]["water_segments"], 0)
@@ -36,6 +36,15 @@ class ImportTest(unittest.TestCase):
             edge = graph["edges"][0]
             self.assertTrue(edge["walk"] and edge["drive_ab"] and edge["drive_ba"])
             self.assertGreater(edge["meters"], 50)
+            self.assertEqual(30, edge["speed_ab"])
+            self.assertEqual(30, edge["speed_ba"])
+    def test_speed_targets(self):
+        self.assertEqual(72, module.driving_limit({"highway":"trunk","maxspeed":"90"}))
+        self.assertEqual(25, module.driving_limit({"highway":"primary","junction":"roundabout"}))
+        self.assertEqual(48, module.driving_limit({"highway":"primary","maxspeed":"30 mph"}))
+        self.assertEqual(20, module.driving_limit({"highway":"secondary","maxspeed":"50","maxspeed:forward":"20"}, "forward"))
+        self.assertEqual(50, module.driving_limit({"highway":"secondary","maxspeed":"IT:urban"}))
+
     def test_access(self):
         self.assertEqual((True,False,"no"), module.access({"highway":"footway"}))
         self.assertEqual((False,False,"no"), module.access({"highway":"residential","access":"private"}))

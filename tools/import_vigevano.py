@@ -15,7 +15,7 @@ REGIONS = {"central": BBOX, "wide": WIDE_BBOX}
 CHUNK = 128
 SOURCE = "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright"
 SCHEMA = 2
-DETAIL_VERSION = 4
+DETAIL_VERSION = 5
 WATER_WIDTH = {"river": 30, "canal": 5, "stream": 2, "ditch": 1, "drain": 1.5}
 ROAD_WIDTH = {"motorway": 12, "trunk": 10, "primary": 8, "secondary": 7,
               "tertiary": 6, "residential": 5, "service": 3, "living_street": 4,
@@ -81,6 +81,26 @@ def access(tags):
     if motor in ("no", "private"): drive = False
     direction = tags.get("oneway", "yes" if tags.get("junction") == "roundabout" or kind == "motorway" else "no")
     return walk, drive, direction
+
+
+def driving_limit(tags, direction=""):
+    """Gameplay speed target in km/h, using explicit OSM tags when numeric."""
+    raw = tags.get("maxspeed:" + direction, tags.get("maxspeed", "")) if direction else tags.get("maxspeed", "")
+    raw = raw.strip().lower()
+    try:
+        speed = float(raw.removesuffix(" mph").strip()) * 1.609344 if raw.endswith(" mph") else float(raw)
+        if math.isfinite(speed) and speed > 0:
+            return max(5, min(72, round(speed)))
+    except ValueError:
+        pass
+    kind = tags.get("highway", "")
+    if kind.endswith("_link"):
+        return 30
+    if tags.get("junction") == "roundabout":
+        return 25
+    return {"motorway": 72, "trunk": 72, "primary": 50, "secondary": 50,
+            "tertiary": 40, "residential": 30, "living_street": 10,
+            "service": 15, "track": 15, "unclassified": 40}.get(kind, 30)
 
 
 def road_width(tags):
@@ -186,6 +206,8 @@ def convert(source, output, bounds=BBOX, region="central"):
                     graph_nodes[a_id], graph_nodes[b_id] = nodes[a_id], nodes[b_id]
                     graph_edges.append({"a": a_id, "b": b_id, "meters": round(distance, 2),
                                         "name": name, "walk": walk,
+                                        "speed_ab": driving_limit(tags, "forward"),
+                                        "speed_ba": driving_limit(tags, "backward"),
                                         "drive_ab": drive and direction != "-1",
                                         "drive_ba": drive and direction not in ("yes", "1", "true")})
         if tags.get("highway") in ROAD_WIDTH or tags.get("railway") in ("rail", "light_rail"):

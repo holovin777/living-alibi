@@ -21,11 +21,16 @@ def export(source, destination):
     rows = ["N\t%s\t%.2f\t%.2f" % (n, *points[n]) for n in ids]
     rows.extend("E\t%s\t%s" % edge for edge in edges)
     # Separate motor nodes: preserve the pedestrian graph and its components.
-    motor = sorted({(str(e[a]),str(e[b])) for e in graph["edges"]
-                    for a,b,flag in (("a","b","drive_ab"),("b","a","drive_ba")) if e.get(flag)})
+    motor = {}
+    for e in graph["edges"]:
+        for a,b,flag,speed_key in (("a","b","drive_ab","speed_ab"),("b","a","drive_ba","speed_ba")):
+            if e.get(flag):
+                edge = (str(e[a]),str(e[b]))
+                speed = max(5, min(72, int(e.get(speed_key, 36))))
+                motor[edge] = min(speed, motor.get(edge, speed))
     motor_ids = sorted({n for edge in motor for n in edge})
     rows.extend("M\t%s\t%.2f\t%.2f" % (n,*graph["nodes"][n]) for n in motor_ids)
-    rows.extend("D\t%s\t%s" % edge for edge in motor)
+    rows.extend("D\t%s\t%s\t%d" % (*edge, motor[edge]) for edge in sorted(motor))
     seen = set()
     for chunk in city["chunks"].values():
         for b in chunk["buildings"]:

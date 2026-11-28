@@ -2,6 +2,7 @@ extends Node3D
 ## Lightweight first-person cabin, independent of authoritative road simulation.
 var steering: Node3D
 var speed_display: Label3D
+var gear_display: Label3D
 var materials: Dictionary={}
 
 func _box(at: Vector3,size: Vector3,color: Color) -> MeshInstance3D:
@@ -43,6 +44,13 @@ func _ready() -> void:
     speed_display.no_depth_test=false
     add_child(speed_display)
     _box(Vector3(0.19,0.93,-0.55),Vector3(0.28,0.16,0.08),Color("#26363a"))
+    gear_display=Label3D.new()
+    gear_display.position=Vector3(0.19,0.94,-0.50)
+    gear_display.pixel_size=0.0015
+    gear_display.font_size=36
+    gear_display.modulate=Color("#b6e7cf")
+    gear_display.outline_size=0
+    add_child(gear_display)
     for y in [0.80,0.84]:
         _box(Vector3(0.19,float(y),-0.39),Vector3(0.24,0.018,0.03),trim)
     _box(Vector3(0.13,0.43,0.04),Vector3(0.25,0.30,0.58),trim)
@@ -68,3 +76,7 @@ func update_instruments(speed_kmh: float,turn: float,delta: float) -> void:
     if not is_instance_valid(steering):return
     steering.rotation.z=lerpf(steering.rotation.z,-turn*0.75,minf(delta*8.0,1.0))
     speed_display.text="%02d km/h" % roundi(maxf(0,speed_kmh))
+    gear_display.text="D%d" % gear_for_speed(speed_kmh)
+
+static func gear_for_speed(speed_kmh: float) -> int:
+    return 1 if speed_kmh<15 else (2 if speed_kmh<30 else (3 if speed_kmh<48 else (4 if speed_kmh<65 else 5)))
