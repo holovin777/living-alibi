@@ -290,7 +290,7 @@ final class GeoProjection {
     static boolean indoor(TownLife.Citizen c){
         return c.alive&&c.travelRemaining==0&&hasInterior(c.place)
             &&c.currentSpace().equals(TownLife.publicSpace(c.place))
-            &&!PoliceLife.officer(c)&&!Set.of("SLEEPING","IN_CUSTODY","OUTSIDE_HOME").contains(c.activity);
+            &&!PoliceLife.officer(c)&&!Set.of("SLEEPING","IN_CUSTODY","OUTSIDE_HOME","FIREFIGHTING","EVACUATED").contains(c.activity);
     }
     List<Actor> interiorActors(TownLife.Town t,TownLife.Place place){
         Point center=point(place);

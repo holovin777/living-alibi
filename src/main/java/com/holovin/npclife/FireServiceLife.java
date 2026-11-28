@@ -119,10 +119,10 @@ final class FireServiceLife {
         }
     }
     private static void clear(TownLife.Town t){for(String k:List.of("site","started","reported","arrive","end","crew-1","crew-2"))set(t,k,0);}
-    record View(String district,String status,int minutesRemaining,int incidents,int extinguished,int uncontrolled,int damage,int employed,int available,int assigned,int equipment,int services){}
+    record View(String district,String status,int minutesRemaining,int incidents,int extinguished,int uncontrolled,int damage,int employed,int available,int assigned,int equipment,int services,int evacuating,int sheltered,int evacuatedTotal){}
     static View view(TownLife.Town t,WorldState s){
         var p=site(t);int arrival=get(t,"arrive");
         String status=p==null?"NONE":arrival==0?(get(t,"reported")==0?"UNREPORTED":StaffingLife.enabled(t)&&available(t,s).size()<CREW_SIZE?"WAITING_CREW":equipment(t)<EQUIPMENT_MIN?"WAITING_EQUIPMENT":"WAITING_RESOURCES"):now(s)<arrival?"EN_ROUTE":"FIGHTING";
-        return new View(p==null?"":p.name(),status,arrival==0?0:Math.max(0,(status.equals("FIGHTING")?get(t,"end"):arrival)-now(s)),get(t,"incidents"),get(t,"extinguished"),get(t,"uncontrolled"),get(t,"damage"),(int)t.people.values().stream().filter(FireServiceLife::firefighter).count(),available(t,s).size(),(int)t.people.values().stream().filter(c->assigned(t,c)).count(),equipment(t),get(t,"services"));
+        return new View(p==null?"":p.name(),status,arrival==0?0:Math.max(0,(status.equals("FIGHTING")?get(t,"end"):arrival)-now(s)),get(t,"incidents"),get(t,"extinguished"),get(t,"uncontrolled"),get(t,"damage"),(int)t.people.values().stream().filter(FireServiceLife::firefighter).count(),available(t,s).size(),(int)t.people.values().stream().filter(c->assigned(t,c)).count(),equipment(t),get(t,"services"),FireEvacuationLife.affectedCount(t),FireEvacuationLife.shelteredCount(t),get(t,"evacuated-total"));
     }
 }

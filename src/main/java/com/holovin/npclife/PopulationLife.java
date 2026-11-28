@@ -27,7 +27,7 @@ final class PopulationLife {
         // A resident who agreed to speak stays here for this conversation
         // minute, rather than starting their autonomous commute mid-sentence.
         // GameSession removes this transient flag before persisting the world.
-        if(TownLife.inPlayerConversation(town,c)) {
+        if(TownLife.inPlayerConversation(town,c)&&FireServiceLife.site(town)!=c.place) {
             // Speaking at a counter, in class or during a patrol does not
             // erase the work activity or move the worker outside.
             if(!PoliceLife.staff(c)&&!ConversationAvailability.duty(c,clock.day,minute)
@@ -142,6 +142,8 @@ final class PopulationLife {
         } else desired=c.home;
         NpcTransportLife.prepare(town,c,clock,events,observations);
         if(child&&FamilyDoorLife.lockedFor(town,c,clock.day,minute)&&desired!=TownLife.Place.SCHOOL)desired=c.home;
+        var evacuation=FireEvacuationLife.destination(town,c,desired);
+        if(evacuation!=null)desired=evacuation;
         if(c.travelRemaining>0 || c.place!=desired) {
             NpcTransportLife.depart(town,c,desired,clock);
             TownLife.move(town,c,desired,clock,events,observations);
@@ -194,7 +196,9 @@ final class PopulationLife {
             c.water--;c.thirst=clamp(c.thirst-52);
             TownLife.publish(town,clock,c.id,c.place,c.name+" drank water.",events,observations);
         }
-        if(search!=null&&manual==null)c.activity="SEARCHING_FOR_CHILD";
+        if(evacuation!=null)c.activity="EVACUATED";
+        else if(FireServiceLife.assigned(town,c)&&c.place==FireServiceLife.site(town))c.activity="FIREFIGHTING";
+        else if(search!=null&&manual==null)c.activity="SEARCHING_FOR_CHILD";
         else if(RebirthLife.childOutsideHome(town,c))c.activity="OUTSIDE_HOME";
         else if(RebirthLife.freeChild(town,c)&&manual!=null)c.activity="FREE_TIME";
         else if(sleeping&&!fireWorking)c.activity="SLEEPING";
