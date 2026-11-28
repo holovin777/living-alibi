@@ -65,7 +65,7 @@ final class ITBusinessLife {
             }
             case "rent" -> {
                 if(!status.canRent())throw new IllegalArgumentException("Office rental requires EUR 20 in company cash and an expired lease.");
-                set(t,c,"cash",status.cash()-RENT);credit(t,"city-maintenance",RENT);
+                set(t,c,"cash",status.cash()-RENT);CommercialPropertyLife.rent(t,c,day);
                 set(t,c,"rent-until",Math.addExact(day,6));message="Shared office rented for seven days.";
             }
             default -> {

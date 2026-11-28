@@ -43,7 +43,8 @@ final class NpcEnterpriseLife {
     static boolean startIT(TownLife.Town t,WorldState s,TownLife.Citizen c){
         if(!founder(t,c,s)||(!SoftwareLife.deployed(t,"retail-api")&&!SoftwareLife.deployed(t,"water-control")))return false;
         c.money-=ITBusinessLife.REGISTRATION+ITBusinessLife.RENT+STARTUP_CAPITAL;
-        ITBusinessLife.credit(t,MunicipalLife.CITY,ITBusinessLife.REGISTRATION+ITBusinessLife.RENT);
+        ITBusinessLife.credit(t,MunicipalLife.CITY,ITBusinessLife.REGISTRATION);
+        CommercialPropertyLife.rent(t,c,s.day);
         ITBusinessLife.set(t,c,"registered",1);ITBusinessLife.set(t,c,"cash",STARTUP_CAPITAL);
         ITBusinessLife.set(t,c,"rent-until",s.day+6);ITBusinessLife.set(t,c,"managed",1);
         ITBusinessLife.set(t,c,"npc-founded",s.day);
@@ -59,7 +60,7 @@ final class NpcEnterpriseLife {
             .sorted(Comparator.comparingInt((TownLife.Citizen x)->EducationLife.get(t,x,"technical")).reversed()
                 .thenComparing(x->x.id)).findFirst().orElse(null);
         if(w==null)return;
-        if(rent>0){ITBusinessLife.credit(t,MunicipalLife.CITY,rent);ITBusinessLife.set(t,c,"rent-until",s.day+6);}
+        if(rent>0){CommercialPropertyLife.rent(t,c,s.day);ITBusinessLife.set(t,c,"rent-until",s.day+6);}
         ITBusinessLife.set(t,c,"cash",cash-rent-ITStaffLife.BONUS);
         w.money=Math.addExact(w.money,ITStaffLife.BONUS);w.employed=true;w.unemploymentDays=0;
         w.lastHiredDay=s.day;w.occupation=ITStaffLife.OCCUPATION;w.workplace=TownLife.Place.OFFICE;w.jobChanges++;
@@ -70,7 +71,8 @@ final class NpcEnterpriseLife {
         if(!StaffingLife.enabled(t))return;
         if(s.minute==390){
             for(String a:BusinessSolvencyLife.accounts(t))if(get(t,"owner:"+a)>0&&owner(t,a)==null){
-                set(t,"owner:"+a,0);BusinessManagementLife.clear(t,a);
+                var heir=CommercialPropertyLife.heir(t,DemographyLife.byIndex(t,get(t,"owner:"+a)));
+                set(t,"owner:"+a,heir==null?0:heir.generationIndex);BusinessManagementLife.clear(t,a);
             }
             return;
         }

@@ -54,7 +54,7 @@ final class ITStaffLife {
                 if(!owner.alive||!ITBusinessLife.registered(t,owner)||employee(t,owner)==null){release(t,owner);continue;}
                 if(get(t,owner,"rent-until")<day&&get(t,owner,"managed")>0&&get(t,owner,"cash")>=ITBusinessLife.RENT+WAGE){
                     set(t,owner,"cash",get(t,owner,"cash")-ITBusinessLife.RENT);
-                    ITBusinessLife.credit(t,MunicipalLife.CITY,ITBusinessLife.RENT);
+                    CommercialPropertyLife.rent(t,owner,day);
                     set(t,owner,"rent-until",day+6);
                 }
                 // Managed firms pause when the lease cannot be renewed; ownership is retained.
