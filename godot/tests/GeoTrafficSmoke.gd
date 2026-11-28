@@ -72,6 +72,18 @@ func _check(traffic,graph: Dictionary) -> void:
     if truck.get_child_count()<14:
         truck.free();push_error("Truck exterior incomplete");quit(1);return
     truck.free()
+    var models=preload("res://scripts/VehicleModels.gd")
+    var detail:=MeshInstance3D.new()
+    detail.name="seat_test"
+    models.configure_lod(detail)
+    if not is_equal_approx(detail.lod_bias,0.65) or detail.visibility_range_end!=32.0:
+        detail.free();push_error("Vehicle LOD configuration failed");quit(1);return
+    detail.free()
+    var bus: Node3D=traffic._bus()
+    traffic.set_plate(bus,"LA BUS1","BUS")
+    if not bus.has_node("RegistrationPlate"):
+        bus.free();push_error("Bus registration failed");quit(1);return
+    bus.free()
     var car: Node3D=traffic._car()
     if not car.has_node("ImportedVehicle"):
         car.free();push_error("Geographic car model missing");quit(1);return

@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
-# Explicit, one-time optional download. No sudo, no changes to the OS or saves.
+# Idempotent asset installation. No sudo, no changes to the OS or saves.
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="$ROOT/godot/assets/vehicles/realistic"
+if [[ "${LIVING_ALIBI_SKIP_VEHICLE_DOWNLOAD:-0}" == 1 ]]; then
+    echo "Vehicle downloads disabled; using local assets."
+    exit 0
+fi
 mkdir -p "$DEST"
+timeout=120
+connect=15
+retries=2
+if [[ "${1:-}" == --auto ]]; then
+    timeout=30
+    connect=5
+    retries=0
+fi
 command -v curl >/dev/null || { echo "curl is required" >&2; exit 1; }
 command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
 validate() {
@@ -23,22 +35,33 @@ with p.open("rb") as f:
     doc = json.loads(f.read(chunk_length))
     if not doc.get("meshes") or not doc.get("scenes"):
         raise SystemExit("Missing GLB meshes/scenes")
+    if any("uri" in x and not x["uri"].startswith("data:") for x in doc.get("buffers", []) + doc.get("images", [])):
+        raise SystemExit("External GLB dependencies are not allowed")
 PY
 }
 tmp=""
 trap 'if [[ -n "$tmp" ]]; then rm -f -- "$tmp"; fi' EXIT
-for name in sport-sedan hot-hatchback luxury-suv; do
+failed=0
+for name in sport-sedan hot-hatchback luxury-suv city-van minibus; do
     file="$DEST/$name.glb"
     if [[ -f "$file" ]] && validate "$file"; then
-        echo "Already installed: $name"
         continue
     fi
+    case "$name" in
+        city-van) url="https://vinish-models.pages.dev/vans/city-van.glb" ;;
+        minibus) url="https://vinish-models.pages.dev/buses/minibus.glb" ;;
+        *) url="https://models.vinish.dev/realistic-cars/$name.glb" ;;
+    esac
     tmp="$(mktemp "$DEST/.$name.XXXXXX")"
     echo "Downloading $name (vinish.dev, CC BY 4.0)..."
-    curl --fail --location --retry 2 --connect-timeout 15 --max-time 120 --silent --show-error \
-        "https://models.vinish.dev/realistic-cars/$name.glb" -o "$tmp"
-    validate "$tmp"
-    mv -f -- "$tmp" "$file"
+    if curl --fail --location --proto '=https' --proto-redir '=https' --retry "$retries" --connect-timeout "$connect" --max-time "$timeout" --max-filesize 25000000 --silent --show-error "$url" -o "$tmp" && validate "$tmp"; then
+        mv -f -- "$tmp" "$file"
+        echo "Installed: $name"
+    else
+        rm -f -- "$tmp"
+        echo "Could not install $name; keeping bundled fallback." >&2
+        failed=1
+    fi
     tmp=""
 done
-echo "Realistic cars installed. Start Living Alibi normally; Godot will import them."
+exit "$failed"

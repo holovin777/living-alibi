@@ -32,6 +32,7 @@ Requires: JDK 21+, Maven 3.9+, curl and (for the game window) Godot 4.
 Saved world: data/world.db (kept between launches; never erased).
 No API key or cloud server is needed for the current offline demo.
 Graphics: system default, or run prime-run bash play.sh yourself.
+Realistic cars, vans and buses download automatically once; set LIVING_ALIBI_SKIP_VEHICLE_DOWNLOAD=1 to skip network downloads.
 EOF
 }
 
@@ -91,6 +92,9 @@ fi
 
 # Import new GLB resources after git pull even with an existing cache.
 prepare_godot_assets() {
+    if ! bash "$ROOT/tools/install-realistic-vehicles.sh" --auto; then
+        echo "Some realistic vehicle assets are unavailable; using bundled models where needed." >&2
+    fi
     echo "Checking Godot asset imports..."
     "$GODOT" --headless --path "$ROOT/godot" --import
 }

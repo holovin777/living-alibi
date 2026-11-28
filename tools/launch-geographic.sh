@@ -32,6 +32,9 @@ if [[ ! -s "$MAP.json" || "$NEEDS_IMPORT" == true || "$REFRESH" == true ]]; then
         python3 tools/import_vigevano.py --region "$REGION" --input "$MAP.osm" --output "$MAP.json" --download
     fi
 fi
+if ! bash "$ROOT/tools/install-realistic-vehicles.sh" --auto; then
+    echo "Some realistic vehicle assets are unavailable; using bundled models where needed." >&2
+fi
 "$GODOT" --headless --path "$ROOT/godot" --import
 if [[ "$PREVIEW" == true ]]; then
     exec "${GODOT_COMMAND[@]}" --path "$ROOT/godot" res://scenes/vigevano.tscn -- "--city-map=$ROOT/$MAP.json"

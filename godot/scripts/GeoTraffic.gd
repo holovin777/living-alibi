@@ -194,7 +194,8 @@ func set_plate(vehicle: Node3D,number: String,kind: String="CAR") -> void:
         if model!=null and model.has_meta("rear_z"):
             rear.z=float(model.get_meta("rear_z"))+0.02
         if kind=="AMBULANCE":rear=Vector3(0,0.68,2.43)
-        elif kind=="BUS":rear=Vector3(0,0.92,3.84)
+        elif kind=="BUS":
+            rear=Vector3(0,0.92,float(model.get_meta("rear_z"))+0.02 if model!=null and model.has_meta("rear_z") else 3.84)
         elif kind in ["TRUCK","FIRE"]:rear=Vector3(0,0.94,3.57)
         elif kind in ["SCOOTER","MOTORCYCLE"]:rear=Vector3(0,0.62,0.94)
         var plate:=_box(vehicle,Vector3(0.38,0.13,0.025),rear,Color("#f1f0e5"))
@@ -268,6 +269,10 @@ func _truck() -> Node3D:
 
 func _bus() -> Node3D:
     var root:=Node3D.new()
+    var model:=VehicleModels.minibus()
+    if model!=null:
+        root.add_child(model)
+        return root
     var paint:=Color("#d7a53c")
     var glass:=Color("#435a67")
     _box(root,Vector3(2.38,2.38,7.5),Vector3(0,1.58,0),paint)

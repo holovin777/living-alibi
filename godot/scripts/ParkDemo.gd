@@ -1867,28 +1867,33 @@ func _build_bus_stop(place_id: String) -> void:
         var bus := Node3D.new()
         bus.name="Bus"
         stop.add_child(bus)
-        var blue := Color("#416c9c")
-        var glass := Color("#344d5b")
-        _box(bus,Vector3(2.15,1.9,5.5),blue,Vector3(0,1.45,0))
-        _box(bus,Vector3(2.2,0.14,5.55),Color("#e3dfd1"),Vector3(0,2.48,0))
-        _box(bus,Vector3(1.85,0.84,0.06),glass,Vector3(0,1.85,-2.78))
-        _box(bus,Vector3(1.7,0.72,0.06),glass,Vector3(0,1.8,2.78))
-        for side in [-1.0,1.0]:
-            for z in [-1.5,-0.3,0.9,1.9]:
-                if side>0 and z==-1.5:continue
-                _box(bus,Vector3(0.05,0.72,0.92),glass,Vector3(side*1.09,1.85,z))
-            for z in [-1.75,1.75]:
-                var wheel := _cylinder(bus,0.40,0.23,Color("#27292a"),Vector3(side*1.0,0.43,z))
-                wheel.rotation.z=PI/2
-            _box(bus,Vector3(0.30,0.20,0.07),Color("#fff0be"),Vector3(side*0.7,0.85,-2.79))
-            _box(bus,Vector3(0.30,0.20,0.07),Color("#bd302d"),Vector3(side*0.7,0.85,2.79))
-        var door := Node3D.new()
-        door.name="PassengerDoor"
-        bus.add_child(door)
-        for i in range(2):
-            _box(door,Vector3(0.07,1.55,0.48),Color("#d4d6d0"),Vector3(1.10,1.28,-1.75+float(i)*0.50))
-            _box(door,Vector3(0.08,0.70,0.40),glass,Vector3(1.15,1.63,-1.75+float(i)*0.50))
-        _physical_sign(bus,"BUS URBANO",Vector3(0,2.36,-2.82),PI,1.65)
+        var imported_bus:=VehicleModels.minibus(2.2,5.5)
+        if imported_bus!=null:
+            bus.add_child(imported_bus)
+            _mark_imported_wheels(imported_bus)
+        else:
+            var blue := Color("#416c9c")
+            var glass := Color("#344d5b")
+            _box(bus,Vector3(2.15,1.9,5.5),blue,Vector3(0,1.45,0))
+            _box(bus,Vector3(2.2,0.14,5.55),Color("#e3dfd1"),Vector3(0,2.48,0))
+            _box(bus,Vector3(1.85,0.84,0.06),glass,Vector3(0,1.85,-2.78))
+            _box(bus,Vector3(1.7,0.72,0.06),glass,Vector3(0,1.8,2.78))
+            for side in [-1.0,1.0]:
+                for z in [-1.5,-0.3,0.9,1.9]:
+                    if side>0 and z==-1.5:continue
+                    _box(bus,Vector3(0.05,0.72,0.92),glass,Vector3(side*1.09,1.85,z))
+                for z in [-1.75,1.75]:
+                    var wheel := _cylinder(bus,0.40,0.23,Color("#27292a"),Vector3(side*1.0,0.43,z))
+                    wheel.rotation.z=PI/2
+                _box(bus,Vector3(0.30,0.20,0.07),Color("#fff0be"),Vector3(side*0.7,0.85,-2.79))
+                _box(bus,Vector3(0.30,0.20,0.07),Color("#bd302d"),Vector3(side*0.7,0.85,2.79))
+            var door := Node3D.new()
+            door.name="PassengerDoor"
+            bus.add_child(door)
+            for i in range(2):
+                _box(door,Vector3(0.07,1.55,0.48),Color("#d4d6d0"),Vector3(1.10,1.28,-1.75+float(i)*0.50))
+                _box(door,Vector3(0.08,0.70,0.40),glass,Vector3(1.15,1.63,-1.75+float(i)*0.50))
+            _physical_sign(bus,"BUS URBANO",Vector3(0,2.36,-2.82),PI,1.65)
         bus.visible=false
         return
     _sign(_scenery,"BUS · Fermata · F",KIOSK_POSITION+Vector3(0,3.0,0))
@@ -1930,7 +1935,7 @@ func _sync_bus_stops() -> void:
         elif not wants_bus and state=="approaching":
             state="leaving"
         stop.set_meta("bus_state",state)
-        bus.get_node("PassengerDoor").visible=state!="parked"
+        VehicleModels.set_bus_door(bus,state!="parked")
         board.text=tr("Next bus: %s min") % wait if open else tr("Bus service closed")
 
 # Animate between snapshots instead of toggling the bus at each departure.
@@ -1965,11 +1970,13 @@ func _advance_buses(delta: float) -> void:
                             break
                     if blocked:break
         if blocked:continue
+        var before:=bus.position.z
         bus.position.z=move_toward(bus.position.z,target,4.0*clampf(delta,0.0,0.1))
+        _animate_car_wheels(bus,absf(before-bus.position.z)/maxf(delta,0.001),delta)
         if is_equal_approx(bus.position.z,target):
             if state=="approaching":
                 stop.set_meta("bus_state","parked")
-                bus.get_node("PassengerDoor").visible=false
+                VehicleModels.set_bus_door(bus,false)
             else:
                 bus.visible=false
                 stop.set_meta("bus_state","hidden")
@@ -1977,7 +1984,7 @@ func _advance_buses(delta: float) -> void:
                     bus.position.z=float(stop.get_meta("entry_z"))
                     bus.visible=true
                     stop.set_meta("bus_state","approaching")
-                    bus.get_node("PassengerDoor").visible=true
+                    VehicleModels.set_bus_door(bus,true)
 
 func _build_road_links(place_id: String) -> void:
     _road_links.clear()
@@ -2867,7 +2874,7 @@ func _make_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
 
 func _mark_imported_wheels(node: Node3D) -> void:
     var n := str(node.name).to_lower().replace("_","-")
-    if n.begins_with("wheel-front-") or n.begins_with("wheel-back-") or n in ["wheel-fl","wheel-fr","wheel-rl","wheel-rr"]:
+    if n.begins_with("wheel-front-") or n.begins_with("wheel-back-") or n.begins_with("wheel-rear-") or n in ["wheel-fl","wheel-fr","wheel-rl","wheel-rr"]:
         node.set_meta("rolling_wheel",true)
     for child in node.get_children():
         if child is Node3D:_mark_imported_wheels(child)
