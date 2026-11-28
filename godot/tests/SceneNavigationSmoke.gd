@@ -282,7 +282,7 @@ func _exercise() -> void:
         return
     if not _check(centro_root.has_node("PiazzaCentrale/PasseggiataDeiTigli")
             and world._can_stand(Vector3(6,0,18.0),world.WALKER_RADIUS)
-            and not world._can_stand(Vector3(6,0,22),world.WALKER_RADIUS),
+            and not world._can_stand(Vector3(6,0,24),world.WALKER_RADIUS),
             "historic centre promenade expands walkable space without crossing the tile boundary"):
         return
     var food_saved_position: Vector3=world._avatar.position
@@ -990,10 +990,9 @@ func _exercise() -> void:
     if not _check(slid.x > 7.5 and slid.z >= 4.1,
             "diagonal movement slides along an obstacle"):
         return
-    var edge: Vector3 = world._move_on_ground(Vector3(16,0,0),
-            Vector3(4,0,0), world.WALKER_RADIUS)
-    if not _check(edge.x <= 17.0 and edge.x > 16.8,
-            "district boundary remains enforced"):
+    if not _check(not world._can_stand(Vector3(world.ROAD_EDGE,0,0),world.WALKER_RADIUS)
+            and not world._can_stand(Vector3(0,0,world.ROAD_EDGE),world.WALKER_RADIUS),
+            "district boundary remains enforced at the actual 48 m tile seam"):
         return
 
     if not _check(world._road_links.size() == 4
@@ -1005,12 +1004,12 @@ func _exercise() -> void:
         return
     var road_end: Vector3 = world._move_on_ground(Vector3(0,0,16),
             Vector3(0,0,12),world.WALKER_RADIUS,true)
-    if not _check(road_end.z >= 23.8 and road_end.z <= 24.001,
+    if not _check(road_end.z >= world.FOOT_SEAM_TRIGGER and road_end.z <= world.ROAD_EDGE-world.WALKER_RADIUS+0.001,
             "visitor can walk to a road seam"):
         return
     var offroad: Vector3 = world._move_on_ground(Vector3(8,0,16),
             Vector3(0,0,12),world.WALKER_RADIUS,true)
-    if not _check(offroad.z > 20.0 and offroad.z <= 21.0
+    if not _check(offroad.z > 20.0 and offroad.z <= world.ROAD_EDGE-world.WALKER_RADIUS+0.001
             and world._scenery.has_node("ParkDetails/SouthGardenPromenade")
             and world._can_stand(Vector3(8,0,18.6),world.WALKER_RADIUS),
             "expanded park promenade is walkable but outer boundary remains solid"):

@@ -61,10 +61,15 @@ public final class UtilityBehaviorSmokeTest {
         // is redirected to an indoor venue while the streetlights are down.
         var eveningClock=new WorldState();
         eveningClock.day=1;
-        eveningClock.minute=1110;
+        eveningClock.minute=1111; // After scheduled creative workshops end.
         var evening=TownLife.create(eveningClock);
         var leisure=PopulationGenerator.add(evening,1).getFirst();
-        leisure.personalSeed=0; // floorMod(0 ^ (1*31),4) = 3 => park.
+        // Isolate free-time behavior, not work, sport or creative commitments.
+        leisure.personalSeed=4; // floorMod(4 ^ (1*31),4) = 3 => park.
+        leisure.goal="FIND_BALANCE";
+        leisure.age=35;
+        leisure.employed=false;
+        leisure.sickUntilDay=0;
         leisure.food=3;
         leisure.water=3;
         leisure.place=leisure.home;
@@ -72,14 +77,17 @@ public final class UtilityBehaviorSmokeTest {
         leisure.travelRemaining=0;
         var dark=evening.copy();
         var lit=evening.copy();
+        dark.technicalOrders.get("street-lights").condition=50;
         lit.technicalOrders.get("street-lights").condition=90;
+        check(!UtilityLife.status(dark).lightsWorking() && UtilityLife.status(lit).lightsWorking(),
+                "fixture isolates a broken light and a powered repaired light");
 
         PopulationLife.tick(dark,eveningClock,new ArrayList<>(),new ArrayList<>());
         PopulationLife.tick(lit,eveningClock,new ArrayList<>(),new ArrayList<>());
         check(dark.get(leisure.id).destination==TownLife.Place.CAFE,
-                "resident avoids an unlit public park after dusk");
+                "resident avoids an unlit public park after dusk; actual="+dark.get(leisure.id).destination);
         check(lit.get(leisure.id).destination==TownLife.Place.PARK,
-                "engineering repair restores the resident's preferred park visit");
+                "engineering repair restores the resident's preferred park visit; actual="+lit.get(leisure.id).destination);
 
         TownLife.tick(dark,eveningClock,new ArrayList<>(),new ArrayList<>());
         TownLife.tick(lit,eveningClock,new ArrayList<>(),new ArrayList<>());

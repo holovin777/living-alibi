@@ -132,9 +132,9 @@ final class PopulationLife {
             if(c.generationIndex>48 && (clock.day+c.generationIndex)%2==0)desired=CityExpansionLife.leisure(c,clock.day);
             else if(preference==0)desired=TownLife.Place.CAFE;
             else if(preference==1)desired=TownLife.Place.LIBRARY;
+            else if(preference==2)desired=TownLife.Place.CENTRO;
             else if(minute>=1080 && !UtilityLife.status(town).lightsWorking())
                 desired=TownLife.Place.CAFE;
-            else if(preference==2)desired=TownLife.Place.CENTRO;
             else desired=TownLife.Place.PARK;
         } else desired=c.home;
         NpcTransportLife.prepare(town,c,clock,events,observations);
