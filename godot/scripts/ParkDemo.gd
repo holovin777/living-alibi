@@ -1668,29 +1668,59 @@ func _generate_chunk(place_id: String) -> void:
 # Reserve a small pull-out away from buildings, car parking and motor axes.
 # If no safe bay fits, retain the existing kiosk-based transport service.
 func _build_bus_stop(place_id: String) -> void:
-    var candidates: Array[Vector3]=[]
-    for x in [-12.0,-8.0,8.0,12.0,-5.5,5.5]:
-        for z in [-10.0,-5.0,5.0,10.0,0.0]:
-            if TownLayout.outer(place_id) and absf(z)<7.8:continue
-            candidates.append(Vector3(x,0,z))
-    for at in candidates:
-        var bay := Rect2(Vector2(at.x-1.5,at.z-3.7),Vector2(5.1,7.4))
-        if TownLayout.outer(place_id) and (absf(at.x)<5.5 or bay.position.x<3.5 and bay.end.x> -3.5):continue
+    # A real through lane with sufficient clearance for the entire bus.
+    # Prefer the park's existing north street; elsewhere test clear corridors.
+    var candidates: Array[Dictionary]=[]
+    var offsets := [-16.0,16.0,0.0,-6.0,6.0,-10.0,10.0,-19.0,19.0]
+    for offset in offsets:
+        for along in [0.0,-5.0,5.0,-10.0,10.0]:
+            candidates.append({"at":Vector3(along,0,offset),"yaw":PI/2.0})
+            candidates.append({"at":Vector3(offset,0,along),"yaw":0.0})
+    for candidate in candidates:
+        var at: Vector3=candidate["at"]
+        var yaw: float=candidate["yaw"]
+        var horizontal := yaw>0.1
+        # Keep the bus lane separate from existing motor approaches.
+        if TownLayout.outer(place_id) and absf(at.z if horizontal else at.x)<5.5:continue
+        var lane := Rect2(-24.0,at.z-1.55,48.0,3.1) if horizontal else Rect2(at.x-1.55,-24.0,3.1,48.0)
+        var platform := Rect2(at.x-3.7,at.z-3.6,7.4,2.1) if horizontal else Rect2(at.x+1.5,at.z-3.7,2.1,7.4)
+        if not Rect2(-23.8,-23.8,47.6,47.6).encloses(platform):continue
         var blocked := false
         for obstacle in _obstacles:
-            if bay.intersects(obstacle.grow(0.45)):
+            if lane.intersects(obstacle.grow(0.12)) or platform.intersects(obstacle.grow(0.12)):
                 blocked=true
                 break
         if blocked:continue
-        if TownLayout.motor_district(place_id) and bay.intersects(Rect2(Vector2(CAR_PARK.x-2.0,CAR_PARK.z-2.6),Vector2(4.0,6.0))):continue
+        var reserved: Array[Rect2]=[]
+        if TownLayout.motor_district(place_id):
+            reserved.append(Rect2(CAR_PARK.x-2.0,CAR_PARK.z-2.6,4.0,6.0))
         if place_id in FREIGHT_DISTRICTS:
             var truck := _truck_parking(place_id)
-            if bay.intersects(Rect2(Vector2(truck.x-2,truck.z-2.8),Vector2(4,6))):continue
-        if (place_id in RACK_DISTRICTS or TownLayout.outer(place_id)) and bay.has_point(Vector2(RACK_POSITION.x,RACK_POSITION.z)):continue
+            reserved.append(Rect2(truck.x-2,truck.z-2.8,4,6))
+        if place_id in RACK_DISTRICTS or TownLayout.outer(place_id):
+            reserved.append(Rect2(RACK_POSITION.x-1,RACK_POSITION.z-1,2,2))
+        for area in reserved:
+            if lane.intersects(area) or platform.intersects(area):
+                blocked=true
+                break
+        if blocked:continue
+        var lane_node := Node3D.new()
+        lane_node.name="MunicipalBusLane"
+        _scenery.add_child(lane_node)
+        var centre := Vector3(0,0,at.z) if horizontal else Vector3(at.x,0,0)
+        var dimensions := Vector3(48,0.05,3.1) if horizontal else Vector3(3.1,0.05,48)
+        _box(lane_node,dimensions,Color("#454b4d"),centre+Vector3(0,0.085,0),"asphalt")
         var stop := Node3D.new()
         stop.name="MunicipalBusStop"
         stop.position=at
+        stop.rotation.y=yaw
         _scenery.add_child(stop)
+        # The lane is parameterized along the bus's local Z direction.
+        var along_axis: float=at.x if horizontal else at.z
+        stop.set_meta("entry_z",27.0-along_axis)
+        stop.set_meta("exit_z",-27.0-along_axis)
+        stop.set_meta("bus_initialized",false)
+        stop.set_meta("bus_state","hidden")
         _box(stop,Vector3(2.9,0.045,7.2),Color("#454b4d"),Vector3(0,0.03,0),"asphalt")
         _box(stop,Vector3(1.6,0.08,6.8),Color("#c9c1ad"),Vector3(2.3,0.035,0),"paving")
         for z in [-3.3,3.3]:
@@ -1738,7 +1768,7 @@ func _bus_stop_node() -> Node3D:
 
 func _bus_platform() -> Vector3:
     var stop := _bus_stop_node()
-    return stop.position+Vector3(2.3,0,0) if stop!=null else KIOSK_POSITION+Vector3(0,0,2)
+    return stop.position+stop.basis*Vector3(2.3,0,0) if stop!=null else KIOSK_POSITION+Vector3(0,0,2)
 
 func _near_bus_stop() -> bool:
     return TownLayout.bus_stop(_current_place) and not _apartment_active and not _guest_active and not _stairwell_active and _avatar.position.distance_to(_bus_platform())<1.65
@@ -1752,9 +1782,72 @@ func _sync_bus_stops() -> void:
         if stop==null:continue
         var bus := stop.get_node("Bus") as Node3D
         var board := stop.get_node("Timetable") as Label3D
-        bus.visible= open and wait<=2
-        bus.get_node("PassengerDoor").visible=not bus.visible
+        var wants_bus := open and wait<=5
+        stop.set_meta("bus_wanted",wants_bus)
+        var state := str(stop.get_meta("bus_state","hidden"))
+        if not bool(stop.get_meta("bus_initialized",false)):
+            stop.set_meta("bus_initialized",true)
+            if open and wait<=2:
+                bus.position.z=0.0
+                bus.visible=true
+                state="parked"
+        if wants_bus and state=="hidden":
+            bus.position.z=float(stop.get_meta("entry_z"))
+            bus.visible=true
+            state="approaching"
+        elif not wants_bus and state=="parked":
+            state="leaving"
+        elif not wants_bus and state=="approaching":
+            state="leaving"
+        stop.set_meta("bus_state",state)
+        bus.get_node("PassengerDoor").visible=state!="parked"
         board.text=tr("Next bus: %s min") % wait if open else tr("Bus service closed")
+
+# Animate between snapshots instead of toggling the bus at each departure.
+# This is a local street segment, not yet a city-wide vehicle identity.
+func _advance_buses(delta: float) -> void:
+    for chunk in _chunks.values():
+        var root_node: Node3D=chunk["root"]
+        var stop := root_node.get_node_or_null("MunicipalBusStop") as Node3D
+        if stop==null:continue
+        var bus := stop.get_node("Bus") as Node3D
+        var state := str(stop.get_meta("bus_state","hidden"))
+        if state not in ["approaching","leaving"]:continue
+        var target := 0.0 if state=="approaching" else float(stop.get_meta("exit_z"))
+        var blocked := false
+        if root_node==_scenery:
+            var centre: Vector3=stop.position+stop.basis*bus.position
+            var forward: Vector3=-stop.basis.z.normalized()
+            var right: Vector3=stop.basis.x.normalized()
+            for at in _traffic_people():
+                var relative: Vector3=at-centre
+                if relative.dot(forward)>=-2.8 and relative.dot(forward)<=5.5 and absf(relative.dot(right))<1.5:
+                    blocked=true
+                    break
+            if not blocked:
+                for edge in _traffic_edges.values():
+                    for record in edge["cars"]:
+                        var car: Node3D=record["node"]
+                        if not car.visible:continue
+                        var relative: Vector3=car.position-centre
+                        if relative.dot(forward)>=-3.0 and relative.dot(forward)<=6.5 and absf(relative.dot(right))<2.2:
+                            blocked=true
+                            break
+                    if blocked:break
+        if blocked:continue
+        bus.position.z=move_toward(bus.position.z,target,4.0*clampf(delta,0.0,0.1))
+        if is_equal_approx(bus.position.z,target):
+            if state=="approaching":
+                stop.set_meta("bus_state","parked")
+                bus.get_node("PassengerDoor").visible=false
+            else:
+                bus.visible=false
+                stop.set_meta("bus_state","hidden")
+                if bool(stop.get_meta("bus_wanted",false)):
+                    bus.position.z=float(stop.get_meta("entry_z"))
+                    bus.visible=true
+                    stop.set_meta("bus_state","approaching")
+                    bus.get_node("PassengerDoor").visible=true
 
 func _build_road_links(place_id: String) -> void:
     _road_links.clear()
@@ -1999,6 +2092,7 @@ func _advance_traffic(delta: float) -> void:
         return
     var dt := clampf(delta,0.0,0.1)
     _traffic_seconds += dt
+    _advance_buses(dt)
     var phase := _traffic_phase(_traffic_seconds)
     var origin := TownLayout.world_center(_current_place)
     var people := _traffic_people()
@@ -2233,7 +2327,9 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
             return false
     var bus_stop := _bus_stop_node()
     if bus_stop!=null and (bus_stop.get_node("Bus") as Node3D).visible:
-        if Rect2(Vector2(bus_stop.position.x-1.1,bus_stop.position.z-2.8),Vector2(2.2,5.6)).grow(radius).has_point(p):return false
+        var bus := bus_stop.get_node("Bus") as Node3D
+        var local_at := bus_stop.basis.inverse()*(at-bus_stop.position)-bus.position
+        if Rect2(-1.1,-2.8,2.2,5.6).grow(radius).has_point(Vector2(local_at.x,local_at.z)):return false
     if _car_place()==_current_place and TownLayout.motor_district(_current_place):
         if Rect2(Vector2(CAR_PARK.x-0.94,CAR_PARK.z-1.81),Vector2(1.88,3.62)).grow(radius).has_point(p):
             return false

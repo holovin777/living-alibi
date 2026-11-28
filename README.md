@@ -182,3 +182,11 @@ work and urgent needs. Public-facing staff can initiate a greeting and have
 longer service conversations. A willing resident may finish a brief reply
 before resuming their schedule, without erasing their work activity.
 Ollama is still optional and cannot change the authoritative world state.
+
+### Physical bus approaches
+
+Municipal bus stops now use collision-checked local through lanes. A visible
+bus approaches and departs over several seconds, with a stationary boarding
+phase and a moving collision footprint. If no clear lane fits, the kiosk
+service remains instead of placing a vehicle in an isolated parking bay.
+These are local street segments, not yet continuous cross-district bus routes.
