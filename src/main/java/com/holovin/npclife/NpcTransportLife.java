@@ -50,7 +50,7 @@ final class NpcTransportLife {
     }
     static void depart(TownLife.Town t,TownLife.Citizen c,TownLife.Place desired,WorldState s){
         if(!enabled(t)||!eligible(c)||c.travelRemaining>0||c.place==desired)return;
-        set(t,c,"mode",WALK);
+        set(t,c,"mode",WALK);set(t,c,"fleet-bus",0);
         if(ServiceFleetLife.depart(t,c,desired,s))return;
         int distance=CityExpansionLife.distance(c.place,desired);
         int units=Math.max(1,(distance+3)/4);
@@ -60,9 +60,11 @@ final class NpcTransportLife {
             set(t,c,"mode",CAR);set(t,c,"fuel",get(t,c,"fuel")-units);
             set(t,c,"condition",get(t,c,"condition")-units*3);set(t,c,"parked",desired.ordinal()+1);
         }else if(BusLife.route(t,c.place,desired)&&BusLife.open(s.minute)&&c.money>=BusLife.FARE+10){
-            c.money-=BusLife.FARE;t.employerFunds.merge("city-maintenance",BusLife.FARE,Math::addExact);set(t,c,"mode",BUS);
+            int id=MunicipalBusFleetLife.boarding(t,s,c.place,desired);
+            int minutes=BusLife.duration(t,s,c.place,desired);
+            c.money-=BusLife.FARE;MunicipalBusFleetLife.fare(t,id);set(t,c,"mode",BUS);set(t,c,"fleet-bus",id);
             set(t,c,"bus-departure",Math.addExact(Math.multiplyExact(s.day-1,1440),s.minute)+1);
-            set(t,c,"trip-duration",BusLife.duration(t,c.place,desired,s.minute));
+            set(t,c,"trip-duration",minutes);
         }
     }
     static void returned(TownLife.Town t,int index,int fuel,int condition){

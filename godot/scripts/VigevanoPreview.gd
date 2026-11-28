@@ -1090,6 +1090,11 @@ func _open_actions(work_only: bool=false) -> void:
         hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         action_list.add_child(hint)
     if str(room.get("id",""))=="OFFICE":
+        var bus_fleet: Dictionary=residents.world.get("municipalBusFleet",{})
+        if not bus_fleet.is_empty():
+            WorkPanel.label(action_list,"Bus fleet / Autolinee · €%s" % bus_fleet.get("cash",0))
+            for bus in bus_fleet.get("buses",[]):
+                WorkPanel.label(action_list,"Bus %s · %s → %s · %s%%\nPassengers / Passeggeri: %s/%s · Trips / Corse: %s" % [bus.get("id",0),bus.get("from",""),bus.get("to",""),bus.get("condition",100),bus.get("passengers",0),bus.get("seats",12),bus.get("trips",0)])
         for transport in residents.world.get("transportProjects",[]):
             WorkPanel.label(action_list,"%s · Road / Strada %s%% · Bus %s/2\nDemand / Domanda: %s · Repairs / Riparazioni: %s · €%s" % [transport.get("district",""),transport.get("condition",100),transport.get("stage",0),transport.get("demand",0),transport.get("repairs",0),transport.get("spent",0)])
         for infra in residents.world.get("infrastructureProjects",[]):

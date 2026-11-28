@@ -224,6 +224,7 @@ final class PopulationLife {
             c.activity="WORKING";
             if(minute%60==0){
                 if(BusinessSolvencyLife.payHour(town,c,clock)){ /* paid or recorded as arrears */ }
+                else if(MunicipalBusFleetLife.role(c.occupation)){ /* paid from fleet contracts */ }
                 else if(IndustrialExpansionLife.role(c.occupation)!=null){ /* paid per batch */ }
                 else if(ConstructionCrewLife.role(c.occupation)){ /* paid per completed construction contract */ }
                 else if(fireStaff)FireServiceLife.pay(town,c);
