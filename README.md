@@ -42,7 +42,7 @@ prime-run bash play.sh --wide
 bash play.sh --wide --preview-only
 ```
 
-The launcher no longer selects NVIDIA automatically. External PRIME variables are inherited, and the geographic renderer enables bounded sun shadows when PRIME is requested unless `LIVING_ALIBI_SHADOWS=0` is set. OpenGL Compatibility remains the default. Use `LIVING_ALIBI_RENDERER=mobile` for experimental Vulkan rendering. NVIDIA driver and `prime-run` must already work on your system; the game does not install drivers. Check Godot's startup device or `nvidia-smi`.
+With Mesa/Nouveau, use `DRI_PRIME=1 bash play.sh` (or add `--wide`), not proprietary-driver prime-run. The launcher no longer selects NVIDIA automatically. External PRIME variables are inherited, and the geographic renderer enables bounded sun shadows when PRIME is requested unless `LIVING_ALIBI_SHADOWS=0` is set. OpenGL Compatibility remains the default. Use `LIVING_ALIBI_RENDERER=mobile` for experimental Vulkan rendering. NVIDIA driver and `prime-run` must already work on your system; the game does not install drivers. Check Godot's startup device or `nvidia-smi`.
 
 The expanded real-map mode uses the same SQLite world and provisional district positions. Back up the save before switching, or use `--preview-only`. First map import requires an internet connection and Python 3.
 
@@ -87,7 +87,7 @@ ollama pull qwen2.5:7b
 LIVING_ALIBI_OLLAMA_MODEL=qwen2.5:7b bash play.sh
 ```
 
-The launcher checks the configured model at `127.0.0.1:11434`. If Ollama is installed but not running, start its service or run `ollama serve` in a separate terminal. Verify the connection with `ollama list`.
+The launcher checks installed models at `127.0.0.1:11434` and automatically uses qwen2.5:3b, qwen2.5:7b, qwen2.5:1.5b or qwen2.5:latest (in that order) unless explicitly overridden. It never downloads Ollama models automatically. If Ollama is installed but not running, start its service or run `ollama serve` in a separate terminal. Verify the connection with `ollama list`.
 
 No paid API key is needed for local dialogue. Inference speed depends on your hardware. If the model cannot respond, the game falls back to scripted dialogue and logs warnings. AI replies may still be inaccurate; free-form language does not yet execute arbitrary gameplay actions. Introductions, money transfers, jobs and other world changes remain validated by Java.
 

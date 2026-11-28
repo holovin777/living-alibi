@@ -31,7 +31,8 @@ Usage:
 Requires: JDK 21+, Maven 3.9+, curl and (for the game window) Godot 4.
 Saved world: data/world.db (kept between launches; never erased).
 No API key or cloud server is needed for the current offline demo.
-Graphics: system default, or run prime-run bash play.sh yourself.
+Graphics: system default; use DRI_PRIME=1 bash play.sh for Mesa/Nouveau or prime-run bash play.sh for proprietary NVIDIA.
+Dialogue: automatically chooses an installed Qwen 2.5 model from a running local Ollama service.
 Realistic cars, vans and buses download automatically once; set LIVING_ALIBI_SKIP_VEHICLE_DOWNLOAD=1 to skip network downloads.
 EOF
 }
@@ -115,17 +116,8 @@ if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/world >/dev/null 2>&1 || 
     exit 1
 fi
 
-MODEL="${LIVING_ALIBI_OLLAMA_MODEL:-qwen2.5:3b}"
-export LIVING_ALIBI_OLLAMA_MODEL="$MODEL"
-if tags="$(curl -fsS --max-time 3 http://127.0.0.1:11434/api/tags 2>/dev/null)"; then
-    if printf '%s' "$tags" | grep -Fq "\"$MODEL\""; then
-        echo "NPC dialogue: Ollama model $MODEL available."
-    else
-        echo "NPC dialogue: Ollama is running but model $MODEL was not found. Run: ollama pull $MODEL"
-    fi
-else
-    echo "NPC dialogue: Ollama not reachable; using scripted replies. Start ollama serve or the Ollama service for natural dialogue."
-fi
+source "$ROOT/tools/game_dialogue.sh"
+configure_game_dialogue
 
 echo "Building the Java world engine..."
 mvn -q -DskipTests install

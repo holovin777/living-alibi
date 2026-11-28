@@ -30,7 +30,7 @@ transfer is recorded. The dialogue attempt still consumes a minute.
 
 Known intents continue to use the deterministic Java world rules. Free-form
 small talk can call Ollama at `http://127.0.0.1:11434/api/chat` using
-`qwen2.5:3b`. Set `LIVING_ALIBI_OLLAMA_MODEL` to override the model.
+the installed Qwen 2.5 model selected by the launcher (3b, then 7b, then 1.5b or latest). Set `LIVING_ALIBI_OLLAMA_MODEL` to override the model.
 No API key, cloud service or automatic installation is required. A missing
 model, unavailable Ollama or a 20-second timeout falls back to existing
 dialogue. The model receives only observable activity, sociability, coarse

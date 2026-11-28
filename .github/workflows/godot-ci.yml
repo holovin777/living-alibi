@@ -30,9 +30,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Check graphics launcher selection
         run: |
-          for script in play.sh tools/launch-geographic.sh tools/game_gpu.sh; do bash -n "$script"; done
+          for script in play.sh tools/launch-geographic.sh tools/game_gpu.sh tools/game_dialogue.sh tools/tests/test_game_dialogue.sh; do bash -n "$script"; done
           bash play.sh --help | grep -q -- "--wide"
           bash tools/tests/test_game_gpu.sh
+          bash tools/tests/test_game_dialogue.sh
       - name: Install official Godot 4.6.1 stable editor
         run: |
           set -euo pipefail

@@ -45,6 +45,8 @@ done
 if curl -fsS --max-time 1 http://127.0.0.1:8080/api/v1/world >/dev/null 2>&1 || curl -fsS --max-time 1 http://127.0.0.1:8091/geo/nearby >/dev/null 2>&1; then
     echo "Living Alibi already running. Close the other server first."; exit 1
 fi
+source "$ROOT/tools/game_dialogue.sh"
+configure_game_dialogue
 python3 tools/export_geo_population.py "$MAP.json" "$MAP-graph.tsv"
 echo "Building shared Java world and Spring API..."
 mvn -q -DskipTests install
