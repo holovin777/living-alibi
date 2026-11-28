@@ -75,7 +75,7 @@ final class GeoProjection {
     }
     record CivilianCar(String id,String district,int ownerIndex,double x,double z,double heading){}
     record Patrol(String id,double x,double z,double heading,boolean responding){}
-    record TrafficCar(String id,double x,double z,double heading,String kind,int condition){}
+    record TrafficCar(String id,double x,double z,double heading,String kind,int condition,String trip,List<Point> route,double distance){}
     record ActionResult(String message,District arrival){}
     record View(int day,int minute,int population,int commuting,List<Actor> residents,
                 District playerDistrict,District nearestDistrict,boolean canEnter,
@@ -360,7 +360,7 @@ final class GeoProjection {
         double fraction=1.0-c.travelRemaining/(double)Math.max(1,TownLife.travelTime(c.place,c.destination));
         Point at=route.at(fraction),next=route.at(Math.min(1,fraction+.01)),prev=route.at(Math.max(0,fraction-.01));
         double heading=Math.atan2(-(next.x-prev.x),-(next.z-prev.z));
-        return new TrafficCar(mode==NpcTransportLife.CAR?"npc-car-"+c.generationIndex:"bus-"+c.place.name()+"-"+c.destination.name()+"-"+NpcTransportLife.get(t,c,"bus-departure"),at.x,at.z,heading,mode==NpcTransportLife.CAR?"CAR":"BUS",mode==NpcTransportLife.CAR?NpcTransportLife.get(t,c,"condition"):100);
+        return new TrafficCar(mode==NpcTransportLife.CAR?"npc-car-"+c.generationIndex:"bus-"+c.place.name()+"-"+c.destination.name()+"-"+NpcTransportLife.get(t,c,"bus-departure"),at.x,at.z,heading,mode==NpcTransportLife.CAR?"CAR":"BUS",mode==NpcTransportLife.CAR?NpcTransportLife.get(t,c,"condition"):100,c.place.name()+":"+c.destination.name(),route.points(),Math.max(0,Math.min(1,fraction))*route.meters());
     }
     CivilianCar civilian(TownLife.Town t,Point player){
         if(VehicleTheftLife.active(t))return null;

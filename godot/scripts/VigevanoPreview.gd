@@ -65,6 +65,9 @@ var patrol_models: Dictionary={}
 var patrol_goals: Dictionary={}
 var commute_models: Dictionary={}
 var commute_goals: Dictionary={}
+const CommuteMotion=preload("res://scripts/GeoCommuteMotion.gd")
+var commute_motion: Dictionary={}
+var commute_signal_points: Dictionary={}
 const Cockpit=preload("res://scripts/GeoCockpit.gd")
 var driving_body: Node3D
 var drive_speed:=0.0
@@ -112,6 +115,11 @@ func _ready() -> void:
     traffic=Traffic.new()
     add_child(traffic)
     traffic.configure(city.get("graph",{}))
+    var graph: Dictionary=city.get("graph",{})
+    for raw_id in graph.get("signals",{}):
+        if not graph.get("nodes",{}).has(raw_id):continue
+        var at: Array=graph["nodes"][raw_id]
+        commute_signal_points[CommuteMotion.point_key(Vector2(float(at[0]),float(at[1])))]=int(graph["signals"][raw_id])
     residents=Residents.new()
     add_child(residents)
     shared_mode="--geo-world" in OS.get_cmdline_user_args()
@@ -668,18 +676,47 @@ func _sync_commutes(records: Array) -> void:
             car.position=goal
             commute_models[id]=car
         commute_goals[id]={"point":goal,"heading":float(record.get("heading",0))}
+        if record.get("route",[]).size()>=2:
+            if not commute_motion.has(id) or commute_motion[id].trip!=str(record.get("trip","")):
+                var motion=CommuteMotion.new()
+                motion.configure(record,commute_signal_points)
+                commute_motion[id]=motion
+                var pos: Vector2=motion.at()
+                commute_models[id].position=Vector3(pos.x,0.05,pos.y)
+            commute_motion[id].set_target(float(record.get("distance",0)))
+        else:commute_motion.erase(id)
     for id in commute_models.keys():
         if not seen.has(id):
             commute_models[id].queue_free()
             commute_models.erase(id)
             commute_goals.erase(id)
+            commute_motion.erase(id)
 
 func _animate_commutes(delta: float) -> void:
     for id in commute_models:
         var car: Node3D=commute_models[id]
         var goal: Dictionary=commute_goals[id]
-        car.position=car.position.move_toward(goal["point"],delta*12.0)
-        car.rotation.y=lerp_angle(car.rotation.y,float(goal["heading"]),minf(1.0,delta*5.0))
+        if commute_motion.has(id):
+            var motion=commute_motion[id]
+            var dir: Vector2=motion.direction()
+            var pos: Vector2=motion.at()
+            var gap:=12.0*delta
+            # Keep a queue on the road rather than passing through stopped cars.
+            for other_id in commute_models:
+                if other_id==id:continue
+                var other: Node3D=commute_models[other_id]
+                var offset:=Vector2(other.position.x,other.position.z)-pos
+                var ahead:=offset.dot(dir)
+                if ahead>0.1 and ahead<9.0 and absf(offset.cross(dir))<1.6:
+                    gap=minf(gap,maxf(0.0,ahead-5.5))
+            motion.advance(gap,Signals.seconds())
+            var at: Vector2=motion.at()
+            var heading: Vector2=motion.direction()
+            car.position=Vector3(at.x,0.05,at.y)
+            car.rotation.y=lerp_angle(car.rotation.y,atan2(-heading.x,-heading.y),minf(1.0,delta*5.0))
+        else:
+            car.position=car.position.move_toward(goal["point"],delta*12.0)
+            car.rotation.y=lerp_angle(car.rotation.y,float(goal["heading"]),minf(1.0,delta*5.0))
 
 func _sync_patrols(records: Array) -> void:
     var seen: Dictionary={}
