@@ -15,19 +15,19 @@ class EnergyLifeTest {
   }
   int fuel=FuelLife.stock(t);
   EnergyLife.tick(t,s);
-  assertTrue(EnergyLife.publicPower(t));assertEquals(14,EnergyLife.get(t,"generated"));
-  assertEquals(10,EnergyLife.get(t,"battery"));assertEquals(fuel,FuelLife.stock(t));
-  EnergyLife.tick(t,s);assertEquals(10,EnergyLife.get(t,"battery"));
+  assertTrue(EnergyLife.publicPower(t));assertEquals(24,EnergyLife.get(t,"generated")); // thermal backup covers industrial demand
+  assertEquals(20,EnergyLife.get(t,"battery"));assertEquals(fuel-1,FuelLife.stock(t));
+  EnergyLife.tick(t,s);assertEquals(20,EnergyLife.get(t,"battery"));
   var p=FactoryNetworkLife.PLANTS.get(0);FactoryNetworkLife.change(t,"logs",2);
   int cash=t.employerFunds.get(FactoryNetworkLife.account(p));
   assertTrue(FactoryNetworkLife.produce(t,p,s.day));
-  assertEquals(9,EnergyLife.get(t,"battery"));assertEquals(cash-6,t.employerFunds.get(FactoryNetworkLife.account(p)).intValue());
+  assertEquals(19,EnergyLife.get(t,"battery"));assertEquals(cash-6,t.employerFunds.get(FactoryNetworkLife.account(p)).intValue());
   EnergyLife.set(t,"battery",0);FactoryNetworkLife.change(t,"logs",2);
   assertFalse(FactoryNetworkLife.produce(t,p,s.day));
   assertEquals(2,FactoryNetworkLife.stock(t,"logs"));
   s.day=9;t.people.get("energy-0").sickUntilDay=9;t.people.get("energy-1").sickUntilDay=9;
   EnergyLife.tick(t,s);assertEquals(10,EnergyLife.get(t,"generated"));
-  assertEquals(fuel-1,FuelLife.stock(t));assertTrue(EnergyLife.publicPower(t));
+  assertEquals(fuel-2,FuelLife.stock(t));assertTrue(EnergyLife.publicPower(t));
   assertEquals(EnergyLife.view(t),EnergyLife.view(t.copy()));
   s.day=10;EnergyLife.set(t,"battery",0);
   for(int i=0;i<3;i++)t.people.get("energy-"+i).sickUntilDay=10;

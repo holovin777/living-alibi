@@ -2090,6 +2090,10 @@ class GameSessionTest {
             c.age=100;c.health=100;
             state.day=DemographyLife.get(town,c,"born")+101*365;
             state.minute=359;
+            c.age=101;
+            long seed=0;while(seed<100000){c.personalSeed=seed++;if(DemographyLife.ageRelatedDeath(c,state.day))break;}
+            assertTrue(DemographyLife.ageRelatedDeath(c,state.day));
+            c.age=100;
             db.save(state,java.util.List.of(),java.util.List.of(),town,java.util.List.of(),java.util.List.of(),java.util.List.of());
         }
         String deceased;
@@ -2434,6 +2438,9 @@ class GameSessionTest {
             assertEquals(first.generationIndex,DemographyLife.get(town,child,"parent-a"));
             assertEquals(second.generationIndex,DemographyLife.get(town,child,"parent-b"));
             state.day=366;state.minute=360;
+            int originalAge=first.age;first.age=originalAge+1;
+            long seed=0;while(seed<100000){first.personalSeed=seed++;if(DemographyLife.ageRelatedDeath(first,state.day))break;}
+            assertTrue(DemographyLife.ageRelatedDeath(first,state.day));first.age=originalAge;
             DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
             DemographyLife.tick(town,state,new java.util.ArrayList<>(),new java.util.ArrayList<>());
             assertFalse(first.alive);assertEquals(0,first.money);assertEquals(140,child.money);

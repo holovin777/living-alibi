@@ -7,6 +7,8 @@ class BusinessManagementLifeTest {
         PopulationGenerator.add(t,12);t.industryStocks.put(StaffingLife.ENABLED,1);
         var workers=t.people.values().stream().filter(c->c.generationIndex>0&&c.alive).limit(2).toList();
         String a="shop-assistant";
+        // Isolate exactly two eligible employees, rather than a random extra vendor.
+        for(var c:t.people.values())if(c.generationIndex>0&&!workers.contains(c)&&"Market vendor".equals(c.occupation))c.employed=false;
         for(var c:workers){c.age=35;c.employed=true;c.occupation="Market vendor";c.workplace=TownLife.Place.MARKET;c.sickUntilDay=0;}
         t.player.place=TownLife.Place.OFFICE;t.player.destination=t.player.place;
         t.industryStocks.put("business-owner:"+a,t.player.incarnation);t.employerFunds.put(a,200);

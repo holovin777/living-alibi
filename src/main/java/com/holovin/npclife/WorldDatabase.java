@@ -901,7 +901,7 @@ final class WorldDatabase implements AutoCloseable {
         try(Statement st=db.createStatement();
                 ResultSet rs=st.executeQuery("SELECT account_id,balance FROM career_accounts")) {
             while(rs.next()) {
-                if(town.employerFunds.containsKey(rs.getString("account_id")) || rs.getString("account_id").startsWith("factory-network:") || rs.getString("account_id").equals(FactoryNetworkLife.LUMBER) || rs.getString("account_id").equals(FactoryNetworkLife.SUPPLIER) || rs.getString("account_id").equals(TelecomLife.ACCOUNT) || rs.getString("account_id").equals(FuneralLife.PROVIDER))
+                if(town.employerFunds.containsKey(rs.getString("account_id")) || rs.getString("account_id").startsWith("factory-network:") || rs.getString("account_id").equals(FactoryNetworkLife.LUMBER) || rs.getString("account_id").equals(FactoryNetworkLife.SUPPLIER) || rs.getString("account_id").equals(TelecomLife.ACCOUNT) || rs.getString("account_id").equals(FuneralLife.PROVIDER) || recentLifeAccount(rs.getString("account_id")))
                     town.employerFunds.put(rs.getString("account_id"),
                             Math.max(0,rs.getInt("balance")));
             }
@@ -1154,9 +1154,19 @@ final class WorldDatabase implements AutoCloseable {
         }
     }
 
+    private static boolean recentLifeAccount(String k){
+        return k.startsWith("industrial-expansion:")||java.util.Set.of(
+            EnergyLife.ACCOUNT,GasNetworkLife.ACCOUNT,GasNetworkLife.SUPPLIER,WaterNetworkLife.ACCOUNT,
+            FoodSupplyLife.SUPPLIER,ConstructionCrewLife.ACCOUNT,MunicipalBusFleetLife.ACCOUNT,
+            RegionalRailLife.ACCOUNT,"regional-rolling-stock").contains(k);
+    }
     private static boolean recentLifeKey(String k){
         for(String prefix:java.util.List.of("telecom:","identity:","family-door:","partnership:","funeral:",
-            "conviction:","psychology:","substance:","clinical:","athletics:","culture:","corruption:","education:","election:"))
+            "conviction:","psychology:","substance:","clinical:","athletics:","culture:","corruption:","education:","election:",
+            "staffing:","sim:","business-solvency:","business-credit:","business-owner:","business-management:","business-insurance:",
+            "enterprise-governance:","procurement:","trade-credit:","npc-enterprise:","it-market:","commercial:",
+            "construction-crew:","residential-development:","industrial-expansion:","infrastructure:","transport-development:","bus-fleet:","regional-rail:",
+            "food-supply:","telecom:","industrial-repair:"))
             if(k.startsWith(prefix))return true;
         return false;
     }

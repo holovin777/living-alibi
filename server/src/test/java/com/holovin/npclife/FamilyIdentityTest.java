@@ -20,11 +20,12 @@ class FamilyIdentityTest {
         var people=PopulationGenerator.add(t,2);
         var a=people.get(0);var b=people.get(1);
         for(var c:people){c.age=0;DemographyLife.set(t,c,"born",s.day);}
+        DemographyLife.set(t,a,"sex",ResidentSexLife.MALE);DemographyLife.set(t,b,"sex",ResidentSexLife.FEMALE);
         RebirthLife.enableRandomBirth(t,true);FirstLifeChoice.require(t);
         assertFalse(RebirthLife.acceptNaturalBirths(t,s,people));
         FirstLifeChoice.choose(t,2);
         assertTrue(RebirthLife.acceptNaturalBirths(t,s,people));
-        assertEquals(2,FirstLifeChoice.birthSex(RebirthLife.child(t)));
+        assertEquals(2,ResidentSexLife.sex(t,RebirthLife.child(t)));
         assertThrows(IllegalArgumentException.class,()->FirstLifeChoice.choose(t,1));
     }
 }

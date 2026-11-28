@@ -443,7 +443,8 @@ final class PlayerLife {
         }
         if(recall){
             String lasting=LifetimeMemoryLife.recollect(town,resident,"en");
-            return lasting==null?SocialMemoryLife.recollection(town,id):lasting;
+            String summary=SocialMemoryLife.recollection(town,id);
+            return lasting==null?summary:SocialMemoryLife.unresolved(town,id)||SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.APOLOGY)>0?lasting+" "+summary:lasting;
         }
         if(support)return SocialMemoryLife.last(town,id,SocialMemoryLife.Kind.SUPPORT)==day?"Thank you for being here.":"Thank you for the kind words.";
         if(askingMood)return EmotionLife.reply(EmotionLife.mood(town,resident,day,minute),contact.trust>=55);

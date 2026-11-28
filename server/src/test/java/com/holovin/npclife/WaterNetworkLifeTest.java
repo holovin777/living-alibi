@@ -14,6 +14,7 @@ class WaterNetworkLifeTest {
   var river=t.naturalResources.get("river-water");river.stock=60;
   WaterNetworkLife.generate(t,s);assertEquals(44,river.stock);
   assertEquals(16,WaterNetworkLife.get(t,"treated"));assertEquals(9,EnergyLife.get(t,"battery"));
+  t.retailStock.put("water",0);t.employerFunds.put(FoodSupplyLife.SHOP,100);
   int shop=FoodSupplyLife.stock(t,"water");assertEquals(8,WaterNetworkLife.sell(t));
   assertEquals(shop+8,FoodSupplyLife.stock(t,"water"));
   WaterNetworkLife.discharge(t);WaterNetworkLife.discharge(t);
