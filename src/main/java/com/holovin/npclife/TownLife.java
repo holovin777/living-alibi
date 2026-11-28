@@ -782,12 +782,14 @@ final class TownLife {
         AgriFoodLife.tick(town,marco);
         FoodSupplyLife.tick(town,marco);
         ConstructionLife.tick(town,marco.day,marco.minute);
+        if(marco.day%4==0)TransportDevelopmentLife.tick(town,marco);
         if(marco.day%2==0)InfrastructureDevelopmentLife.tick(town,marco);
         if(marco.day%3==0)IndustrialExpansionLife.tick(town,marco);
         if(marco.day%2==0){ResidentialDevelopmentLife.tick(town,marco);CommercialPropertyLife.tick(town,marco);}
         else{CommercialPropertyLife.tick(town,marco);ResidentialDevelopmentLife.tick(town,marco);}
         if(marco.day%3!=0)IndustrialExpansionLife.tick(town,marco);
         if(marco.day%2!=0)InfrastructureDevelopmentLife.tick(town,marco);
+        if(marco.day%4!=0)TransportDevelopmentLife.tick(town,marco);
         FireRecoveryLife.tick(town,marco);
         HouseholdInsuranceLife.tick(town,marco);
         BusinessCreditLife.tick(town,marco);
@@ -939,7 +941,8 @@ final class TownLife {
         }
         if(c.place!=desired) {
             c.destination=desired;
-            c.travelRemaining=travelTime(c.place,desired);
+            c.travelRemaining=NpcTransportLife.get(town,c,"mode")==NpcTransportLife.BUS&&NpcTransportLife.enabled(town)
+                ?Math.max(1,NpcTransportLife.get(town,c,"trip-duration")):travelTime(c.place,desired);
             c.activity="TRAVELING";
         }
     }

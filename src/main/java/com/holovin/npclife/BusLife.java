@@ -13,6 +13,11 @@ final class BusLife {
         int distance=CityExpansionLife.distance(a,b);
         return distance>0&&distance<=7;
     }
+    static boolean stop(TownLife.Town t,TownLife.Place p){return stop(p)||TransportDevelopmentLife.opened(t,p);}
+    static boolean route(TownLife.Town t,TownLife.Place a,TownLife.Place b){
+        int distance=CityExpansionLife.distance(a,b);return a!=b&&stop(t,a)&&stop(t,b)&&distance>0&&distance<=7;
+    }
+    static int duration(TownLife.Town t,TownLife.Place a,TownLife.Place b,int minute){return duration(a,b,minute)+TransportDevelopmentLife.delay(t,a,b);}
     static int waitMinutes(int minute){return Math.floorMod(-minute,15);}
     static boolean open(int minute){return minute>=360&&minute+waitMinutes(minute)<1320;}
     static int duration(TownLife.Place a,TownLife.Place b,int minute){return waitMinutes(minute)+Math.max(4,CityExpansionLife.distance(a,b)*2);}
@@ -20,17 +25,17 @@ final class BusLife {
     record View(boolean atStop,boolean available,int fare,int waitMinutes,List<Route> routes,boolean serviceOpen,int nextDepartureMinute,int localBusTravellers){}
     static View view(TownLife.Town t,WorldState s){
         var p=t.player;
-        boolean at=stop(p.place);
+        boolean at=stop(t,p.place);
         boolean available=at&&open(s.minute)&&p.alive&&!RebirthLife.active(t)&&!JusticeLife.confined(t)&&p.travelRemaining==0
                 &&!p.cycling&&(!p.ownsBicycle||p.bicycleParked!=null)&&p.money>=FARE&&!IntercomLife.insideVisit(t,s.day,s.minute);
         int travellers=at?(int)t.people.values().stream().filter(c->c.alive&&c.place==p.place&&NpcTransportLife.mode(t,c)==NpcTransportLife.BUS).count():0;
-        return new View(at,available,FARE,waitMinutes(s.minute),at?PlayerLife.publicPlaces().stream().filter(d->route(p.place,d))
-                .map(d->new Route(d.name(),d.label,duration(p.place,d,s.minute))).toList():List.of(),
+        return new View(at,available,FARE,waitMinutes(s.minute),at?PlayerLife.publicPlaces().stream().filter(d->route(t,p.place,d))
+                .map(d->new Route(d.name(),d.label,duration(t,p.place,d,s.minute))).toList():List.of(),
                 open(s.minute),open(s.minute)?s.minute+waitMinutes(s.minute):-1,travellers);
     }
     static int ride(TownLife.Town t,WorldState s,TownLife.Place destination){
-        if(!view(t,s).available()||!route(t.player.place,destination))throw new IllegalArgumentException("Bus service unavailable for this journey.");
-        int minutes=duration(t.player.place,destination,s.minute);
+        if(!view(t,s).available()||!route(t,t.player.place,destination))throw new IllegalArgumentException("Bus service unavailable for this journey.");
+        int minutes=duration(t,t.player.place,destination,s.minute);
         t.player.money-=FARE;
         t.employerFunds.merge("city-maintenance",FARE,Math::addExact);
         t.player.cycling=false;t.player.destination=destination;t.player.travelRemaining=minutes;

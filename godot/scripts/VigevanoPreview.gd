@@ -1090,6 +1090,8 @@ func _open_actions(work_only: bool=false) -> void:
         hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         action_list.add_child(hint)
     if str(room.get("id",""))=="OFFICE":
+        for transport in residents.world.get("transportProjects",[]):
+            WorkPanel.label(action_list,"%s · Road / Strada %s%% · Bus %s/2\nDemand / Domanda: %s · Repairs / Riparazioni: %s · €%s" % [transport.get("district",""),transport.get("condition",100),transport.get("stage",0),transport.get("demand",0),transport.get("repairs",0),transport.get("spent",0)])
         for infra in residents.world.get("infrastructureProjects",[]):
             WorkPanel.label(action_list,"%s · %s/3 · €%s/%s\nPressure / Pressione: %s days" % [infra.get("id",""),infra.get("stage",0),infra.get("spent",0),infra.get("totalCost",0),infra.get("pressureDays",0)])
         for plant in residents.world.get("industrialProjects",[]):
