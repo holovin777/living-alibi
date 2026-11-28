@@ -796,12 +796,12 @@ func _drive_frame(delta: float) -> void:
         var location: Dictionary=residents.world.get("playerDistrict",{})
         if not location.is_empty():_sync_spawn(Vector2(float(location["x"]),float(location["z"])))
         return
-    walker.position=walker.position.move_toward(drive_goal,delta*maxf(12.0,server_drive_speed/3.6*1.2))
+    walker.position=walker.position.move_toward(drive_goal,delta*maxf(12.0,absf(server_drive_speed)/3.6*1.2))
     walker.rotation.y=lerp_angle(walker.rotation.y,drive_heading,minf(delta*5.0,1.0))
     driving_body.position=walker.position-Vector3(0,1.0,0)
     driving_body.rotation.y=walker.rotation.y
     drive_speed=lerpf(drive_speed,server_drive_speed,minf(delta*5.0,1.0))
-    drive_audio.update_drive(true,drive_speed,Input.is_physical_key_pressed(KEY_W),delta)
+    drive_audio.update_drive(true,absf(drive_speed),Input.is_physical_key_pressed(KEY_W),delta)
     var steering_input:=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
     driving_body.update_instruments(drive_speed,steering_input,delta)
     if not driving_light.is_empty():
@@ -813,13 +813,15 @@ func _drive_frame(delta: float) -> void:
     drive_timer+=delta
     if drive_timer>=0.65:
         drive_timer=0
-        var braking:=Input.is_physical_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_S)
+        var braking:=Input.is_physical_key_pressed(KEY_SPACE)
+        var reversing:=Input.is_physical_key_pressed(KEY_S)
+        var handbrake:=Input.is_physical_key_pressed(KEY_SHIFT)
         var accelerating:=Input.is_physical_key_pressed(KEY_W)
-        if accelerating or braking or server_drive_speed>0.01:
+        if accelerating or braking or reversing or handbrake or absf(server_drive_speed)>0.01:
             var turn:=0
             if Input.is_physical_key_pressed(KEY_A):turn=-1
             elif Input.is_physical_key_pressed(KEY_D):turn=1
-            var command: String="brake" if braking else ("step" if accelerating else "coast")
+            var command: String="handbrake" if handbrake else ("brake" if braking else ("reverse" if reversing else ("step" if accelerating else "coast")))
             residents.drive_command(command,Vector2(walker.position.x,walker.position.z),turn)
         _update_navigation()
 

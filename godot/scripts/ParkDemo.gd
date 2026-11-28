@@ -1087,6 +1087,7 @@ func _begin_driving(destination: String,freight: bool = false) -> bool:
         _message.text = "Park your bicycle before driving."
         return false
     var candidate := DriveControls.new()
+    candidate.configure(freight,bool(_last_snapshot.get("weather",{}).get("raining",false)),int(player.get("carCondition",100)) if not freight else int(_last_snapshot.get("freight",{}).get("condition",100)))
     _drive_direction = (TownLayout.world_center(destination)-TownLayout.world_center(_current_place)).normalized()
     var start := _drive_position(Vector2(candidate.distance,candidate.lateral))
     if not _drive_clear(start):
@@ -1136,7 +1137,7 @@ func _update_drive_hud() -> void:
         if int(player.get("carFuel",0))<1 or int(player.get("carCondition",0))<3:
             _drive_hud.text += "\nCar needs fuel or service."
         return
-    _drive_hud.text = "%s km/h  |  Fuel %s/12  |  Condition %s%%\nTo %s · W gas / S reverse / A D steer / Space brake\n%s" % [
+    _drive_hud.text = "%s km/h  |  Fuel %s/12  |  Condition %s%%\nTo %s · W gas / S brake-reverse / A D steer / Space brake / Shift handbrake\n%s" % [
         roundi(absf(_drive.speed)*3.6),player.get("carFuel",0),player.get("carCondition",0),
         _drive_target.capitalize(),"Awaiting confirmed arrival..." if _drive_pending else "Esc: cancel before arrival · Mouse: look around"]
 
@@ -1144,7 +1145,7 @@ func _process_driving(delta: float) -> void:
     if not _drive_pending:
         var throttle := float(Input.is_key_pressed(KEY_W))-float(Input.is_key_pressed(KEY_S))
         var turn := float(Input.is_key_pressed(KEY_D))-float(Input.is_key_pressed(KEY_A))
-        var next := _drive.propose(delta,throttle,turn,Input.is_key_pressed(KEY_SPACE),_traffic_phase(_traffic_seconds))
+        var next := _drive.propose(delta,throttle,turn,Input.is_key_pressed(KEY_SPACE),_traffic_phase(_traffic_seconds),Input.is_key_pressed(KEY_SHIFT))
         var at := _drive_position(next)
         if _drive_clear(at):
             _drive.accept(next)
@@ -1177,7 +1178,7 @@ func _end_driving(return_to_car: bool) -> void:
         _avatar.position = _truck_exit(_current_place) if was_freight else CAR_ARRIVAL
     _sync_owned_car()
     _follow_player()
-    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _park_in_cabin() -> void:
     _drive_target = ""
@@ -1332,10 +1333,11 @@ func _follow_player() -> void:
         return
     if _drive_active():
         _cockpit.position = _avatar.position
-        _cockpit.rotation.y = _view_yaw
+        var cabin_yaw:=_view_yaw-_drive.heading_offset
+        _cockpit.rotation = Vector3(_drive.pitch,cabin_yaw,_drive.roll)
         _steering_wheel.rotation.z = -_drive.steering*0.7
-        _camera.position = _avatar.position+Basis(Vector3.UP,_view_yaw)*DRIVER_EYE
-        _camera.rotation = Vector3(_view_pitch,_view_yaw+_drive_look,0.0)
+        _camera.position = _avatar.position+_cockpit.basis*DRIVER_EYE
+        _camera.rotation = Vector3(_view_pitch+_drive.pitch,cabin_yaw+_drive_look,_drive.roll)
     else:
         var eye := EYE_HEIGHT
         if str(_last_snapshot.get("rebirth",{}).get("phase","ADULT")) == "CHILDHOOD":

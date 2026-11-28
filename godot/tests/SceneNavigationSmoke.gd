@@ -721,6 +721,21 @@ func _exercise() -> void:
     controls.accept(controls.propose(0.1,0.0,0.0,true,2))
     if not _check(controls.speed<4.5,"brake slows car"):
         return
+    var dry_controls=preload("res://scripts/DriveControls.gd").new()
+    var wet_controls=preload("res://scripts/DriveControls.gd").new()
+    dry_controls.configure(false,false,100)
+    wet_controls.configure(false,true,100)
+    dry_controls.speed=4.0
+    wet_controls.speed=4.0
+    dry_controls.accept(dry_controls.propose(0.1,0.0,0.0,true,2))
+    wet_controls.accept(wet_controls.propose(0.1,0.0,0.0,true,2))
+    if not _check(dry_controls.speed<wet_controls.speed,"wet road reduces braking grip"):
+        return
+    dry_controls.distance=20.0
+    dry_controls.speed=0.0
+    dry_controls.accept(dry_controls.propose(0.1,-1.0,0.0,false,2))
+    if not _check(dry_controls.speed<0.0 and dry_controls.distance<20.0 and dry_controls.gear=="R","reverse moves car backwards"):
+        return
     for edge in world._traffic_edges.values():
         for record in edge["cars"]:
             record["node"].visible = false

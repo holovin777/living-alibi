@@ -47,14 +47,31 @@ final class GeoDrive {
     double vehicleLimit(double roadLimit){return Math.min(roadLimit,lightKind.equals("scooter")?45:truck?60:bus?54:72);}
     double controlBudget(String command,double elapsed,double limit){
         limit=Math.max(0,Math.min(vehicleLimit(72)/3.6,limit));
-        speed=Math.min(speed,limit);
+        speed=Math.max(-3.0,Math.min(speed,limit));
         double dt=Math.max(0,Math.min(0.8,elapsed));
         if(elapsed>1.5)speed=0;
         double initial=speed;
+        if(command.equals("reverse")||command.equals("handbrake")||initial<0){
+            double target=command.equals("reverse")&&initial<=0?-Math.min(3.0,limit):0;
+            double rate=command.equals("handbrake")?10:command.equals("reverse")&&initial<=0?1.8:command.equals("coast")?1.8:8;
+            double change=target-initial;
+            double used=Math.min(dt,Math.abs(change)/rate);
+            speed=initial+Math.copySign(rate*used,change);
+            if(used<dt)speed=target;
+            return Math.abs((initial+speed)*0.5*used+speed*(dt-used));
+        }
         double acceleration=switch(command){case "step" -> lightKind.equals("motorcycle")?4.5:lightKind.equals("scooter")?2.5:truck?1.2:bus?1.6:3.0;case "brake" -> !lightKind.isEmpty()?-6.0:truck?-4.0:bus?-5.0:-8.0;default -> -1.8;};
         speed=Math.max(0,Math.min(limit,speed+acceleration*dt));
         if(acceleration<0&&initial+acceleration*dt<0)dt=initial/-acceleration;
         return (initial+speed)*0.5*dt;
+    }
+    /** Reverse only on the current edge: no jumping through intersections. */
+    double reverse(GeoProjection map,double budget){
+        waitingForSignal=false;
+        double length=map.motorNodes.get(from).distance(map.motorNodes.get(to));
+        if(length<0.01)return 0;
+        double moved=Math.min(Math.max(0,budget),length*progress);
+        progress=Math.max(0,progress-moved/length);meters+=moved;return moved;
     }
     double advance(GeoProjection map,int turn,double budget){return advance(map,turn,budget,System.currentTimeMillis()/1000);}
     double advance(GeoProjection map,int turn,double budget,long seconds){

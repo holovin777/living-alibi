@@ -772,7 +772,7 @@ public final class GameSession implements AutoCloseable {
             var park=map.point(destination);
             return new GeoDrive.Pose(false,false,park.x(),park.z(),0,town.player.carFuel,town.player.carCondition,0,0,"CAR","Parked at "+destination.label+".");
         }
-        if(!Set.of("step","coast","brake").contains(command)||turn<-1||turn>1)throw new IllegalArgumentException("Unknown driving control.");
+        if(!Set.of("step","coast","brake","reverse","handbrake").contains(command)||turn<-1||turn>1)throw new IllegalArgumentException("Unknown driving control.");
         long now=System.nanoTime();
         if(now<geoDrive.checkUntil){geoDrive.lastStep=now;return drivePose(map,"Police document check / Controllo documenti.");}
         if(now-geoDrive.lastStep<400_000_000L)return drivePose(map,"");
@@ -784,7 +784,8 @@ public final class GameSession implements AutoCloseable {
         double budget=next.controlBudget(command,(now-geoDrive.lastStep)/1e9,map.speedLimit(next.from,next.to)/3.6);
         if(budget<0.001){geoDrive=next;return drivePose(map,"");}
         int oldUnits=(int)(next.meters/100);
-        double traveled=next.advance(map,turn,budget);
+        boolean reversing=geoDrive.speed<0||next.speed<0;
+        double traveled=reversing?next.reverse(map,budget):next.advance(map,turn,budget);
         if(traveled+0.001<budget)next.speed=0;
         else next.speed=Math.min(next.speed,next.vehicleLimit(map.speedLimit(next.from,next.to))/3.6);
         if(next.waitingForSignal&&traveled<0.001){geoDrive=next;return drivePose(map,"Waiting for green light.");}
@@ -795,7 +796,7 @@ public final class GameSession implements AutoCloseable {
             var parked=map.civilian(town,previousPosition);
             boolean collision=parked!=null&&GeoResponse.contact(previousPosition,next.position(map),new GeoProjection.Point(parked.x(),parked.z()));
             if(next.stolen&&town.player.carPlace!=null){var own=map.point(town.player.carPlace);collision|=GeoResponse.contact(previousPosition,next.position(map),new GeoProjection.Point(own.x()+2.5,own.z()));}
-            if(collision){impactSpeed=Math.max(geoDrive.speed,next.speed)*3.6;impact=RoadAccidentLife.damage(impactSpeed);next.speed=0;geoLastImpact=now;}
+            if(collision){impactSpeed=Math.max(Math.abs(geoDrive.speed),Math.abs(next.speed))*3.6;impact=RoadAccidentLife.damage(impactSpeed);next.speed=0;geoLastImpact=now;}
         }
         var copy=town.copy();var destination=map.nearest(next.position(map));
         copy.player.place=destination;copy.player.destination=destination;copy.player.cycling=false;

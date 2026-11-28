@@ -75,8 +75,8 @@ func _ready() -> void:
 func update_instruments(speed_kmh: float,turn: float,delta: float) -> void:
     if not is_instance_valid(steering):return
     steering.rotation.z=lerpf(steering.rotation.z,-turn*0.75,minf(delta*8.0,1.0))
-    speed_display.text="%02d km/h" % roundi(maxf(0,speed_kmh))
-    gear_display.text="D%d" % gear_for_speed(speed_kmh)
+    speed_display.text="%02d km/h" % roundi(absf(speed_kmh))
+    gear_display.text="R" if speed_kmh<-0.1 else ("N" if absf(speed_kmh)<0.1 else "D%d" % gear_for_speed(speed_kmh))
 
 static func gear_for_speed(speed_kmh: float) -> int:
     return 1 if speed_kmh<15 else (2 if speed_kmh<30 else (3 if speed_kmh<48 else (4 if speed_kmh<65 else 5)))

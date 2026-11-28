@@ -22,6 +22,23 @@ class GeoDriveTest {
         assertTrue(drive.controlBudget("step",60)<1);
         assertEquals(drive.speed,drive.copy().speed,.001);
     }
+    @Test void reverseIsBoundedToCurrentRoadAndCountsDistance()throws Exception{
+        var graph=dir.resolve("reverse.tsv");
+        Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\nM\t1\t0\t0\nM\t2\t100\t0\nD\t1\t2\n");
+        var map=new GeoProjection(graph);var car=new GeoDrive(false,"1");
+        car.advance(map,0,12);
+        car.controlBudget("step",.5);
+        car.controlBudget("reverse",.8);
+        assertEquals(0,car.speed,.001);
+        double budget=car.controlBudget("reverse",.8);
+        assertTrue(car.speed<0);assertTrue(budget>0);
+        assertEquals(budget,car.reverse(map,budget),.001);
+        assertEquals(12-budget,car.position(map).x(),.001);
+        assertEquals(12+budget,car.meters,.001);
+        car.reverse(map,100);
+        assertEquals(0,car.position(map).x(),.001);
+        assertEquals(0,car.reverse(map,5),.001);
+    }
     @Test void roadSpeedTargetsAreBounded()throws Exception{
         var graph=dir.resolve("speeds.tsv");
         Files.writeString(graph,"N\t1\t0\t0\nN\t2\t100\t0\nE\t1\t2\nM\t1\t0\t0\nM\t2\t100\t0\nD\t1\t2\t72\nD\t2\t1\t20\n");
