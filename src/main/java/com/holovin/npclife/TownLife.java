@@ -717,6 +717,7 @@ final class TownLife {
         TowServiceLife.tick(town,marco);
         AmbulanceLife.tick(town,marco);
         FireServiceLife.tick(town,marco);
+        FireHousingLife.prepare(town,marco);
         StallSupplyLife.tick(town,marco.day,marco.minute);
         BankLife.tick(town,marco.day,marco.minute);
         TechnicalWorkLife.tick(town,marco.day,marco.minute);

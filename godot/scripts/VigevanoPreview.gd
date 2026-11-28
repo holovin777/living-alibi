@@ -642,9 +642,11 @@ func _update_navigation() -> void:
         if str(world.get("jobId",""))=="firefighter":hud.text+="\nFire duty / Servizio: kit %s%% · %s" % [duty.get("gearCondition",0),"Assigned / In missione" if duty.get("assigned",false) else "Standby / Disponibile" if duty.get("standby",false) else "Off duty / Riposo"]
         for damaged in world.get("fireRecovery",[]):
             if str(damaged.get("id",""))==str(district.get("id","")):hud.text+="\nRestoration / Ripristino: %s%% · %s" % [damaged.get("condition",100),"Closed / Chiuso" if damaged.get("closed",false) else "Open / Aperto"]
+        var housing: Dictionary=world.get("fireHousing",{})
+        if int(housing.get("accommodated",0))+int(housing.get("waiting",0))>0:hud.text+="\nTemporary shelter / Alloggio: %s/%s assigned · %s waiting" % [housing.get("accommodated",0),housing.get("capacity",24),housing.get("waiting",0)]
         var fire: Dictionary=world.get("fireService",{})
         if str(fire.get("status","NONE"))!="NONE":hud.text+="\nFire / Incendio: %s · %s · %s min · Crew %s" % [fire.get("district",""),fire.get("status",""),fire.get("minutesRemaining",0),fire.get("assigned",0)]
-        if int(fire.get("evacuating",0))>0:hud.text+="\nEvacuation / Evacuazione: %s people · %s at park" % [fire.get("evacuating",0),fire.get("sheltered",0)]
+        if int(fire.get("evacuating",0))>0:hud.text+="\nEvacuation / Evacuazione: %s people · %s at safe locations" % [fire.get("evacuating",0),fire.get("sheltered",0)]
         var ambulance: Dictionary=world.get("ambulance",{})
         if str(ambulance.get("status",""))=="EN_ROUTE":hud.text+="\nAmbulance / Ambulanza: %s min · Stay in district" % ambulance.get("minutesRemaining",0)
         elif str(ambulance.get("status",""))=="ARRIVED":hud.text+="\nAmbulance arrived / Arrivata · F to board near district marker"

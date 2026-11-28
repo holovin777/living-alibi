@@ -14,7 +14,12 @@ final class FireEvacuationLife {
         if(!c.alive||c.generationIndex<=0||FireServiceLife.assigned(t,c)
                 ||RebirthLife.linkedAdult(t,c)||RebirthLife.linkedChild(t,c))return null;
         // Closed housing remains unavailable after the fire is out.
-        if((c.home==TownLife.Place.NORTH_RESIDENCES||c.home==TownLife.Place.SOUTH_RESIDENCES)&&FireRecoveryLife.closed(t,c.home))return SHELTER;
+        if((c.home==TownLife.Place.NORTH_RESIDENCES||c.home==TownLife.Place.SOUTH_RESIDENCES)&&FireRecoveryLife.closed(t,c.home)){
+            if(site==c.home&&!affected(t,c)){
+                t.industryStocks.put(key(c),FireServiceLife.get(t,"started"));FireServiceLife.add(t,"evacuated-total",1);
+            }
+            return FireHousingLife.accommodated(t,c)?FireHousingLife.PLACE:SHELTER;
+        }
         if(site==null){return FireRecoveryLife.closed(t,planned)?SHELTER:null;}
         // Residents react once they are in, headed into, or normally scheduled in the affected district.
         if(!affected(t,c)&&c.place!=site&&planned!=site&&(c.travelRemaining<=0||c.destination!=site))return null;
@@ -28,6 +33,6 @@ final class FireEvacuationLife {
         return (int)t.people.values().stream().filter(c->c.alive&&affected(t,c)).count();
     }
     static int shelteredCount(TownLife.Town t){
-        return (int)t.people.values().stream().filter(c->c.alive&&affected(t,c)&&c.presentAt(SHELTER)).count();
+        return (int)t.people.values().stream().filter(c->c.alive&&affected(t,c)&&(c.presentAt(SHELTER)||FireHousingLife.accommodated(t,c)&&c.presentAt(FireHousingLife.PLACE))).count();
     }
 }

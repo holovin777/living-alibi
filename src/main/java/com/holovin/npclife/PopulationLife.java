@@ -197,7 +197,7 @@ final class PopulationLife {
             c.water--;c.thirst=clamp(c.thirst-52);
             TownLife.publish(town,clock,c.id,c.place,c.name+" drank water.",events,observations);
         }
-        if(evacuation!=null)c.activity="EVACUATED";
+        if(evacuation!=null)c.activity=FireHousingLife.accommodated(town,c)&&c.place==FireHousingLife.PLACE?"TEMPORARY_HOUSING":"EVACUATED";
         else if(FireServiceLife.assigned(town,c)&&c.place==FireServiceLife.site(town))c.activity="FIREFIGHTING";
         else if(search!=null&&manual==null)c.activity="SEARCHING_FOR_CHILD";
         else if(RebirthLife.childOutsideHome(town,c))c.activity="OUTSIDE_HOME";
