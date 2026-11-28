@@ -223,7 +223,8 @@ final class PopulationLife {
         else if(working && (c.place==c.workplace||fireStaff&&c.place==FireServiceLife.destination(town,c)||publicSafety&&c.place==PoliceLife.assignment(town,c,clock.day,minute))){
             c.activity="WORKING";
             if(minute%60==0){
-                if(fireStaff)FireServiceLife.pay(town,c);
+                if(BusinessSolvencyLife.payHour(town,c,clock)){ /* paid or recorded as arrears */ }
+                else if(fireStaff)FireServiceLife.pay(town,c);
                 else if(HouseholdInsuranceLife.agent(c)){ /* commission is paid only on a real policy sale */ }
                 else if(SecurityLife.guard(c))SecurityLife.pay(town,c);
                 else if(PostalLife.postalWorker(c))PostalLife.pay(town,c);

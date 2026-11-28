@@ -38,7 +38,7 @@ final class StaffingLife {
     static Role role(String name){return ROLES.stream().filter(r->r.name().equals(name)).findFirst().orElse(null);}
     static boolean staffed(TownLife.Citizen c,Role r){return c.alive&&c.employed&&c.age>=18&&c.age<67&&r.name().equals(c.occupation)&&r.workplace()==c.workplace;}
     static long count(TownLife.Town t,Role r){return t.people.values().stream().filter(c->staffed(c,r)).count();}
-    static boolean funded(TownLife.Town t,Role r){return r.fund()==null||t.employerFunds.getOrDefault(r.fund(),0)>=(r.name().equals("Journalist")?NewspaperLife.REPORTER_PAY:r.name().equals("Postal worker")?PostalLife.WAGE:r.name().equals("Security guard")?5:IndustryLife.HOURLY_WAGE);}
+    static boolean funded(TownLife.Town t,Role r){return !BusinessSolvencyLife.suspended(t,BusinessSolvencyLife.account(r.name()))&&(r.fund()==null||t.employerFunds.getOrDefault(r.fund(),0)>=(r.name().equals("Journalist")?NewspaperLife.REPORTER_PAY:r.name().equals("Postal worker")?PostalLife.WAGE:r.name().equals("Security guard")?5:IndustryLife.HOURLY_WAGE));}
     static boolean eligible(TownLife.Town t,TownLife.Citizen c,WorldState s){
         return c.alive&&c.generationIndex>0&&c.age>=25&&c.age<65&&!RelationshipBoundaryLife.controlled(t,c)
             &&!EmploymentLife.sick(c,s.day)&&!NpcJusticeLife.confined(t,c,s)

@@ -642,6 +642,14 @@ func _update_navigation() -> void:
         if str(world.get("jobId",""))=="firefighter":hud.text+="\nFire duty / Servizio: kit %s%% · %s" % [duty.get("gearCondition",0),"Assigned / In missione" if duty.get("assigned",false) else "Standby / Disponibile" if duty.get("standby",false) else "Off duty / Riposo"]
         for damaged in world.get("fireRecovery",[]):
             if str(damaged.get("id",""))==str(district.get("id","")):hud.text+="\nRestoration / Ripristino: %s%% · %s" % [damaged.get("condition",100),"Closed / Chiuso" if damaged.get("closed",false) else "Open / Aperto"]
+        var firms: Array=world.get("businessSolvency",[])
+        if str(district.get("id","")) in ["OFFICE","FACTORY","MARKET"] and not firms.is_empty():
+            var suspended_count:=0
+            var arrears:=0
+            for firm in firms:
+                if bool(firm.get("suspended",false)):suspended_count+=1
+                arrears+=int(firm.get("arrears",0))
+            if suspended_count>0 or arrears>0:hud.text+="\nCompanies / Imprese: %s suspended · €%s wage arrears" % [suspended_count,arrears]
         var business_insurance: Dictionary=world.get("businessInsurance",{})
         if str(district.get("id",""))=="OFFICE" and int(business_insurance.get("businesses",0))>0:hud.text+="\nBusiness cover / Imprese: %s/%s · €%s pending" % [business_insurance.get("insured",0),business_insurance.get("businesses",0),business_insurance.get("pending",0)]
         var insurer: Dictionary=world.get("householdInsurance",{})

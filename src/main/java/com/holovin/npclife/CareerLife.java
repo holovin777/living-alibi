@@ -115,7 +115,7 @@ final class CareerLife {
         if(skill(town,vacancy.subject)<vacancy.requiredSkill)
             throw new IllegalArgumentException("Study "+vacancy.subject+" first: "+
                     vacancy.requiredSkill+" skill required.");
-        if(town.employerFunds.getOrDefault(payrollAccount(vacancy.id),0)<vacancy.wage)
+        if(BusinessSolvencyLife.suspended(town,payrollAccount(vacancy.id))||town.employerFunds.getOrDefault(payrollAccount(vacancy.id),0)<vacancy.wage)
             throw new IllegalArgumentException("Employer cannot fund another shift right now.");
         EmploymentContractLife.clearVisitor(town);
         p.jobId=vacancy.id;
@@ -172,6 +172,7 @@ final class CareerLife {
                     "Inspect and complete an actual city work order before this technical shift.");
         if(NewspaperLife.JOB.equals(vacancy.id)&&!NewspaperLife.filed(town,day))throw new IllegalArgumentException("Interview a resident and file a public news dispatch before working.");
         if(FireTrainingLife.JOB.equals(vacancy.id)&&(!FireTrainingLife.qualified(town)||p.health<60||p.fatigue>=85))throw new IllegalArgumentException("Fire shift requires qualification and adequate health and rest.");
+        if(BusinessSolvencyLife.suspended(town,payrollAccount(vacancy.id)))throw new IllegalArgumentException("Company temporarily suspended due to insolvency.");
         int funds=town.employerFunds.getOrDefault(payrollAccount(vacancy.id),0);
         if(funds<vacancy.wage)
             throw new IllegalArgumentException("Employer has insufficient payroll funds.");
