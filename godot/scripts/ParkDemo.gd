@@ -448,7 +448,11 @@ func _process(delta: float) -> void:
             if search is Dictionary and str(search.get("status","NONE")) not in ["NONE","LOCATED"]:
                 _hint.text+="\n"+("Police notified / Polizia avvisata" if bool(search.get("policeReported",false)) else "Family is looking for you / La famiglia ti cerca")
             return
-        if not _nearest_resident().is_empty():
+        if _near_car():
+            _hint.text="E: Sali in auto / Enter car · F: options"
+        elif _current_place=="WORKSHOP" and _can_use_car() and _near_kiosk() and _car_place().is_empty():
+            _hint.text="F: Compra auto / Buy car"
+        elif not _nearest_resident().is_empty():
             _hint.text=tr("Talk: approach someone and press T or click on them.")
         elif _near_software():
             _hint.text="E: Borgo Digital · "+_office_station()+" · F: life choices"
@@ -639,7 +643,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
             _cycle_held_item()
             get_viewport().set_input_as_handled()
         return
-    if _rebirth_active():
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_E and not _drive_active() and _near_car() and not _action_panel.visible and not _dialog_panel.visible:
+        _close_dialog()
+        _park_in_cabin()
+        Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+        get_viewport().set_input_as_handled()
+        return
+    if _rebirth_active() and not _drive_active():
         if event is InputEventKey and event.pressed and not event.echo and not _child_can_walk() and event.keycode in [KEY_F,KEY_ESCAPE]:
             if event.keycode==KEY_F:
                 _show_childhood_details=false
@@ -729,7 +739,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 if event.keycode in [KEY_F,KEY_ESCAPE]:
                     _end_driving(true)
                     _message.text = "Car parked. You are on foot."
-                elif event.keycode in [KEY_1,KEY_2,KEY_3]:
+                elif event.keycode>=KEY_1 and event.keycode<=KEY_9:
                     var choices: Array = _last_snapshot.get("player",{}).get("carDestinations",[])
                     var index: int = event.keycode-KEY_1
                     if index<choices.size() and _connected and not _api.is_busy():
@@ -1026,10 +1036,14 @@ func _render_vehicle_crime() -> void:
         if available:
             _action_choices.add_child(_button(tr("Steal civilian car") if kind=="car" else (tr("Steal municipal bus") if kind=="bus" else tr("Steal employer truck")),_vehicle_crime_action.bind("vehicle-steal:"+kind)))
 
+func _can_use_car() -> bool:
+    return not _rebirth_active() or str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT"
+
 func _near_car() -> bool:
-    return _car_place()==_current_place and TownLayout.motor_district(_current_place) and _avatar.position.distance_to(CAR_PARK)<3.3
+    return _can_use_car() and not _apartment_active and not _guest_active and not _stairwell_active and _car_place()==_current_place and TownLayout.motor_district(_current_place) and _avatar.position.distance_to(CAR_PARK)<3.3
 
 func _car_action(action: String) -> void:
+    if not _can_use_car():return
     if (_current_place=="WORKSHOP" or (_current_place=="FUEL_STATION" and action=="refuel") or (TownLayout.service_hub(_current_place) and action in ["refuel","repair"])) and (_near_kiosk() or _near_car()) and _connected and not _api.is_busy():
         _api.car_action(action)
 
@@ -7657,6 +7671,24 @@ func _render_parent_requests(rebirth: Dictionary) -> void:
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _custody_active:return
+    if _rebirth_active() and _can_use_car() and not _apartment_active:
+        if _near_car():
+            _action_title.text="Automobile / Car"
+            _action_choices.add_child(_button("Enter car / Sali in auto",func():
+                _action_panel.hide()
+                _park_in_cabin()
+                Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)))
+            for id in _last_snapshot.get("player",{}).get("carDestinations",[]):
+                _action_choices.add_child(_button("Drive to / Vai a "+TownLayout.label_for(str(id)),_drive_to.bind(str(id))))
+            if _current_place in ["WORKSHOP","FUEL_STATION"] or TownLayout.service_hub(_current_place):
+                _action_choices.add_child(_button("Refuel / Rifornimento",_car_action.bind("refuel")))
+            if _current_place=="WORKSHOP" or TownLayout.service_hub(_current_place):
+                _action_choices.add_child(_button("Service car / Manutenzione · 15 EUR",_car_action.bind("repair")))
+            return
+        if _current_place=="WORKSHOP" and _near_kiosk() and _car_place().is_empty():
+            _action_title.text="Officina / Garage"
+            _action_choices.add_child(_button("Buy used car / Compra auto usata · 180 EUR",_car_action.bind("buy")))
+            return
     if _near_vehicle_crime():
         _render_vehicle_crime()
         if not _near_bus_stop() and not _near_truck() and not _near_kiosk():return

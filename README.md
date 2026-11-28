@@ -206,3 +206,12 @@ sport hatchback, van, SUV), with animated wheel nodes and a revised first-person
 dashboard. The original models are CC0; see `godot/assets/vehicles/CREDITS.md`.
 No network download is required at launch. These are stylized game assets, not
 photorealistic vehicle interiors. Driving still uses the existing road-leg system.
+
+### Driving in a born life
+
+A linked adult can buy the existing used car at the workshop for 180 EUR,
+using their own savings, and enter it with E near the parked vehicle. F opens
+purchase, fuel and service choices. Choose an adjacent road with number keys
+while seated, then W/S, A/D and Space. Children cannot use the car system.
+The same fuel/condition rules apply; the legacy visitor remains inactive.
+Driving is still a short lane preview with a server-confirmed district arrival.

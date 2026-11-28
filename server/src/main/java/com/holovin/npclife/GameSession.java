@@ -952,19 +952,52 @@ public final class GameSession implements AutoCloseable {
         return apply(copy,minutes,(copy.player.cycling?"Cycled to ":"Walked to ")+place.label+".");
     }
 
+    // Reuse the established motor economy with the living adult's actual
+    // wallet. The inactive visitor shell is enabled only during validation,
+    // never during world ticks or persistence.
+    static TownLife.Citizen beginLinkedMotorAction(TownLife.Town copy,int day){
+        var c=RebirthLife.requireAdult(copy);
+        if(!RebirthLife.awakePresent(c)||RebirthLife.atHome(c)||EmploymentLife.sick(c,day))
+            throw new IllegalArgumentException("Go outside and finish traveling before driving.");
+        var p=copy.player;
+        p.place=c.place;p.destination=c.place;p.travelRemaining=0;
+        p.money=c.money;p.alive=true;
+        return c;
+    }
+    static void endLinkedMotorAction(TownLife.Town copy,TownLife.Citizen c){
+        c.money=copy.player.money;
+        copy.player.money=0;
+        copy.player.alive=false;
+        copy.player.travelRemaining=0;
+        RebirthLife.synchronize(copy);
+    }
     public synchronized ActionView carAction(String action) throws SQLException {
         var copy=town.copy();
+        var linked=RebirthLife.active(copy)?beginLinkedMotorAction(copy,state.day):null;
         String message=switch(action==null?"":action) {
             case "buy" -> MotorLife.buy(copy,state.minute);
             case "refuel" -> MotorLife.refuel(copy,state.minute);
             case "repair" -> MotorLife.repair(copy,state.minute);
             default -> throw new IllegalArgumentException("Unknown car action.");
         };
+        if(linked!=null){
+            endLinkedMotorAction(copy,linked);
+            RebirthLife.holdPublicPlace(copy,linked);
+            return applyInternal(copy,action.equals("repair")?30:5,message,true);
+        }
         return apply(copy,action.equals("repair")?30:5,message);
     }
     public synchronized ActionView drive(String destination) throws SQLException {
         var copy=town.copy();
         var place=PlayerLife.destination(destination);
+        if(RebirthLife.active(copy)){
+            var linked=beginLinkedMotorAction(copy,state.day);
+            int minutes=MotorLife.drive(copy.player,place);
+            endLinkedMotorAction(copy,linked);
+            RebirthLife.travel(copy,place,state.day);
+            linked.travelRemaining=minutes;
+            return applyInternal(copy,minutes,"Drove to "+place.label+". Your car is parked there.",true);
+        }
         int minutes=MotorLife.drive(copy.player,place);
         return apply(copy,minutes,"Drove to "+place.label+". Your car is parked there.");
     }
