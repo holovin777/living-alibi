@@ -1785,7 +1785,7 @@ func _sync_bus_stops() -> void:
         var wants_bus := open and wait<=5
         stop.set_meta("bus_wanted",wants_bus)
         var state := str(stop.get_meta("bus_state","hidden"))
-        if not bool(stop.get_meta("bus_initialized",false)):
+        if _last_snapshot.has("bus") and not bool(stop.get_meta("bus_initialized",false)):
             stop.set_meta("bus_initialized",true)
             if open and wait<=2:
                 bus.position.z=0.0

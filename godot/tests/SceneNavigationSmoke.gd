@@ -645,13 +645,16 @@ func _exercise() -> void:
     var municipal_bus: Node3D=bus_stop.get_node("Bus")
     if not _check(municipal_bus.visible and bus_stop.get_meta("bus_state")=="leaving"
             and world._scenery.has_node("MunicipalBusLane"),"bus departs along a physical lane instead of disappearing"):return
-    # Move the player clear and remove pedestrian obstructions in this
-    # synthetic snapshot so the departure can complete.
-    world._avatar.position=Vector3(0,0,0)
+    # Move the player to the platform, safely outside the bus lane.
+    world._avatar.position=world._bus_platform()
     var old_bus_z: float=municipal_bus.position.z
     world._advance_buses(0.1)
-    if not _check(municipal_bus.position.z<old_bus_z or municipal_bus.visible,
+    if not _check(municipal_bus.position.z<old_bus_z and municipal_bus.visible,
             "departing bus remains visible while moving"):return
+    for frame in range(180):
+        world._advance_buses(0.1)
+    if not _check(not municipal_bus.visible and is_equal_approx(municipal_bus.position.z,float(bus_stop.get_meta("exit_z"))),
+            "bus leaves the visible lane before being hidden"):return
     world._begin_bus_preview("WORKSHOP",6)
     var start_money: int=int(world._last_snapshot["player"]["money"])
     var original_pos: Vector3=world._avatar.position
