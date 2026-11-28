@@ -182,6 +182,9 @@ func _ready() -> void:
     var sun := DirectionalLight3D.new()
     sun.rotation_degrees=Vector3(-55,-35,0)
     sun.light_energy=0.85
+    # Optional bounded shadows for the discrete GPU; keep the low-end default light.
+    sun.shadow_enabled=OS.get_environment("LIVING_ALIBI_SHADOWS")=="1"
+    sun.directional_shadow_max_distance=120.0
     add_child(sun)
     daylight=sun
     precipitation=WeatherVisual.new()

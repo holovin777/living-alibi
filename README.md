@@ -32,6 +32,20 @@ The launcher builds the Java engine and Spring Boot server, starts the local API
 
 Your world is saved in `data/world.db`. **Do not delete this file to install updates.** Back it up with the game and server stopped. If startup fails, check the terminal and `data/server.log`.
 
+## Graphics — NVIDIA / hybrid laptops
+
+Both Linux launchers prefer NVIDIA PRIME offload when `prime-run` or a working `nvidia-smi` is detected. Only the interactive Godot process is offloaded; Java and asset import run normally. Compatibility (OpenGL) remains the default, with bounded directional shadows in geographic mode when NVIDIA is requested. Verify the device in Godot's startup output or `nvidia-smi`; requesting PRIME does not guarantee the driver is correctly configured.
+
+```bash
+LIVING_ALIBI_GPU=nvidia bash play-vigevano.sh --wide
+LIVING_ALIBI_GPU=system bash play.sh
+LIVING_ALIBI_SHADOWS=0 bash play-vigevano.sh --wide
+# Experimental Vulkan renderer, if supported by your GPU/driver:
+LIVING_ALIBI_RENDERER=mobile bash play-vigevano.sh --wide --preview-only
+```
+
+On Arch Linux, `nvidia-prime` provides `prime-run`; install a driver appropriate to your actual GPU first. The launcher does not install drivers. See https://wiki.archlinux.org/title/PRIME. The wide geographic mode uses the same SQLite world; back up before switching maps, or use `--preview-only` to explore without changing it.
+
 ## Your first life
 
 On a new save, the current game intends to offer a choice of boy or girl, then links the player to a newborn in a real household. If a suitable birth is not available yet, the waiting menu advances time. Childhood, schooling and age-dependent interactions lead into adulthood. Choose a career, make friends, explore, or start a family.

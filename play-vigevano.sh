@@ -5,6 +5,8 @@ cd "$ROOT"
 if command -v godot >/dev/null 2>&1; then GODOT=godot
 elif command -v godot4 >/dev/null 2>&1; then GODOT=godot4
 else echo "Godot 4 required."; exit 1; fi
+source "$ROOT/tools/game_gpu.sh"
+configure_game_gpu
 REGION=central
 REFRESH=false
 PREVIEW=false
@@ -32,7 +34,7 @@ if [[ ! -s "$MAP.json" || "$NEEDS_IMPORT" == true || "$REFRESH" == true ]]; then
 fi
 "$GODOT" --headless --path "$ROOT/godot" --import
 if [[ "$PREVIEW" == true ]]; then
-    exec "$GODOT" --path "$ROOT/godot" res://scenes/vigevano.tscn -- "--city-map=$ROOT/$MAP.json"
+    exec "${GODOT_COMMAND[@]}" --path "$ROOT/godot" res://scenes/vigevano.tscn -- "--city-map=$ROOT/$MAP.json"
 fi
 for cmd in python3 java mvn curl; do
     command -v "$cmd" >/dev/null || { echo "$cmd required for the shared Java world."; exit 1; }
@@ -59,4 +61,4 @@ done
 if [[ "$READY" != true ]]; then
     echo "Shared Java world failed."; tail -n 20 data/vigevano-server.log; exit 1
 fi
-"$GODOT" --path "$ROOT/godot" res://scenes/vigevano.tscn -- "--city-map=$ROOT/$MAP.json" --geo-world
+"${GODOT_COMMAND[@]}" --path "$ROOT/godot" res://scenes/vigevano.tscn -- "--city-map=$ROOT/$MAP.json" --geo-world

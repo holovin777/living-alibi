@@ -19,6 +19,8 @@ Usage:
 Requires: JDK 21+, Maven 3.9+, curl and (for the game window) Godot 4.
 Saved world: data/world.db (kept between launches; never erased).
 No API key or cloud server is needed for the current offline demo.
+Graphics: NVIDIA PRIME preferred on Linux when available.
+Set LIVING_ALIBI_GPU=system to opt out, or =nvidia to request offload.
 EOF
 }
 
@@ -57,6 +59,11 @@ if [[ "$MODE" != "--server-only" ]]; then
     fi
 fi
 
+if [[ "$MODE" != "--server-only" ]]; then
+    source "$ROOT/tools/game_gpu.sh"
+    configure_game_gpu
+fi
+
 if [[ "$MODE" == "--check" ]]; then
     echo "Dependencies found: Java, Maven, curl, Godot ($GODOT)."
     java -version 2>&1 | head -n 1
@@ -84,7 +91,7 @@ if [[ "$MODE" == "--client-only" ]]; then
     fi
     export LIVING_ALIBI_REMOTE=1
     prepare_godot_assets
-    exec "$GODOT" --path "$ROOT/godot"
+    exec "${GODOT_COMMAND[@]}" --path "$ROOT/godot"
 fi
 
 if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/world >/dev/null 2>&1 || curl -fsS --max-time 2 http://127.0.0.1:8091/geo/nearby >/dev/null 2>&1; then
@@ -165,4 +172,4 @@ echo "Opening Living Alibi..."
 echo "WASD/arrows = walk; click scene = mouse look; first-person only; Esc = cursor."
 echo "E at yellow gate = travel; F at blue kiosk = actions."
 echo "Close the Godot window to stop the server. The SQLite save is preserved."
-"$GODOT" --path "$ROOT/godot"
+"${GODOT_COMMAND[@]}" --path "$ROOT/godot"

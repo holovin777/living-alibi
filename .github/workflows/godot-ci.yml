@@ -28,6 +28,10 @@ jobs:
     steps:
       - name: Check out Godot project
         uses: actions/checkout@v4
+      - name: Check graphics launcher selection
+        run: |
+          bash -n play.sh play-vigevano.sh tools/game_gpu.sh
+          bash tools/tests/test_game_gpu.sh
       - name: Install official Godot 4.6.1 stable editor
         run: |
           set -euo pipefail
