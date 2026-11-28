@@ -570,7 +570,7 @@ func _exercise() -> void:
         return
     var traffic: Dictionary = world._traffic_edges["FACTORY:WORKSHOP"]
     var sample_car: Node3D = traffic["cars"][0]["node"]
-    if not _check(sample_car.has_meta("body_style") and sample_car.get_child_count()>20,
+    if not _check(sample_car.has_meta("body_style") and sample_car.has_node("ImportedVehicle"),
             "traffic uses detailed compact vehicle models"):
         return
     var car_record: Dictionary=traffic["cars"][0]
@@ -582,8 +582,8 @@ func _exercise() -> void:
             and restored_car["distance"]==car_record["distance"],
             "streamed traffic preserves car identity, body style and road position"):return
     var rolling_parts: Array[Node3D]=[]
-    for part in restored_node.get_children():
-        if part is Node3D and part.has_meta("rolling_wheel"):
+    for part in restored_node.find_children("*","Node3D",true,false):
+        if part.has_meta("rolling_wheel"):
             rolling_parts.append(part)
     if not _check(rolling_parts.size()==4,"car has four animated wheel rims"):return
     var rim_angle: float=rolling_parts[0].rotation.x

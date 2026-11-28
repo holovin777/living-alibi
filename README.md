@@ -198,3 +198,11 @@ rims and smoother acceleration. They yield to visible municipal buses.
 Lightweight road-edge state is retained during local chunk streaming; cars
 on unloaded roads are not yet simulated continuously or saved to SQLite.
 Core streets still use bounded loops where no safe through junction exists.
+
+### Imported vehicle models
+
+The main Godot city scene uses four bundled Kenney Car Kit glTF models (sedan,
+sport hatchback, van, SUV), with animated wheel nodes and a revised first-person
+dashboard. The original models are CC0; see `godot/assets/vehicles/CREDITS.md`.
+No network download is required at launch. These are stylized game assets, not
+photorealistic vehicle interiors. Driving still uses the existing road-leg system.

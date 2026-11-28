@@ -1475,6 +1475,19 @@ func _build_cockpit() -> void:
     _box(_steering_wheel,Vector3(0.30,0.035,0.045),dark,Vector3.ZERO)
     _box(_steering_wheel,Vector3(0.035,0.15,0.045),dark,Vector3(0,-0.06,0))
     _box(_steering_wheel,Vector3(0.09,0.08,0.06),trim,Vector3.ZERO)
+    for x in [-0.43,-0.23]:
+        var dial := _cylinder(_cockpit,0.082,0.018,Color("#171c21"),Vector3(x,0.965,-0.505))
+        dial.rotation.x=PI/2.0
+        for i in range(7):
+            var angle := -2.15+float(i)*0.72
+            _box(_cockpit,Vector3(0.012,0.018,0.008),Color("#d5dfdd"),Vector3(x+cos(angle)*0.061,0.965+sin(angle)*0.061,-0.487))
+    _box(_cockpit,Vector3(0.28,0.18,0.08),Color("#192428"),Vector3(0.19,0.91,-0.51))
+    _box(_cockpit,Vector3(0.23,0.105,0.018),Color("#759390"),Vector3(0.19,0.94,-0.46))
+    for y in [0.83,0.79,0.75]:
+        _box(_cockpit,Vector3(0.23,0.012,0.022),Color("#9da5a5"),Vector3(0.19,y,-0.45))
+    _box(_cockpit,Vector3(0.26,0.32,0.65),trim,Vector3(0.13,0.45,0.04))
+    _cylinder(_cockpit,0.027,0.13,dark,Vector3(0.13,0.68,-0.02))
+    _sphere(_cockpit,0.043,Color("#202527"),Vector3(0.13,0.76,-0.02))
     _cockpit.visible = false
 
 func _render_place(place_id: String) -> void:
@@ -2715,7 +2728,36 @@ func _build_motor_court() -> void:
     service_car.position = Vector3(12.5,0,12)
     _add_obstacle(service_car.position,Vector2(1.85,3.6))
 
+const CAR_MODELS := [
+    preload("res://assets/vehicles/sedan.glb"),
+    preload("res://assets/vehicles/hatchback_sports.glb"),
+    preload("res://assets/vehicles/van.glb"),
+    preload("res://assets/vehicles/suv.glb")
+]
+
 func _make_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
+    var car := Node3D.new()
+    car.name="CityCar"
+    parent.add_child(car)
+    var index := posmod(style,CAR_MODELS.size())
+    car.set_meta("body_style",style)
+    car.set_meta("vehicle_kind",["sedan","hatchback","van","suv"][index])
+    var model := CAR_MODELS[index].instantiate() as Node3D
+    model.name="ImportedVehicle"
+    car.add_child(model)
+    model.rotation.y=PI
+    model.scale=Vector3(1.18,1.20,1.32)
+    _mark_imported_wheels(model)
+    return car
+
+func _mark_imported_wheels(node: Node3D) -> void:
+    var n := str(node.name).to_lower().replace("_","-")
+    if n.begins_with("wheel-front-") or n.begins_with("wheel-back-"):
+        node.set_meta("rolling_wheel",true)
+    for child in node.get_children():
+        if child is Node3D:_mark_imported_wheels(child)
+
+func _make_procedural_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
     var car := Node3D.new()
     car.name = "CityCar"
     parent.add_child(car)
@@ -2785,8 +2827,11 @@ func _make_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
 
 func _animate_car_wheels(car: Node3D,speed: float,delta: float) -> void:
     for part in car.get_children():
-        if part is Node3D and part.has_meta("rolling_wheel"):
-            part.rotation.x=fposmod(part.rotation.x-speed*delta/0.32,TAU)
+        if part is Node3D:
+            if part.has_meta("rolling_wheel"):
+                part.rotation.x=fposmod(part.rotation.x+speed*delta/0.36,TAU)
+            else:
+                _animate_car_wheels(part,speed,delta)
 
 func _build_farm() -> void:
     var farm := Node3D.new()
