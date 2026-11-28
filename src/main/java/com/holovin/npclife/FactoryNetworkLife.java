@@ -64,7 +64,10 @@ final class FactoryNetworkLife {
         if(BusinessSolvencyLife.suspended(t,account(p))||!FactoryMaintenance.operational(t,p)||!GridDistributionLife.power(t,p.site()))return false;
         if(stock(t,p.output())+p.units()>12||p.inputs().entrySet().stream().anyMatch(e->stock(t,e.getKey())<e.getValue()))return false;
         if(contractual&&p.inputs().entrySet().stream().anyMatch(e->!imported(e.getKey())&&!ProcurementLife.ordered(t,p,e.getKey(),day)))return false;
-        int cost=p.inputs().entrySet().stream().filter(e->!supplier(e.getKey()).equals(SUPPLIER))
+        String deferred=contractual?p.inputs().keySet().stream().filter(i->!imported(i))
+            .sorted().filter(i->TradeCreditLife.eligible(t,p,i,ProcurementLife.quote(t,p,i,p.inputs().get(i),day)))
+            .findFirst().orElse(""):"";
+        int cost=p.inputs().entrySet().stream().filter(e->!imported(e.getKey())&&!e.getKey().equals(deferred))
             .mapToInt(e->contractual?ProcurementLife.quote(t,p,e.getKey(),e.getValue(),day):2*e.getValue()).sum();
         boolean gas=GasNetworkLife.active(t)&&GasNetworkLife.heatPlant(p);
         int gasCost=gas?GasNetworkLife.PRICE:0;
@@ -75,8 +78,13 @@ final class FactoryNetworkLife {
         for(var e:p.inputs().entrySet()){
             if(!supplier(e.getKey()).equals(SUPPLIER)){
                 int amount=contractual?ProcurementLife.quote(t,p,e.getKey(),e.getValue(),day):2*e.getValue();
-                if(!SupplyChainLife.pay(t,account(p),supplier(e.getKey()),amount))throw new IllegalStateException("Validated purchase failed.");
-                if(contractual)ProcurementLife.settled(t,p,e.getKey(),e.getValue(),amount,day);
+                if(e.getKey().equals(deferred)){
+                    TradeCreditLife.issue(t,p,e.getKey(),e.getValue(),amount,day);
+                    ProcurementLife.deferred(t,p,e.getKey(),day);
+                }else{
+                    if(!SupplyChainLife.pay(t,account(p),supplier(e.getKey()),amount))throw new IllegalStateException("Validated purchase failed.");
+                    if(contractual)ProcurementLife.settled(t,p,e.getKey(),e.getValue(),amount,day);
+                }
             }
             change(t,e.getKey(),-e.getValue());
         }

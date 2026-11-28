@@ -13,21 +13,23 @@ final class BusinessCreditLife {
         return t.people.values().stream().anyMatch(c->"Bank clerk".equals(c.occupation)&&c.workplace==TownLife.Place.OFFICE
                 &&WorkplaceHierarchy.onDuty(c,s.day)&&!RebirthLife.linkedAdult(t,c)&&!NpcJusticeLife.confined(t,c,s)&&!TownLife.inPlayerConversation(t,c));
     }
-    static int offer(TownLife.Town t,String a){
+    static int offer(TownLife.Town t,String a){return offer(t,a,0);}
+    static int offer(TownLife.Town t,String a,int day){
         if(!StaffingLife.enabled(t)||!BusinessSolvencyLife.accounts(t).contains(a)||get(t,a,"balance")>0
             ||BusinessSolvencyLife.distressDays(t,a)<2)return 0;
-        int need=BusinessSolvencyLife.outstanding(t,a)+WORKING_RESERVE-t.employerFunds.getOrDefault(a,0);
+        int need=BusinessSolvencyLife.outstanding(t,a)+(day>0?TradeCreditLife.overdue(t,a,day):0)+WORKING_RESERVE-t.employerFunds.getOrDefault(a,0);
         int available=Math.max(0,BankLife.free(t)-BANK_RESERVE);
         if(need<=0||need>MAX_LOAN||available<need)return 0;
         return need;
     }
     static boolean lend(TownLife.Town t,WorldState s,String a){
-        int amount=offer(t,a);
+        int amount=offer(t,a,s.day);
         if(amount<=0||!clerk(t,s)||!SupplyChainLife.pay(t,BankLife.ACCOUNT,a,amount))return false;
         set(t,a,"balance",amount);set(t,a,"last-week",(s.day-1)/7);set(t,a,"next-payment",s.day+1);
         set(t,a,"missed",0);set(t,a,"borrowed",Math.addExact(get(t,a,"borrowed"),amount));
         // Wage claims precede discretionary spending.
         BusinessSolvencyLife.settle(t,a);
+        TradeCreditLife.settle(t,a,s.day);
         return true;
     }
     static void review(TownLife.Town t,WorldState s,String a){
@@ -55,7 +57,7 @@ final class BusinessCreditLife {
         if(!StaffingLife.enabled(t))return;
         if(s.minute==540)for(String a:BusinessSolvencyLife.accounts(t))review(t,s,a);
         if(s.minute!=600||get(t,"bank","last-loan-day")>=s.day||!clerk(t,s))return;
-        var candidates=BusinessSolvencyLife.accounts(t).stream().filter(a->offer(t,a)>0)
+        var candidates=BusinessSolvencyLife.accounts(t).stream().filter(a->offer(t,a,s.day)>0)
             .sorted(Comparator.<String>comparingInt(a->BusinessSolvencyLife.distressDays(t,a)).reversed().thenComparing(a->a)).toList();
         for(String a:candidates)if(lend(t,s,a)){set(t,"bank","last-loan-day",s.day);break;}
     }

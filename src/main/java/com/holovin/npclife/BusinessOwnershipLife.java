@@ -14,7 +14,7 @@ final class BusinessOwnershipLife {
             &&BusinessSolvencyLife.suspended(t,a)&&BusinessSolvencyLife.distressDays(t,a)>=SALE_DAYS;
     }
     static int capital(TownLife.Town t,String a){
-        return Math.max(0,Math.addExact(BusinessSolvencyLife.outstanding(t,a),BusinessCreditLife.WORKING_RESERVE)-t.employerFunds.getOrDefault(a,0));
+        return Math.max(0,Math.addExact(Math.addExact(BusinessSolvencyLife.outstanding(t,a),TradeCreditLife.payable(t,a)),BusinessCreditLife.WORKING_RESERVE)-t.employerFunds.getOrDefault(a,0));
     }
     static int total(TownLife.Town t,String a){return Math.addExact(PRICE,capital(t,a));}
     private static boolean office(TownLife.Town t,WorldState s){
@@ -31,7 +31,7 @@ final class BusinessOwnershipLife {
         t.employerFunds.merge(a,funding,Math::addExact);
         t.industryStocks.put(key(a),t.player.incarnation);
         BusinessSolvencyLife.settle(t,a);
-        return "Acquired / Acquistata "+a+". EUR "+funding+" invested. Existing bank debt remains with the firm.";
+        return "Acquired / Acquistata "+a+". EUR "+funding+" invested. Existing bank and supplier debts remain with the firm.";
     }
     static boolean canInvest(TownLife.Town t,WorldState s,String a){
         return office(t,s)&&yours(t,a)&&BusinessSolvencyLife.accounts(t).contains(a)&&t.player.money>=CAPITAL_STEP;
@@ -44,7 +44,7 @@ final class BusinessOwnershipLife {
     }
     static boolean canDividend(TownLife.Town t,WorldState s,String a){
         return office(t,s)&&yours(t,a)&&!BusinessSolvencyLife.suspended(t,a)
-            &&BusinessSolvencyLife.outstanding(t,a)==0&&BusinessCreditLife.get(t,a,"balance")==0
+            &&BusinessSolvencyLife.outstanding(t,a)==0&&TradeCreditLife.payable(t,a)==0&&BusinessCreditLife.get(t,a,"balance")==0
             &&t.employerFunds.getOrDefault(a,0)>=DIVIDEND_RESERVE+CAPITAL_STEP;
     }
     static String dividend(TownLife.Town t,WorldState s,String a){

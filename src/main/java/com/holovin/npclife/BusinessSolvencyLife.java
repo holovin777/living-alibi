@@ -58,7 +58,7 @@ final class BusinessSolvencyLife {
         for(String a:accounts(t)){
             if(get(t,a,"day")>=s.day)continue;
             set(t,a,"day",s.day);settle(t,a);
-            boolean distressed=outstanding(t,a)>0||t.employerFunds.getOrDefault(a,0)<BusinessManagementLife.wage(t,a);
+            boolean distressed=outstanding(t,a)>0||TradeCreditLife.overdue(t,a,s.day)>0||BusinessCreditLife.get(t,a,"missed")>=3||t.employerFunds.getOrDefault(a,0)<BusinessManagementLife.wage(t,a);
             if(!distressed){set(t,a,"days",0);set(t,a,"suspended",0);continue;}
             int days=Math.addExact(get(t,a,"days"),1);set(t,a,"days",days);
             if(days>=GRACE_DAYS){

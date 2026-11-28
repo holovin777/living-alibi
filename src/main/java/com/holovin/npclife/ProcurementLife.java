@@ -48,7 +48,7 @@ final class ProcurementLife {
                     &&FactoryQuality.reputation(t,x)<60))price--;
             int required=price+(imported?FuelLife.PRICE:0);
             set(t,p,item,"day",s.day);set(t,p,item,"units",units);set(t,p,item,"price",price);
-            set(t,p,item,"status",t.employerFunds.getOrDefault(a,0)>=required?1:3);
+            set(t,p,item,"status",t.employerFunds.getOrDefault(a,0)>=required||TradeCreditLife.eligible(t,p,item,price)?1:3);
         }
     }
     static boolean ordered(TownLife.Town t,FactoryNetworkLife.Plant p,String item,int day){
@@ -64,6 +64,10 @@ final class ProcurementLife {
         set(t,p,item,"day",day);set(t,p,item,"units",units);set(t,p,item,"price",amount);set(t,p,item,"status",2);
         set(t,p,item,"invoice-day",day);set(t,p,item,"invoice-units",units);set(t,p,item,"invoice-amount",amount);
     }
+    static void deferred(TownLife.Town t,FactoryNetworkLife.Plant p,String item,int day){
+        if(!ordered(t,p,item,day))throw new IllegalStateException("Purchase order unavailable.");
+        set(t,p,item,"status",5);
+    }
     static void finish(TownLife.Town t,FactoryNetworkLife.Plant p,int day){
         for(String item:p.inputs().keySet())if(ordered(t,p,item,day))
             set(t,p,item,"status",4);
@@ -75,7 +79,7 @@ final class ProcurementLife {
         if(p==null)return List.of();
         return p.inputs().keySet().stream().sorted().filter(item->get(t,p,item,"day")>0).map(item->{
             String status=switch(get(t,p,item,"status")){
-                case 1->"ORDERED";case 2->"PAID";case 3->"NO_FUNDS";case 4->"UNFULFILLED";default->"NONE";};
+                case 1->"ORDERED";case 2->"PAID";case 3->"NO_FUNDS";case 4->"UNFULFILLED";case 5->"ON_CREDIT";default->"NONE";};
             return new Order(item,FactoryNetworkLife.supplier(item),get(t,p,item,"day"),get(t,p,item,"units"),
                 get(t,p,item,"price"),status,get(t,p,item,"invoice-day"),get(t,p,item,"invoice-units"),get(t,p,item,"invoice-amount"));
         }).toList();

@@ -81,9 +81,9 @@ final class BusinessManagementLife {
         return "Updated management of "+a+".";
     }
     static void clear(TownLife.Town t,String a){for(String f:List.of("director","raise","target"))set(t,a,f,0);EnterpriseGovernanceLife.clearManagement(t,a);}
-    record View(String account,String director,int employees,int target,int hourlyWage,EnterpriseGovernanceLife.View governance,List<ProcurementLife.Order> procurement){}
+    record View(String account,String director,int employees,int target,int hourlyWage,EnterpriseGovernanceLife.View governance,List<ProcurementLife.Order> procurement,TradeCreditLife.View tradeCredit){}
     static View view(TownLife.Town t,String a){
         var c=director(t,a);var r=role(a);
-        return new View(a,c==null?"":c.name,members(t,a).size(),r==null?0:target(t,r),wage(t,a),EnterpriseGovernanceLife.view(t,a),ProcurementLife.view(t,a));
+        return new View(a,c==null?"":c.name,members(t,a).size(),r==null?0:target(t,r),wage(t,a),EnterpriseGovernanceLife.view(t,a),ProcurementLife.view(t,a),TradeCreditLife.view(t,a));
     }
 }
