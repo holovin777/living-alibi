@@ -15,7 +15,7 @@ REGIONS = {"central": BBOX, "wide": WIDE_BBOX}
 CHUNK = 128
 SOURCE = "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright"
 SCHEMA = 2
-DETAIL_VERSION = 5
+DETAIL_VERSION = 6
 WATER_WIDTH = {"river": 30, "canal": 5, "stream": 2, "ditch": 1, "drain": 1.5}
 ROAD_WIDTH = {"motorway": 12, "trunk": 10, "primary": 8, "secondary": 7,
               "tertiary": 6, "residential": 5, "service": 3, "living_street": 4,
@@ -32,7 +32,7 @@ def project(lat, lon):
 
 def download(path, bounds=BBOX):
     bbox = ",".join(map(str, bounds))
-    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox}););out body;>;out skel qt;'
+    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});way["landuse"~"^(farmland|meadow|forest|orchard|vineyard|grass)$"]({bbox});way["natural"~"^(wood|grassland|water)$"]({bbox});way["leisure"="park"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox}););out body;>;out skel qt;'
     req = urllib.request.Request("https://overpass-api.de/api/interpreter",
                                  data=urllib.parse.urlencode({"data": query}).encode(),
                                  headers={"User-Agent": "LivingAlibi/0.1 local OSM import"})
@@ -127,15 +127,39 @@ def convert(source, output, bounds=BBOX, region="central"):
     nodes = {n.attrib["id"]: project(float(n.attrib["lat"]), float(n.attrib["lon"]))
              for n in root.findall("node") if "lat" in n.attrib and "lon" in n.attrib}
     chunks = {}
-    counts = {"buildings": 0, "roads": 0, "rail_segments": 0, "trees": 0, "benches": 0, "water_segments": 0, "tree_row_trees": 0, "skipped": 0}
+    land = {}
+    counts = {"buildings": 0, "roads": 0, "rail_segments": 0, "trees": 0, "benches": 0, "water_segments": 0, "tree_row_trees": 0, "land_areas": 0, "skipped": 0}
     spawn = None
     best = float("inf")
     graph_nodes = {}
     graph_edges = []
 
+    def chunk(key):
+        return chunks.setdefault(key, {"buildings": [], "roads": [], "rail": [], "trees": [], "benches": [], "water": [], "land": []})
+
     def add(kind, feature, point):
         key = f"{math.floor(point[0]/CHUNK)},{math.floor(point[1]/CHUNK)}"
-        chunks.setdefault(key, {"buildings": [], "roads": [], "rail": [], "trees": [], "benches": [], "water": []})[kind].append(feature)
+        chunk(key)[kind].append(feature)
+
+    # Register each polygon once and index overlapping chunks by its bounding box.
+    # Keep indexing bounded to the chosen extract, even when OSM ways extend far outside.
+    west, north = project(bounds[2], bounds[1])
+    east, south = project(bounds[0], bounds[3])
+
+    def add_land(way_id, kind, polygon):
+        if len({tuple(p) for p in polygon}) < 3:
+            return
+        x0 = max(math.floor(min(p[0] for p in polygon)/CHUNK), math.floor(west/CHUNK))
+        x1 = min(math.floor(max(p[0] for p in polygon)/CHUNK), math.floor(east/CHUNK))
+        y0 = max(math.floor(min(p[1] for p in polygon)/CHUNK), math.floor(north/CHUNK))
+        y1 = min(math.floor(max(p[1] for p in polygon)/CHUNK), math.floor(south/CHUNK))
+        if x1 < x0 or y1 < y0:
+            return
+        land[way_id] = {"kind": kind, "points": polygon}
+        counts["land_areas"] += 1
+        for x in range(x0, x1+1):
+            for y in range(y0, y1+1):
+                chunk(f"{x},{y}")["land"].append(way_id)
 
     for n in root.findall("node"):
         if n.attrib["id"] in nodes and any(t.attrib.get("k") == "natural" and t.attrib.get("v") == "tree" for t in n.findall("tag")):
@@ -155,6 +179,13 @@ def convert(source, output, bounds=BBOX, region="central"):
             continue
         points = [nodes[r] for r in refs]
         name = tags.get("name", "")
+        land_kind = tags.get("landuse", "")
+        if tags.get("natural") in ("wood", "grassland", "water"):
+            land_kind = {"wood": "forest", "grassland": "meadow", "water": "water"}[tags["natural"]]
+        elif tags.get("leisure") == "park":
+            land_kind = "park"
+        if land_kind in ("farmland", "meadow", "forest", "orchard", "vineyard", "grass", "park", "water") and refs[0] == refs[-1] and len(refs) >= 4:
+            add_land(way.attrib["id"], land_kind, points[:-1])
         waterway = tags.get("waterway")
         if waterway in WATER_WIDTH and tags.get("tunnel") not in ("yes", "culvert") and tags.get("covered") != "yes":
             try:
@@ -236,7 +267,7 @@ def convert(source, output, bounds=BBOX, region="central"):
         raise ValueError("Extract must contain buildings and walkable roads")
     result = {"schema": SCHEMA, "detail_version": DETAIL_VERSION, "graph": {"nodes": graph_nodes, "edges": graph_edges}, "origin": list(ORIGIN), "bounds": list(bounds), "region": region,
               "chunk_size": CHUNK, "attribution": SOURCE, "counts": counts,
-              "spawn": spawn, "chunks": chunks}
+              "spawn": spawn, "chunks": chunks, "land": land}
     output.parent.mkdir(parents=True, exist_ok=True)
     tmp = output.with_suffix(".tmp")
     tmp.write_text(json.dumps(result, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

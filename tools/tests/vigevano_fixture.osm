@@ -16,4 +16,9 @@
 <way id="30"><nd ref="9"/><nd ref="11"/><tag k="waterway" v="canal"/><tag k="width" v="4"/></way>
 <way id="31"><nd ref="9"/><nd ref="11"/><tag k="natural" v="tree_row"/></way>
 <way id="32"><nd ref="5"/><nd ref="6"/><tag k="waterway" v="ditch"/><tag k="tunnel" v="culvert"/></way>
+<node id="41" lat="45.3160" lon="8.8560"/>
+<node id="42" lat="45.3160" lon="8.8600"/>
+<node id="43" lat="45.3165" lon="8.8600"/>
+<node id="44" lat="45.3165" lon="8.8560"/>
+<way id="40"><nd ref="41"/><nd ref="42"/><nd ref="43"/><nd ref="44"/><nd ref="41"/><tag k="landuse" v="farmland"/></way>
 </osm>

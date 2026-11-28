@@ -22,7 +22,7 @@ MAP="data/vigevano"
 if [[ "$REGION" == wide ]]; then MAP="data/vigevano-wide"; fi
 NEEDS_IMPORT=false
 if [[ -s "$MAP.json" ]]; then
-    if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["schema"] == 2 and d.get("detail_version",0) == 5 and d.get("region") == sys.argv[2]' "$MAP.json" "$REGION" 2>/dev/null; then NEEDS_IMPORT=true; fi
+    if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["schema"] == 2 and d.get("detail_version",0) == 6 and d.get("region") == sys.argv[2]' "$MAP.json" "$REGION" 2>/dev/null; then NEEDS_IMPORT=true; fi
 fi
 if [[ ! -s "$MAP.json" || "$NEEDS_IMPORT" == true || "$REFRESH" == true ]]; then
     command -v python3 >/dev/null || { echo "Python 3 required."; exit 1; }

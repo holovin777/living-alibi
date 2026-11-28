@@ -10,6 +10,9 @@ var hud: Label
 var wall_material: StandardMaterial3D
 var roof_material: StandardMaterial3D
 const Architecture=preload("res://scripts/GeoArchitecture.gd")
+const Landscape=preload("res://scripts/GeoLandscape.gd")
+var land_materials: Dictionary={}
+var land_records: Dictionary={}
 var detail_materials: Dictionary={}
 var daylight: DirectionalLight3D
 var sky_environment: Environment
@@ -187,6 +190,7 @@ func _ready() -> void:
     city_map.destination_selected.connect(_select_destination)
     city_map.hide()
     chunk_size=float(city.get("chunk_size",128))
+    land_records=city.get("land",{})
     wall_material=_material(Color("#cbb49b"))
     roof_material=_material(Color("#925f4d"))
     var asphalt:=ShaderMaterial.new()
@@ -982,6 +986,7 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     add_child(node)
     chunks[key]=node
     var detail=Architecture.new()
+    _build_land(node,key,data,detail)
     var walls := PackedVector3Array()
     var roofs := PackedVector3Array()
     var roads := PackedVector3Array()
@@ -1034,6 +1039,42 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     _surface(node,rails,rail_material,false)
     if not detail_materials.has("waterway"):detail_materials["waterway"]=Architecture.material("waterway")
     _surface(node,water,detail_materials["waterway"],false)
+
+func _build_land(node: Node3D,key: String,data: Dictionary,detail) -> void:
+    var coords:=key.split(",")
+    var cell:=Vector2i(int(coords[0]),int(coords[1]))
+    var nearby: Array=[]
+    for x in range(cell.x-1,cell.x+2):
+        for y in range(cell.y-1,cell.y+2):
+            nearby.append(city["chunks"].get("%s,%s" % [x,y],{}))
+    var batches: Dictionary={}
+    var tree_sites: Dictionary={}
+    for id in data.get("land",[]):
+        if not land_records.has(id):continue
+        var area: Dictionary=land_records[id]
+        var kind:=str(area["kind"])
+        for part in Landscape.pieces(area["points"],cell,chunk_size):
+            var triangles:=Geometry2D.triangulate_polygon(part)
+            if triangles.is_empty():continue
+            if not batches.has(kind):batches[kind]=PackedVector3Array()
+            var verts: PackedVector3Array=batches[kind]
+            var level: float=0.009 if kind=="water" else 0.004
+            for i in triangles:verts.append(Vector3(part[i].x,level,part[i].y))
+            batches[kind]=verts
+            if kind not in ["forest","orchard"]:continue
+            # Stable sparse canopy, capped per tile and kept away from mapped paths.
+            for x in range(8,int(chunk_size),16):
+                for y in range(8,int(chunk_size),16):
+                    if tree_sites.size()>=64:break
+                    var site:=Vector2(cell)*chunk_size+Vector2(x,y)
+                    var site_key:=Vector2i(x,y)
+                    if tree_sites.has(site_key) or not Geometry2D.is_point_in_polygon(site,part):continue
+                    if not Landscape.clear_of_paths(site,nearby):continue
+                    tree_sites[site_key]=true
+                    detail.tree({"id":"land-%s-%s-%s" % [key,x,y],"point":[site.x,site.y]})
+    for kind in batches:
+        if not land_materials.has(kind):land_materials[kind]=Landscape.material(kind)
+        _surface(node,batches[kind],land_materials[kind],false)
 
 func _surface(parent: Node3D,vertices: PackedVector3Array,material: Material,collision: bool,visual: bool=true) -> void:
     if vertices.is_empty():return
