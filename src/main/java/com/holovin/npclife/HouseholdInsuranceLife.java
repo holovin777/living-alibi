@@ -78,11 +78,18 @@ final class HouseholdInsuranceLife {
         var agents=t.people.values().stream().filter(c->onDuty(t,c,s)).sorted(Comparator.comparing(c->c.id)).toList();
         if(agents.isEmpty())return;
         var homes=households(t);
-        for(var agent:agents){
-            // Existing claims take priority; otherwise issue one new or renewed policy.
+        var businesses=BusinessInsuranceLife.businesses(t);
+        for(int i=0;i<agents.size();i++){
+            var agent=agents.get(i);
+            // Alternate customer classes without doubling agent throughput.
+            boolean businessFirst=(s.minute/15+i)%2==0;
             boolean handled=false;
-            for(var h:homes)if(payClaim(t,s,h,agent)){handled=true;break;}
-            if(!handled)for(var h:homes)if(sell(t,s,h,agent))break;
+            if(businessFirst)for(var b:businesses)if(BusinessInsuranceLife.payClaim(t,s,b,agent)){handled=true;break;}
+            if(!handled)for(var h:homes)if(payClaim(t,s,h,agent)){handled=true;break;}
+            if(!handled&&!businessFirst)for(var b:businesses)if(BusinessInsuranceLife.payClaim(t,s,b,agent)){handled=true;break;}
+            if(!handled&&businessFirst)for(var b:businesses)if(BusinessInsuranceLife.sell(t,s,b,agent)){handled=true;break;}
+            if(!handled)for(var h:homes)if(sell(t,s,h,agent)){handled=true;break;}
+            if(!handled&&!businessFirst)for(var b:businesses)if(BusinessInsuranceLife.sell(t,s,b,agent))break;
         }
     }
     record View(int households,int insured,int agents,int onDuty,int pending,int paid,int funds){}

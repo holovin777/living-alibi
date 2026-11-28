@@ -642,6 +642,8 @@ func _update_navigation() -> void:
         if str(world.get("jobId",""))=="firefighter":hud.text+="\nFire duty / Servizio: kit %s%% · %s" % [duty.get("gearCondition",0),"Assigned / In missione" if duty.get("assigned",false) else "Standby / Disponibile" if duty.get("standby",false) else "Off duty / Riposo"]
         for damaged in world.get("fireRecovery",[]):
             if str(damaged.get("id",""))==str(district.get("id","")):hud.text+="\nRestoration / Ripristino: %s%% · %s" % [damaged.get("condition",100),"Closed / Chiuso" if damaged.get("closed",false) else "Open / Aperto"]
+        var business_insurance: Dictionary=world.get("businessInsurance",{})
+        if str(district.get("id",""))=="OFFICE" and int(business_insurance.get("businesses",0))>0:hud.text+="\nBusiness cover / Imprese: %s/%s · €%s pending" % [business_insurance.get("insured",0),business_insurance.get("businesses",0),business_insurance.get("pending",0)]
         var insurer: Dictionary=world.get("householdInsurance",{})
         if str(district.get("id",""))=="OFFICE" and int(insurer.get("agents",0))>0:hud.text+="\nInsurance / Assicurazioni: %s/%s homes · %s agents · €%s claims" % [insurer.get("insured",0),insurer.get("households",0),insurer.get("onDuty",0),insurer.get("pending",0)]
         var insurance: Dictionary=world.get("homeInsurance",{})

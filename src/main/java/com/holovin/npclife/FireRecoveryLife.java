@@ -16,6 +16,7 @@ final class FireRecoveryLife {
         t.industryStocks.put(key(p,"condition"),after);
         HomeInsuranceLife.damage(t,p,before-after);
         HouseholdInsuranceLife.damage(t,p,before-after);
+        BusinessInsuranceLife.damage(t,p,before-after);
     }
     static boolean resources(TownLife.Town t,TownLife.Place p){
         return FireServiceLife.SITES.contains(p)&&FireServiceLife.site(t)!=p&&condition(t,p)<100
