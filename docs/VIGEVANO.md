@@ -62,3 +62,6 @@ Use `bash play.sh --wide --refresh --preview-only` once to fetch the added OSM w
 
 ### Driving visuals and NVIDIA launch defaults
 PRIME offload is controlled by the caller: use prime-run bash play.sh --wide. The launcher never installs packages. The bundled CC0 vehicle models are now used for geographic ambient and civilian cars; police and the first-person driving body keep the existing procedural geometry to avoid clipping and beacon placement regressions. Imported model paints are authored by the asset, not dynamically repainted. Asphalt uses a world-space procedural grain shader, and major highways gain simple edge markings. No new driving physics or mountain elevation in this change. Compatibility stays the default renderer; local NVIDIA driver support and actual frame rate must be checked on the user's hardware.
+
+### Weather and driving atmosphere
+The geographic scene now uses a procedural day/night sky and rain-darkened asphalt, with two bounded shadowless headlights on the first-person driving body in darkness/rain. The original game also shares weather-sensitive asphalt materials across streamed districts. These are visual effects, not puddle simulation, true reflections, changing tire grip or new driving physics. The GPU cost is limited by two player lights; actual rendered quality and FPS still need hardware testing.

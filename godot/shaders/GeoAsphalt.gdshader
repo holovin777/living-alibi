@@ -1,6 +1,7 @@
 shader_type spatial;
 render_mode cull_disabled;
 varying vec2 ground_position;
+uniform float wetness : hint_range(0.0, 1.0) = 0.0;
 
 void vertex() {
     ground_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
@@ -18,6 +19,8 @@ void fragment() {
     // Fade tiny grains at a distance to reduce shimmering.
     float visible_grain = 1.0 - smoothstep(0.02, 0.12, length(fwidth(p)));
     float variation = (coarse - 0.5) * 0.022 + (fine - 0.5) * 0.055 * visible_grain;
-    ALBEDO = vec3(0.35, 0.36, 0.37) + vec3(variation);
-    ROUGHNESS = 0.94;
+    vec3 dry = vec3(0.35, 0.36, 0.37) + vec3(variation);
+    ALBEDO = mix(dry, dry * vec3(0.63, 0.68, 0.72), wetness);
+    ROUGHNESS = mix(0.94, 0.28, wetness);
+    SPECULAR = mix(0.3, 0.65, wetness);
 }

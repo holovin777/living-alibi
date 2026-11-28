@@ -316,7 +316,8 @@ func _exercise() -> void:
             and not world._can_stand(Vector3(-8.4,0,-14.3),world.WALKER_RADIUS),
             "courtyard centre is accessible and boundary wall blocks walking"):
         return
-    for at in [Vector3(0,0,-23.9),Vector3(23.9,0,0),Vector3(0,0,23.9),Vector3(-23.9,0,0)]:
+    var foot_edge: float=world.ROAD_EDGE-world.WALKER_RADIUS-0.05
+    for at in [Vector3(0,0,-foot_edge),Vector3(foot_edge,0,0),Vector3(0,0,foot_edge),Vector3(-foot_edge,0,0)]:
         if not _check(world._can_stand(at,world.WALKER_RADIUS,true),
                 "all four Centro exits remain walkable"):
             return

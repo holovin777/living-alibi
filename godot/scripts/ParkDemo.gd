@@ -54,6 +54,8 @@ const FirstPersonHands = preload("res://scripts/FirstPersonHands.gd")
 const TownPhone = preload("res://scripts/TownPhone.gd")
 const TownVisuals = preload("res://scripts/TownVisuals.gd")
 var _sky_material: ProceduralSkyMaterial
+var _asphalt_materials: Dictionary={}
+var _asphalt_wet:=false
 var _surface_textures: Dictionary = {}
 var _graphics_quality := 1
 var _leaf_mesh: SphereMesh
@@ -6285,7 +6287,14 @@ func _box(parent: Node3D, size: Vector3, color: Color,
     node.mesh = mesh
     var mat := StandardMaterial3D.new()
     mat.albedo_color = color
-    if _surface_textures.has(surface):
+    if surface=="asphalt":
+        if not _asphalt_materials.has(color):
+            if _surface_textures.has(surface):TownVisuals.surface(mat,_surface_textures[surface],0.32)
+            _asphalt_materials[color]=mat
+        mat=_asphalt_materials[color]
+        mat.albedo_color=color.darkened(0.30) if _asphalt_wet else color
+        mat.roughness=0.29 if _asphalt_wet else 0.94
+    elif _surface_textures.has(surface):
         TownVisuals.surface(mat,_surface_textures[surface],0.65 if surface=="paving" else 0.32)
     node.material_override = mat
     node.position = where
@@ -10610,6 +10619,11 @@ func _apply_weather() -> void:
     if _ground_material == null:
         return
     var climate: Dictionary = _last_snapshot.get("weather", {})
+    _asphalt_wet=bool(climate.get("raining",false)) or str(climate.get("sky","CLEAR"))=="RAIN"
+    for color in _asphalt_materials:
+        var asphalt: StandardMaterial3D=_asphalt_materials[color]
+        asphalt.albedo_color=color.darkened(0.30) if _asphalt_wet else color
+        asphalt.roughness=0.29 if _asphalt_wet else 0.94
     _update_foliage(str(_last_snapshot.get("season","SPRING")),bool(climate.get("snowing",false)))
     if climate.get("snowing", false):
         _ground_material.albedo_color = Color(0.80, 0.86, 0.88)

@@ -13,6 +13,8 @@ const Architecture=preload("res://scripts/GeoArchitecture.gd")
 var detail_materials: Dictionary={}
 var daylight: DirectionalLight3D
 var sky_environment: Environment
+var sky_material: ProceduralSkyMaterial
+var headlamps: Array[SpotLight3D]=[]
 const WeatherVisual=preload("res://scripts/GeoWeather.gd")
 var precipitation: Node3D
 var lamp_pool: Array[OmniLight3D]=[]
@@ -144,6 +146,18 @@ func _ready() -> void:
     driving_body=traffic._car(Color("#55585a"),false)
     add_child(driving_body)
     driving_body.hide()
+    for side in [-1.0,1.0]:
+        var beam:=SpotLight3D.new()
+        beam.position=Vector3(float(side)*0.62,0.72,-1.65)
+        beam.rotation_degrees.x=-5.0
+        beam.light_color=Color("#fff1d5")
+        beam.light_energy=2.4
+        beam.spot_range=38.0
+        beam.spot_angle=25.0
+        beam.shadow_enabled=false
+        beam.hide()
+        driving_body.add_child(beam)
+        headlamps.append(beam)
     impact_overlay=ColorRect.new()
     canvas.add_child(impact_overlay)
     impact_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -173,7 +187,15 @@ func _ready() -> void:
     rail_material=_material(Color("#8f8578"))
     var world_environment := WorldEnvironment.new()
     var environment := Environment.new()
-    environment.background_mode=Environment.BG_COLOR
+    sky_material=ProceduralSkyMaterial.new()
+    sky_material.sky_top_color=Color("#5284bd")
+    sky_material.sky_horizon_color=Color("#d3e3ef")
+    sky_material.ground_horizon_color=sky_material.sky_horizon_color
+    sky_material.ground_bottom_color=Color("#858973")
+    var sky:=Sky.new()
+    sky.sky_material=sky_material
+    environment.sky=sky
+    environment.background_mode=Environment.BG_SKY
     environment.background_color=Color("#a7c7de")
     environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
     environment.ambient_light_color=Color("#ffffff")
@@ -861,11 +883,22 @@ func _update_daylight() -> void:
     var hour:=float(residents.minute)/60.0 if residents.connected else 12.0
     var sun_amount:=clampf(sin((hour-6.0)*PI/12.0),0.0,1.0)
     var weather: Dictionary=residents.world.get("weather",{})
-    var overcast:=str(weather.get("sky","CLEAR"))!="CLEAR"
+    var weather_kind:=str(weather.get("sky","CLEAR"))
+    var overcast:=weather_kind!="CLEAR"
+    var wet:=weather_kind=="RAIN"
+    (road_material as ShaderMaterial).set_shader_parameter("wetness",1.0 if wet else 0.0)
     daylight.rotation_degrees=Vector3(-12.0-sun_amount*55.0,-35.0+(hour-12.0)*7.0,0)
     daylight.light_energy=(0.08+sun_amount*0.90)*(0.58 if overcast else 1.0)
     daylight.light_color=Color("#e6bd94").lerp(Color("#fff4e3"),sun_amount)
     sky_environment.background_color=Color("#263447").lerp(Color("#9da8b0") if overcast else Color("#a7c7de"),sun_amount)
+    var daylight_blend:=smoothstep(0.0,0.40,sun_amount)
+    var horizon:=Color("#edc49a").lerp(Color("#d3e3ef"),smoothstep(0.0,0.75,sun_amount))
+    if overcast:horizon=Color("#b4c1ca")
+    sky_material.sky_top_color=Color("#101b31").lerp(Color("#788995") if overcast else Color("#5284bd"),daylight_blend)
+    sky_material.sky_horizon_color=Color("#263447").lerp(horizon,daylight_blend)
+    sky_material.ground_horizon_color=sky_material.sky_horizon_color
+    sky_material.ground_bottom_color=Color("#32372e").lerp(Color("#858973"),daylight_blend)
+    for beam in headlamps:beam.visible=sun_amount<=0.25 or wet
     sky_environment.ambient_light_color=Color("#a1b1ce").lerp(Color.WHITE,sun_amount)
     sky_environment.ambient_light_energy=0.32+sun_amount*0.34
     if detail_materials.has("lamp"):
