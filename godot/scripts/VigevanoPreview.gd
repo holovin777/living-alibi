@@ -628,6 +628,8 @@ func _update_navigation() -> void:
         if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Road target %s km/h · Fuel %s · Condition %s" % [residents.driving.get("speedLimitKmh",36),residents.driving.get("fuel",0),residents.driving.get("condition",0)]
         for doc in world.get("vehicleDocuments",[]):
             hud.text+="\n%s · %s · RC %s d · Revisione %s d" % [doc.get("kind",""),doc.get("plate",""),doc.get("insuranceDays",0),doc.get("inspectionDays",0)]
+        var tow: Dictionary=world.get("towService",{})
+        if not str(tow.get("kind","")).is_empty():hud.text+="\nRecovery / Carro attrezzi: %s · %s min to workshop" % [tow.get("kind",""),tow.get("minutesRemaining",0)]
         var accidents: Dictionary=world.get("roadAccidents",{})
         if int(accidents.get("accidents",0))>0:hud.text+="\nAccidents / Incidenti: %s · Insurance paid €%s · Health %s" % [accidents.get("accidents",0),accidents.get("compensation",0),world.get("health",0)]
         var road_police: Dictionary=world.get("roadPolice",{})

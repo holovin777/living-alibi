@@ -721,6 +721,7 @@ public final class GameSession implements AutoCloseable {
             boolean truck=command.equals("steal-truck");
             String lightKind=command.endsWith("-scooter")?"scooter":command.endsWith("-motorcycle")?"motorcycle":"";
             boolean stolen=command.startsWith("steal");
+            if(!stolen)TowServiceLife.requireAvailable(town,lightKind.isEmpty()?"car":lightKind);
             var civilian=map.civilian(town,point);
             if(!lightKind.isEmpty()){
                 if(!stolen)LightMotorLife.present(town,lightKind);
@@ -971,6 +972,10 @@ public final class GameSession implements AutoCloseable {
             };
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.startsWith("tow:")){
+            var copy=town.copy();String message=TowServiceLife.request(copy,state,action.substring(4));
+            apply(copy,1,message);return new GeoProjection.ActionResult(message,null);
+        }
         if(action.equals("accident-treatment")){
             var copy=town.copy();String message=RoadAccidentLife.treat(copy,state);
             apply(copy,30,message);return new GeoProjection.ActionResult(message,null);
@@ -1055,6 +1060,7 @@ public final class GameSession implements AutoCloseable {
         RebirthLife.synchronize(copy);
     }
     public synchronized ActionView carAction(String action) throws SQLException {
+        TowServiceLife.requireAvailable(town,"car");
         var copy=town.copy();
         var linked=RebirthLife.active(copy)?beginLinkedMotorAction(copy,state.day):null;
         String message=switch(action==null?"":action) {

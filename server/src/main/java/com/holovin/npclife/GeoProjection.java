@@ -82,7 +82,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,ParkedBus parkedBus,ParkedBus parkedTruck,ParkedBus parkedScooter,ParkedBus parkedMotorcycle,ParkedBus ownedScooter,ParkedBus ownedMotorcycle,String ownedCarPlate,List<DrivingSchoolLife.Progress> drivingLicenses,RoadPoliceLife.View roadPolice,List<VehicleDocumentsLife.Document> vehicleDocuments,RoadAccidentLife.View roadAccidents,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,ParkedBus parkedBus,ParkedBus parkedTruck,ParkedBus parkedScooter,ParkedBus parkedMotorcycle,ParkedBus ownedScooter,ParkedBus ownedMotorcycle,String ownedCarPlate,List<DrivingSchoolLife.Progress> drivingLicenses,RoadPoliceLife.View roadPolice,List<VehicleDocumentsLife.Document> vehicleDocuments,RoadAccidentLife.View roadAccidents,TowServiceLife.View towService,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -457,7 +457,7 @@ final class GeoProjection {
         }
         return List.copyOf(result);
     }
-    static boolean outsideAction(String id){return id.startsWith("vehicle-docs:")||id.startsWith("license:")||id.startsWith("light:")||id.startsWith("car:")||id.startsWith("bike:")||id.equals("bike-buy")||id.startsWith("drive:")||id.startsWith("bus:");}
+    static boolean outsideAction(String id){return id.startsWith("tow:")||id.startsWith("vehicle-docs:")||id.startsWith("license:")||id.startsWith("light:")||id.startsWith("car:")||id.startsWith("bike:")||id.equals("bike-buy")||id.startsWith("drive:")||id.startsWith("bus:");}
     List<Choice> choices(TownLife.Town t,WorldState s,Point player){
         var p=t.player;var result=new ArrayList<Choice>();
         if(!p.alive||p.travelRemaining>0||JusticeLife.confined(t)||RebirthLife.active(t)||IntercomLife.insideVisit(t,s.day,s.minute))return result;
@@ -475,6 +475,7 @@ final class GeoProjection {
             else result.add(new Choice("apply:"+job.id(),"Apply / Candidati · "+job.title()+" (€"+job.wage()+"/shift)"));
         }
         if(RoadPoliceLife.canPay(t,s))result.add(new Choice("road-fine-pay","Pay traffic fines / Paga multe · €"+RoadPoliceLife.view(t).outstanding()));
+        for(String kind:VehicleDocumentsLife.KINDS)if(TowServiceLife.canRequest(t,s,kind))result.add(new Choice("tow:"+kind,"Recovery / Carro attrezzi "+kind+" · €"+TowServiceLife.fee(p.place)));
         if(RoadAccidentLife.canTreat(t,s))result.add(new Choice("accident-treatment","Accident treatment / Cura trauma · €"+RoadAccidentLife.TREATMENT_FEE));
         for(var option:VehicleDocumentsLife.options(t,s))result.add(new Choice(option.id(),option.label()));
         for(var option:DrivingSchoolLife.options(t,s))result.add(new Choice(option.id(),option.label()));
@@ -492,7 +493,7 @@ final class GeoProjection {
             var parked=LightMotorLife.parked(t,kind);
             boolean workshop=p.place==TownLife.Place.WORKSHOP&&s.minute>=480&&s.minute<1080;
             if(workshop&&parked==null)result.add(new Choice("light:buy:"+kind,"Buy / Compra "+kind+" · €"+LightMotorLife.price(kind)));
-            if(parked!=p.place)continue;
+            if(parked!=p.place||TowServiceLife.pending(t,kind))continue;
             if(workshop){
                 result.add(new Choice("light:sell:"+kind,"Sell / Vendi "+kind));
                 if(LightMotorLife.get(t,kind,"condition")<100)result.add(new Choice("light:repair:"+kind,"Service / Ripara "+kind+" · €10"));
@@ -506,7 +507,7 @@ final class GeoProjection {
                 if(TransportLife.hasRack(p.place))result.add(new Choice("bike:park","Park bicycle / Parcheggia bici"));
             }else if(p.bicycleParked==p.place)result.add(new Choice("bike:retrieve","Retrieve bicycle / Ritira bici"));
         }
-        if(p.carPlace==p.place){
+        if(p.carPlace==p.place&&!TowServiceLife.pending(t,"car")){
             if(p.place==TownLife.Place.WORKSHOP||p.place==TownLife.Place.FUEL_STATION||CityExpansionLife.serviceHub(p.place))
                 result.add(new Choice("car:refuel","Refuel / Rifornisci"));
             if(p.place==TownLife.Place.WORKSHOP||CityExpansionLife.serviceHub(p.place))
@@ -566,6 +567,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,(room==null?nearby.subList(0,Math.min(40,nearby.size())):inside).stream().map(a->a.withAppearance(t)).toList(),
             district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,room==null?ownedLight(t,player,"scooter"):null,room==null?ownedLight(t,player,"motorcycle"):null,p.carPlace==null?"":VehicleRegistrationLife.personal(t,"car"),DrivingSchoolLife.view(t),RoadPoliceLife.view(t),VehicleDocumentsLife.view(t,s),RoadAccidentLife.view(t),JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,room==null?ownedLight(t,player,"scooter"):null,room==null?ownedLight(t,player,"motorcycle"):null,p.carPlace==null?"":VehicleRegistrationLife.personal(t,"car"),DrivingSchoolLife.view(t),RoadPoliceLife.view(t),VehicleDocumentsLife.view(t,s),RoadAccidentLife.view(t),TowServiceLife.view(t,s),JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
     }
 }

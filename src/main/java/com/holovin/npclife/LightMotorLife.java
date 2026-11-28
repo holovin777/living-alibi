@@ -23,6 +23,7 @@ final class LightMotorLife {
     }
     static String action(TownLife.Town t,String kind,String action,int minute){
         validate(kind);TransportLife.ready(t.player);JusticeLife.requireFree(t);
+        TowServiceLife.requireAvailable(t,kind);
         if(RebirthLife.active(t))throw new IllegalArgumentException("This vehicle shop is not available in linked life mode yet.");
         switch(action){
             case "buy" -> {
