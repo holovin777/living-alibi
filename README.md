@@ -190,3 +190,11 @@ bus approaches and departs over several seconds, with a stationary boarding
 phase and a moving collision footprint. If no clear lane fits, the kiosk
 service remains instead of placing a vehicle in an isolated parking bay.
 These are local street segments, not yet continuous cross-district bus routes.
+
+### Street traffic presentation
+
+Traffic cars have four compact body styles, more paint colors, rolling wheel
+rims and smoother acceleration. They yield to visible municipal buses.
+Lightweight road-edge state is retained during local chunk streaming; cars
+on unloaded roads are not yet simulated continuously or saved to SQLite.
+Core streets still use bounded loops where no safe through junction exists.

@@ -168,6 +168,8 @@ var _current_place := ""
 var _road_links: Dictionary = {}
 var _traffic_root: Node3D
 var _traffic_edges: Dictionary = {}
+# Keep lightweight traffic state when a district is streamed out.
+var _traffic_history: Dictionary = {}
 var _traffic_seconds := 0.0
 var _road_pending := ""
 var _bus_pending := ""
@@ -1960,41 +1962,72 @@ func _sync_traffic_edges(origin_id: String) -> void:
             wanted[key] = true
             if not _traffic_edges.has(key):
                 var cars: Array[Dictionary] = []
-                for i in range(2):
-                    var colors := [Color("#7894aa"),Color("#ad7965"),Color("#c4c1b7"),Color("#687c64"),Color("#806b7f"),Color("#414d59")]
-                    var palette_index := absi((key+str(i)).hash())%colors.size()
-                    var car := _make_city_car(_traffic_root,colors[palette_index],palette_index%2)
-                    car.visible = false
-                    var brakes := Node3D.new()
-                    brakes.name="BrakeLights"
-                    car.add_child(brakes)
-                    for side in [-1.0,1.0]:
-                        _box(brakes,Vector3(0.29,0.19,0.04),Color("#ff4438"),Vector3(side*0.65,0.7,1.85))
-                        var lamp := brakes.get_child(brakes.get_child_count()-1) as MeshInstance3D
-                        var mat := lamp.material_override as StandardMaterial3D
-                        mat.emission_enabled=true
-                        mat.emission=Color("#ff3025")
-                    brakes.visible=false
-                    cars.append({"node":car,"distance":14.2,"delay":float(i)*3.0,
-                        "reverse":i==1,"turn":-1.0,"speed":4.0,"brakes":brakes})
+                var saved: Array = _traffic_history.get(key,[])
+                if not _traffic_history.has(key):
+                    for i in range(2):
+                        var seed_value := absi((key+str(i)).hash())
+                        saved.append({"id":key+":"+str(i),"palette":seed_value%8,"style":seed_value%4,
+                            "distance":14.2,"delay":0.0,"reverse":i==1,"turn":-1.0,
+                            "speed":4.0,"junction_count":0})
+                for data in saved:
+                    cars.append(_restore_traffic_car(data))
+                _traffic_history.erase(key)
                 _traffic_edges[key] = {"first":str(first),"second":str(second),"cars":cars}
     for key in _traffic_edges.keys():
         if not wanted.has(key):
+            var saved: Array[Dictionary]=[]
             for record in _traffic_edges[key]["cars"]:
+                saved.append(_save_traffic_car(record))
                 var car: Node3D = record["node"]
                 car.visible = false
                 car.queue_free()
+            _traffic_history[key]=saved
             _traffic_edges.erase(key)
     for edge in _traffic_edges.values():
         var cars: Array=edge["cars"]
         for i in range(cars.size()-1,-1,-1):
             var route: Dictionary=cars[i].get("junction",{})
             if not route.is_empty() and not _traffic_edges.has(route["key"]):
+                # Finish this streamed-out junction in its destination lane
+                # rather than losing the car or creating a duplicate.
+                var saved: Array=_traffic_history.get(route["key"],[])
+                var data := _save_traffic_car(cars[i])
+                data["reverse"]=bool(route["reverse"])
+                data["distance"]=14.2
+                data["turn"]=-1.0
+                saved.append(data)
+                _traffic_history[route["key"]]=saved
                 var car: Node3D=cars[i]["node"]
                 car.visible=false
                 car.queue_free()
                 cars.remove_at(i)
         _position_traffic_edge(edge,origin_id)
+
+func _save_traffic_car(record: Dictionary) -> Dictionary:
+    var data: Dictionary={}
+    for field in ["id","palette","style","distance","delay","reverse","turn","speed","junction_count"]:
+        if record.has(field):data[field]=record[field]
+    return data
+
+func _restore_traffic_car(data: Dictionary) -> Dictionary:
+    var colors := [Color("#7894aa"),Color("#ad7965"),Color("#c4c1b7"),Color("#687c64"),Color("#806b7f"),Color("#414d59"),Color("#eceae4"),Color("#9e3f39")]
+    var car := _make_city_car(_traffic_root,colors[int(data.get("palette",0))%colors.size()],int(data.get("style",0)))
+    car.set_meta("traffic_id",str(data.get("id","")))
+    car.visible=false
+    var brakes := Node3D.new()
+    brakes.name="BrakeLights"
+    car.add_child(brakes)
+    for side in [-1.0,1.0]:
+        _box(brakes,Vector3(0.29,0.19,0.04),Color("#ff4438"),Vector3(side*0.65,0.7,1.85))
+        var lamp := brakes.get_child(brakes.get_child_count()-1) as MeshInstance3D
+        var mat := lamp.material_override as StandardMaterial3D
+        mat.emission_enabled=true
+        mat.emission=Color("#ff3025")
+    brakes.visible=false
+    var record := data.duplicate(true)
+    record["node"]=car
+    record["brakes"]=brakes
+    return record
 
 func _position_traffic_edge(edge: Dictionary,origin_id: String) -> void:
     var origin := TownLayout.world_center(origin_id)
@@ -2145,6 +2178,16 @@ func _advance_traffic(delta: float) -> void:
                     var exit_at := start+direction*33.8-right*1.6
                     if other_car.position.distance_to(exit_at)<5.2:blocked=true
                 if angle>=0.0 and offset.length()<3.2 and ahead>0.0:blocked=true
+            # A municipal bus is also a vehicle in the traffic lane.
+            for chunk in _chunks.values():
+                var stop := (chunk["root"] as Node3D).get_node_or_null("MunicipalBusStop") as Node3D
+                if stop==null:continue
+                var bus := stop.get_node("Bus") as Node3D
+                if not bus.visible:continue
+                var offset := bus.global_position-car.global_position
+                if offset.dot(direction)>0.0 and offset.dot(direction)<7.0 and absf(offset.dot(right))<2.2:
+                    blocked=true
+                    break
             var brakes: Node3D=record["brakes"]
             if float(record["delay"])>0.0:
                 record["delay"]=maxf(0.0,float(record["delay"])-dt)
@@ -2160,7 +2203,8 @@ func _advance_traffic(delta: float) -> void:
             var limit := 2.0 if phase==-1 else 4.0
             if angle>=0.0 or distance>=32.0:limit=minf(limit,2.0)
             if not route.is_empty():limit=3.0 if phase!=-1 else 2.0
-            var speed := move_toward(float(record.get("speed",4.0)),limit,dt*5.0)
+            var speed := move_toward(float(record.get("speed",4.0)),limit,dt*2.8)
+            _animate_car_wheels(car,speed,dt)
             if not route.is_empty():
                 route["progress"]=minf(1.0,float(route["progress"])+speed*dt/28.4)
                 record["speed"]=speed
@@ -2683,8 +2727,19 @@ func _make_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
     var paint_material := body.material_override as StandardMaterial3D
     paint_material.roughness = 0.29
     paint_material.metallic = 0.18
-    var roof_height := 1.45 if style==0 else 1.58
-    _box(car,Vector3(1.52,0.10,1.40),paint,Vector3(0,roof_height,0.20))
+    # Compact, hatchback, estate and small crossover share the safe
+    # lane footprint, but have visibly different rooflines and details.
+    var roof_height := float([1.40,1.53,1.49,1.68][posmod(style,4)])
+    var roof_length := float([1.22,1.45,1.80,1.58][posmod(style,4)])
+    car.set_meta("vehicle_kind",["compact","hatchback","estate","crossover"][posmod(style,4)])
+    _box(car,Vector3(1.52,0.10,roof_length),paint,Vector3(0,roof_height,0.20))
+    if style==3:
+        for side in [-1.0,1.0]:
+            _box(car,Vector3(0.09,0.18,2.95),dark,Vector3(side*0.89,0.47,0))
+            _box(car,Vector3(0.07,0.06,1.22),dark,Vector3(side*0.58,roof_height+0.11,0.20))
+    if style==2:
+        _box(car,Vector3(1.43,roof_height-1.03,0.37),glass,Vector3(0,(roof_height+1.03)*0.5,1.03))
+        _box(car,Vector3(1.49,0.10,0.48),paint,Vector3(0,roof_height-0.01,1.03))
     _box(car,Vector3(1.53,0.12,0.95),paint,Vector3(0,0.91,-1.23))
     _box(car,Vector3(1.53,0.12,0.65),paint,Vector3(0,0.91,1.39))
     # Tilt the front and rear glass between hood and roof instead of a square cabin.
@@ -2709,11 +2764,14 @@ func _make_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
             hub.rotation_degrees.z = 90
             var center := _cylinder(car,0.075,0.04,Color("#4b5151"),Vector3(side*0.953,0.34,z))
             center.rotation_degrees.z = 90
+            var rim := Node3D.new()
+            rim.position=Vector3(side*0.954,0.34,z)
+            rim.set_meta("rolling_wheel",true)
+            car.add_child(rim)
             for n in range(5):
                 var spoke := Node3D.new()
-                spoke.position = Vector3(side*0.954,0.34,z)
                 spoke.rotation.x = float(n)*TAU/5.0
-                car.add_child(spoke)
+                rim.add_child(spoke)
                 _box(spoke,Vector3(0.018,0.14,0.035),Color("#666d6d"),Vector3(0,0.095,0))
         _box(car,Vector3(0.38,0.18,0.08),Color("#eee5bb"),Vector3(side*0.60,0.70,-1.79))
         _box(car,Vector3(0.28,0.18,0.08),Color("#b33b36"),Vector3(side*0.65,0.7,1.79))
@@ -2724,6 +2782,11 @@ func _make_city_car(parent: Node3D,paint: Color,style: int = 0) -> Node3D:
         _box(car,Vector3(1.75,0.16,0.13),dark,Vector3(0,0.43,z))
         _box(car,Vector3(0.40,0.12,0.03),Color("#e7e6de"),Vector3(0,0.60,z*1.035))
     return car
+
+func _animate_car_wheels(car: Node3D,speed: float,delta: float) -> void:
+    for part in car.get_children():
+        if part is Node3D and part.has_meta("rolling_wheel"):
+            part.rotation.x=fposmod(part.rotation.x-speed*delta/0.32,TAU)
 
 func _build_farm() -> void:
     var farm := Node3D.new()
