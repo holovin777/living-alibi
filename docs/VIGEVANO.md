@@ -80,3 +80,6 @@ Run `prime-run bash play.sh --wide --refresh --preview-only` once to download la
 
 ### Bridge details and distant horizon (detail version 7)
 Mapped bridge tags now produce concrete edge strips and metal parapets; the existing road centerline stays flat. They are visual only, not collision barriers or elevated decks. A lightweight three-layer procedural mountain backdrop faces the northern/western horizon, changes with daylight and overcast sky, and is hidden indoors. It is not a DEM-derived panorama or a drivable mountain area. No terrain elevations or serpentines have been added yet. Existing cached OSM can be reconverted without fetching new tags.
+
+### Textured buildings and street names
+The geographic renderer shares five original mipmapped procedural textures for plaster, clay roof tiles, stone paving, wood and grass. Roof finishes are inferred from building type, not surveyed roof shape/material. Up to four decorative two-sided street-name plates per streamed tile use real OSM names but approximate locations, no regulatory meaning or collision. Geometry and map cache schema are unchanged. No new assets need downloading. Visual quality and frame rate still need local testing.

@@ -35,6 +35,14 @@ func _initialize() -> void:
         push_error("Invalid mountain silhouette geometry")
         quit(1)
         return
+    if Architecture.roof_kind("warehouse")!="flat" or Architecture.roof_kind("house")!="clay" or Architecture.texture_kind("wall_0")!="stucco" or Architecture.texture_kind("glass")!="":
+        push_error("Invalid building surface selection");quit(1);return
+    var sign_road={"a":[0,0],"b":[12,0],"kind":"residential"}
+    if not Architecture.street_sign_candidate(sign_road):
+        push_error("Named local street cannot host a plate");quit(1);return
+    sign_road["bridge"]=true
+    if Architecture.street_sign_candidate(sign_road):
+        push_error("Street plate placed on a bridge");quit(1);return
     var capped=Architecture.new()
     capped.windows_count=Architecture.MAX_WINDOWS
     capped.facade({"id":"1","kind":"apartments","height":9.6,"points":[[0,0],[12,0],[12,10],[0,10]]})

@@ -188,6 +188,22 @@ func tree(record: Dictionary) -> void:
     _foliage("leaves",at+Vector3.UP*3.1,Vector3(1.35,1.6,1.35)*variation)
     _foliage("leaves_light",at+Vector3(-0.4,4.0,0.2),Vector3(1.0,0.95,0.95)*variation)
 
+static func roof_kind(building_kind: String) -> String:
+    return "flat" if building_kind in ["industrial","warehouse","commercial","retail","garage","garages","roof"] else "clay"
+
+static func texture_kind(kind: String) -> String:
+    if kind.begins_with("wall_") or kind in ["stone","bridge_concrete"]:return "stucco"
+    if kind in ["pavement","stone_road","curb"]:return "paving"
+    if kind in ["door","shutter","bark"]:return "wood"
+    return ""
+
+static func street_sign_candidate(record: Dictionary) -> bool:
+    if bool(record.get("bridge",false)) or bool(record.get("tunnel",false)):return false
+    if str(record.get("kind","")) not in ["residential","living_street","tertiary","secondary","pedestrian"]:return false
+    var a:=Vector2(float(record["a"][0]),float(record["a"][1]))
+    var b:=Vector2(float(record["b"][0]),float(record["b"][1]))
+    return a.distance_to(b)>=8.0
+
 static func material(kind: String) -> StandardMaterial3D:
     var mat:=StandardMaterial3D.new()
     var colors: Dictionary={"bridge_concrete":Color("#a4a39a"),"waterway":Color("#467b80"),"stone_road":Color("#8b8378"),"dirt_road":Color("#9b896b"),"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}

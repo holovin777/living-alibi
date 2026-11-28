@@ -9,6 +9,9 @@ var head: Node3D
 var hud: Label
 var wall_material: StandardMaterial3D
 var roof_material: StandardMaterial3D
+var flat_roof_material: StandardMaterial3D
+const Textures=preload("res://scripts/TownVisuals.gd")
+var surface_textures: Dictionary={}
 const Architecture=preload("res://scripts/GeoArchitecture.gd")
 const Landscape=preload("res://scripts/GeoLandscape.gd")
 var land_materials: Dictionary={}
@@ -193,7 +196,12 @@ func _ready() -> void:
     chunk_size=float(city.get("chunk_size",128))
     land_records=city.get("land",{})
     wall_material=_material(Color("#cbb49b"))
-    roof_material=_material(Color("#925f4d"))
+    roof_material=_material(Color("#b47a60"))
+    flat_roof_material=_material(Color("#96938b"))
+    for kind in ["stucco","terracotta","paving","wood","grass"]:
+        surface_textures[kind]=Textures.texture(kind)
+    Textures.surface(roof_material,surface_textures["terracotta"],0.48)
+    Textures.surface(flat_roof_material,surface_textures["stucco"],0.30)
     var asphalt:=ShaderMaterial.new()
     asphalt.shader=preload("res://shaders/GeoAsphalt.gdshader")
     road_material=asphalt
@@ -248,7 +256,9 @@ func _ready() -> void:
         extent=extent.max(Vector2(absf(float(point[0])),absf(float(point[1])))+Vector2(512,512))
     floor_mesh.size=extent*2.0
     ground_visual.mesh=floor_mesh
-    ground_visual.material_override=_material(Color("#a4a98c"))
+    var ground_material:=_material(Color("#a4a98c"))
+    Textures.surface(ground_material,surface_textures["grass"],0.42)
+    ground_visual.material_override=ground_material
     add_child(ground_visual)
     mountain_horizon=preload("res://scripts/GeoHorizon.gd").new()
     add_child(mountain_horizon)
@@ -995,6 +1005,7 @@ func _build_chunk(key: String,data: Dictionary) -> void:
     _build_land(node,key,data,detail)
     var walls := PackedVector3Array()
     var roofs := PackedVector3Array()
+    var flat_roofs := PackedVector3Array()
     var roads := PackedVector3Array()
     var stone_roads := PackedVector3Array()
     var dirt_roads := PackedVector3Array()
@@ -1016,7 +1027,10 @@ func _build_chunk(key: String,data: Dictionary) -> void:
             # Both faces are solid, including on the exterior irrespective of OSM winding.
             _quad(walls,b,a,a+Vector3.UP*h,b+Vector3.UP*h)
         for i in triangles:
-            roofs.append(_point(points[i],h))
+            if Architecture.roof_kind(str(feature.get("kind","yes")))=="flat":
+                flat_roofs.append(_point(points[i],h))
+            else:
+                roofs.append(_point(points[i],h))
         detail.facade(feature)
     for record in data.get("roads",[]):
         var surface:=str(record.get("surface",""))
@@ -1028,23 +1042,77 @@ func _build_chunk(key: String,data: Dictionary) -> void:
         else:
             _strip(roads,record,0.025)
         detail.road(record)
+    _street_signs(node,data.get("roads",[]))
     for record in data.get("trees",[]):detail.tree(record)
     for record in data.get("benches",[]):detail.bench(record)
     node.set_meta("lamp_positions",detail.lamp_positions)
     for record in data.get("rail",[]):_strip(rails,record,0.035)
     _surface(node,walls,wall_material,true,false)
     for kind in detail.batches:
-        if not detail_materials.has(kind):detail_materials[kind]=Architecture.material(kind)
+        if not detail_materials.has(kind):detail_materials[kind]=_detail_material(kind)
         _surface(node,detail.batches[kind],detail_materials[kind],false)
     _surface(node,roofs,roof_material,false)
+    _surface(node,flat_roofs,flat_roof_material,false)
     _surface(node,roads,road_material,false)
     for kind in ["stone_road","dirt_road"]:
-        if not detail_materials.has(kind):detail_materials[kind]=Architecture.material(kind)
+        if not detail_materials.has(kind):detail_materials[kind]=_detail_material(kind)
     _surface(node,stone_roads,detail_materials["stone_road"],false)
     _surface(node,dirt_roads,detail_materials["dirt_road"],false)
     _surface(node,rails,rail_material,false)
     if not detail_materials.has("waterway"):detail_materials["waterway"]=Architecture.material("waterway")
     _surface(node,water,detail_materials["waterway"],false)
+
+func _detail_material(kind: String) -> StandardMaterial3D:
+    var mat:=Architecture.material(kind)
+    var texture_kind:=Architecture.texture_kind(kind)
+    if surface_textures.has(texture_kind):
+        Textures.surface(mat,surface_textures[texture_kind],0.55 if texture_kind=="paving" else 0.32)
+    return mat
+
+func _street_signs(node: Node3D,records: Array) -> void:
+    # Decorative street-name plates, not regulatory signs. Names come from OSM.
+    var used: Dictionary={}
+    var pole_material:=_material(Color("#686e70"))
+    var sign_material:=_material(Color("#ede9dc"))
+    for record in records:
+        if used.size()>=4:break
+        var name:=str(record.get("name","")).strip_edges()
+        if name.is_empty() or used.has(name) or not Architecture.street_sign_candidate(record):continue
+        var a:=_point(record["a"],0)
+        var b:=_point(record["b"],0)
+        var direction: Vector3=(b-a).normalized()
+        var side:=Vector3(-direction.z,0,direction.x)
+        var at:=a.lerp(b,0.5)+side*(float(record["width"])*0.5+1.25)
+        var plate:=Node3D.new()
+        plate.position=at
+        plate.rotation.y=atan2(-side.x,-side.z)
+        node.add_child(plate)
+        var pole:=MeshInstance3D.new()
+        var shaft:=BoxMesh.new()
+        shaft.size=Vector3(0.07,2.1,0.07)
+        pole.mesh=shaft
+        pole.material_override=pole_material
+        pole.position.y=1.05
+        plate.add_child(pole)
+        var board:=MeshInstance3D.new()
+        var panel:=BoxMesh.new()
+        var title_text:=name.left(40)
+        panel.size=Vector3(clampf(float(title_text.length())*0.055+0.22,0.85,2.45),0.28,0.05)
+        board.mesh=panel
+        board.material_override=sign_material
+        board.position.y=2.05
+        plate.add_child(board)
+        for face in [-1.0,1.0]:
+            var label:=Label3D.new()
+            label.text=title_text
+            label.font_size=48
+            label.pixel_size=0.0018
+            label.outline_size=0
+            label.modulate=Color("#26364a")
+            label.position=Vector3(0,2.05,float(face)*0.032)
+            label.rotation.y=PI if face<0 else 0.0
+            plate.add_child(label)
+        used[name]=true
 
 func _build_land(node: Node3D,key: String,data: Dictionary,detail) -> void:
     var coords:=key.split(",")
