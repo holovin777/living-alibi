@@ -10,6 +10,9 @@ import import_vigevano as osm
 
 
 class OverpassDownloadTests(unittest.TestCase):
+    def setUp(self):
+        osm.endpoint_failures.clear()
+
     def test_wide_tiles(self):
         tiles = osm.tiles(osm.WIDE_BBOX)
         self.assertEqual(len(tiles), 16)
@@ -86,3 +89,22 @@ class OverpassDownloadTests(unittest.TestCase):
         self.assertEqual(osm.merge_tiles([empty], require_ways=False).tag, "osm")
         with self.assertRaises(ValueError):
             osm.merge_tiles([empty])
+
+    def test_third_endpoint_and_prefer_healthy_mirror(self):
+        import io
+        import urllib.error
+        xml = b'<osm><node id="1"/><way id="2"/></osm>'
+        failure = urllib.error.HTTPError("https://example.com", 502, "bad gateway", {}, None)
+        with tempfile.TemporaryDirectory() as work:
+            with patch.object(osm.urllib.request, "urlopen", side_effect=[failure, failure, io.BytesIO(xml)]) as call:
+                osm.download_tile(osm.BBOX, Path(work))
+                self.assertEqual(call.call_count, 3)
+            with patch.object(osm.urllib.request, "urlopen", return_value=io.BytesIO(xml)) as call:
+                osm.download_tile(osm.BBOX, Path(work))
+                self.assertEqual(call.call_args.args[0].full_url, osm.OVERPASS_ENDPOINTS[2])
+
+    def test_local_pbf_requires_existing_file(self):
+        with tempfile.TemporaryDirectory() as work:
+            folder = Path(work)
+            with self.assertRaises(ValueError):
+                osm.import_pbf(folder / "missing.pbf", folder / "map.osm", osm.BBOX)

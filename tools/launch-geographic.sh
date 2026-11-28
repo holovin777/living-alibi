@@ -26,7 +26,12 @@ valid_map() {
 }
 if ! valid_map || [[ "$REFRESH" == true ]]; then
     imported=false
-    if [[ -s "$MAP.osm" && "$REFRESH" != true ]]; then
+    if [[ -n "${LIVING_ALIBI_OSM_PBF:-}" ]]; then
+        if python3 tools/import_vigevano.py --region "$REGION" --input "$MAP.osm" --output "$MAP.json" --pbf "$LIVING_ALIBI_OSM_PBF"; then
+            imported=true
+        fi
+    fi
+    if [[ "$imported" != true && -s "$MAP.osm" && "$REFRESH" != true ]]; then
         if python3 tools/import_vigevano.py --region "$REGION" --input "$MAP.osm" --output "$MAP.json"; then imported=true; fi
     fi
     if [[ "$imported" != true ]]; then

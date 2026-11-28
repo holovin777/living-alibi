@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -37,15 +38,21 @@ def project(lat, lon):
 
 OVERPASS_ENDPOINTS = (
     "https://overpass-api.de/api/interpreter",
+    "https://ovp.dresel.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 )
+
+
+endpoint_failures = {}
 
 
 def download_tile(bounds, directory):
     bbox = ",".join(f"{value:.7f}" for value in bounds)
     query = f'[out:xml][timeout:35];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});way["landuse"~"^(farmland|meadow|forest|orchard|vineyard|grass)$"]({bbox});way["natural"~"^(wood|grassland|water)$"]({bbox});way["leisure"="park"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox});node["highway"~"^(traffic_signals|crossing)$"]({bbox}););out body;>;out skel qt;'
     tmp = directory / "response.osm"
-    for endpoint in OVERPASS_ENDPOINTS:
+    # Prefer the European mirror after any failures in this process.
+    endpoints = sorted(OVERPASS_ENDPOINTS, key=lambda endpoint: endpoint_failures.get(endpoint, 0))
+    for endpoint in endpoints:
         req = urllib.request.Request(endpoint,
                                      data=urllib.parse.urlencode({"data": query}).encode(),
                                      headers={"User-Agent": "LivingAlibi/0.1 local OSM import"})
@@ -57,8 +64,10 @@ def download_tile(bounds, directory):
             root = ET.parse(tmp).getroot()
             if root.tag != "osm" or root.find("remark") is not None:
                 raise ValueError("Incomplete or invalid Overpass response")
+            endpoint_failures[endpoint] = 0
             return root
         except (OSError, urllib.error.URLError, ET.ParseError, ValueError) as exc:
+            endpoint_failures[endpoint] = endpoint_failures.get(endpoint, 0) + 1
             print(f"Overpass attempt failed: {exc}", file=sys.stderr, flush=True)
         finally:
             tmp.unlink(missing_ok=True)
@@ -110,14 +119,17 @@ def resumable_tile(bounds, cache, work, depth=0):
         root = merge_tiles(previous, require_ways=False)
     else:
         try:
+            if depth < 2 and any(root is not None for root in previous):
+                raise RuntimeError("Resuming previously split tile")
             root = download_tile(bounds, work)
         except RuntimeError:
-            if depth >= 1:
+            if depth >= 2:
                 raise
             print("Tile failed; splitting into four smaller requests.", flush=True)
-            root = merge_tiles(
-                [resumable_tile(child, cache, work, depth+1) for child in children],
-                require_ways=False)
+            roots = []
+            for child in children:
+                roots.append(resumable_tile(child, cache, work, depth+1))
+            root = merge_tiles(roots, require_ways=False)
     # Atomic writes: interruption cannot leave a half-written cached tile.
     tmp = work / "cached-tile.osm"
     ET.ElementTree(root).write(tmp, encoding="utf-8", xml_declaration=True)
@@ -147,6 +159,7 @@ def merge_tiles(roots, require_ways=True):
 
 def download(path, bounds=BBOX):
     path.parent.mkdir(parents=True, exist_ok=True)
+    endpoint_failures.clear()
     # Persist successful tiles across failed launches, separately for each map.
     # The completed extract is replaced only after every tile is available.
     cache = path.with_suffix(".tiles-v2")
@@ -164,6 +177,25 @@ def download(path, bounds=BBOX):
         tmp.replace(path)
     # A later explicit refresh starts a fresh snapshot after a successful merge.
     shutil.rmtree(cache, ignore_errors=True)
+
+
+def import_pbf(source, path, bounds):
+    """Clip a local regional PBF with osmium, retaining complete way references."""
+    if not source.is_file():
+        raise ValueError(f"PBF file not found: {source}")
+    if not shutil.which("osmium"):
+        raise RuntimeError("The optional offline PBF import requires osmium-tool")
+    south, west, north, east = bounds
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="osm-pbf-", dir=path.parent) as work:
+        tmp = Path(work) / "clipped.osm"
+        subprocess.run(["osmium", "extract", "--strategy=complete_ways",
+                        "--bbox", f"{west},{south},{east},{north}",
+                        "--output", str(tmp), str(source)], check=True)
+        root = ET.parse(tmp).getroot()
+        if root.tag != "osm" or root.find("way") is None:
+            raise ValueError("PBF extract contains no ways in the game bounds")
+        tmp.replace(path)
 
 
 def height(tags):
@@ -422,14 +454,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=Path("data/vigevano.osm"))
     parser.add_argument("--output", type=Path, default=Path("data/vigevano.json"))
-    parser.add_argument("--download", action="store_true", help="Fetch the selected Vigevano extract once")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--download", action="store_true", help="Fetch the selected Vigevano extract once")
+    source.add_argument("--pbf", type=Path, help="Import an existing regional OSM PBF using osmium-tool")
     parser.add_argument("--region", choices=REGIONS, default="central")
     args = parser.parse_args()
     try:
-        if args.download:
+        if args.pbf:
+            import_pbf(args.pbf, args.input, REGIONS[args.region])
+        elif args.download:
             download(args.input, REGIONS[args.region])
         result = convert(args.input, args.output, REGIONS[args.region], args.region)
-    except (OSError, ET.ParseError, ValueError, RuntimeError) as exc:
+    except (OSError, ET.ParseError, ValueError, RuntimeError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"Map import failed: {exc}\n")
     print(f"Imported {result['counts']} across {len(result['chunks'])} chunks -> {args.output}")
 
