@@ -755,7 +755,7 @@ public final class GameSession implements AutoCloseable {
             geoDrive=new GeoDrive(stolen,bus,truck,lightKind,node);
             geoDrive.to=map.motorEdges.get(node).get(0);
             geoDrive.meters=(!stolen&&!lightKind.isEmpty()?LightMotorLife.get(town,lightKind,"remainder"):VehicleTheftLife.get(town,stolen?"stolen-remainder":"owned-remainder"))/1000.0;
-            return drivePose(map,stolen?"Stolen vehicle reported to police.":"In your own vehicle.");
+            return drivePose(map,stolen?"Stolen vehicle reported to police.":DrivingSchoolLife.allowed(town,lightKind)?"In your own vehicle.":"Driving without a license / Guida senza patente.");
         }
         if(geoDrive==null)throw new IllegalArgumentException("You are not driving.");
         if(command.equals("exit")){
@@ -949,6 +949,13 @@ public final class GameSession implements AutoCloseable {
                 case "hire" -> hireBusinessWorker(command[2]);
                 default -> throw new IllegalArgumentException("Unknown workshop action.");
             };
+            return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.startsWith("license:")){
+            String[] command=action.split(":",3);
+            var copy=town.copy();
+            var result=DrivingSchoolLife.action(copy,state,command[1],command[2]);
+            apply(copy,result.minutes(),result.message());
             return new GeoProjection.ActionResult(result.message(),null);
         }
         if(action.startsWith("light:")){

@@ -618,6 +618,11 @@ func _update_navigation() -> void:
         hud.text+="\nJava traffic: %s" % commute_models.size()
         if property_scenery.missing_yard or property_scenery.missing_site:hud.text+="\nPlot visual unavailable: no clear mapped space. F actions still work."
         if driving:civilian_car.hide()
+        var licenses: Array=world.get("drivingLicenses",[])
+        var categories:=PackedStringArray()
+        for license in licenses:
+            if bool(license.get("licensed",false)):categories.append(str(license.get("category","")))
+        hud.text+="\nPatente / License: "+(" · ".join(categories) if not categories.is_empty() else "None / Nessuna")
         hud.text+="\nG: enter nearby vehicle / steal parked reserve"
         if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Road target %s km/h · Fuel %s · Condition %s" % [residents.driving.get("speedLimitKmh",36),residents.driving.get("fuel",0),residents.driving.get("condition",0)]
         var justice: Dictionary=world.get("justice",{})
