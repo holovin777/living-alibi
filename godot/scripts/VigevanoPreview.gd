@@ -59,6 +59,9 @@ var commute_goals: Dictionary={}
 const Cockpit=preload("res://scripts/GeoCockpit.gd")
 var driving_body: Node3D
 var drive_speed:=0.0
+var server_drive_speed:=0.0
+var drive_audio: Node
+const DriveSound=preload("res://scripts/DriveAudio.gd")
 var drive_heading:=0.0
 var drive_goal:=Vector3.ZERO
 var driving:=false
@@ -146,6 +149,8 @@ func _ready() -> void:
     civilian_car=traffic._car()
     add_child(civilian_car)
     civilian_car.hide()
+    drive_audio=DriveSound.new()
+    add_child(drive_audio)
     driving_body=Cockpit.new()
     add_child(driving_body)
     driving_body.hide()
@@ -517,7 +522,7 @@ func _update_navigation() -> void:
         if property_scenery.missing_yard or property_scenery.missing_site:hud.text+="\nPlot visual unavailable: no clear mapped space. F actions still work."
         if driving:civilian_car.hide()
         hud.text+="\nG: enter own car / steal nearby civilian car"
-        if driving:hud.text+="\nW: accelerate · A/D: choose turn · G: exit | Fuel %s · Condition %s" % [residents.driving.get("fuel",0),residents.driving.get("condition",0)]
+        if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Fuel %s · Condition %s" % [residents.driving.get("fuel",0),residents.driving.get("condition",0)]
         var justice: Dictionary=world.get("justice",{})
         if str(justice.get("status",""))=="REPORTED":hud.text+="\nPolice report · possible detention in %s game min" % justice.get("minutesRemaining",0)
         _sync_parked_vehicle(parked_bike,world.get("parkedBicycle"),pos,Vector3(-2,0.05,0))
@@ -543,6 +548,7 @@ func _drive_pose(pose: Dictionary) -> void:
     driving=bool(pose.get("active",false))
     driving_body.visible=driving
     if driving:
+        server_drive_speed=float(pose.get("speedKmh",0))
         drive_goal=Vector3(float(pose["x"]),1.05,float(pose["z"]))
         drive_heading=float(pose.get("heading",0))
         if not was_driving:
@@ -565,34 +571,40 @@ func _reset_driving_view() -> void:
     head.rotation=Vector3.ZERO
     linked_age=-999 # next walking frame restores the age-specific camera
     drive_speed=0.0
+    server_drive_speed=0.0
+    drive_audio.update_drive(false,0,false,0)
 
 func _drive_frame(delta: float) -> void:
     if not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)):
-        if not residents.connected:return # freeze until authoritative state is available again
+        if not residents.connected:
+            drive_audio.update_drive(false,0,false,delta)
+            return # freeze until authoritative state is available again
         driving=false
         driving_body.hide()
         _reset_driving_view()
         var location: Dictionary=residents.world.get("playerDistrict",{})
         if not location.is_empty():_sync_spawn(Vector2(float(location["x"]),float(location["z"])))
         return
-    var before:=walker.position
     walker.position=walker.position.move_toward(drive_goal,delta*12.0)
     walker.rotation.y=lerp_angle(walker.rotation.y,drive_heading,minf(delta*5.0,1.0))
     driving_body.position=walker.position-Vector3(0,1.0,0)
     driving_body.rotation.y=walker.rotation.y
-    var measured:=before.distance_to(walker.position)*3.6/maxf(delta,0.001)
-    drive_speed=lerpf(drive_speed,measured,minf(delta*5.0,1.0))
+    drive_speed=lerpf(drive_speed,server_drive_speed,minf(delta*5.0,1.0))
+    drive_audio.update_drive(true,drive_speed,Input.is_physical_key_pressed(KEY_W),delta)
     var steering_input:=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
     driving_body.update_instruments(drive_speed,steering_input,delta)
     _stream()
     drive_timer+=delta
     if drive_timer>=0.65:
         drive_timer=0
-        if Input.is_physical_key_pressed(KEY_W) and not Input.is_physical_key_pressed(KEY_SPACE):
+        var braking:=Input.is_physical_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_S)
+        var accelerating:=Input.is_physical_key_pressed(KEY_W)
+        if accelerating or braking or server_drive_speed>0.01:
             var turn:=0
             if Input.is_physical_key_pressed(KEY_A):turn=-1
             elif Input.is_physical_key_pressed(KEY_D):turn=1
-            residents.drive_command("step",Vector2(walker.position.x,walker.position.z),turn)
+            var command: String="brake" if braking else ("step" if accelerating else "coast")
+            residents.drive_command(command,Vector2(walker.position.x,walker.position.z),turn)
         _update_navigation()
 
 func _sync_civilian(record,pos: Vector2) -> void:

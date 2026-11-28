@@ -154,6 +154,7 @@ var _ground_material: StandardMaterial3D
 var _environment: Environment
 var _weather_fx: Node3D
 var _town_audio: Node3D
+var _drive_audio: Node
 var _hands: Node3D
 var _held_label: Label
 var _phone: PanelContainer
@@ -1448,6 +1449,8 @@ func _build_world() -> void:
     _weather_fx.follow(_avatar.position)
     _town_audio = TownAudio.new()
     add_child(_town_audio)
+    _drive_audio=preload("res://scripts/DriveAudio.gd").new()
+    add_child(_drive_audio)
     _build_cockpit()
     _camera = Camera3D.new()
     _camera.current = true
@@ -10562,6 +10565,8 @@ func _footstep_surface() -> String:
     return "stone"
 
 func _update_town_audio(delta: float,moved: float) -> void:
+    var speed_kmh: float=absf(_drive.speed)*3.6 if _drive!=null and _drive_active() else 0.0
+    _drive_audio.update_drive(_drive_active() and _town_audio.enabled,speed_kmh,Input.is_physical_key_pressed(KEY_W),delta)
     var at := _avatar.position
     var sheltered := _stairwell_active or _apartment_active or _inside_guest_room() or _drive_active()
     _town_audio.footstep(moved,_footstep_surface(),_movement_speed()>=RUN_SPEED,

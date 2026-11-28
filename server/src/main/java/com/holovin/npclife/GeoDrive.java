@@ -4,14 +4,15 @@ import java.util.*;
 
 /** Road-constrained manual driving. Java advances the car along legal directed edges. */
 final class GeoDrive {
-    record Pose(boolean active,boolean stolen,double x,double z,double heading,int fuel,int condition,String message){}
+    record Pose(boolean active,boolean stolen,double x,double z,double heading,int fuel,int condition,double speedKmh,String message){}
     final boolean stolen;
     String from,to;
-    double progress,meters;
+    double progress,meters,speed;
+    static final double MAX_SPEED=10.0; // m/s; urban prototype
     long lastStep;
     GeoDrive(boolean stolen,String from){this.stolen=stolen;this.from=from;this.to=from;lastStep=System.nanoTime();}
     GeoDrive copy(){
-        var c=new GeoDrive(stolen,from);c.to=to;c.progress=progress;c.meters=meters;c.lastStep=lastStep;return c;
+        var c=new GeoDrive(stolen,from);c.to=to;c.progress=progress;c.meters=meters;c.speed=speed;c.lastStep=lastStep;return c;
     }
     GeoProjection.Point position(GeoProjection map){return map.motorNodes.get(from).lerp(map.motorNodes.get(to),progress);}
     double heading(GeoProjection map){
@@ -32,6 +33,16 @@ final class GeoDrive {
             return Math.abs(angle-turn*Math.PI/2);
         });
         return options.stream().min(cmp.thenComparing(n->n)).orElse(null);
+    }
+    /** Bound elapsed time so pauses or network stalls cannot teleport the car. */
+    double controlBudget(String command,double elapsed){
+        double dt=Math.max(0,Math.min(0.8,elapsed));
+        if(elapsed>1.5)speed=0;
+        double initial=speed;
+        double acceleration=switch(command){case "step" -> 3.0;case "brake" -> -8.0;default -> -1.8;};
+        speed=Math.max(0,Math.min(MAX_SPEED,speed+acceleration*dt));
+        if(acceleration<0&&initial+acceleration*dt<0)dt=initial/-acceleration;
+        return (initial+speed)*0.5*dt;
     }
     double advance(GeoProjection map,int turn,double budget){
         double traveled=0;

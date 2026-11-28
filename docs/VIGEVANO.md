@@ -68,3 +68,6 @@ The geographic scene now uses a procedural day/night sky and rain-darkened aspha
 
 ### First-person cabin
 The geographic driving camera now sits on the left inside a lightweight dashboard and open windshield, with a turning steering wheel, a speed estimate from visual motion, and limited mouse head-look. Mirror surfaces are decorative; there are no live rear-view reflections. Heading is interpolated visually between server poses. Java still validates each road segment and controls movement; this is not free-steering or a new speed/physics model.
+
+### Driving speed and cabin sound
+The geographic server now maintains a bounded speed (maximum 36 km/h), acceleration, coasting and braking; W accelerates and Space/S brakes. Server responses expose speedKmh. A long pause resets speed and bounds movement, and dead ends/collisions stop the speed model. Both scenes use a lightweight synthesized engine and tire loop with pitch/volume related to speed; it is not a recording of a real vehicle. The older scene retains its own driving mechanics. No gear ratios, reverse in geographic mode, grip or suspension physics yet.
