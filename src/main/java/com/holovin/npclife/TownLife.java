@@ -494,10 +494,11 @@ final class TownLife {
             c.sickUntilDay=sickUntilDay;c.lastHiredDay=lastHiredDay;c.jobChanges=jobChanges;
             return c;
         }
-        boolean presentAt(Place p) {return alive && travelRemaining==0 && place==p;}
+        boolean presentAt(Place p) {return alive && travelRemaining==0 && place==p && !"REGIONAL_TRIP".equals(activity);}
         /** A shared neighborhood does not imply a shared apartment or line of sight. */
         String currentSpace() {
             if("IN_CUSTODY".equals(activity))return "custody:"+id;
+            if("REGIONAL_TRIP".equals(activity))return "regional-trip:"+id;
             return place==home && !"OUTSIDE_HOME".equals(activity) ? homeUnit : publicSpace(place);
         }
         String locationText() {
@@ -753,6 +754,7 @@ final class TownLife {
         ResidentServiceLife.prepare(town,marco);
         ChildSearchLife.tick(town,marco);
         MunicipalBusFleetLife.tick(town,marco);
+        RegionalRailLife.tick(town,marco);
         PopulationLife.tick(town,marco,truth,observations);
         PsychologyLife.tick(town,marco);
         SubstanceLife.tick(town,marco);

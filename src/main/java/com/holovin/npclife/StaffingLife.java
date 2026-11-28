@@ -35,7 +35,7 @@ final class StaffingLife {
         new Role("Factory machinist",FACTORY,3,"machinist",null,20),new Role("Transport driver",QUARRY,2,"miner",null,20),
         job("Farm worker",FARM,4),job("Fuel station attendant",FUEL_STATION,2),job("Warehouse worker",LOGISTICS_DEPOT,3),job("Station attendant",STAZIONE,2),job(HouseholdInsuranceLife.ROLE,OFFICE,2),new Role(ConstructionCrewLife.ARCHITECT,WORKSHOP,1,null,"engineering",45),job(ConstructionCrewLife.BUILDER,WORKSHOP,3),job(ConstructionCrewLife.DRIVER,LOGISTICS_DEPOT,2),
         job("Cement expansion operator",FACTORY,1),job("Materials expansion operator",FACTORY,1),job(MunicipalBusFleetLife.DRIVER,STAZIONE,2),
-        job(MunicipalBusFleetLife.DISPATCHER,STAZIONE,1),job(MunicipalBusFleetLife.MECHANIC,STAZIONE,1));
+        job(MunicipalBusFleetLife.DISPATCHER,STAZIONE,1),job(MunicipalBusFleetLife.MECHANIC,STAZIONE,1),job(RegionalRailLife.DRIVER,STAZIONE,1),job(RegionalRailLife.FREIGHT,STAZIONE,1));
     static boolean enabled(TownLife.Town t){return t.industryStocks.getOrDefault(ENABLED,0)>0;}
     static Role role(String name){return ROLES.stream().filter(r->r.name().equals(name)).findFirst().orElse(null);}
     static boolean staffed(TownLife.Citizen c,Role r){return c.alive&&c.employed&&c.age>=18&&c.age<67&&r.name().equals(c.occupation)&&r.workplace()==c.workplace;}

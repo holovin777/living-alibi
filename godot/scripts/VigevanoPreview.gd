@@ -1089,6 +1089,12 @@ func _open_actions(work_only: bool=false) -> void:
         hint.text="Use E at an office computer / Usa il PC in ufficio"
         hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         action_list.add_child(hint)
+    if str(room.get("id","")) in ["OFFICE","STAZIONE"]:
+        var rail: Dictionary=residents.world.get("regionalRail",{})
+        if not rail.is_empty():
+            WorkPanel.label(action_list,"Rail / Ferrovia · €%s" % rail.get("cash",0))
+            for line in rail.get("services",[]):
+                WorkPanel.label(action_list,"%s · %s min · €%s\nPassengers / Passeggeri: %s/%s · Cargo / Merci: %s %s · Trips / Corse: %s" % [line.get("destination",""),line.get("tripMinutes",0),line.get("fare",0),line.get("passengers",0),line.get("seats",16),line.get("cargo",0),line.get("cargoItem",""),line.get("trips",0)])
     if str(room.get("id",""))=="OFFICE":
         var bus_fleet: Dictionary=residents.world.get("municipalBusFleet",{})
         if not bus_fleet.is_empty():

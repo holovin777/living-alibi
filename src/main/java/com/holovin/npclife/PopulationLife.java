@@ -46,6 +46,8 @@ final class PopulationLife {
         if((minute+thirstPhase)%10==0)c.thirst=clamp(c.thirst+1);
         boolean sleeping=minute<390||minute>=1320;
         if(minute%15==0)c.fatigue=clamp(c.fatigue+(sleeping?-3:1));
+        if(RegionalRailLife.away(town,c,clock)){c.activity="REGIONAL_TRIP";return;}
+        if("REGIONAL_TRIP".equals(c.activity))c.activity="OUTSIDE_HOME";
         boolean workday=(clock.day-1)%7<5;
         boolean sick=EmploymentLife.sick(c,clock.day);
         // Independent workshops use short real two-hour shifts, not fictitious
@@ -224,6 +226,7 @@ final class PopulationLife {
             c.activity="WORKING";
             if(minute%60==0){
                 if(BusinessSolvencyLife.payHour(town,c,clock)){ /* paid or recorded as arrears */ }
+                else if(RegionalRailLife.role(c.occupation)){ /* paid by rail operations */ }
                 else if(MunicipalBusFleetLife.role(c.occupation)){ /* paid from fleet contracts */ }
                 else if(IndustrialExpansionLife.role(c.occupation)!=null){ /* paid per batch */ }
                 else if(ConstructionCrewLife.role(c.occupation)){ /* paid per completed construction contract */ }
