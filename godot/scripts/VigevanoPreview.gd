@@ -17,6 +17,7 @@ var detail_materials: Dictionary={}
 var daylight: DirectionalLight3D
 var sky_environment: Environment
 var sky_material: ProceduralSkyMaterial
+var mountain_horizon: Node3D
 var headlamps: Array[SpotLight3D]=[]
 const WeatherVisual=preload("res://scripts/GeoWeather.gd")
 var precipitation: Node3D
@@ -249,6 +250,8 @@ func _ready() -> void:
     ground_visual.mesh=floor_mesh
     ground_visual.material_override=_material(Color("#a4a98c"))
     add_child(ground_visual)
+    mountain_horizon=preload("res://scripts/GeoHorizon.gd").new()
+    add_child(mountain_horizon)
     walker=CharacterBody3D.new()
     var capsule := CapsuleShape3D.new()
     capsule.radius=0.32
@@ -359,6 +362,8 @@ func _input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
     if not ready_to_walk:return
+    mountain_horizon.position=Vector3(walker.position.x,0,walker.position.z)
+    mountain_horizon.visible=room.is_empty() and daylight.light_energy>0.13
     var direction := Vector3.ZERO
     traffic.update_traffic(Vector2(walker.position.x,walker.position.z),delta)
     property_scenery.animate(delta)
@@ -940,6 +945,7 @@ func _update_daylight() -> void:
     sky_material.sky_horizon_color=Color("#263447").lerp(horizon,daylight_blend)
     sky_material.ground_horizon_color=sky_material.sky_horizon_color
     sky_material.ground_bottom_color=Color("#32372e").lerp(Color("#858973"),daylight_blend)
+    mountain_horizon.update_view(walker.position,sun_amount,overcast,sky_material.sky_horizon_color,not room.is_empty())
     for beam in headlamps:beam.visible=sun_amount<=0.25 or wet
     sky_environment.ambient_light_color=Color("#a1b1ce").lerp(Color.WHITE,sun_amount)
     sky_environment.ambient_light_energy=0.32+sun_amount*0.34

@@ -15,7 +15,7 @@ REGIONS = {"central": BBOX, "wide": WIDE_BBOX}
 CHUNK = 128
 SOURCE = "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright"
 SCHEMA = 2
-DETAIL_VERSION = 6
+DETAIL_VERSION = 7
 WATER_WIDTH = {"river": 30, "canal": 5, "stream": 2, "ditch": 1, "drain": 1.5}
 ROAD_WIDTH = {"motorway": 12, "trunk": 10, "primary": 8, "secondary": 7,
               "tertiary": 6, "residential": 5, "service": 3, "living_street": 4,
@@ -257,7 +257,9 @@ def convert(source, output, bounds=BBOX, region="central"):
                         "name": name, "width": 1.8 if rail else road_width(tags),
                         "kind": tags.get("highway", ""), "sidewalk": tags.get("sidewalk", ""),
                         "oneway": "no" if rail else access(tags)[2],
-                        "surface": tags.get("surface", ""), "junction": tags.get("junction", "")}, center)
+                        "surface": tags.get("surface", ""), "junction": tags.get("junction", ""),
+                        "bridge": tags.get("bridge", "no") not in ("no", ""),
+                        "tunnel": tags.get("tunnel", "no") not in ("no", "")}, center)
                     counts["rail_segments" if rail else "roads"] += 1
                     if not rail and access(tags)[0] and tags.get("highway") != "steps":
                         d = math.hypot(*center)

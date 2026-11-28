@@ -22,7 +22,7 @@ class ImportTest(unittest.TestCase):
             self.assertEqual(4, len(buildings[0]["points"]))
             self.assertAlmostEqual(0, result["spawn"][1])
             self.assertEqual(2, result["schema"])
-            self.assertEqual(6, result["detail_version"])
+            self.assertEqual(7, result["detail_version"])
             self.assertEqual(1, result["counts"]["benches"])
             self.assertEqual(1, result["counts"]["trees"])
             self.assertGreater(result["counts"]["water_segments"], 0)
@@ -34,6 +34,7 @@ class ImportTest(unittest.TestCase):
             self.assertGreaterEqual(sum("40" in c["land"] for c in result["chunks"].values()), 2)
             roads = [r for c in result["chunks"].values() for r in c["roads"]]
             self.assertTrue(all("kind" in r and "sidewalk" in r and "oneway" in r for r in roads))
+            self.assertTrue(all(r["bridge"] and not r["tunnel"] for r in roads))
             graph = result["graph"]
             self.assertEqual({"5", "6"}, set(graph["nodes"]))
             edge = graph["edges"][0]

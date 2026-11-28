@@ -24,6 +24,17 @@ func _initialize() -> void:
         push_error("Highway edge marking geometry invalid")
         quit(1)
         return
+    var bridge=Architecture.new()
+    bridge.road({"a":[0,0],"b":[20,0],"width":8,"kind":"primary","bridge":true,"sidewalk":"both"})
+    if not bridge.batches.has("bridge_concrete") or bridge.batches.get("iron",PackedVector3Array()).is_empty():
+        push_error("Bridge railing geometry missing")
+        quit(1)
+        return
+    var horizon=preload("res://scripts/GeoHorizon.gd")
+    if horizon.ridge(470,0).size()!=960:
+        push_error("Invalid mountain silhouette geometry")
+        quit(1)
+        return
     var capped=Architecture.new()
     capped.windows_count=Architecture.MAX_WINDOWS
     capped.facade({"id":"1","kind":"apartments","height":9.6,"points":[[0,0],[12,0],[12,10],[0,10]]})

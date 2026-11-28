@@ -96,6 +96,8 @@ func road(record: Dictionary) -> void:
     var width:=float(record["width"])
     var kind:=str(record.get("kind",""))
     var sidewalk:=str(record.get("sidewalk",""))
+    if bool(record.get("bridge",false)) and not bool(record.get("tunnel",false)):
+        _bridge_edges(a,b,direction,side,width,sidewalk)
     if kind in ["motorway","trunk","motorway_link","trunk_link"]:
         # Roadside white edge lines on major paved roads. No invented sidewalks.
         if width>=3.0 and str(record.get("surface","")) not in ["gravel","ground","dirt","unpaved"]:
@@ -133,6 +135,22 @@ func road(record: Dictionary) -> void:
     var bulb:=loc+Vector3.UP*3.39-side*0.56
     _box("lamp",bulb,Vector3(0.24,0.13,0.36),direction,side)
     lamp_positions.append(bulb-Vector3.UP*0.13)
+
+func _bridge_edges(a: Vector3,b: Vector3,direction: Vector3,side: Vector3,width: float,sidewalk: String) -> void:
+    var length:=a.distance_to(b)
+    if length<0.1:return
+    for sign_value in [-1.0,1.0]:
+        var s: float=float(sign_value)
+        var has_walk:=sidewalk in ["both","yes"] or (sidewalk=="left" and s<0) or (sidewalk=="right" and s>0) or (sidewalk.is_empty() and width>=5)
+        var offset:=side*s*(width*0.5+(1.12 if has_walk else 0.12))
+        var center: Vector3=(a+b)*0.5+offset
+        _box("bridge_concrete",center+Vector3.UP*0.10,Vector3(length,0.20,0.24),direction,side)
+        for h in [0.47,0.96]:
+            _box("iron",center+Vector3.UP*float(h),Vector3(length,0.065,0.065),direction,side)
+        var posts:=maxi(1,ceili(length/2.6))
+        for i in range(posts):
+            var at:=a.lerp(b,float(i)/posts)+offset
+            _box("iron",at+Vector3.UP*0.58,Vector3(0.10,1.12,0.10),direction,side)
 
 func bench(record: Dictionary) -> void:
     var at:=Vector3(float(record["point"][0]),0,float(record["point"][1]))
@@ -172,7 +190,7 @@ func tree(record: Dictionary) -> void:
 
 static func material(kind: String) -> StandardMaterial3D:
     var mat:=StandardMaterial3D.new()
-    var colors: Dictionary={"waterway":Color("#467b80"),"stone_road":Color("#8b8378"),"dirt_road":Color("#9b896b"),"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
+    var colors: Dictionary={"bridge_concrete":Color("#a4a39a"),"waterway":Color("#467b80"),"stone_road":Color("#8b8378"),"dirt_road":Color("#9b896b"),"stone":Color("#d7cab4"),"glass":Color("#43555e"),"door":Color("#6c4c38"),"frame":Color("#a9a197"),"shutter":Color("#526c5a"),"iron":Color("#40484b"),"pavement":Color("#b2aba1"),"curb":Color("#d0c9bd"),"mark":Color("#e0d9c4"),"lamp":Color("#f4db9a"),"bark":Color("#70543d"),"leaves":Color("#657e4c"),"leaves_light":Color("#80985c")}
     mat.albedo_color=PALETTE[int(kind.trim_prefix("wall_"))] if kind.begins_with("wall_") else colors.get(kind,Color.WHITE)
     mat.cull_mode=BaseMaterial3D.CULL_DISABLED
     mat.roughness=0.87
