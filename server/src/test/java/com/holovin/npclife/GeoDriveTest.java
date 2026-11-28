@@ -45,6 +45,24 @@ class GeoDriveTest {
         assertEquals(3,drive.advance(map,0,5,17),.001);
         assertFalse(drive.waitingForSignal);
     }
+    @Test void ownedTwoWheelersHaveSeparateWalletParkingAndCondition(){
+        var t=TownLife.create(new WorldState());
+        t.player.place=TownLife.Place.WORKSHOP;t.player.destination=t.player.place;t.player.money=300;
+        int dealer=t.employerFunds.getOrDefault("technician",0);
+        LightMotorLife.action(t,"scooter","buy",600);
+        LightMotorLife.action(t,"motorcycle","buy",600);
+        assertEquals(85,t.player.money);
+        assertEquals(dealer+215,t.employerFunds.get("technician").intValue());
+        assertEquals(3,LightMotorLife.get(t,"scooter","fuel"));
+        assertEquals(4,LightMotorLife.get(t,"motorcycle","fuel"));
+        LightMotorLife.park(t,"motorcycle",TownLife.Place.PARK);
+        assertThrows(IllegalArgumentException.class,()->LightMotorLife.action(t,"motorcycle","sell",600));
+        LightMotorLife.action(t,"scooter","sell",600);
+        assertEquals(115,t.player.money);
+        assertNull(LightMotorLife.parked(t,"scooter"));
+        assertEquals(TownLife.Place.PARK,LightMotorLife.parked(t,"motorcycle"));
+        assertEquals(0,JusticeLife.thefts(t));
+    }
     @Test void lightVehicleLimitsAndCustody(){
         var s=new WorldState();var t=TownLife.create(s);
         t.player.place=TownLife.Place.MARKET;t.player.destination=t.player.place;

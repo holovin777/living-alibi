@@ -64,6 +64,8 @@ var reserve_bus: Node3D
 var reserve_truck: Node3D
 var reserve_scooter: Node3D
 var reserve_motorcycle: Node3D
+var own_scooter: Node3D
+var own_motorcycle: Node3D
 var rider_body: Node3D
 var rider_speed: Label3D
 var driving_light: String=""
@@ -181,12 +183,16 @@ func _ready() -> void:
     if is_instance_valid(reserve_truck):reserve_truck.hide()
     if is_instance_valid(reserve_scooter):reserve_scooter.hide()
     if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
+    if is_instance_valid(own_scooter):own_scooter.hide()
+    if is_instance_valid(own_motorcycle):own_motorcycle.hide()
     reserve_truck=traffic._truck()
     add_child(reserve_truck)
     reserve_truck.hide()
     reserve_scooter=traffic._two_wheeler(true)
     reserve_motorcycle=traffic._two_wheeler(false)
-    for vehicle in [reserve_scooter,reserve_motorcycle]:
+    own_scooter=traffic._two_wheeler(true)
+    own_motorcycle=traffic._two_wheeler(false)
+    for vehicle in [reserve_scooter,reserve_motorcycle,own_scooter,own_motorcycle]:
         add_child(vehicle)
         vehicle.hide()
     rider_body=Node3D.new()
@@ -354,6 +360,10 @@ func _input(event: InputEvent) -> void:
         if event.keycode==KEY_G and residents.connected and room.is_empty() and not bool(residents.world.get("rebirth",false)):
             if owned_car.visible and walker.position.distance_to(owned_car.position)<5:
                 residents.drive_command("start",pos)
+            elif own_scooter.visible and walker.position.distance_to(own_scooter.position)<5:
+                residents.drive_command("start-scooter",pos)
+            elif own_motorcycle.visible and walker.position.distance_to(own_motorcycle.position)<5:
+                residents.drive_command("start-motorcycle",pos)
             elif reserve_scooter.visible and walker.position.distance_to(reserve_scooter.position)<5:
                 residents.drive_command("steal-scooter",pos)
             elif reserve_motorcycle.visible and walker.position.distance_to(reserve_motorcycle.position)<5:
@@ -593,11 +603,15 @@ func _update_navigation() -> void:
         _sync_parked_vehicle(reserve_motorcycle,world.get("parkedMotorcycle"),pos,Vector3(0,0.05,0))
         if reserve_scooter.visible:reserve_scooter.rotation.y=float(world["parkedScooter"].get("heading",0))
         if reserve_motorcycle.visible:reserve_motorcycle.rotation.y=float(world["parkedMotorcycle"].get("heading",0))
+        _sync_parked_vehicle(own_scooter,world.get("ownedScooter"),pos,Vector3(0,0.05,0))
+        _sync_parked_vehicle(own_motorcycle,world.get("ownedMotorcycle"),pos,Vector3(0,0.05,0))
         if driving:
             reserve_bus.hide()
             if is_instance_valid(reserve_truck):reserve_truck.hide()
             if is_instance_valid(reserve_scooter):reserve_scooter.hide()
             if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
+            if is_instance_valid(own_scooter):own_scooter.hide()
+            if is_instance_valid(own_motorcycle):own_motorcycle.hide()
             reserve_truck.hide()
         _sync_patrols(world.get("patrols",[]))
         _sync_commutes(world.get("traffic",[]))
@@ -621,6 +635,8 @@ func _update_navigation() -> void:
         if is_instance_valid(reserve_truck):reserve_truck.hide()
         if is_instance_valid(reserve_scooter):reserve_scooter.hide()
         if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
+        if is_instance_valid(own_scooter):own_scooter.hide()
+        if is_instance_valid(own_motorcycle):own_motorcycle.hide()
         _sync_patrols([])
         _sync_commutes([])
         parked_bike.hide()
@@ -660,6 +676,8 @@ func _drive_pose(pose: Dictionary) -> void:
             if is_instance_valid(reserve_truck):reserve_truck.hide()
             if is_instance_valid(reserve_scooter):reserve_scooter.hide()
             if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
+            if is_instance_valid(own_scooter):own_scooter.hide()
+            if is_instance_valid(own_motorcycle):own_motorcycle.hide()
     elif was_driving:
         _reset_driving_view()
         walker.position=Vector3(float(pose["x"]),1.05,float(pose["z"]))
@@ -1045,6 +1063,8 @@ func _change_interior(next_room: Dictionary) -> void:
         if is_instance_valid(reserve_truck):reserve_truck.hide()
         if is_instance_valid(reserve_scooter):reserve_scooter.hide()
         if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
+        if is_instance_valid(own_scooter):own_scooter.hide()
+        if is_instance_valid(own_motorcycle):own_motorcycle.hide()
         parked_bike.hide()
         _sync_patrols([])
         _sync_commutes([])

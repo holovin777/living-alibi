@@ -712,18 +712,19 @@ public final class GameSession implements AutoCloseable {
             geoDrive=null;throw new IllegalArgumentException("Driving unavailable.");
         }
         if(command.equals("status"))return drivePose(map,"");
-        if(command.equals("start")||command.equals("steal")||command.equals("steal-bus")||command.equals("steal-truck")||command.equals("steal-scooter")||command.equals("steal-motorcycle")){
+        if(command.equals("start")||command.equals("steal")||command.equals("steal-bus")||command.equals("steal-truck")||command.equals("steal-scooter")||command.equals("steal-motorcycle")||command.equals("start-scooter")||command.equals("start-motorcycle")){
             if(geoDrive!=null)throw new IllegalArgumentException("Already driving.");
             var p=town.player;TransportLife.ready(p);
             if(p.ownsBicycle&&p.bicycleParked==null)throw new IllegalArgumentException("Park your bicycle first.");
             if(IntercomLife.insideVisit(town,state.day,state.minute))throw new IllegalArgumentException("Leave the apartment first.");
             boolean bus=command.equals("steal-bus");
             boolean truck=command.equals("steal-truck");
-            String lightKind=command.equals("steal-scooter")?"scooter":command.equals("steal-motorcycle")?"motorcycle":"";
-            boolean stolen=bus||truck||!lightKind.isEmpty()||command.equals("steal");
+            String lightKind=command.endsWith("-scooter")?"scooter":command.endsWith("-motorcycle")?"motorcycle":"";
+            boolean stolen=command.startsWith("steal");
             var civilian=map.civilian(town,point);
             if(!lightKind.isEmpty()){
-                var parked=lightKind.equals("scooter")?map.parkedScooter(town,point):map.parkedMotorcycle(town,point);
+                if(!stolen)LightMotorLife.present(town,lightKind);
+                var parked=!stolen?map.ownedLight(town,point,lightKind):lightKind.equals("scooter")?map.parkedScooter(town,point):map.parkedMotorcycle(town,point);
                 if(parked==null||Math.hypot(parked.x()-x,parked.z()-z)>5)throw new IllegalArgumentException("Approach the parked two-wheeler.");
             }else if(truck){
                 var parked=map.parkedTruck(town,point);
@@ -748,18 +749,21 @@ public final class GameSession implements AutoCloseable {
                 }
                 applyInternal(copy,1,!lightKind.isEmpty()?"Two-wheeler reported stolen.":truck?"Freight truck reported stolen.":bus?"Municipal bus reported stolen.":"Civilian car reported stolen.",false,clock,truth,observations);
                 if(JusticeLife.confined(town))return drivePose(map,"Police detained you.");
+            }else if(!lightKind.isEmpty()){
+                if(LightMotorLife.get(town,lightKind,"fuel")<1||LightMotorLife.get(town,lightKind,"condition")<3)throw new IllegalArgumentException("Two-wheeler needs fuel or service.");
             }else if(p.carFuel<1||p.carCondition<3)throw new IllegalArgumentException("Car needs fuel or service.");
             geoDrive=new GeoDrive(stolen,bus,truck,lightKind,node);
             geoDrive.to=map.motorEdges.get(node).get(0);
-            geoDrive.meters=VehicleTheftLife.get(town,stolen?"stolen-remainder":"owned-remainder")/1000.0;
-            return drivePose(map,stolen?"Stolen vehicle reported to police.":"In your car.");
+            geoDrive.meters=(!stolen&&!lightKind.isEmpty()?LightMotorLife.get(town,lightKind,"remainder"):VehicleTheftLife.get(town,stolen?"stolen-remainder":"owned-remainder"))/1000.0;
+            return drivePose(map,stolen?"Stolen vehicle reported to police.":"In your own vehicle.");
         }
         if(geoDrive==null)throw new IllegalArgumentException("You are not driving.");
         if(command.equals("exit")){
             var pointAt=geoDrive.position(map);
             var destination=map.nearest(pointAt);
             var copy=town.copy();copy.player.place=destination;copy.player.destination=destination;
-            if(!geoDrive.stolen)copy.player.carPlace=destination;
+            if(!geoDrive.stolen&&!geoDrive.lightKind.isEmpty())LightMotorLife.park(copy,geoDrive.lightKind,destination);
+            else if(!geoDrive.stolen)copy.player.carPlace=destination;
             else VehicleTheftLife.recover(copy); // abandoned civilian car is recovered
             apply(copy,0,"Parked.");
             geoDrive=null;
@@ -769,8 +773,8 @@ public final class GameSession implements AutoCloseable {
         if(!Set.of("step","coast","brake").contains(command)||turn<-1||turn>1)throw new IllegalArgumentException("Unknown driving control.");
         long now=System.nanoTime();
         if(now-geoDrive.lastStep<400_000_000L)return drivePose(map,"");
-        int fuel=geoDrive.stolen?VehicleTheftLife.get(town,"fuel"):town.player.carFuel;
-        int condition=geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition;
+        int fuel=driveResource(geoDrive,"fuel");
+        int condition=driveResource(geoDrive,"condition");
         if(fuel<1||condition<3){geoDrive.speed=0;geoDrive.lastStep=now;return drivePose(map,"No fuel or service required. Exit the car.");}
         var next=geoDrive.copy();next.lastStep=now;
         var previousPosition=geoDrive.position(map);
@@ -793,19 +797,29 @@ public final class GameSession implements AutoCloseable {
         copy.player.place=destination;copy.player.destination=destination;copy.player.cycling=false;
         if(next.stolen){
             VehicleTheftLife.set(copy,"fuel",fuel-units);VehicleTheftLife.set(copy,"condition",condition-3*units-impact);
+        }else if(!next.lightKind.isEmpty()){
+            LightMotorLife.park(copy,next.lightKind,destination);
+            LightMotorLife.set(copy,next.lightKind,"fuel",fuel-units);
+            LightMotorLife.set(copy,next.lightKind,"condition",condition-3*units-impact);
         }else{
             copy.player.carPlace=destination;copy.player.carFuel=Math.max(0,fuel-units);copy.player.carCondition=Math.max(0,condition-3*units-impact);
         }
-        VehicleTheftLife.set(copy,next.stolen?"stolen-remainder":"owned-remainder",(int)Math.round((next.meters%100)*1000));
+        int remainder=(int)Math.round((next.meters%100)*1000);
+        if(!next.stolen&&!next.lightKind.isEmpty())LightMotorLife.set(copy,next.lightKind,"remainder",remainder);
+        else VehicleTheftLife.set(copy,next.stolen?"stolen-remainder":"owned-remainder",remainder);
         apply(copy,0,"Driving.");geoDrive=next;
         return drivePose(map,impact>0?"Collision: vehicle condition reduced.":next.waitingForSignal?"Waiting for green light.":traveled<0.001?"End of this directed road. Exit the vehicle.":"");
+    }
+    private int driveResource(GeoDrive drive,String field){
+        if(drive.stolen)return VehicleTheftLife.get(town,field);
+        if(!drive.lightKind.isEmpty())return LightMotorLife.get(town,drive.lightKind,field);
+        return field.equals("fuel")?town.player.carFuel:town.player.carCondition;
     }
     private GeoDrive.Pose drivePose(GeoProjection map,String message){
         if(geoDrive==null)return new GeoDrive.Pose(false,false,0,0,0,town.player.carFuel,town.player.carCondition,0,0,"CAR",message);
         var p=geoDrive.position(map);
         return new GeoDrive.Pose(true,geoDrive.stolen,p.x(),p.z(),geoDrive.heading(map),
-            geoDrive.stolen?VehicleTheftLife.get(town,"fuel"):town.player.carFuel,
-            geoDrive.stolen?VehicleTheftLife.get(town,"condition"):town.player.carCondition,geoDrive.speed*3.6,(int)geoDrive.vehicleLimit(map.speedLimit(geoDrive.from,geoDrive.to)),!geoDrive.lightKind.isEmpty()?geoDrive.lightKind.toUpperCase(java.util.Locale.ROOT):geoDrive.truck?"TRUCK":geoDrive.bus?"BUS":"CAR",message);
+            driveResource(geoDrive,"fuel"),driveResource(geoDrive,"condition"),geoDrive.speed*3.6,(int)geoDrive.vehicleLimit(map.speedLimit(geoDrive.from,geoDrive.to)),!geoDrive.lightKind.isEmpty()?geoDrive.lightKind.toUpperCase(java.util.Locale.ROOT):geoDrive.truck?"TRUCK":geoDrive.bus?"BUS":"CAR",message);
     }
     synchronized GeoProjection.View geoNearby(GeoProjection map,double x,double z)throws SQLException{
         var target=geoDrive==null?new GeoProjection.Point(x,z):geoDrive.position(map);
@@ -936,6 +950,13 @@ public final class GameSession implements AutoCloseable {
                 default -> throw new IllegalArgumentException("Unknown workshop action.");
             };
             return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.startsWith("light:")){
+            String[] command=action.split(":",3);
+            var copy=town.copy();
+            String message=LightMotorLife.action(copy,command[2],command[1],state.minute);
+            apply(copy,command[1].equals("repair")?30:5,message);
+            return new GeoProjection.ActionResult(message,null);
         }
         String[] parts=action.split(":",2);
         String arg=parts.length>1?parts[1]:"";
