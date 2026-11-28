@@ -27,7 +27,7 @@ final class EnterpriseGovernanceLife {
         return a!=null&&BusinessManagementLife.director(t,a)!=null;
     }
     private static TownLife.Citizen director(TownLife.Town t,String a,WorldState s,List<TownLife.Citizen> members){
-        if(BusinessOwnershipLife.yours(t,a))return BusinessManagementLife.director(t,a);
+        if(BusinessOwnershipLife.yours(t,a)||NpcEnterpriseLife.owned(t,a))return BusinessManagementLife.director(t,a);
         return members.isEmpty()?null:members.getFirst();
     }
     private static TownLife.Citizen select(List<TownLife.Citizen> members,Set<Integer> used,boolean social,TownLife.Citizen fallback){

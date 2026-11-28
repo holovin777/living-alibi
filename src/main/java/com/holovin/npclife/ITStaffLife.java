@@ -90,7 +90,7 @@ final class ITStaffLife {
         t.employerFunds.merge(client,-gross,Integer::sum);ITBusinessLife.credit(t,MunicipalLife.CITY,tax);
         set(t,owner,"cash",Math.addExact(get(t,owner,"cash"),gross-tax));
         set(t,owner,"tax-paid",Math.addExact(get(t,owner,"tax-paid"),tax));
-        set(t,owner,"last-"+id,day);set(t,owner,"contracts",Math.addExact(get(t,owner,"contracts"),1));
+        t.industryStocks.put("it-market:last:"+id,day);set(t,owner,"last-"+id,day);set(t,owner,"contracts",Math.addExact(get(t,owner,"contracts"),1));
         set(t,owner,"delegated",Math.addExact(get(t,owner,"delegated"),1));
         set(t,owner,"management-profit",Math.addExact(get(t,owner,"management-profit"),gross-tax-WAGE));
         EducationLife.learn(t,w,"technical",1);

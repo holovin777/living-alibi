@@ -646,10 +646,12 @@ func _update_navigation() -> void:
         if str(district.get("id",""))=="OFFICE" and not ownership.is_empty():
             var listings:=0
             var owned_firms:=0
+            var npc_firms:=0
             for firm in ownership:
                 if bool(firm.get("listed",false)):listings+=1
                 if bool(firm.get("owned",false)):owned_firms+=1
-            hud.text+="\nBusiness registry / Registro imprese: %s for sale · %s owned" % [listings,owned_firms]
+                if not str(firm.get("npcOwner","")).is_empty():npc_firms+=1
+            hud.text+="\nBusiness registry / Registro imprese: %s for sale · %s yours · %s NPC owned" % [listings,owned_firms,npc_firms]
         var loans: Array=world.get("businessCredit",[])
         if str(district.get("id",""))=="OFFICE" and not loans.is_empty():
             var loan_balance:=0
@@ -1087,6 +1089,10 @@ func _open_actions(work_only: bool=false) -> void:
         hint.text="Use E at an office computer / Usa il PC in ufficio"
         hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         action_list.add_child(hint)
+    if str(room.get("id",""))=="OFFICE":
+        for entry in residents.world.get("businessOwnership",[]):
+            if not str(entry.get("npcOwner","")).is_empty():
+                WorkPanel.label(action_list,"%s · Owner / Proprietario: %s" % [entry.get("account",""),entry.get("npcOwner","")])
     if work_only:
         for firm in residents.world.get("businessOwnership",[]):
             if not bool(firm.get("owned",false)):continue

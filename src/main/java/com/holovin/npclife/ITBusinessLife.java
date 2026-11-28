@@ -39,7 +39,7 @@ final class ITBusinessLife {
             "Senior Developer can register for EUR 50. Keep business funds separate. Rent a shared office for seven days, then deliver each available client report at most once per seven days. A fictional 20% revenue tax is paid to the town; this is not real tax law.",offers,ITStaffLife.report(t,c,day,minute,offers));
     }
     static boolean eligibleWeek(TownLife.Town t,TownLife.Citizen c,String id,int day){
-        int last=get(t,c,"last-"+id);return last==0||day-last>=7;
+        int last=Math.max(get(t,c,"last-"+id),t.industryStocks.getOrDefault("it-market:last:"+id,0));return last==0||day-last>=7;
     }
     static void credit(TownLife.Town t,String account,int amount){
         t.employerFunds.merge(account,amount,Math::addExact);
@@ -83,7 +83,7 @@ final class ITBusinessLife {
                 t.employerFunds.merge(client,-offer.gross(),Integer::sum);
                 credit(t,MunicipalLife.CITY,offer.tax());
                 set(t,c,"tax-paid",Math.addExact(status.taxPaid(),offer.tax()));
-                set(t,c,"last-"+offer.id(),day);set(t,c,"contracts",Math.addExact(status.contracts(),1));
+                t.industryStocks.put("it-market:last:"+offer.id(),day);set(t,c,"last-"+offer.id(),day);set(t,c,"contracts",Math.addExact(status.contracts(),1));
                 duration=60;message="Client paid EUR "+offer.gross()+"; EUR "+offer.tax()+" tax; net company revenue EUR "+(offer.gross()-offer.tax())+".";
             }
         }

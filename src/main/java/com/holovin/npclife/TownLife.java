@@ -743,6 +743,7 @@ final class TownLife {
         TradeCreditLife.tick(town,marco);
         BusinessSolvencyLife.tick(town,marco);
         BusinessOwnershipLife.tick(town,marco);
+        NpcEnterpriseLife.tick(town,marco);
         EmploymentLife.tick(town,marco,truth,observations);
         StaffingLife.tick(town,marco);
         EmploymentContractLife.tick(town,marco);

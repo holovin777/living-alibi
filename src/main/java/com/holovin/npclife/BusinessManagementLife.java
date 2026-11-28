@@ -20,7 +20,7 @@ final class BusinessManagementLife {
     }
     static TownLife.Citizen director(TownLife.Town t,String a){
         int index=get(t,a,"director");
-        return index<=0||!BusinessOwnershipLife.yours(t,a)?null:members(t,a).stream().filter(c->c.generationIndex==index).findFirst().orElse(null);
+        return index<=0||(!BusinessOwnershipLife.yours(t,a)&&!NpcEnterpriseLife.owned(t,a))?null:members(t,a).stream().filter(c->c.generationIndex==index).findFirst().orElse(null);
     }
     static int target(TownLife.Town t,StaffingLife.Role r){
         String a=BusinessSolvencyLife.account(r.name());
@@ -44,6 +44,13 @@ final class BusinessManagementLife {
         return members(t,a).stream().filter(c->c.age>=25&&!EmploymentLife.sick(c,s.day)&&!RebirthLife.linkedAdult(t,c)
             &&!NpcJusticeLife.confined(t,c,s))
             .max(Comparator.comparingInt((TownLife.Citizen c)->c.carefulness+c.sociability+WorkplaceHierarchy.tenure(c,s.day)).thenComparing(c->c.id)).orElse(null);
+    }
+    static void appointNpc(TownLife.Town t,WorldState s,String a){
+        if(!NpcEnterpriseLife.owned(t,a)||director(t,a)!=null)return;
+        var c=candidate(t,a,s);
+        if(c!=null&&!RelationshipBoundaryLife.controlled(t,c)){
+            EnterpriseGovernanceLife.clearManagement(t,a);set(t,a,"director",c.generationIndex);
+        }
     }
     record Option(String id,String label){}
     static List<Option> options(TownLife.Town t,WorldState s,String a){
