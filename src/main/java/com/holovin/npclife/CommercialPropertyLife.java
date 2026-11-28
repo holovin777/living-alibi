@@ -17,7 +17,7 @@ final class CommercialPropertyLife {
     static boolean buy(TownLife.Town t,WorldState s,String p,TownLife.Citizen c){
         if(!PLOTS.contains(p)||get(t,p,"owner")!=0||!NpcEnterpriseLife.eligible(t,c,s)
             ||PLOTS.stream().anyMatch(x->get(t,x,"owner")==c.generationIndex)
-            ||c.money<NpcEnterpriseLife.PERSONAL_RESERVE+LAND+STAGES*(LABOR+STEEL+MATERIAL))return false;
+            ||c.money<NpcEnterpriseLife.PERSONAL_RESERVE+LAND+ConstructionCrewLife.total())return false;
         c.money-=LAND;t.employerFunds.merge("city-maintenance",LAND,Math::addExact);
         set(t,p,"owner",c.generationIndex);return true;
     }
@@ -26,18 +26,9 @@ final class CommercialPropertyLife {
         var owner=DemographyLife.byIndex(t,get(t,p,"owner"));
         if(owner==null||!owner.alive||owner.age<18||RelationshipBoundaryLife.controlled(t,owner)
             ||owner.money<NpcEnterpriseLife.PERSONAL_RESERVE+LABOR+STEEL+MATERIAL)return false;
-        var worker=t.people.values().stream().filter(c->c!=owner&&"Engineer".equals(c.occupation)
-            &&WorkplaceHierarchy.onDuty(c,s.day)&&!RelationshipBoundaryLife.controlled(t,c)
-            &&!NpcJusticeLife.confined(t,c,s)&&!TownLife.inPlayerConversation(t,c)&&c.fatigue<80)
-            .min(Comparator.comparing(c->c.id)).orElse(null);
-        if(worker==null||get(t,"town","crew-day")==s.day||IndustryLife.stock(t,IndustryLife.FACTORY_STEEL)<1
+        if(get(t,"town","crew-day")==s.day||IndustryLife.stock(t,IndustryLife.FACTORY_STEEL)<1
             ||FactoryNetworkLife.stock(t,"building-material")<1)return false;
-        owner.money-=LABOR+STEEL+MATERIAL;worker.money=Math.addExact(worker.money,LABOR);
-        worker.fatigue=Math.min(100,worker.fatigue+5);
-        t.employerFunds.merge("machinist",STEEL,Math::addExact);
-        t.employerFunds.merge(FactoryNetworkLife.supplier("building-material"),MATERIAL,Math::addExact);
-        t.industryStocks.merge(IndustryLife.FACTORY_STEEL,-1,Integer::sum);
-        FactoryNetworkLife.change(t,"building-material",-1);
+        if(!ConstructionCrewLife.complete(t,s,owner,get(t,p,"stage")))return false;
         set(t,p,"build-day",s.day);set(t,"town","crew-day",s.day);
         set(t,p,"stage",get(t,p,"stage")+1);
         return true;

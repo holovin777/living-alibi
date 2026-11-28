@@ -8,7 +8,10 @@ final class GeoProperty {
                 List<GeoProjection.Choice> actions){}
     record Yard(GeoProjection.District anchor,GardenLife.Report garden,HenLife.Report hens,OrchardLife.Report orchard){}
     record Site(GeoProjection.District anchor,int stage,boolean active,boolean owned){}
-    record Scenery(Yard yard,Site site){}
+    record CommercialSite(String id,GeoProjection.District anchor,int stage,boolean active){}
+    record Scenery(Yard yard,Site site,List<CommercialSite> commercial){
+        Scenery(Yard yard,Site site){this(yard,site,List.of());}
+    }
     static Scenery scenery(TownLife.Town t,WorldState s,GeoProjection map,GeoProjection.Point at,TownLife.Place room){
         if(room!=null)return new Scenery(null,null);
         Yard yard=null;Site site=null;
@@ -19,7 +22,15 @@ final class GeoProperty {
             // The original building stays after sale or owner death.
             site=new Site(map.district(TownLife.Place.OFFICE),b.stage(),b.enabled(),b.owned());
         }
-        return new Scenery(yard,site);
+        List<CommercialSite> projects=new ArrayList<>();
+        var places=List.of(TownLife.Place.OFFICE,TownLife.Place.FACTORY,TownLife.Place.WORKSHOP);
+        var plots=CommercialPropertyLife.view(t,s.day);
+        for(int i=0;i<plots.size();i++){
+            var p=plots.get(i);
+            if(!p.owner().isEmpty()||p.stage()>0)
+                projects.add(new CommercialSite(p.id(),map.district(places.get(i)),p.stage(),p.stage()<3&&!p.owner().isEmpty()));
+        }
+        return new Scenery(yard,site,List.copyOf(projects));
     }
     static View view(TownLife.Town t,WorldState s,GeoProjection map,GeoProjection.Point at,TownLife.Place room){
         var p=t.player;var a=new ArrayList<GeoProjection.Choice>();

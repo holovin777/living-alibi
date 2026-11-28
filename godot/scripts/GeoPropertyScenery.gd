@@ -9,6 +9,8 @@ var elapsed:=0.0
 var materials: Dictionary={}
 var missing_site:=false
 var missing_yard:=false
+var commercial_anchors: Dictionary={}
+var commercial_signature:=0
 
 func configure(map: Dictionary) -> void:
     city=map
@@ -153,6 +155,7 @@ func sync(data: Dictionary) -> void:
         signatures[id]=signature
         if id=="yard":_yard(root,record)
         else:_site(root,record)
+    _sync_commercial(data.get("commercial",[]))
 
 func _yard(root: Node3D,record: Dictionary) -> void:
     var garden: Dictionary=record["garden"]
@@ -241,3 +244,72 @@ func animate(delta: float) -> void:
         var angle:=elapsed*0.65+i*TAU/3.0
         bird.position=Vector3(-0.8+cos(angle)*0.65,0.05,2.35+sin(angle)*0.55)
         bird.rotation.y=atan2(sin(angle),-cos(angle))
+
+# Commercial lots are visual projections only; deterministic clear-space search
+# avoids imported footprints, roads, and other reserved commercial plots.
+func _sync_commercial(projects: Array) -> void:
+    var signature:=hash(projects)
+    if signature==commercial_signature:return
+    commercial_signature=signature
+    var wanted: Dictionary={}
+    for project in projects:
+        var id: String="commercial:"+str(project.get("id",""))
+        wanted[id]=true
+        if not commercial_anchors.has(id):
+            var anchor: Dictionary=project.get("anchor",{})
+            var origin:=Vector2(float(anchor.get("x",0)),float(anchor.get("z",0)))
+            var found: Variant=null
+            for distance in [70,85,100,120,150]:
+                for step in range(16):
+                    var angle:=float(step)*TAU/16.0
+                    var candidate:=origin+Vector2(cos(angle),sin(angle))*float(distance)
+                    if not clear_at(city,candidate,7.0):continue
+                    var overlap:=false
+                    for other in commercial_anchors.values():
+                        if other!=null and candidate.distance_to(other)<15:overlap=true
+                    for other_id in ["yard_reserved","site_reserved"]:
+                        if anchors.has(other_id) and candidate.distance_to(anchors[other_id])<15:overlap=true
+                    if not overlap:
+                        found=candidate
+                        break
+                if found!=null:break
+            commercial_anchors[id]=found
+        var center: Variant=commercial_anchors[id]
+        if center==null:continue
+        var sig:=hash(project)
+        if signatures.get(id)==sig and models.has(id):continue
+        _remove(id)
+        var root:=Node3D.new()
+        root.position=Vector3(center.x,0.06,center.y)
+        add_child(root)
+        models[id]=root
+        signatures[id]=sig
+        _commercial_site(root,project)
+    for id in models.keys():
+        if str(id).begins_with("commercial:") and not wanted.has(id):_remove(id)
+
+func _commercial_site(root: Node3D,project: Dictionary) -> void:
+    var stage:=clampi(int(project.get("stage",0)),0,3)
+    var active: bool=bool(project.get("active",false))
+    _box(root,Vector3.ZERO,Vector3(8,0.08,7),Color("#a7977d"))
+    if stage>=1:_box(root,Vector3(0,0.17,0),Vector3(6.2,0.3,5.4),Color("#a9acae"),true)
+    if stage>=2:
+        var wall:=Color("#d2c2aa")
+        _box(root,Vector3(0,2.0,0),Vector3(6,3.5,5.2),wall,true)
+        for x in [-2.0,0.0,2.0]:
+            _box(root,Vector3(x,2.2,2.62),Vector3(1.3,1.5,0.06),Color("#62818d"))
+    if stage==3:
+        _box(root,Vector3(0,3.85,0),Vector3(6.5,0.28,5.7),Color("#777c7e"))
+        _box(root,Vector3(0,1.2,2.64),Vector3(1.1,2.0,0.08),Color("#425a63"))
+        _sign(root,Vector3(0,4.4,2.7),"UFFICI · "+str(project.get("id","")).to_upper())
+    elif active:
+        var yellow:=Color("#d9a643")
+        # Static tower crane and delivered material pallets are scenery,
+        # not independently moving trucks or physics equipment.
+        _box(root,Vector3(-3.2,2.8,-2.7),Vector3(0.25,5.6,0.25),yellow)
+        _box(root,Vector3(-1.2,5.6,-2.7),Vector3(4.3,0.22,0.22),yellow)
+        _box(root,Vector3(0.5,4.6,-2.7),Vector3(0.04,1.8,0.04),Color("#454545"))
+        _box(root,Vector3(3.3,0.25,1.8),Vector3(0.8,0.5,1.6),Color("#a3a5a3"))
+        for x in [-3.6,3.6]:_box(root,Vector3(x,0.6,3.25),Vector3(0.12,1.2,0.12),yellow)
+        _box(root,Vector3(0,0.85,3.25),Vector3(7.2,0.12,0.12),yellow)
+        _sign(root,Vector3(0,2.0,3.3),"CANTIERE · %s/3" % stage)
