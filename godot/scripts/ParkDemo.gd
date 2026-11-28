@@ -220,6 +220,12 @@ var _drive_direction := Vector3.ZERO
 var _drive_look := 0.0
 var _drive_pending := false
 var _drive_parked := false
+var _free_driving := false
+var _free_car=preload("res://scripts/FreeCarControls.gd").new()
+var _free_arrival:=Vector3.ZERO
+var _local_car_district:=""
+var _local_car_position:=CAR_PARK
+var _local_car_yaw:=0.0
 var _drive_freight := false
 var _bike_model: Node3D
 var _bike_wheel_angle := 0.0
@@ -648,7 +654,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_E and not _drive_active() and _near_car() and not _action_panel.visible and not _dialog_panel.visible:
         _close_dialog()
-        _park_in_cabin()
+        _enter_free_car()
         Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
         get_viewport().set_input_as_handled()
         return
@@ -737,6 +743,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     if event is InputEventKey and event.pressed and not event.echo:
         if _drive_active():
+            if _free_driving:
+                if event.keycode in [KEY_E,KEY_F,KEY_ESCAPE] and not _drive_pending and absf(_free_car.speed)<0.2:
+                    _exit_free_car()
+                get_viewport().set_input_as_handled()
+                return
             if _drive_parked:
                 if event.keycode in [KEY_F,KEY_ESCAPE]:
                     _end_driving(true)
@@ -1042,15 +1053,89 @@ func _can_use_car() -> bool:
     return not _rebirth_active() or str(_last_snapshot.get("rebirth",{}).get("phase",""))=="LINKED_ADULT"
 
 func _near_car() -> bool:
-    return _can_use_car() and not _apartment_active and not _guest_active and not _stairwell_active and _car_place()==_current_place and TownLayout.motor_district(_current_place) and _avatar.position.distance_to(CAR_PARK)<3.3
+    return _can_use_car() and not _apartment_active and not _guest_active and not _stairwell_active and _car_place()==_current_place and TownLayout.motor_district(_current_place) and _avatar.position.distance_to(_car_local_position())<3.3
 
 func _car_action(action: String) -> void:
     if not _can_use_car():return
     if (_current_place=="WORKSHOP" or (_current_place=="FUEL_STATION" and action=="refuel") or (TownLayout.service_hub(_current_place) and action in ["refuel","repair"])) and (_near_kiosk() or _near_car()) and _connected and not _api.is_busy():
         _api.car_action(action)
 
+func _car_local_position() -> Vector3:
+    return _local_car_position if _local_car_district==_car_place() else CAR_PARK
+
+func _enter_free_car() -> void:
+    if not _connected or _api.is_busy() or not _near_car():return
+    var player: Dictionary=_last_snapshot.get("player",{})
+    if int(player.get("carFuel",0))<1 or int(player.get("carCondition",0))<3:
+        _message.text=tr("The car needs fuel or service.")
+        return
+    if bool(player.get("ownsBicycle",false)) and _parked_district().is_empty():return
+    _park_in_cabin()
+    _avatar.position=_car_local_position()
+    _free_car=preload("res://scripts/FreeCarControls.gd").new()
+    _free_car.yaw=_local_car_yaw if _local_car_district==_current_place else 0.0
+    _view_yaw=_free_car.yaw
+    _drive_parked=false
+    _free_driving=true
+    _sync_owned_car()
+    _follow_player()
+
+func _exit_free_car() -> void:
+    _local_car_district=_current_place
+    _local_car_position=_avatar.position
+    _local_car_yaw=_free_car.yaw
+    var side:=Vector3(cos(_free_car.yaw),0,-sin(_free_car.yaw))
+    var exit_at:=_avatar.position-side*1.8
+    _end_driving(false)
+    _avatar.position=_nearest_walkable_position(exit_at)
+    _follow_player()
+
+func _free_car_clear(at: Vector3,yaw: float) -> bool:
+    var forward:=Vector3(-sin(yaw),0,-cos(yaw))
+    for offset in [-1.05,0.0,1.05]:
+        var point:=at+forward*float(offset)
+        if not _can_stand(point,0.82,true):return false
+        if not _people_clear(_avatar.position,point,0.82,null):return false
+    return true
+
+func _process_free_car(delta: float) -> void:
+    if _drive_pending or not _connected:return
+    var player: Dictionary=_last_snapshot.get("player",{})
+    if int(player.get("carFuel",0))<1 or int(player.get("carCondition",0))<3:
+        _free_car.stop()
+        return
+    var gas:=float(Input.is_key_pressed(KEY_W))-float(Input.is_key_pressed(KEY_S))
+    var steer:=float(Input.is_key_pressed(KEY_D))-float(Input.is_key_pressed(KEY_A))
+    var wet:=bool(_last_snapshot.get("weather",{}).get("raining",false))
+    var previous_yaw: float=_free_car.yaw
+    var motion: Vector3=_free_car.step(delta,gas,steer,Input.is_key_pressed(KEY_SPACE),Input.is_key_pressed(KEY_SHIFT),0.65 if wet else 1.0,int(player.get("carCondition",100)))
+    var next:=_avatar.position+motion
+    var destination:=_road_destination(next,21.7)
+    if not destination.is_empty() and destination in player.get("carDestinations",[]) and TownLayout.motor_road(_current_place,destination):
+        var direction: Vector3=(TownLayout.world_center(destination)-TownLayout.world_center(_current_place)).normalized()
+        if motion.dot(direction)>0.0 and absf(Vector3(-sin(_free_car.yaw),0,-cos(_free_car.yaw)).dot(direction))>0.85 and _free_car_clear(next,_free_car.yaw) and not _api.is_busy():
+            _drive_target=destination
+            _drive_pending=true
+            _free_arrival=next-direction*next.dot(direction)-direction*20.5
+            _free_car.stop()
+            _api.drive_to(destination)
+            return
+    if _free_car_clear(next,_free_car.yaw):
+        _avatar.position=next
+    else:
+        _free_car.yaw=previous_yaw
+        _free_car.stop()
+    _view_yaw=_free_car.yaw
+    _drive.speed=_free_car.speed
+    _drive.steering=_free_car.steering
+    _drive.pitch=_free_car.pitch
+    _drive.roll=_free_car.roll
+    _drive.heading_offset=0.0
+    _follow_player()
+    _update_drive_hud()
+
 func _drive_active() -> bool:
-    return _drive_parked or not _drive_target.is_empty()
+    return _free_driving or _drive_parked or not _drive_target.is_empty()
 
 func _drive_to(destination: String) -> void:
     if not _near_car() or not _connected or _api.is_busy():
@@ -1094,6 +1179,7 @@ func _begin_driving(destination: String,freight: bool = false) -> bool:
         _message.text = "Road occupied. Let traffic pass before departing."
         return false
     _drive = candidate
+    _free_driving=false
     _drive_freight = freight
     _drive_target = destination
     _drive_parked = false
@@ -1123,6 +1209,9 @@ func _cargo_caption(cargo: Dictionary) -> String:
 
 func _update_drive_hud() -> void:
     var player: Dictionary = _last_snapshot.get("player",{})
+    if _free_driving:
+        _drive_hud.text="%s km/h · Fuel %s/12 · Condition %s%%\\nW/S gas/reverse · A/D steer · Space brake · Shift handbrake\\n%s" % [roundi(absf(_free_car.speed)*3.6),player.get("carFuel",0),player.get("carCondition",0),"Awaiting arrival..." if _drive_pending else "E/F: exit when stopped"]
+        return
     if _drive_freight:
         var cargo: Dictionary = _last_snapshot.get("freight",{})
         _drive_hud.text = "FREIGHT | %s km/h | %s\nTo %s · W/S gas/reverse · A/D steer · Space brake\n%s" % [roundi(absf(_drive.speed)*3.6),_cargo_caption(cargo),_drive_target.capitalize(),"Awaiting arrival..." if _drive_pending else "Esc: cancel this leg"]
@@ -1142,6 +1231,9 @@ func _update_drive_hud() -> void:
         _drive_target.capitalize(),"Awaiting confirmed arrival..." if _drive_pending else "Esc: cancel before arrival · Mouse: look around"]
 
 func _process_driving(delta: float) -> void:
+    if _free_driving:
+        _process_free_car(delta)
+        return
     if not _drive_pending:
         var throttle := float(Input.is_key_pressed(KEY_W))-float(Input.is_key_pressed(KEY_S))
         var turn := float(Input.is_key_pressed(KEY_D))-float(Input.is_key_pressed(KEY_A))
@@ -1165,6 +1257,7 @@ func _process_driving(delta: float) -> void:
 func _end_driving(return_to_car: bool) -> void:
     var was_freight := _drive_freight
     _drive_freight = false
+    _free_driving=false
     _drive_parked = false
     _drive_target = ""
     _drive_pending = false
@@ -1217,6 +1310,8 @@ func _sync_owned_car() -> void:
         var car := root.get_node_or_null("PublicCarPark/OwnedCar") as Node3D
         if car!=null:
             car.visible = _car_place()==id and (not _drive_active() or _drive_freight or id!=_current_place)
+            car.position=_car_local_position()-CAR_PARK if _car_place()==id else Vector3.ZERO
+            car.rotation.y=_local_car_yaw if _local_car_district==id else 0.0
     for id in FREIGHT_DISTRICTS:
         if not _chunks.has(id):
             continue
@@ -2407,8 +2502,10 @@ func _can_stand(at: Vector3, radius: float, allow_roads: bool = false) -> bool:
         var bus := bus_stop.get_node("Bus") as Node3D
         var local_at := bus_stop.basis.inverse()*(at-bus_stop.position)-bus.position
         if Rect2(-1.1,-2.8,2.2,5.6).grow(radius).has_point(Vector2(local_at.x,local_at.z)):return false
-    if _car_place()==_current_place and TownLayout.motor_district(_current_place):
-        if Rect2(Vector2(CAR_PARK.x-0.94,CAR_PARK.z-1.81),Vector2(1.88,3.62)).grow(radius).has_point(p):
+    if not _free_driving and _car_place()==_current_place and TownLayout.motor_district(_current_place):
+        var parked:=_car_local_position()
+        var local:=Vector3(at.x-parked.x,0,at.z-parked.z).rotated(Vector3.UP,-(_local_car_yaw if _local_car_district==_current_place else 0.0))
+        if Rect2(Vector2(-0.94,-1.81),Vector2(1.88,3.62)).grow(radius).has_point(Vector2(local.x,local.z)):
             return false
     for edge in _traffic_edges.values():
         for record in edge["cars"]:
@@ -7761,7 +7858,7 @@ func _render_actions() -> void:
             _action_title.text="Automobile / Car"
             _action_choices.add_child(_button("Enter car / Sali in auto",func():
                 _action_panel.hide()
-                _park_in_cabin()
+                _enter_free_car()
                 Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)))
             for id in _last_snapshot.get("player",{}).get("carDestinations",[]):
                 _action_choices.add_child(_button("Drive to / Vai a "+TownLayout.label_for(str(id)),_drive_to.bind(str(id))))
@@ -10528,7 +10625,18 @@ func _on_world_updated(snapshot: Dictionary) -> void:
         _action_panel.visible = false
         _travel_panel.visible = false
     if continue_in_cabin:
-        _park_in_cabin()
+        if _free_driving:
+            _drive_pending=false
+            _drive_target=""
+            _local_car_district=""
+            _avatar.position=_free_arrival
+            if not _free_car_clear(_avatar.position,_free_car.yaw):
+                _avatar.position=CAR_PARK
+            _free_car.stop()
+            _drive.speed=0.0
+            Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+        else:
+            _park_in_cabin()
 
     _render_hud_summary(snapshot)
     if first_snapshot:

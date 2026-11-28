@@ -707,6 +707,15 @@ func _exercise() -> void:
     if not _check(world._scenery.has_node("PoligonoDiTiro") and world._can_stand(world.SPORT_COUNTER,world.WALKER_RADIUS) and not world._near_sport_counter(),
             "sports facility remains accessible and does not intercept parking actions"):
         return
+    var free_controls=preload("res://scripts/FreeCarControls.gd").new()
+    var free_motion: Vector3=Vector3.ZERO
+    for i in range(12):free_motion+=free_controls.step(0.1,1.0,0.5,false,false,1.0,100)
+    if not _check(free_motion.length()>1.0 and absf(free_motion.x)>0.05 and absf(free_controls.yaw)>0.05,"free car accelerates and changes heading"):
+        return
+    free_controls.stop()
+    var backwards: Vector3=free_controls.step(0.1,-1.0,0.0,false,false,1.0,100)
+    if not _check(free_controls.speed<0.0 and backwards.dot(Vector3(-sin(free_controls.yaw),0,-cos(free_controls.yaw)))<0.0,"free car reverses along its heading"):
+        return
     var controls = preload("res://scripts/DriveControls.gd").new()
     for i in range(100):
         controls.accept(controls.propose(0.1,1.0,0.0,false,0))
