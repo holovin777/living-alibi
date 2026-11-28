@@ -12,7 +12,7 @@ import import_vigevano as osm
 class OverpassDownloadTests(unittest.TestCase):
     def test_wide_tiles(self):
         tiles = osm.tiles(osm.WIDE_BBOX)
-        self.assertEqual(len(tiles), 4)
+        self.assertEqual(len(tiles), 16)
         self.assertEqual(osm.tiles(osm.BBOX), [osm.BBOX])
         self.assertEqual(tiles[0][:2], osm.WIDE_BBOX[:2])
         self.assertEqual(tiles[-1][2:], osm.WIDE_BBOX[2:])
@@ -44,3 +44,45 @@ class OverpassDownloadTests(unittest.TestCase):
                 self.assertEqual(root.tag, "osm")
                 self.assertEqual(call.call_count, 2)
                 self.assertEqual(call.call_args.args[0].full_url, osm.OVERPASS_ENDPOINTS[1])
+
+    def test_resume_after_failure(self):
+        sample = ET.fromstring('<osm><node id="1"/><way id="2"><nd ref="1"/></way></osm>')
+        with tempfile.TemporaryDirectory() as work:
+            path = Path(work) / "map.osm"
+            calls = []
+            def partial(bounds, directory):
+                calls.append(bounds)
+                if len(calls) == 1:
+                    return sample
+                raise RuntimeError("offline")
+            with patch.object(osm, "download_tile", side_effect=partial):
+                with self.assertRaises(RuntimeError):
+                    osm.download(path, osm.WIDE_BBOX)
+            first = osm.tiles(osm.WIDE_BBOX)[0]
+            self.assertTrue(osm.cache_path(path.with_suffix(".tiles-v2"), first).is_file())
+            with patch.object(osm, "download_tile", return_value=sample) as call:
+                osm.download(path, osm.WIDE_BBOX)
+                self.assertEqual(call.call_count, 15)
+                self.assertNotEqual(call.call_args_list[0].args[0], first)
+            self.assertTrue(path.is_file())
+            self.assertFalse(path.with_suffix(".tiles-v2").exists())
+
+    def test_adaptive_subdivision(self):
+        with tempfile.TemporaryDirectory() as work:
+            folder = Path(work)
+            cache = folder / "tiles"
+            cache.mkdir()
+            sample = ET.fromstring('<osm><node id="1"/><way id="2"/></osm>')
+            with patch.object(osm, "download_tile", side_effect=[RuntimeError("timeout")] + [sample]*4) as call:
+                result = osm.resumable_tile(osm.BBOX, cache, folder)
+                self.assertEqual(call.call_count, 5)
+                self.assertEqual(len(result.findall("way")), 1)
+            with patch.object(osm, "download_tile") as call:
+                osm.resumable_tile(osm.BBOX, cache, folder)
+                call.assert_not_called()
+
+    def test_empty_subtile_is_valid(self):
+        empty = ET.fromstring('<osm/>')
+        self.assertEqual(osm.merge_tiles([empty], require_ways=False).tag, "osm")
+        with self.assertRaises(ValueError):
+            osm.merge_tiles([empty])

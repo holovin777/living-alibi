@@ -42,7 +42,8 @@ if ! valid_map || [[ "$REFRESH" == true ]]; then
     fi
     if [[ "$imported" != true ]] || ! valid_map; then
         echo "Cannot load the $REGION map. No compatible cached map is available." >&2
-        echo "Retry later, or use bash play.sh for the built-in town (no OSM download)." >&2
+        echo "Completed tiles are kept in $MAP.tiles-v2. Run the same command to resume." >&2
+        echo "Or use bash play.sh for the built-in town (no OSM download)." >&2
         echo "Your SQLite save has not been reset." >&2
         exit 1
     fi

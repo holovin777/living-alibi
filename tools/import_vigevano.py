@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 import sys
 import tempfile
+import shutil
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,8 +42,8 @@ OVERPASS_ENDPOINTS = (
 
 
 def download_tile(bounds, directory):
-    bbox = ",".join(map(str, bounds))
-    query = f'[out:xml][timeout:60];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});way["landuse"~"^(farmland|meadow|forest|orchard|vineyard|grass)$"]({bbox});way["natural"~"^(wood|grassland|water)$"]({bbox});way["leisure"="park"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox});node["highway"~"^(traffic_signals|crossing)$"]({bbox}););out body;>;out skel qt;'
+    bbox = ",".join(f"{value:.7f}" for value in bounds)
+    query = f'[out:xml][timeout:35];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});way["landuse"~"^(farmland|meadow|forest|orchard|vineyard|grass)$"]({bbox});way["natural"~"^(wood|grassland|water)$"]({bbox});way["leisure"="park"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox});node["highway"~"^(traffic_signals|crossing)$"]({bbox}););out body;>;out skel qt;'
     tmp = directory / "response.osm"
     for endpoint in OVERPASS_ENDPOINTS:
         req = urllib.request.Request(endpoint,
@@ -49,7 +51,7 @@ def download_tile(bounds, directory):
                                      headers={"User-Agent": "LivingAlibi/0.1 local OSM import"})
         try:
             print(f"Fetching OSM tile {bbox} from {endpoint}", flush=True)
-            with urllib.request.urlopen(req, timeout=80) as response, tmp.open("wb") as out:
+            with urllib.request.urlopen(req, timeout=50) as response, tmp.open("wb") as out:
                 while block := response.read(65536):
                     out.write(block)
             root = ET.parse(tmp).getroot()
@@ -63,16 +65,67 @@ def download_tile(bounds, directory):
     raise RuntimeError(f"All Overpass servers failed for tile {bbox}")
 
 
-def tiles(bounds):
-    if bounds != WIDE_BBOX:
-        return [bounds]
+def split_grid(bounds, size):
     south, west, north, east = bounds
-    mid_lat, mid_lon = (south+north)/2, (west+east)/2
-    return [(s, w, n, e) for s, n in ((south, mid_lat), (mid_lat, north))
-            for w, e in ((west, mid_lon), (mid_lon, east))]
+    lat = [south + (north-south)*i/size for i in range(size+1)]
+    lon = [west + (east-west)*i/size for i in range(size+1)]
+    lat[-1], lon[-1] = north, east
+    return [(lat[i], lon[j], lat[i+1], lon[j+1])
+            for i in range(size) for j in range(size)]
 
 
-def merge_tiles(roots):
+def tiles(bounds):
+    return split_grid(bounds, 4) if bounds == WIDE_BBOX else [bounds]
+
+
+def cache_path(directory, bounds):
+    return directory / ("tile_" + "_".join(f"{v:.7f}" for v in bounds) + ".osm")
+
+
+def read_cached_tile(path):
+    if not path.is_file():
+        return None
+    try:
+        # Resume downloads for a week; avoid merging very old snapshots.
+        if time.time() - path.stat().st_mtime > 7 * 86400:
+            return None
+        root = ET.parse(path).getroot()
+        if root.tag == "osm" and root.find("remark") is None:
+            return root
+    except (OSError, ET.ParseError):
+        pass
+    return None
+
+
+def resumable_tile(bounds, cache, work, depth=0):
+    path = cache_path(cache, bounds)
+    cached = read_cached_tile(path)
+    if cached is not None:
+        print(f"Using cached OSM tile {path.name}", flush=True)
+        return cached
+    # If all four subtiles were already fetched, don't hit the parent again.
+    children = split_grid(bounds, 2)
+    previous = [read_cached_tile(cache_path(cache, child)) for child in children]
+    if all(root is not None for root in previous):
+        root = merge_tiles(previous, require_ways=False)
+    else:
+        try:
+            root = download_tile(bounds, work)
+        except RuntimeError:
+            if depth >= 1:
+                raise
+            print("Tile failed; splitting into four smaller requests.", flush=True)
+            root = merge_tiles(
+                [resumable_tile(child, cache, work, depth+1) for child in children],
+                require_ways=False)
+    # Atomic writes: interruption cannot leave a half-written cached tile.
+    tmp = work / "cached-tile.osm"
+    ET.ElementTree(root).write(tmp, encoding="utf-8", xml_declaration=True)
+    tmp.replace(path)
+    return root
+
+
+def merge_tiles(roots, require_ways=True):
     # Overpass can emit a tagged node in one tile and an untagged skeleton
     # in another. Keep the richer duplicate; preserve full way references.
     elements = {}
@@ -84,7 +137,7 @@ def merge_tiles(roots):
             old = elements.get(key)
             if old is None or len(element) > len(old):
                 elements[key] = element
-    if not any(kind == "way" for kind, _ in elements):
+    if require_ways and not any(kind == "way" for kind, _ in elements):
         raise ValueError("Extract contains no ways")
     result = ET.Element("osm", {"version": "0.6", "generator": "LivingAlibi"})
     for kind in ("node", "way", "relation"):
@@ -94,18 +147,23 @@ def merge_tiles(roots):
 
 def download(path, bounds=BBOX):
     path.parent.mkdir(parents=True, exist_ok=True)
-    # Stage every tile before replacing the previous raw extract.
+    # Persist successful tiles across failed launches, separately for each map.
+    # The completed extract is replaced only after every tile is available.
+    cache = path.with_suffix(".tiles-v2")
+    cache.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="osm-", dir=path.parent) as work:
         directory = Path(work)
         regions = tiles(bounds)
         roots = []
         for index, tile in enumerate(regions, 1):
             print(f"Map download: tile {index}/{len(regions)}", flush=True)
-            roots.append(download_tile(tile, directory))
+            roots.append(resumable_tile(tile, cache, directory))
         merged = merge_tiles(roots)
         tmp = directory / "merged.osm"
         ET.ElementTree(merged).write(tmp, encoding="utf-8", xml_declaration=True)
         tmp.replace(path)
+    # A later explicit refresh starts a fresh snapshot after a successful merge.
+    shutil.rmtree(cache, ignore_errors=True)
 
 
 def height(tags):

@@ -230,4 +230,4 @@ while seated, then W/S, A/D and Space. Children cannot use the car system.
 The same fuel/condition rules apply; the legacy visitor remains inactive.
 Driving is still a short lane preview with a server-confirmed district arrival.
 
-The first real-map launch needs OpenStreetMap data. Wide mode downloads four tiles sequentially, trying the public Overpass fallback if a request fails. A valid cached map is reused offline; a failed first download never resets SQLite. `bash play.sh` opens the built-in town without a map download.
+The first real-map launch needs OpenStreetMap data. Wide mode downloads 16 tiles sequentially, trying the public Overpass fallback and subdividing failed tiles once. Completed tiles are cached under data/*.tiles-v2 and reused for up to seven days on retry; a completed map is never replaced by a partial extract. A valid cached map is reused offline; a failed first download never resets SQLite. `bash play.sh` opens the built-in town without a map download.
