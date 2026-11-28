@@ -111,11 +111,13 @@ final class FireServiceLife {
         int elapsed=now(s)-get(t,"started");
         if(elapsed>=10)report(t); // abstract resident notification
         if(get(t,"reported")!=0&&get(t,"arrive")==0&&s.minute%5==0)dispatch(t,s);
-        if(s.minute%5==0&&get(t,"arrive")==0)add(t,"damage",1);
+        if(s.minute%5==0&&(get(t,"arrive")==0||now(s)<get(t,"arrive"))&&get(t,"last-damage")!=now(s)){
+            set(t,"last-damage",now(s));add(t,"damage",1);FireRecoveryLife.damage(t,site(t),4);
+        }
         if(get(t,"end")>0&&now(s)>=get(t,"end")){
             add(t,"extinguished",1);clear(t);
         }else if(get(t,"arrive")==0&&elapsed>=120){
-            add(t,"uncontrolled",1);clear(t);
+            FireRecoveryLife.damage(t,site(t),20);add(t,"uncontrolled",1);clear(t);
         }
     }
     private static void clear(TownLife.Town t){for(String k:List.of("site","started","reported","arrive","end","crew-1","crew-2"))set(t,k,0);}

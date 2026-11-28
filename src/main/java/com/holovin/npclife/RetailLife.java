@@ -57,7 +57,7 @@ final class RetailLife {
         var product=product(id);
         if(!availableAt(player.place,product) || player.travelRemaining>0)
             throw new IllegalArgumentException("This product is not available at your local counter.");
-        if(!open(player.place,minute)||minute+2>closes(player.place))
+        if(FireRecoveryLife.closed(t,player.place)||!open(player.place,minute)||minute+2>closes(player.place))
             throw new IllegalArgumentException("The shop is closed or closing.");
         if(t.retailStock.getOrDefault(id,0)<1)
             throw new IllegalArgumentException("This product is sold out.");
@@ -112,6 +112,7 @@ final class RetailLife {
     }
     static String buyProduce(TownLife.Town t,int minute) {
         var p=t.player;TransportLife.ready(p);
+        if(FireRecoveryLife.closed(t,TownLife.Place.MARKET))throw new IllegalArgumentException("Market temporarily closed for restoration.");
         if(p.place!=TownLife.Place.MARKET)throw new IllegalArgumentException("Sell produce at the market.");
         if(minute<480||minute>=1200)throw new IllegalArgumentException("Market opens 08:00–20:00.");
         if(FoodLife.quantity(p,"vegetables",false)<1)throw new IllegalArgumentException("Bring vegetables in your bag.");
@@ -129,6 +130,7 @@ final class RetailLife {
     }
     static String buyEggs(TownLife.Town t,int minute) {
         var p=t.player;TransportLife.ready(p);
+        if(FireRecoveryLife.closed(t,TownLife.Place.MARKET))throw new IllegalArgumentException("Market temporarily closed for restoration.");
         if(p.place!=TownLife.Place.MARKET||minute<480||minute>=1200)
             throw new IllegalArgumentException("Sell eggs at Market 08:00–20:00.");
         if(FoodLife.quantity(p,"eggs",false)<1)throw new IllegalArgumentException("Bring eggs in your bag.");
@@ -146,6 +148,7 @@ final class RetailLife {
     }
     static String buyFruit(TownLife.Town t,String id,int minute){
         var p=t.player;TransportLife.ready(p);
+        if(FireRecoveryLife.closed(t,TownLife.Place.MARKET))throw new IllegalArgumentException("Market temporarily closed for restoration.");
         if(p.place!=TownLife.Place.MARKET||minute<480||minute>=1200)throw new IllegalArgumentException("Sell fruit at Market 08:00–20:00.");
         if(fruitSpace(t,id)<1||t.employerFunds.getOrDefault("shop-assistant",0)<OrchardLife.SELL_PRICE)
             throw new IllegalArgumentException("Market cannot accept more fruit.");
@@ -160,6 +163,7 @@ final class RetailLife {
     }
     static String buyHoney(TownLife.Town t,int minute){
         var p=t.player;TransportLife.ready(p);
+        if(FireRecoveryLife.closed(t,TownLife.Place.MARKET))throw new IllegalArgumentException("Market temporarily closed for restoration.");
         if(p.place!=TownLife.Place.MARKET||minute<480||minute>=1200)
             throw new IllegalArgumentException("Sell honey at Market 08:00–20:00.");
         int funds=t.employerFunds.getOrDefault("shop-assistant",0);
@@ -176,6 +180,7 @@ final class RetailLife {
     }
     static String buyCellarProduct(TownLife.Town t,String id,int minute) {
         var p=t.player;TransportLife.ready(p);
+        if(FireRecoveryLife.closed(t,TownLife.Place.MARKET))throw new IllegalArgumentException("Market temporarily closed for restoration.");
         int space=cellarSpace(t,id);
         if(p.place!=TownLife.Place.MARKET||minute<480||minute>=1200)
             throw new IllegalArgumentException("Sell cellar products at Market 08:00–20:00.");

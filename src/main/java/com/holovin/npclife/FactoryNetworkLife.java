@@ -117,7 +117,7 @@ final class FactoryNetworkLife {
             for(var p:PLANTS)FactoryMaintenance.service(t,s,p);
         }
         if(s.minute==780&&SupplyChainLife.once(t,"network-production",s.day)){
-            for(var p:PLANTS)if(SupplyChainLife.attending(t,p.site(),p.occupation())){
+            for(var p:PLANTS)if(!FireRecoveryLife.closed(t,p.site())&&SupplyChainLife.attending(t,p.site(),p.occupation())){
                 if(!FactoryMaintenance.operational(t,p))IndustrialRepairLife.lostBatch(t,p);
                 else produce(t,p,s.day);
             }

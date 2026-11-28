@@ -11,8 +11,11 @@ final class FireEvacuationLife {
     }
     static TownLife.Place destination(TownLife.Town t,TownLife.Citizen c,TownLife.Place planned){
         var site=FireServiceLife.site(t);
-        if(site==null||!c.alive||c.generationIndex<=0||FireServiceLife.assigned(t,c)
+        if(!c.alive||c.generationIndex<=0||FireServiceLife.assigned(t,c)
                 ||RebirthLife.linkedAdult(t,c)||RebirthLife.linkedChild(t,c))return null;
+        // Closed housing remains unavailable after the fire is out.
+        if((c.home==TownLife.Place.NORTH_RESIDENCES||c.home==TownLife.Place.SOUTH_RESIDENCES)&&FireRecoveryLife.closed(t,c.home))return SHELTER;
+        if(site==null){return FireRecoveryLife.closed(t,planned)?SHELTER:null;}
         // Residents react once they are in, headed into, or normally scheduled in the affected district.
         if(!affected(t,c)&&c.place!=site&&planned!=site&&(c.travelRemaining<=0||c.destination!=site))return null;
         if(!affected(t,c)){

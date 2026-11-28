@@ -640,6 +640,8 @@ func _update_navigation() -> void:
             hud.text+="\n%s · %s · RC %s d · Revisione %s d" % [doc.get("kind",""),doc.get("plate",""),doc.get("insuranceDays",0),doc.get("inspectionDays",0)]
         var duty: Dictionary=world.get("fireDuty",{})
         if str(world.get("jobId",""))=="firefighter":hud.text+="\nFire duty / Servizio: kit %s%% · %s" % [duty.get("gearCondition",0),"Assigned / In missione" if duty.get("assigned",false) else "Standby / Disponibile" if duty.get("standby",false) else "Off duty / Riposo"]
+        for damaged in world.get("fireRecovery",[]):
+            if str(damaged.get("id",""))==str(district.get("id","")):hud.text+="\nRestoration / Ripristino: %s%% · %s" % [damaged.get("condition",100),"Closed / Chiuso" if damaged.get("closed",false) else "Open / Aperto"]
         var fire: Dictionary=world.get("fireService",{})
         if str(fire.get("status","NONE"))!="NONE":hud.text+="\nFire / Incendio: %s · %s · %s min · Crew %s" % [fire.get("district",""),fire.get("status",""),fire.get("minutesRemaining",0),fire.get("assigned",0)]
         if int(fire.get("evacuating",0))>0:hud.text+="\nEvacuation / Evacuazione: %s people · %s at park" % [fire.get("evacuating",0),fire.get("sheltered",0)]

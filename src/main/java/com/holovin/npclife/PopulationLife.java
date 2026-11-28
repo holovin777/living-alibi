@@ -64,7 +64,7 @@ final class PopulationLife {
         boolean working=!child&&!retired&&c.employed && !PlayerServiceBusiness.ROLE.equals(c.occupation) && !sick && (fireStaff?fireWorking:publicSafety?PoliceLife.scheduled(c,clock.day,minute):(foodWorker?(clock.day-1)%7!=0:workday)) &&
                 (fireStaff||publicSafety?true:itEmployee?ITStaffLife.scheduled(town,c,clock.day,minute):journalist?(minute>=480&&minute<=960):carrier?(minute>=510 && minute<840):shopEmployee?(minute>=660 && minute<840):stallEmployee?MarketStallLife.scheduled(town,clock.day,minute):foodWorker?(minute>=660&&minute<1140):
                 (minute>=420+c.scheduleOffset && minute<960+c.scheduleOffset));
-        boolean marketOpen=minute>=420 && minute<1200;
+        boolean marketOpen=minute>=420 && minute<1200&&!FireRecoveryLife.closed(town,TownLife.Place.MARKET);
         boolean needFood=c.food<2 && (c.money>=9||MarketStallLife.offer(town,c,clock.day,minute)!=null);
         boolean needWater=c.water<2;
         // A repaired public fountain provides an affordable alternative to
@@ -144,6 +144,7 @@ final class PopulationLife {
         if(child&&FamilyDoorLife.lockedFor(town,c,clock.day,minute)&&desired!=TownLife.Place.SCHOOL)desired=c.home;
         var evacuation=FireEvacuationLife.destination(town,c,desired);
         if(evacuation!=null)desired=evacuation;
+        else if(FireRecoveryLife.closed(town,desired)&&!FireServiceLife.assigned(town,c))desired=TownLife.Place.PARK;
         if(c.travelRemaining>0 || c.place!=desired) {
             NpcTransportLife.depart(town,c,desired,clock);
             TownLife.move(town,c,desired,clock,events,observations);

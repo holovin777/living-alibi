@@ -899,7 +899,7 @@ public final class GameSession implements AutoCloseable {
         // The player has walked there in Godot; avoid charging travel twice.
         copy.player.place=place;copy.player.destination=place;copy.player.travelRemaining=0;
         apply(copy,0,"Entered "+place.label+".");
-        if(GeoProjection.hasInterior(place))geoInterior=place;
+        if(GeoProjection.hasInterior(place)&&!FireRecoveryLife.closed(town,place))geoInterior=place;
     }
     synchronized String geoSpeak(GeoProjection map,String id,String message,String language,double x,double z) throws SQLException {
         if(geoDrive!=null)throw new IllegalArgumentException("Exit the vehicle first.");
@@ -982,6 +982,10 @@ public final class GameSession implements AutoCloseable {
                 default -> throw new IllegalArgumentException("Unknown workshop action.");
             };
             return new GeoProjection.ActionResult(result.message(),null);
+        }
+        if(action.equals("fire-recovery-repair")){
+            var copy=town.copy();String message=FireRecoveryLife.playerRepair(copy,state,copy.player.place);apply(copy,60,message);
+            return new GeoProjection.ActionResult(message,null);
         }
         if(action.equals("fire-duty-gear")){
             var copy=town.copy();String message=FireDutyLife.issueGear(copy,state);apply(copy,5,message);
