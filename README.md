@@ -32,19 +32,19 @@ The launcher builds the Java engine and Spring Boot server, starts the local API
 
 Your world is saved in `data/world.db`. **Do not delete this file to install updates.** Back it up with the game and server stopped. If startup fails, check the terminal and `data/server.log`.
 
-## Graphics — NVIDIA / hybrid laptops
+## Graphics and maps
 
-Both Linux launchers request NVIDIA PRIME offload by default. They use `prime-run` when available, otherwise the equivalent NVIDIA environment variables without changing system configuration. Set `LIVING_ALIBI_GPU=auto` for detection or `LIVING_ALIBI_GPU=system` to opt out. Only the interactive Godot process is offloaded; Java and asset import run normally. Compatibility (OpenGL) remains the default, with bounded directional shadows in geographic mode when NVIDIA is requested. Verify the device in Godot's startup output or `nvidia-smi`; requesting PRIME does not guarantee the driver is correctly configured.
+Use the single public launcher. The original game stays the default because the real-map client still lacks some original gameplay features.
 
 ```bash
-LIVING_ALIBI_GPU=nvidia bash play-vigevano.sh --wide
-LIVING_ALIBI_GPU=system bash play.sh
-LIVING_ALIBI_SHADOWS=0 bash play-vigevano.sh --wide
-# Experimental Vulkan renderer, if supported by your GPU/driver:
-LIVING_ALIBI_RENDERER=mobile bash play-vigevano.sh --wide --preview-only
+prime-run bash play.sh
+prime-run bash play.sh --wide
+bash play.sh --wide --preview-only
 ```
 
-On Arch Linux, `nvidia-prime` provides `prime-run`; install a driver appropriate to your actual GPU first. The launcher does not install drivers. See https://wiki.archlinux.org/title/PRIME. The wide geographic mode uses the same SQLite world; back up before switching maps, or use `--preview-only` to explore without changing it.
+The launcher no longer selects NVIDIA automatically. External PRIME variables are inherited, and the geographic renderer enables bounded sun shadows when PRIME is requested unless `LIVING_ALIBI_SHADOWS=0` is set. OpenGL Compatibility remains the default. Use `LIVING_ALIBI_RENDERER=mobile` for experimental Vulkan rendering. NVIDIA driver and `prime-run` must already work on your system; the game does not install drivers. Check Godot's startup device or `nvidia-smi`.
+
+The expanded real-map mode uses the same SQLite world and provisional district positions. Back up the save before switching, or use `--preview-only`. First map import requires an internet connection and Python 3.
 
 ## Your first life
 

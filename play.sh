@@ -6,11 +6,23 @@ set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-play}"
 
+# One public entry point: preserve the original game and expose real-map mode.
+if [[ "$MODE" == "--map" ]]; then
+    shift
+    exec bash "$ROOT/tools/launch-geographic.sh" "$@"
+elif [[ "$MODE" == "--wide" || "$MODE" == "--preview-only" || "$MODE" == "--refresh" ]]; then
+    exec bash "$ROOT/tools/launch-geographic.sh" --wide "$@"
+fi
+
 usage() {
     cat <<'EOF'
 Living Alibi — local Godot preview
 Usage:
   bash play.sh                 Build Java + Spring, start server, open Godot.
+  bash play.sh --wide          Open the expanded real-map world (experimental).
+  bash play.sh --map           Open the central real-map world.
+  bash play.sh --wide --preview-only  Explore without changing the save.
+  bash play.sh --wide --refresh       Refresh cached geographic data.
   bash play.sh --check         Check required installed programs.
   bash play.sh --server-only   Build and run the persistent private Spring server.
   bash play.sh --client-only   Open Godot against an existing server or SSH tunnel.
@@ -19,8 +31,7 @@ Usage:
 Requires: JDK 21+, Maven 3.9+, curl and (for the game window) Godot 4.
 Saved world: data/world.db (kept between launches; never erased).
 No API key or cloud server is needed for the current offline demo.
-Graphics: NVIDIA PRIME preferred on Linux when available.
-Set LIVING_ALIBI_GPU=system to opt out, or =nvidia to request offload.
+Graphics: system default, or run prime-run bash play.sh yourself.
 EOF
 }
 

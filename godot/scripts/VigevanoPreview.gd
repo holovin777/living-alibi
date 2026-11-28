@@ -81,7 +81,7 @@ func _ready() -> void:
     credit.position.y=-30
     canvas.add_child(credit)
     if not FileAccess.file_exists(map_path):
-        hud.text="Map missing. Run bash play-vigevano.sh to import real OSM data."
+        hud.text="Map missing. Run bash play.sh --map to import real OSM data."
         return
     var parsed = JSON.parse_string(FileAccess.get_file_as_string(map_path))
     if not parsed is Dictionary or int(parsed.get("schema",0))!=2 or not parsed.get("chunks") is Dictionary:

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 if command -v godot >/dev/null 2>&1; then GODOT=godot
 elif command -v godot4 >/dev/null 2>&1; then GODOT=godot4
@@ -15,7 +15,7 @@ for arg in "$@"; do
         --wide) REGION=wide ;;
         --refresh) REFRESH=true ;;
         --preview-only) PREVIEW=true ;;
-        *) echo "Usage: bash play-vigevano.sh [--wide] [--refresh] [--preview-only]" >&2; exit 2 ;;
+        *) echo "Usage: bash play.sh --map [--wide] [--refresh] [--preview-only]" >&2; exit 2 ;;
     esac
 done
 MAP="data/vigevano"

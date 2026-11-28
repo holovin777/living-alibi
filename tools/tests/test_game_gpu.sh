@@ -3,6 +3,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT/tools/game_gpu.sh"
 GODOT=/example/godot
+unset __NV_PRIME_RENDER_OFFLOAD LIVING_ALIBI_GPU
+LIVING_ALIBI_RENDERER=compatibility
+configure_game_gpu
+[[ "${GODOT_COMMAND[*]}" == "/example/godot --rendering-method gl_compatibility" ]]
 LIVING_ALIBI_GPU=system
 LIVING_ALIBI_RENDERER=compatibility
 configure_game_gpu
@@ -20,12 +24,16 @@ if [[ "$(uname -s)" == Linux ]]; then
     prime-run() { :; }
     unset LIVING_ALIBI_GPU
     configure_game_gpu
-    [[ "${GODOT_COMMAND[*]}" == *"prime-run /example/godot --rendering-method gl_compatibility" ]]
+    [[ "${GODOT_COMMAND[*]}" == "/example/godot --rendering-method gl_compatibility" ]]
+    __NV_PRIME_RENDER_OFFLOAD=1
+    configure_game_gpu
+    [[ "${GODOT_COMMAND[*]}" == *"LIVING_ALIBI_SHADOWS="*"/example/godot --rendering-method gl_compatibility" ]]
+    unset __NV_PRIME_RENDER_OFFLOAD
     LIVING_ALIBI_GPU=auto
     configure_game_gpu
     [[ "${GODOT_COMMAND[*]}" == *"prime-run /example/godot --rendering-method gl_compatibility" ]]
     unset -f prime-run
-    unset LIVING_ALIBI_GPU
+    LIVING_ALIBI_GPU=nvidia
     configure_game_gpu
     [[ "${GODOT_COMMAND[*]}" == *prime-run* || "${GODOT_COMMAND[*]}" == *__NV_PRIME_RENDER_OFFLOAD=1* ]]
 fi
