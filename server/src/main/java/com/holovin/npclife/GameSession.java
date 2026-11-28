@@ -983,6 +983,16 @@ public final class GameSession implements AutoCloseable {
             };
             return new GeoProjection.ActionResult(result.message(),null);
         }
+        if(action.startsWith("firm:")){
+            String[] parts=action.split(":",3);var copy=town.copy();
+            String message=switch(parts[1]){
+                case "buy" -> BusinessOwnershipLife.buy(copy,state,parts[2]);
+                case "invest" -> BusinessOwnershipLife.invest(copy,state,parts[2]);
+                case "dividend" -> BusinessOwnershipLife.dividend(copy,state,parts[2]);
+                default -> throw new IllegalArgumentException("Unknown firm action.");
+            };
+            apply(copy,15,message);return new GeoProjection.ActionResult(message,null);
+        }
         if(action.equals("home-insurance-buy")||action.equals("home-insurance-collect")){
             var copy=town.copy();String message=action.endsWith("-buy")?HomeInsuranceLife.buy(copy,state):HomeInsuranceLife.collect(copy,state);
             apply(copy,15,message);return new GeoProjection.ActionResult(message,null);

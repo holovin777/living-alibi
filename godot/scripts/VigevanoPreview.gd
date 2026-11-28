@@ -642,6 +642,14 @@ func _update_navigation() -> void:
         if str(world.get("jobId",""))=="firefighter":hud.text+="\nFire duty / Servizio: kit %s%% · %s" % [duty.get("gearCondition",0),"Assigned / In missione" if duty.get("assigned",false) else "Standby / Disponibile" if duty.get("standby",false) else "Off duty / Riposo"]
         for damaged in world.get("fireRecovery",[]):
             if str(damaged.get("id",""))==str(district.get("id","")):hud.text+="\nRestoration / Ripristino: %s%% · %s" % [damaged.get("condition",100),"Closed / Chiuso" if damaged.get("closed",false) else "Open / Aperto"]
+        var ownership: Array=world.get("businessOwnership",[])
+        if str(district.get("id",""))=="OFFICE" and not ownership.is_empty():
+            var listings:=0
+            var owned_firms:=0
+            for firm in ownership:
+                if bool(firm.get("listed",false)):listings+=1
+                if bool(firm.get("owned",false)):owned_firms+=1
+            hud.text+="\nBusiness registry / Registro imprese: %s for sale · %s owned" % [listings,owned_firms]
         var loans: Array=world.get("businessCredit",[])
         if str(district.get("id",""))=="OFFICE" and not loans.is_empty():
             var loan_balance:=0
