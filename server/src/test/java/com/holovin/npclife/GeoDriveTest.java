@@ -45,6 +45,24 @@ class GeoDriveTest {
         assertEquals(3,drive.advance(map,0,5,17),.001);
         assertFalse(drive.waitingForSignal);
     }
+    @Test void lightVehicleLimitsAndCustody(){
+        var s=new WorldState();var t=TownLife.create(s);
+        t.player.place=TownLife.Place.MARKET;t.player.destination=t.player.place;
+        VehicleTheftLife.takeLight(t,s,"scooter",new ArrayList<>(),new ArrayList<>());
+        assertEquals("scooter",VehicleTheftLife.lightKind(t));
+        assertEquals(6,VehicleTheftLife.get(t,"fuel"));
+        VehicleTheftLife.set(t,"fuel",2);
+        VehicleTheftLife.recover(t);
+        assertEquals(2,VehicleTheftLife.reserveFuel(t,"scooter"));
+        assertEquals(9,VehicleTheftLife.reserveFuel(t,"motorcycle"));
+        var scooter=new GeoDrive(true,false,false,"scooter","1");
+        var motorcycle=new GeoDrive(true,false,false,"motorcycle","1");
+        assertEquals(45,scooter.vehicleLimit(72),.001);
+        assertEquals(72,motorcycle.vehicleLimit(72),.001);
+        scooter.controlBudget("step",.5,20);motorcycle.controlBudget("step",.5,20);
+        assertTrue(motorcycle.speed>scooter.speed);
+        assertEquals("motorcycle",motorcycle.copy().lightKind);
+    }
     @Test void reserveMaintenanceConsumesFundsAndSuppliesOnlyOncePerDay(){
         var s=new WorldState();var t=TownLife.create(s);
         s.day=2;s.minute=480;

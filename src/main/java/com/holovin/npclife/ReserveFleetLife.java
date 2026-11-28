@@ -7,11 +7,11 @@ final class ReserveFleetLife {
     static final int REPAIR_COST=15, REPAIR_POINTS=30;
     static void tick(TownLife.Town t,WorldState s){
         if(s.minute!=480)return;
-        for(String kind:new String[]{"bus","truck"}){
+        for(String kind:new String[]{"bus","truck","scooter","motorcycle"}){
             String key="reserve:"+kind+":";
             // Only service a reserve that has actually been used and recovered.
             if(!t.industryStocks.containsKey(key+"fuel"))continue;
-            if(kind.equals("bus")?VehicleTheftLife.bus(t):VehicleTheftLife.truck(t))continue;
+            if(VehicleTheftLife.reserveInCustody(t,kind))continue;
             if(t.industryStocks.getOrDefault(key+"service-day",0)>=s.day)continue;
             t.industryStocks.put(key+"service-day",s.day);
             service(t,kind);
@@ -19,7 +19,7 @@ final class ReserveFleetLife {
     }
     static void service(TownLife.Town t,String kind){
         String key="reserve:"+kind+":";
-        if(kind.equals("bus")?VehicleTheftLife.bus(t):VehicleTheftLife.truck(t))return;
+        if(VehicleTheftLife.reserveInCustody(t,kind))return;
         int condition=VehicleTheftLife.reserveCondition(t,kind);
         if(condition<70 && t.technicalMaterials.getOrDefault("spare-parts",0)>0
                 && SupplyChainLife.pay(t,ACCOUNT,"technician",REPAIR_COST)){
@@ -28,7 +28,7 @@ final class ReserveFleetLife {
             t.industryStocks.merge(key+"repair-expense",REPAIR_COST,Math::addExact);
         }
         int fuel=VehicleTheftLife.reserveFuel(t,kind);
-        int capacity=kind.equals("truck")?16:12;
+        int capacity=VehicleTheftLife.capacity(kind);
         int units=Math.max(0,Math.min(capacity-fuel,Math.min(6,Math.min(FuelLife.stock(t),t.employerFunds.getOrDefault(ACCOUNT,0)/FuelLife.PRICE))));
         if(units>0&&SupplyChainLife.pay(t,ACCOUNT,FuelLife.ACCOUNT,units*FuelLife.PRICE)){
             t.industryStocks.merge(FuelLife.STOCK,-units,Integer::sum);

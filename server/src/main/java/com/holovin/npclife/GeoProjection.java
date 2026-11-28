@@ -82,7 +82,7 @@ final class GeoProjection {
                 District playerDistrict,District nearestDistrict,boolean canEnter,
                 boolean alive,boolean confined,boolean rebirth,int money,int hunger,int thirst,int health,
                 String carDistrict,boolean cycling,District parkedCar,District parkedBicycle,
-                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,ParkedBus parkedBus,ParkedBus parkedTruck,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
+                int carFuel,int carCondition,String jobId,List<Choice> actions,CivilianCar civilianCar,ParkedBus parkedBus,ParkedBus parkedTruck,ParkedBus parkedScooter,ParkedBus parkedMotorcycle,JusticeLife.View justice,int vehicleThefts,List<Patrol> patrols,List<TrafficCar> traffic,Interior interior,Weather weather,PhoneView phone,BusinessLife.Status enterprise,GeoLife.View life,GeoWork.View work,List<GeoOffice.Remark> officeRemarks,GeoCommerce.View commerce,GeoProperty.View property,GeoProperty.Scenery propertyScenery,List<District> entrances){}
     record Step(String id,double cost){}
     record Route(List<Point> points,double meters){
         Point at(double fraction){
@@ -365,6 +365,8 @@ final class GeoProjection {
     }
     ParkedBus parkedBus(TownLife.Town t,Point player){return reserveVehicle(t,player,TownLife.Place.STAZIONE,"municipal-reserve-bus");}
     ParkedBus parkedTruck(TownLife.Town t,Point player){return reserveVehicle(t,player,TownLife.Place.WORKSHOP,"freight-reserve-truck");}
+    ParkedBus parkedScooter(TownLife.Town t,Point player){return reserveVehicle(t,player,TownLife.Place.MARKET,"municipal-scooter");}
+    ParkedBus parkedMotorcycle(TownLife.Town t,Point player){return reserveVehicle(t,player,TownLife.Place.PARK,"municipal-motorcycle");}
     private ParkedBus reserveVehicle(TownLife.Town t,Point player,TownLife.Place depot,String vehicleId){
         if(VehicleTheftLife.active(t)||t.player.place!=depot)return null;
         var station=point(depot);
@@ -540,6 +542,6 @@ final class GeoProjection {
         return new View(s.day,s.minute,population,commuting,(room==null?nearby.subList(0,Math.min(40,nearby.size())):inside).stream().map(a->a.withAppearance(t)).toList(),
             district(p.place),district(nearest),canEnter,rebirth?linked!=null&&linked.alive:p.alive,confined,rebirth,linked!=null?linked.money:p.money,linked!=null?linked.hunger:p.hunger,linked!=null?linked.thirst:p.thirst,linked!=null?linked.health:p.health,
             p.carPlace==null?null:p.carPlace.name(),p.cycling,p.carPlace==null?null:district(p.carPlace),
-            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
+            p.bicycleParked==null?null:district(p.bicycleParked),p.carFuel,p.carCondition,p.jobId,List.copyOf(availableActions),room==null?civilian(t,player):null,room==null?parkedBus(t,player):null,room==null?parkedTruck(t,player):null,room==null?parkedScooter(t,player):null,room==null?parkedMotorcycle(t,player):null,JusticeLife.view(t,s),JusticeLife.thefts(t),room==null?List.copyOf(visiblePatrols):List.of(),room==null?traffic.values().stream().sorted(Comparator.comparingDouble(v->new Point(v.x,v.z).distance(viewer))).limit(32).toList():List.of(),interior,weather(s),phone(t,s),!rebirth&&room==TownLife.Place.WORKSHOP?BusinessLife.status(t,s.day):null,GeoLife.view(t,s),GeoWork.view(t,s),room==TownLife.Place.OFFICE&&!privateRoom?GeoOffice.remarks(t,s,inside):List.of(),commerce,property,GeoProperty.scenery(t,s,this,player,room),room==null?nearbyEntrances(player):List.of());
     }
 }

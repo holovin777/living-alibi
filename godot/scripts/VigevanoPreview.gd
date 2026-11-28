@@ -62,6 +62,11 @@ var parked_bike: Node3D
 var civilian_car: Node3D
 var reserve_bus: Node3D
 var reserve_truck: Node3D
+var reserve_scooter: Node3D
+var reserve_motorcycle: Node3D
+var rider_body: Node3D
+var rider_speed: Label3D
+var driving_light: String=""
 var driving_bus:=false
 var driving_truck:=false
 var civilian_id:=""
@@ -174,9 +179,19 @@ func _ready() -> void:
     add_child(reserve_bus)
     reserve_bus.hide()
     if is_instance_valid(reserve_truck):reserve_truck.hide()
+    if is_instance_valid(reserve_scooter):reserve_scooter.hide()
+    if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
     reserve_truck=traffic._truck()
     add_child(reserve_truck)
     reserve_truck.hide()
+    reserve_scooter=traffic._two_wheeler(true)
+    reserve_motorcycle=traffic._two_wheeler(false)
+    for vehicle in [reserve_scooter,reserve_motorcycle]:
+        add_child(vehicle)
+        vehicle.hide()
+    rider_body=Node3D.new()
+    add_child(rider_body)
+    rider_body.hide()
     drive_audio=DriveSound.new()
     add_child(drive_audio)
     driving_body=Cockpit.new()
@@ -339,6 +354,10 @@ func _input(event: InputEvent) -> void:
         if event.keycode==KEY_G and residents.connected and room.is_empty() and not bool(residents.world.get("rebirth",false)):
             if owned_car.visible and walker.position.distance_to(owned_car.position)<5:
                 residents.drive_command("start",pos)
+            elif reserve_scooter.visible and walker.position.distance_to(reserve_scooter.position)<5:
+                residents.drive_command("steal-scooter",pos)
+            elif reserve_motorcycle.visible and walker.position.distance_to(reserve_motorcycle.position)<5:
+                residents.drive_command("steal-motorcycle",pos)
             elif reserve_truck.visible and walker.position.distance_to(reserve_truck.position)<5:
                 residents.drive_command("steal-truck",pos)
             elif reserve_bus.visible and walker.position.distance_to(reserve_bus.position)<5:
@@ -427,7 +446,7 @@ func _physics_process(delta: float) -> void:
         linked_age=age
         head.position.y=0.18 if age>=0 and age<6 else (0.35 if age>=6 and age<13 else (0.52 if age>=13 and age<18 else 0.65))
     if driving:
-        head.position=Vector3(-0.48,1.05,0.28) if driving_bus or driving_truck else Vector3(-0.33,0.30,0.20)
+        head.position=Vector3(0,0.55,0.32) if not driving_light.is_empty() else (Vector3(-0.48,1.05,0.28) if driving_bus or driving_truck else Vector3(-0.33,0.30,0.20))
         _drive_frame(delta)
         return
     if city_map.visible or chat.visible or actions_panel.visible or phone_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or (linked and not bool(life.get("canWalk",false))))):
@@ -570,16 +589,22 @@ func _update_navigation() -> void:
         if reserve_bus.visible:reserve_bus.rotation.y=float(world["parkedBus"].get("heading",0))
         _sync_parked_vehicle(reserve_truck,world.get("parkedTruck"),pos,Vector3(0,0.05,0))
         if reserve_truck.visible:reserve_truck.rotation.y=float(world["parkedTruck"].get("heading",0))
+        _sync_parked_vehicle(reserve_scooter,world.get("parkedScooter"),pos,Vector3(0,0.05,0))
+        _sync_parked_vehicle(reserve_motorcycle,world.get("parkedMotorcycle"),pos,Vector3(0,0.05,0))
+        if reserve_scooter.visible:reserve_scooter.rotation.y=float(world["parkedScooter"].get("heading",0))
+        if reserve_motorcycle.visible:reserve_motorcycle.rotation.y=float(world["parkedMotorcycle"].get("heading",0))
         if driving:
             reserve_bus.hide()
             if is_instance_valid(reserve_truck):reserve_truck.hide()
+            if is_instance_valid(reserve_scooter):reserve_scooter.hide()
+            if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
             reserve_truck.hide()
         _sync_patrols(world.get("patrols",[]))
         _sync_commutes(world.get("traffic",[]))
         hud.text+="\nJava traffic: %s" % commute_models.size()
         if property_scenery.missing_yard or property_scenery.missing_site:hud.text+="\nPlot visual unavailable: no clear mapped space. F actions still work."
         if driving:civilian_car.hide()
-        hud.text+="\nG: own car / steal car, station bus or workshop truck"
+        hud.text+="\nG: enter nearby vehicle / steal parked reserve"
         if driving:hud.text+="\nW: accelerate · Space/S: brake · A/D: choose turn · G: exit | Road target %s km/h · Fuel %s · Condition %s" % [residents.driving.get("speedLimitKmh",36),residents.driving.get("fuel",0),residents.driving.get("condition",0)]
         var justice: Dictionary=world.get("justice",{})
         if str(justice.get("status",""))=="REPORTED":hud.text+="\nPolice report · possible detention in %s game min" % justice.get("minutesRemaining",0)
@@ -594,6 +619,8 @@ func _update_navigation() -> void:
         civilian_car.hide()
         reserve_bus.hide()
         if is_instance_valid(reserve_truck):reserve_truck.hide()
+        if is_instance_valid(reserve_scooter):reserve_scooter.hide()
+        if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
         _sync_patrols([])
         _sync_commutes([])
         parked_bike.hide()
@@ -607,9 +634,15 @@ func _drive_pose(pose: Dictionary) -> void:
     var was_driving:=driving
     driving=bool(pose.get("active",false))
     driving_body.visible=driving
+    if not driving:rider_body.hide()
     if driving:
         driving_bus=str(pose.get("vehicleKind","CAR"))=="BUS"
         driving_truck=str(pose.get("vehicleKind","CAR"))=="TRUCK"
+        var kind:=str(pose.get("vehicleKind","CAR"))
+        driving_light=kind if kind in ["SCOOTER","MOTORCYCLE"] else ""
+        driving_body.visible=driving_light.is_empty()
+        rider_body.visible=not driving_light.is_empty()
+        if not was_driving and rider_body.visible:_build_rider(kind=="SCOOTER")
         driving_body.scale=Vector3(1.40,1.55,1.30) if driving_bus or driving_truck else Vector3.ONE
         server_drive_speed=float(pose.get("speedKmh",0))
         drive_goal=Vector3(float(pose["x"]),1.05,float(pose["z"]))
@@ -625,15 +658,32 @@ func _drive_pose(pose: Dictionary) -> void:
             civilian_car.hide()
             reserve_bus.hide()
             if is_instance_valid(reserve_truck):reserve_truck.hide()
+            if is_instance_valid(reserve_scooter):reserve_scooter.hide()
+            if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
     elif was_driving:
         _reset_driving_view()
         walker.position=Vector3(float(pose["x"]),1.05,float(pose["z"]))
         walker.velocity=Vector3.ZERO
         _stream()
 
+func _build_rider(scooter: bool) -> void:
+    for child in rider_body.get_children():
+        rider_body.remove_child(child)
+        child.queue_free()
+    rider_body.add_child(traffic._two_wheeler(scooter))
+    rider_speed=Label3D.new()
+    rider_speed.position=Vector3(0,1.20,-0.46)
+    rider_speed.font_size=40
+    rider_speed.pixel_size=0.0015
+    rider_speed.modulate=Color("#b6e7cf")
+    rider_speed.text="00 km/h"
+    rider_body.add_child(rider_speed)
+
 func _reset_driving_view() -> void:
     driving_bus=false
     driving_truck=false
+    driving_light=""
+    rider_body.hide()
     driving_body.scale=Vector3.ONE
     head.position=Vector3(0,0.65,0)
     head.rotation=Vector3.ZERO
@@ -661,6 +711,11 @@ func _drive_frame(delta: float) -> void:
     drive_audio.update_drive(true,drive_speed,Input.is_physical_key_pressed(KEY_W),delta)
     var steering_input:=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
     driving_body.update_instruments(drive_speed,steering_input,delta)
+    if not driving_light.is_empty():
+        rider_body.position=walker.position-Vector3(0,1.0,0)
+        rider_body.rotation.y=walker.rotation.y
+        rider_body.rotation.z=lerpf(rider_body.rotation.z,-steering_input*0.12,minf(1.0,delta*5.0))
+        if is_instance_valid(rider_speed):rider_speed.text="%02d km/h" % roundi(drive_speed)
     _stream()
     drive_timer+=delta
     if drive_timer>=0.65:
@@ -988,6 +1043,8 @@ func _change_interior(next_room: Dictionary) -> void:
         civilian_car.hide()
         reserve_bus.hide()
         if is_instance_valid(reserve_truck):reserve_truck.hide()
+        if is_instance_valid(reserve_scooter):reserve_scooter.hide()
+        if is_instance_valid(reserve_motorcycle):reserve_motorcycle.hide()
         parked_bike.hide()
         _sync_patrols([])
         _sync_commutes([])

@@ -91,6 +91,37 @@ func _car(paint: Color=Color.TRANSPARENT, imported: bool=true) -> Node3D:
         _box(root,Vector3(0.35,0.15,0.06),Vector3(x*0.83,0.72,1.8),Color("#9b2726"))
     return root
 
+func _two_wheeler(scooter: bool) -> Node3D:
+    var root:=Node3D.new()
+    var paint:=Color("#8bb6ad") if scooter else Color("#9e3e35")
+    var dark:=Color("#272c31")
+    var metal:=Color("#a6a9ab")
+    for z in [-0.72,0.72]:
+        var wheel:=MeshInstance3D.new()
+        var tire:=CylinderMesh.new()
+        tire.top_radius=0.27 if scooter else 0.32
+        tire.bottom_radius=tire.top_radius
+        tire.height=0.15
+        tire.radial_segments=16
+        wheel.mesh=tire
+        wheel.rotation.z=PI/2
+        wheel.position=Vector3(0,tire.top_radius,float(z))
+        wheel.material_override=_mat(dark)
+        root.add_child(wheel)
+    _box(root,Vector3(0.36,0.25,1.15),Vector3(0,0.48,0.08),paint)
+    _box(root,Vector3(0.38,0.15,0.63),Vector3(0,0.87,0.30),dark)
+    _box(root,Vector3(0.36,0.30,0.48),Vector3(0,0.76,-0.19),paint)
+    _box(root,Vector3(0.12,0.66,0.15),Vector3(0,0.72,-0.62),metal)
+    _box(root,Vector3(0.62,0.055,0.055),Vector3(0,1.13,-0.53),metal)
+    for x in [-0.29,0.29]:
+        _box(root,Vector3(0.17,0.065,0.08),Vector3(float(x),1.13,-0.53),dark)
+        _box(root,Vector3(0.05,0.22,0.05),Vector3(float(x),1.24,-0.55),metal)
+        _box(root,Vector3(0.13,0.08,0.035),Vector3(float(x),1.36,-0.55),Color("#82949d"))
+    _box(root,Vector3(0.19,0.12,0.07),Vector3(0,1.02,-0.68),Color("#fff2cb"))
+    _box(root,Vector3(0.20,0.09,0.07),Vector3(0,0.68,0.80),Color("#9c2928"))
+    if scooter:_box(root,Vector3(0.46,0.58,0.20),Vector3(0,0.76,-0.48),paint)
+    return root
+
 func _truck() -> Node3D:
     var root:=Node3D.new()
     var paint:=Color("#c5c9cb")
