@@ -1954,6 +1954,28 @@ func _exercise() -> void:
     world._render_actions()
     if not _check(world._near_engineering() and _has_button(world._action_choices,"Inspect · 30 min") and _has_button(world._action_choices,"Repair · 90 min"),"linked engineering work orders"):
         return
+    # Disabled repair must remain disabled after a request; enabled inspect
+    # must be restored. The fixed close button is never API-locked.
+    var inspect: Button=null
+    var repair: Button=null
+    for item in world._action_choices.get_children():
+        if item is Button and item.text.begins_with("Inspect"):inspect=item
+        if item is Button and item.text.begins_with("Repair"):repair=item
+    if not _check(inspect!=null and repair!=null and not inspect.disabled and repair.disabled,"engineering availability before request"):
+        return
+    world._set_request_busy(true)
+    if not _check(inspect.disabled and repair.disabled,"busy locks action buttons"):
+        return
+    world._set_request_busy(false)
+    if not _check(not inspect.disabled and repair.disabled,"request completion preserves unavailable actions"):
+        return
+    world._action_panel.show()
+    var close_work: Button=world._action_panel.find_child("CloseActions",true,false)
+    if not _check(close_work!=null and not close_work.disabled,"fixed close button available"):
+        return
+    close_work.pressed.emit()
+    if not _check(not world._action_panel.visible and not world._engineering_menu,"close button restores walking menu state"):
+        return
     world._close_engineering()
     var office := _world("OFFICE","Office")
     office["rebirth"]={"phase":"LINKED_ADULT","age":30,"childName":"Anna","softwareProjects":[{"id":"water-control","title":"Water control","phase":"OPEN","effect":"Water capacity +2","wage":45,"nextAction":"Develop","minutes":60,"canAdvance":true,"deployed":false}]}

@@ -732,8 +732,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if _action_panel.visible else Input.MOUSE_MODE_CAPTURED)
                 get_viewport().set_input_as_handled()
             elif event.keycode == KEY_ESCAPE:
-                _action_panel.visible = false
-                Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+                _close_action_menu()
                 get_viewport().set_input_as_handled()
         return
     if event is InputEventKey and event.pressed and not event.echo:
@@ -6565,6 +6564,11 @@ func _create_interface() -> void:
     var travel_label := Label.new()
     travel_label.text = "Choose a destination (Java decides travel time):"
     travel_col.add_child(travel_label)
+    var close_travel := Button.new()
+    close_travel.name="CloseTravel"
+    close_travel.text=tr("Close (Esc)")
+    close_travel.pressed.connect(_close_travel_menu)
+    travel_col.add_child(close_travel)
     _destination_filter=LineEdit.new()
     _destination_filter.placeholder_text=tr("Search destinations")
     _destination_filter.text_changed.connect(func(_value):_render_destinations())
@@ -6677,10 +6681,17 @@ func _create_interface() -> void:
     _action_panel.theme = _interface_theme
     canvas.add_child(_action_panel)
     _dock_right(_action_panel,460.0)
+    var action_column := VBoxContainer.new()
+    _action_panel.add_child(action_column)
+    var close_actions := Button.new()
+    close_actions.name="CloseActions"
+    close_actions.text=tr("Close (Esc)")
+    close_actions.pressed.connect(_close_action_menu)
+    action_column.add_child(close_actions)
     var action_scroll := ScrollContainer.new()
-    action_scroll.custom_minimum_size = Vector2(420,420)
+    action_scroll.custom_minimum_size = Vector2(420,minf(420.0,maxf(140.0,get_viewport().get_visible_rect().size.y-110.0)))
     action_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    _action_panel.add_child(action_scroll)
+    action_column.add_child(action_scroll)
     _action_choices = VBoxContainer.new()
     _action_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     action_scroll.add_child(_action_choices)
@@ -7095,6 +7106,40 @@ func _send_dialog(message: String) -> void:
     _dialog_history.append_text(tr("You")+": "+message.strip_edges()+"\n")
     _api.speak_to(_dialog_target,message,"en" if _dialog_language.selected==1 else "it",_stairwell_active and not _guest_active)
 
+func _capture_if_no_menu() -> void:
+    if not (_action_panel.visible or _travel_panel.visible or _map_panel.visible or _dialog_panel.visible or _phone.visible or _intercom.visible):
+        var focus:=get_viewport().gui_get_focus_owner()
+        if focus!=null:focus.release_focus()
+        Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+
+func _close_action_menu() -> void:
+    _action_panel.hide()
+    _grocery_menu=false
+    _cafe_menu=false
+    _medical_menu=false
+    _college_menu=false
+    _engineering_menu=false
+    _software_menu=false
+    _capture_if_no_menu()
+
+func _close_travel_menu() -> void:
+    _travel_panel.hide()
+    _destination_filter.release_focus()
+    _capture_if_no_menu()
+
+func _input(event: InputEvent) -> void:
+    # Escape also works when a text box/button owns GUI keyboard focus.
+    if not is_instance_valid(_action_panel) or _custody_active:return
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_ESCAPE:
+        if _phone.visible:_close_phone()
+        elif _intercom.visible:_close_intercom()
+        elif _dialog_panel.visible:_close_dialog()
+        elif _action_panel.visible:_close_action_menu()
+        elif _travel_panel.visible:_close_travel_menu()
+        elif _map_panel.visible:_toggle_map()
+        else:return
+        get_viewport().set_input_as_handled()
+
 func _toggle_map() -> void:
     _close_dialog()
     _map_panel.visible = not _map_panel.visible
@@ -7105,8 +7150,12 @@ func _toggle_map() -> void:
         _town_map.update_world(_current_place, _locations)
         if _connected and not _api.is_busy():
             _api.list_locations()
+    else:_capture_if_no_menu()
 
 func _toggle_travel() -> void:
+    if _travel_panel.visible:
+        _close_travel_menu()
+        return
     if not _near_gate() or not _connected:
         _message.text = "Approach the yellow gate with the Java server running."
         return
@@ -7130,17 +7179,23 @@ func _render_destinations() -> void:
         var caption := "%s (%sm)" % [destination_name, str(minutes)]
         var choice := _button(caption, _travel_to.bind(id))
         choice.set_meta("destination", id)
-        choice.disabled = id == _current_place or _api.is_busy()
+        choice.disabled = id == _current_place
+        if _api.is_busy():
+            choice.set_meta("before_request_disabled",choice.disabled)
+            choice.disabled=true
         _travel_choices.add_child(choice)
 
 func _travel_to(destination: String) -> void:
     if not _near_gate() or _api.is_busy() or not _connected:
         return
     _road_blocked = ""
-    _travel_panel.visible = false
+    _close_travel_menu()
     _api.go_to(destination)
 
 func _toggle_actions() -> void:
+    if _action_panel.visible:
+        _close_action_menu()
+        return
     if _rebirth_active():
         if not _connected:
             return
@@ -7683,6 +7738,22 @@ func _render_parent_requests(rebirth: Dictionary) -> void:
 func _render_actions() -> void:
     _replace_choices(_action_choices, true)
     if _custody_active:return
+    # Explicit interaction choices outrank automatic nearby vehicle menus.
+    if _software_menu and _near_software():
+        _render_software()
+        return
+    if _engineering_menu and _near_engineering():
+        _render_engineering()
+        return
+    if _college_menu and _near_college():
+        _render_college()
+        return
+    if _medical_menu and not _medical_station().is_empty():
+        _render_medical()
+        return
+    if _cafe_menu and not _cafe_station().is_empty():
+        _render_cafe()
+        return
     if _rebirth_active() and _can_use_car() and not _apartment_active:
         if _near_car():
             _action_title.text="Automobile / Car"
@@ -10824,7 +10895,14 @@ func _set_request_busy(busy: bool) -> void:
         if node is Button:
             var same_place := node.has_meta("destination") and (
                     str(node.get_meta("destination")) == _current_place)
-            node.disabled = busy or same_place or bool(node.get_meta("sold_out",false))
+            if busy:
+                if not node.has_meta("before_request_disabled"):
+                    node.set_meta("before_request_disabled",node.disabled)
+                node.disabled=true
+            elif node.has_meta("before_request_disabled"):
+                node.disabled=bool(node.get_meta("before_request_disabled")) or same_place or bool(node.get_meta("sold_out",false))
+                node.remove_meta("before_request_disabled")
+            # Freshly rebuilt buttons already carry the authoritative availability.
     _refresh_transport_buttons(busy)
     if not busy:
         _update_bag()

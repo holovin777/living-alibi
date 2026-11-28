@@ -344,8 +344,10 @@ func _input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
         return
     if actions_panel.visible:
-        if event is InputEventKey and event.pressed and (event.keycode==KEY_ESCAPE or (event.keycode in [KEY_F,KEY_I] and not get_viewport().gui_get_focus_owner() is TextEdit)):
+        if event is InputEventKey and event.pressed and not event.echo and (event.keycode==KEY_ESCAPE or (event.keycode in [KEY_F,KEY_I] and not get_viewport().gui_get_focus_owner() is TextEdit and not get_viewport().gui_get_focus_owner() is LineEdit)):
             actions_panel.hide()
+            var focus:=get_viewport().gui_get_focus_owner()
+            if focus!=null:focus.release_focus()
             Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
             get_viewport().set_input_as_handled()
         return
