@@ -65,3 +65,6 @@ PRIME offload is controlled by the caller: use prime-run bash play.sh --wide. Th
 
 ### Weather and driving atmosphere
 The geographic scene now uses a procedural day/night sky and rain-darkened asphalt, with two bounded shadowless headlights on the first-person driving body in darkness/rain. The original game also shares weather-sensitive asphalt materials across streamed districts. These are visual effects, not puddle simulation, true reflections, changing tire grip or new driving physics. The GPU cost is limited by two player lights; actual rendered quality and FPS still need hardware testing.
+
+### First-person cabin
+The geographic driving camera now sits on the left inside a lightweight dashboard and open windshield, with a turning steering wheel, a speed estimate from visual motion, and limited mouse head-look. Mirror surfaces are decorative; there are no live rear-view reflections. Heading is interpolated visually between server poses. Java still validates each road segment and controls movement; this is not free-steering or a new speed/physics model.

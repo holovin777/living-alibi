@@ -1,5 +1,6 @@
 extends SceneTree
 const Traffic=preload("res://scripts/GeoTraffic.gd")
+const Cockpit=preload("res://scripts/GeoCockpit.gd")
 func _initialize() -> void:
     var graph={"nodes":{"1":[35,0],"2":[65,0],"3":[65,35],"4":[35,35]},"edges":[
         {"a":"1","b":"2","walk":true,"drive_ab":true,"drive_ba":false},
@@ -11,6 +12,12 @@ func _initialize() -> void:
     _check.call_deferred(traffic,graph)
 
 func _check(traffic,graph: Dictionary) -> void:
+    var cabin=Cockpit.new()
+    root.add_child(cabin)
+    cabin.update_instruments(32.0,1.0,0.2)
+    if cabin.speed_display.text!="32 km/h" or cabin.steering.rotation.z>=0.0:
+        cabin.queue_free();push_error("Cabin instruments failed");quit(1);return
+    cabin.queue_free()
     traffic.configure(graph)
     var car: Node3D=traffic._car()
     if not car.has_node("ImportedVehicle"):

@@ -56,7 +56,10 @@ var patrol_models: Dictionary={}
 var patrol_goals: Dictionary={}
 var commute_models: Dictionary={}
 var commute_goals: Dictionary={}
+const Cockpit=preload("res://scripts/GeoCockpit.gd")
 var driving_body: Node3D
+var drive_speed:=0.0
+var drive_heading:=0.0
 var drive_goal:=Vector3.ZERO
 var driving:=false
 var drive_timer:=0.0
@@ -143,7 +146,7 @@ func _ready() -> void:
     civilian_car=traffic._car()
     add_child(civilian_car)
     civilian_car.hide()
-    driving_body=traffic._car(Color("#55585a"),false)
+    driving_body=Cockpit.new()
     add_child(driving_body)
     driving_body.hide()
     for side in [-1.0,1.0]:
@@ -337,9 +340,13 @@ func _input(event: InputEvent) -> void:
         Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
     if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
         Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
-    if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED and not driving:
-        walker.rotate_y(-event.relative.x*0.0025)
-        head.rotation.x=clampf(head.rotation.x-event.relative.y*0.0025,-1.45,1.45)
+    if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED:
+        if driving:
+            head.rotation.y=clampf(head.rotation.y-event.relative.x*0.0025,-1.0,1.0)
+            head.rotation.x=clampf(head.rotation.x-event.relative.y*0.0025,-0.5,0.45)
+        else:
+            walker.rotate_y(-event.relative.x*0.0025)
+            head.rotation.x=clampf(head.rotation.x-event.relative.y*0.0025,-1.45,1.45)
 
 func _physics_process(delta: float) -> void:
     if not ready_to_walk:return
@@ -365,6 +372,7 @@ func _physics_process(delta: float) -> void:
         linked_age=age
         head.position.y=0.18 if age>=0 and age<6 else (0.35 if age>=6 and age<13 else (0.52 if age>=13 and age<18 else 0.65))
     if driving:
+        head.position=Vector3(-0.33,0.30,0.20)
         _drive_frame(delta)
         return
     if city_map.visible or chat.visible or actions_panel.visible or phone_panel.visible or residents.action_pending or (shared_mode and (not residents.connected or bool(residents.world.get("confined",false)) or (linked and not bool(life.get("canWalk",false))))):
@@ -536,28 +544,46 @@ func _drive_pose(pose: Dictionary) -> void:
     driving_body.visible=driving
     if driving:
         drive_goal=Vector3(float(pose["x"]),1.05,float(pose["z"]))
-        walker.rotation.y=float(pose.get("heading",0))
-        head.rotation.x=0
+        drive_heading=float(pose.get("heading",0))
         if not was_driving:
+            walker.rotation.y=drive_heading
+            head.rotation=Vector3.ZERO
+            drive_speed=0.0
             walker.position=drive_goal
+            driving_body.position=walker.position-Vector3(0,1.0,0)
+            driving_body.rotation.y=drive_heading
             owned_car.hide()
             civilian_car.hide()
     elif was_driving:
+        _reset_driving_view()
         walker.position=Vector3(float(pose["x"]),1.05,float(pose["z"]))
         walker.velocity=Vector3.ZERO
         _stream()
+
+func _reset_driving_view() -> void:
+    head.position=Vector3(0,0.65,0)
+    head.rotation=Vector3.ZERO
+    linked_age=-999 # next walking frame restores the age-specific camera
+    drive_speed=0.0
 
 func _drive_frame(delta: float) -> void:
     if not residents.connected or bool(residents.world.get("confined",false)) or bool(residents.world.get("rebirth",false)):
         if not residents.connected:return # freeze until authoritative state is available again
         driving=false
         driving_body.hide()
+        _reset_driving_view()
         var location: Dictionary=residents.world.get("playerDistrict",{})
         if not location.is_empty():_sync_spawn(Vector2(float(location["x"]),float(location["z"])))
         return
+    var before:=walker.position
     walker.position=walker.position.move_toward(drive_goal,delta*12.0)
+    walker.rotation.y=lerp_angle(walker.rotation.y,drive_heading,minf(delta*5.0,1.0))
     driving_body.position=walker.position-Vector3(0,1.0,0)
     driving_body.rotation.y=walker.rotation.y
+    var measured:=before.distance_to(walker.position)*3.6/maxf(delta,0.001)
+    drive_speed=lerpf(drive_speed,measured,minf(delta*5.0,1.0))
+    var steering_input:=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
+    driving_body.update_instruments(drive_speed,steering_input,delta)
     _stream()
     drive_timer+=delta
     if drive_timer>=0.65:
