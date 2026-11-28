@@ -61,7 +61,7 @@ final class StaffingLife {
         var recruits=t.people.values().stream().filter(c->c.generationIndex>=firstNew&&eligible(t,c,s)).toList();
         Set<Integer> used=new HashSet<>();
         for(var r:ROLES){
-            long missing=r.target()-count(t,r);if(!funded(t,r))continue;
+            long missing=BusinessManagementLife.target(t,r)-count(t,r);if(!funded(t,r))continue;
             for(int i=0;i<missing;i++){
                 var c=recruits.stream().filter(x->!used.contains(x.generationIndex)&&(!x.employed||role(x.occupation)==null||count(t,role(x.occupation))>role(x.occupation).target())).findFirst().orElse(null);
                 if(c==null)break;
@@ -75,7 +75,7 @@ final class StaffingLife {
         int budget=4;
         for(var r:ROLES){
             if(budget==0)return;
-            if(!funded(t,r)||count(t,r)>=r.target())continue;
+            if(!funded(t,r)||count(t,r)>=BusinessManagementLife.target(t,r))continue;
             var c=t.people.values().stream().filter(x->!x.employed&&eligible(t,x,s)
                 &&EducationLife.get(t,x,EducationLife.subject(r.name()))>=r.skill()
                 &&(r.diploma()==null||EducationLife.get(t,x,"diploma-"+r.diploma())>0)

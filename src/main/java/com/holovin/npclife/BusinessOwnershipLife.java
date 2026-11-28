@@ -55,13 +55,13 @@ final class BusinessOwnershipLife {
     static void tick(TownLife.Town t,WorldState s){
         if(!StaffingLife.enabled(t)||s.minute!=390)return;
         for(String a:BusinessSolvencyLife.accounts(t))
-            if(owner(t,a)>0&&(!t.player.alive||owner(t,a)!=t.player.incarnation))t.industryStocks.put(key(a),0);
+            if(owner(t,a)>0&&(!t.player.alive||owner(t,a)!=t.player.incarnation)){t.industryStocks.put(key(a),0);BusinessManagementLife.clear(t,a);}
     }
-    record Firm(String account,boolean listed,boolean owned,int price,int capital,int cash,int wageDebt,int bankDebt){}
+    record Firm(String account,boolean listed,boolean owned,int price,int capital,int cash,int wageDebt,int bankDebt,BusinessManagementLife.View management){}
     static List<Firm> view(TownLife.Town t){
         if(!StaffingLife.enabled(t))return List.of();
         return BusinessSolvencyLife.accounts(t).stream().filter(a->listed(t,a)||yours(t,a))
             .map(a->new Firm(a,listed(t,a),yours(t,a),PRICE,capital(t,a),t.employerFunds.getOrDefault(a,0),
-                BusinessSolvencyLife.outstanding(t,a),BusinessCreditLife.get(t,a,"balance"))).toList();
+                BusinessSolvencyLife.outstanding(t,a),BusinessCreditLife.get(t,a,"balance"),yours(t,a)?BusinessManagementLife.view(t,a):null)).toList();
     }
 }

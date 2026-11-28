@@ -511,6 +511,7 @@ final class GeoProjection {
             if(BusinessOwnershipLife.canBuy(t,s,a))result.add(new Choice("firm:buy:"+a,"Acquire / Acquista "+a+" · €"+BusinessOwnershipLife.total(t,a)));
             if(BusinessOwnershipLife.canInvest(t,s,a))result.add(new Choice("firm:invest:"+a,"Invest / Investi "+a+" · €20"));
             if(BusinessOwnershipLife.canDividend(t,s,a))result.add(new Choice("firm:dividend:"+a,"Owner distribution / Preleva "+a+" · €20"));
+            for(var o:BusinessManagementLife.options(t,s,a))result.add(new Choice("firm:"+o.id()+":"+a,a+" · "+o.label()));
         }
         if(HomeInsuranceLife.canBuy(t,s))result.add(new Choice("home-insurance-buy","Home insurance / Assicurazione casa · €12 · 30 days"));
         if(HomeInsuranceLife.canCollect(t,s))result.add(new Choice("home-insurance-collect","Collect home compensation / Riscuoti indennizzo"));

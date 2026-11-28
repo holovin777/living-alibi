@@ -35,7 +35,7 @@ final class BusinessSolvencyLife {
         String marker="hour:"+c.id;
         if(get(t,a,marker)==FireServiceLife.now(s))return true;
         set(t,a,marker,FireServiceLife.now(s));
-        int due=wage(a),paid=Math.min(due,Math.max(0,t.employerFunds.getOrDefault(a,0)));
+        int due=BusinessManagementLife.wage(t,a),paid=Math.min(due,Math.max(0,t.employerFunds.getOrDefault(a,0)));
         t.employerFunds.merge(a,-paid,Integer::sum);
         c.money=Math.addExact(c.money,paid);
         if(paid<due)set(t,a,"debt:"+c.id,Math.addExact(debt(t,a,c),due-paid));
@@ -56,7 +56,7 @@ final class BusinessSolvencyLife {
         for(String a:accounts(t)){
             if(get(t,a,"day")>=s.day)continue;
             set(t,a,"day",s.day);settle(t,a);
-            boolean distressed=outstanding(t,a)>0||t.employerFunds.getOrDefault(a,0)<wage(a);
+            boolean distressed=outstanding(t,a)>0||t.employerFunds.getOrDefault(a,0)<BusinessManagementLife.wage(t,a);
             if(!distressed){set(t,a,"days",0);set(t,a,"suspended",0);continue;}
             int days=Math.addExact(get(t,a,"days"),1);set(t,a,"days",days);
             if(days>=GRACE_DAYS){

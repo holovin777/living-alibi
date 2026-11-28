@@ -989,7 +989,7 @@ public final class GameSession implements AutoCloseable {
                 case "buy" -> BusinessOwnershipLife.buy(copy,state,parts[2]);
                 case "invest" -> BusinessOwnershipLife.invest(copy,state,parts[2]);
                 case "dividend" -> BusinessOwnershipLife.dividend(copy,state,parts[2]);
-                default -> throw new IllegalArgumentException("Unknown firm action.");
+                default -> BusinessManagementLife.action(copy,state,parts[2],parts[1]);
             };
             apply(copy,15,message);return new GeoProjection.ActionResult(message,null);
         }
