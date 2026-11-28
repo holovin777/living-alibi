@@ -229,3 +229,5 @@ purchase, fuel and service choices. Choose an adjacent road with number keys
 while seated, then W/S, A/D and Space. Children cannot use the car system.
 The same fuel/condition rules apply; the legacy visitor remains inactive.
 Driving is still a short lane preview with a server-confirmed district arrival.
+
+The first real-map launch needs OpenStreetMap data. Wide mode downloads four tiles sequentially, trying the public Overpass fallback if a request fails. A valid cached map is reused offline; a failed first download never resets SQLite. `bash play.sh` opens the built-in town without a map download.

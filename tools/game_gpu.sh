@@ -34,6 +34,8 @@ configure_game_gpu() {
         if [[ "${__NV_PRIME_RENDER_OFFLOAD:-0}" == 1 ]]; then
             GODOT_COMMAND=(env "LIVING_ALIBI_SHADOWS=${LIVING_ALIBI_SHADOWS:-1}" "$GODOT")
             echo "Graphics: inherited NVIDIA PRIME request."
+        elif [[ -n "${DRI_PRIME:-}" && "${DRI_PRIME}" != 0 ]]; then
+            echo "Graphics: inherited Mesa DRI_PRIME=$DRI_PRIME request. Verify the Godot device."
         else
             echo "Graphics: system default GPU."
         fi

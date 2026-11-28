@@ -20,16 +20,31 @@ for arg in "$@"; do
 done
 MAP="data/vigevano"
 if [[ "$REGION" == wide ]]; then MAP="data/vigevano-wide"; fi
-NEEDS_IMPORT=false
-if [[ -s "$MAP.json" ]]; then
-    if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["schema"] == 2 and d.get("detail_version",0) == 8 and d.get("region") == sys.argv[2]' "$MAP.json" "$REGION" 2>/dev/null; then NEEDS_IMPORT=true; fi
-fi
-if [[ ! -s "$MAP.json" || "$NEEDS_IMPORT" == true || "$REFRESH" == true ]]; then
-    command -v python3 >/dev/null || { echo "Python 3 required."; exit 1; }
+command -v python3 >/dev/null || { echo "Python 3 required."; exit 1; }
+valid_map() {
+    [[ -s "$MAP.json" ]] && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["schema"] == 2 and d.get("detail_version",0) == 8 and d.get("region") == sys.argv[2] and d.get("chunks") and d.get("graph",{}).get("edges")' "$MAP.json" "$REGION" 2>/dev/null
+}
+if ! valid_map || [[ "$REFRESH" == true ]]; then
+    imported=false
     if [[ -s "$MAP.osm" && "$REFRESH" != true ]]; then
-        python3 tools/import_vigevano.py --region "$REGION" --input "$MAP.osm" --output "$MAP.json"
-    else
-        python3 tools/import_vigevano.py --region "$REGION" --input "$MAP.osm" --output "$MAP.json" --download
+        if python3 tools/import_vigevano.py --region "$REGION" --input "$MAP.osm" --output "$MAP.json"; then imported=true; fi
+    fi
+    if [[ "$imported" != true ]]; then
+        if python3 tools/import_vigevano.py --region "$REGION" --input "$MAP.osm" --output "$MAP.json" --download; then
+            imported=true
+        elif valid_map; then
+            echo "Map refresh unavailable; using the existing $REGION map." >&2
+            imported=true
+        elif [[ -s "$MAP.osm" ]] && python3 tools/import_vigevano.py --region "$REGION" --input "$MAP.osm" --output "$MAP.json"; then
+            echo "Using cached OSM data." >&2
+            imported=true
+        fi
+    fi
+    if [[ "$imported" != true ]] || ! valid_map; then
+        echo "Cannot load the $REGION map. No compatible cached map is available." >&2
+        echo "Retry later, or use bash play.sh for the built-in town (no OSM download)." >&2
+        echo "Your SQLite save has not been reset." >&2
+        exit 1
     fi
 fi
 if ! bash "$ROOT/tools/install-realistic-vehicles.sh" --auto; then

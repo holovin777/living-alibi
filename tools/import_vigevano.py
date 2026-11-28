@@ -4,6 +4,9 @@ import argparse
 import json
 import math
 from pathlib import Path
+import sys
+import tempfile
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -30,24 +33,79 @@ def project(lat, lon):
             round((ORIGIN[0]-lat)*111132, 2)]
 
 
-def download(path, bounds=BBOX):
+OVERPASS_ENDPOINTS = (
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+)
+
+
+def download_tile(bounds, directory):
     bbox = ",".join(map(str, bounds))
-    query = f'[out:xml][timeout:90];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});way["landuse"~"^(farmland|meadow|forest|orchard|vineyard|grass)$"]({bbox});way["natural"~"^(wood|grassland|water)$"]({bbox});way["leisure"="park"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox});node["highway"~"^(traffic_signals|crossing)$"]({bbox}););out body;>;out skel qt;'
-    req = urllib.request.Request("https://overpass-api.de/api/interpreter",
-                                 data=urllib.parse.urlencode({"data": query}).encode(),
-                                 headers={"User-Agent": "LivingAlibi/0.1 local OSM import"})
+    query = f'[out:xml][timeout:60];(way["building"]({bbox});way["highway"]({bbox});way["railway"]({bbox});way["waterway"~"^(river|canal|stream|ditch|drain)$"]({bbox});way["natural"="tree_row"]({bbox});way["landuse"~"^(farmland|meadow|forest|orchard|vineyard|grass)$"]({bbox});way["natural"~"^(wood|grassland|water)$"]({bbox});way["leisure"="park"]({bbox});node["natural"="tree"]({bbox});node["amenity"="bench"]({bbox});node["highway"~"^(traffic_signals|crossing)$"]({bbox}););out body;>;out skel qt;'
+    tmp = directory / "response.osm"
+    for endpoint in OVERPASS_ENDPOINTS:
+        req = urllib.request.Request(endpoint,
+                                     data=urllib.parse.urlencode({"data": query}).encode(),
+                                     headers={"User-Agent": "LivingAlibi/0.1 local OSM import"})
+        try:
+            print(f"Fetching OSM tile {bbox} from {endpoint}", flush=True)
+            with urllib.request.urlopen(req, timeout=80) as response, tmp.open("wb") as out:
+                while block := response.read(65536):
+                    out.write(block)
+            root = ET.parse(tmp).getroot()
+            if root.tag != "osm" or root.find("remark") is not None:
+                raise ValueError("Incomplete or invalid Overpass response")
+            return root
+        except (OSError, urllib.error.URLError, ET.ParseError, ValueError) as exc:
+            print(f"Overpass attempt failed: {exc}", file=sys.stderr, flush=True)
+        finally:
+            tmp.unlink(missing_ok=True)
+    raise RuntimeError(f"All Overpass servers failed for tile {bbox}")
+
+
+def tiles(bounds):
+    if bounds != WIDE_BBOX:
+        return [bounds]
+    south, west, north, east = bounds
+    mid_lat, mid_lon = (south+north)/2, (west+east)/2
+    return [(s, w, n, e) for s, n in ((south, mid_lat), (mid_lat, north))
+            for w, e in ((west, mid_lon), (mid_lon, east))]
+
+
+def merge_tiles(roots):
+    # Overpass can emit a tagged node in one tile and an untagged skeleton
+    # in another. Keep the richer duplicate; preserve full way references.
+    elements = {}
+    for root in roots:
+        for element in root:
+            if element.tag not in ("node", "way", "relation"):
+                continue
+            key = (element.tag, element.attrib["id"])
+            old = elements.get(key)
+            if old is None or len(element) > len(old):
+                elements[key] = element
+    if not any(kind == "way" for kind, _ in elements):
+        raise ValueError("Extract contains no ways")
+    result = ET.Element("osm", {"version": "0.6", "generator": "LivingAlibi"})
+    for kind in ("node", "way", "relation"):
+        result.extend(element for (tag, _), element in elements.items() if tag == kind)
+    return result
+
+
+def download(path, bounds=BBOX):
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    try:
-        with urllib.request.urlopen(req, timeout=120) as response, tmp.open("wb") as out:
-            while block := response.read(65536):
-                out.write(block)
-        root = ET.parse(tmp).getroot()
-        if root.tag != "osm" or root.find("remark") is not None or root.find("way") is None:
-            raise ValueError("Overpass returned an incomplete or invalid extract; old cache retained")
+    # Stage every tile before replacing the previous raw extract.
+    with tempfile.TemporaryDirectory(prefix="osm-", dir=path.parent) as work:
+        directory = Path(work)
+        regions = tiles(bounds)
+        roots = []
+        for index, tile in enumerate(regions, 1):
+            print(f"Map download: tile {index}/{len(regions)}", flush=True)
+            roots.append(download_tile(tile, directory))
+        merged = merge_tiles(roots)
+        tmp = directory / "merged.osm"
+        ET.ElementTree(merged).write(tmp, encoding="utf-8", xml_declaration=True)
         tmp.replace(path)
-    finally:
-        tmp.unlink(missing_ok=True)
 
 
 def height(tags):
@@ -309,9 +367,12 @@ def main():
     parser.add_argument("--download", action="store_true", help="Fetch the selected Vigevano extract once")
     parser.add_argument("--region", choices=REGIONS, default="central")
     args = parser.parse_args()
-    if args.download:
-        download(args.input, REGIONS[args.region])
-    result = convert(args.input, args.output, REGIONS[args.region], args.region)
+    try:
+        if args.download:
+            download(args.input, REGIONS[args.region])
+        result = convert(args.input, args.output, REGIONS[args.region], args.region)
+    except (OSError, ET.ParseError, ValueError, RuntimeError) as exc:
+        parser.exit(1, f"Map import failed: {exc}\n")
     print(f"Imported {result['counts']} across {len(result['chunks'])} chunks -> {args.output}")
 
 
