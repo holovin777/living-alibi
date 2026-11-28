@@ -17,6 +17,7 @@ final class BusinessSolvencyLife {
     private static int get(TownLife.Town t,String a,String f){return t.industryStocks.getOrDefault(key(a,f),0);}
     private static void set(TownLife.Town t,String a,String f,int n){t.industryStocks.put(key(a,f),n);}
     static int debt(TownLife.Town t,String a,TownLife.Citizen c){return get(t,a,"debt:"+c.id);}
+    static int distressDays(TownLife.Town t,String a){return get(t,a,"days");}
     static boolean suspended(TownLife.Town t,String a){return StaffingLife.enabled(t)&&a!=null&&get(t,a,"suspended")>0;}
     static List<String> accounts(TownLife.Town t){
         var a=new TreeSet<String>();a.add("shop-assistant");a.add("machinist");

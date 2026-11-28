@@ -780,6 +780,7 @@ final class TownLife {
         ConstructionLife.tick(town,marco.day,marco.minute);
         FireRecoveryLife.tick(town,marco);
         HouseholdInsuranceLife.tick(town,marco);
+        BusinessCreditLife.tick(town,marco);
         BusinessLife.tick(town,marco,truth,observations);
         LogisticsLife.tick(town,marco,truth,observations);
         SecondFleetLife.tick(town,marco,truth,observations);

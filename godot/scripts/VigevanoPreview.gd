@@ -642,6 +642,14 @@ func _update_navigation() -> void:
         if str(world.get("jobId",""))=="firefighter":hud.text+="\nFire duty / Servizio: kit %s%% · %s" % [duty.get("gearCondition",0),"Assigned / In missione" if duty.get("assigned",false) else "Standby / Disponibile" if duty.get("standby",false) else "Off duty / Riposo"]
         for damaged in world.get("fireRecovery",[]):
             if str(damaged.get("id",""))==str(district.get("id","")):hud.text+="\nRestoration / Ripristino: %s%% · %s" % [damaged.get("condition",100),"Closed / Chiuso" if damaged.get("closed",false) else "Open / Aperto"]
+        var loans: Array=world.get("businessCredit",[])
+        if str(district.get("id",""))=="OFFICE" and not loans.is_empty():
+            var loan_balance:=0
+            var overdue:=0
+            for loan in loans:
+                loan_balance+=int(loan.get("balance",0))
+                if int(loan.get("missedDays",0))>0:overdue+=1
+            hud.text+="\nBusiness loans / Prestiti: €%s outstanding · %s overdue" % [loan_balance,overdue]
         var firms: Array=world.get("businessSolvency",[])
         if str(district.get("id","")) in ["OFFICE","FACTORY","MARKET"] and not firms.is_empty():
             var suspended_count:=0
